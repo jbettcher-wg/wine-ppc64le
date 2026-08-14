@@ -1,0 +1,480 @@
+#!/usr/bin/env python3
+"""
+spec2thunk -- generate an AMD64 "Wine builtin" thunk PE DLL.
+
+The generated DLL is never executed by the host CPU; it exists so that an
+x86-64 Windows PE guest can bind its imports to AMD64 code at a known,
+tabulated address.  A host-side dispatcher maps a trapping RIP back to an
+export index using the exported __wine_thunk_info structure:
+
+    struct {
+        uint32_t version;    /* = 3 */
+        uint32_t count;
+        uint32_t stubs_rva;
+        uint32_t stride;     /* = 16 */
+        uint32_t names_rva;  /* count x uint32 RVA -> NUL-terminated name  */
+        uint32_t sigs_rva;   /* count x uint32 signature descriptor        */
+        uint32_t trap_off;   /* byte offset of the trapping instruction
+                                within a stub: 3 for trap, 0 for direct    */
+    };
+
+A trapping RIP is stubs_rva + index*stride + trap_off -- NOT a clean multiple
+of the stride -- so the dispatcher can both recover the index and confirm the
+trap landed exactly on a published trap site.
+
+GUEST ARGUMENT REGISTERS AT THE TRAP.  x86-64 SYSCALL architecturally writes
+the address of the following instruction into RCX and RFLAGS into R11.  RCX is
+MS-x64's FIRST argument register, so a bare `0f 05` stub destroys arg0 before
+the host can see it.  The trap stub therefore rescues it first:
+
+        49 89 ca    mov r10, rcx      ; arg0 out of the way
+        0f 05       syscall           ; now free to clobber rcx/r11
+
+which puts the host-visible argument registers at:
+
+        arg0 -> R10 (rescued from RCX)   arg1 -> RDX
+        arg2 -> R8                       arg3 -> R9
+        arg4+ -> [RSP + 8 + i*8]  (past the return address and the 32-byte
+                                   shadow space)
+
+Signature descriptor bits:
+    0..7   number of integer/pointer arguments (0..16)
+    8      set if the function returns void
+    9..31  reserved, always 0
+
+SIGNATURES COME FROM WINE'S HEADERS, NOT FROM THE SPEC FILE.  The spec file's
+nargs / return-kind / header:line columns are ASSERTIONS: they are checked
+against what clang reads out of Wine's real headers (see wine_sig.py) and any
+mismatch is a hard failure.  A function whose shape is not representable --
+float or vector arguments, struct by value, varargs, a return wider than 64
+bits, or no declaration at all -- is REFUSED and listed, never described with
+a plausible-looking descriptor.
+
+A va_list ARGUMENT IS NOT REFUSED on this ABI pair -- it is one pointer-sized
+slot on both sides, measured, not assumed.  See the long note in wine_sig.py
+before changing that back.
+
+Spec file format (see kernel32.thunks):
+    DLL   kernel32.dll
+    <ExportName>  <imm32>  <nargs>  <int|void>  <header.h>:<line>
+Export order in the file IS the stub index order.
+
+The location column may name a Wine `.spec` file instead of a header, for the
+handful of exports Wine implements in C and exports from a .spec but declares
+in NO header (kernel32's delay-load entry points).  That path is a deliberate
+downgrade: a .spec pins the arity and the argument classes but carries no
+return type, so the <int|void> column becomes an unchecked human assertion and
+the entry is listed under a loud banner at generation time.  Use a header
+whenever one exists.
+
+BUILDING.  A module with a <name>.thunks file beside its <name>.spec gets an
+x86_64-windows/<name>.dll target, and "make" produces it like any other PE
+module -- see output_source_thunks() in tools/makedep.c.  "make install" puts
+it in $(libdir)/wine/x86_64-windows, which is already where the loader looks
+for a builtin of that machine, so nothing needs staging into a prefix by hand.
+
+RUNNING IT DIRECTLY, to regenerate or extend one module after Wine is built or
+installed, without a full rebuild:
+
+    tools/spec2thunk/spec2thunk --spec dlls/kernel32/kernel32.thunks \
+        --body=trap --out <builddir>/dlls/kernel32/x86_64-windows/kernel32.dll
+
+From the top of the build directory that is enough.  From anywhere else add
+--wine-generated <builddir>/include: the widl-generated headers the signature
+oracle needs are build output, not source, and the tool says so rather than
+letting clang fail confusingly.
+
+THE EXPORT LIST IS SOURCE FOR NOW AND SHOULD NOT STAY THAT WAY.  A .thunks file
+says which exports to emit, plus an assertion about each signature that the
+oracle re-derives and checks.  But the list itself already exists: it is the
+module's own .spec file, which nobody maintains by hand.  The end state is for
+this tool to read <name>.spec directly and for the .thunks files to disappear.
+Nothing in the format or the build rule depends on them being hand-written --
+the rule is keyed on the module, not on the file.
+
+"""
+
+import argparse
+import os
+import shutil
+import tempfile
+import struct
+import subprocess
+import sys
+
+import wine_sig
+from wine_sig import Refused
+
+STRIDE = 16
+INFO_VERSION = 3
+# Byte offset of the trapping instruction inside a stub, per body mode.
+TRAP_OFF = {'direct': 0, 'trap': 3}
+BUILTIN_SIG = b"Wine builtin DLL\x00"   # 17 bytes, must sit at file offset 0x40
+SIG_OFF = 0x40
+IMAGE_BASE = 0x180000000
+
+
+# --------------------------------------------------------------------------
+# spec file
+# --------------------------------------------------------------------------
+
+def parse_spec(path):
+    dll = None
+    exports = []          # (name, imm32, nargs, returns_void, header, line)
+    with open(path) as f:
+        for lineno, raw in enumerate(f, 1):
+            line = raw.split('#', 1)[0].strip()
+            if not line:
+                continue
+            parts = line.split()
+            if parts[0].upper() == 'DLL':
+                if len(parts) != 2:
+                    sys.exit("%s:%d: DLL needs exactly one argument" % (path, lineno))
+                dll = parts[1]
+                continue
+            if len(parts) != 5:
+                sys.exit("%s:%d: expected "
+                         "'<Name> <imm32> <nargs> <int|void> <header.h>:<line>'"
+                         % (path, lineno))
+            name, imm, nargs, retkind, loc = parts
+            try:
+                imm = int(imm, 0)
+                nargs = int(nargs, 0)
+            except ValueError:
+                sys.exit("%s:%d: bad number" % (path, lineno))
+            if not (0 <= imm <= 0xffffffff):
+                sys.exit("%s:%d: imm32 out of range" % (path, lineno))
+            if retkind not in ('int', 'void'):
+                sys.exit("%s:%d: return kind must be 'int' or 'void'" % (path, lineno))
+            if ':' not in loc:
+                sys.exit("%s:%d: location must be <header.h>:<line>" % (path, lineno))
+            hdr, _, ln = loc.rpartition(':')
+            try:
+                ln = int(ln)
+            except ValueError:
+                sys.exit("%s:%d: bad line number in %r" % (path, lineno, loc))
+            exports.append(dict(name=name, imm=imm, nargs=nargs,
+                                returns_void=(retkind == 'void'),
+                                header=hdr, line=ln))
+    if dll is None:
+        sys.exit("%s: no 'DLL <name>' line" % path)
+    if not exports:
+        sys.exit("%s: no exports" % path)
+    names = [e['name'] for e in exports]
+    if len(set(names)) != len(names):
+        sys.exit("%s: duplicate export names" % path)
+    if '__wine_thunk_info' in names:
+        sys.exit("%s: __wine_thunk_info is reserved" % path)
+    return dll, exports
+
+
+# --------------------------------------------------------------------------
+# signature resolution against Wine's headers
+# --------------------------------------------------------------------------
+
+def resolve_signatures(exports, headers, specs=None):
+    """-> (accepted, refused).  Hard-fails on a spec/header disagreement.
+
+    The location column normally names a Wine HEADER, and that entry is fully
+    verified by clang.  If it names a Wine `.spec` file instead, the entry
+    takes the last-resort arity oracle (wine_sig.WineSpecs) -- read the class
+    docstring, in particular that its <int|void> column is an UNCHECKED human
+    assertion.  Those entries are collected and reported separately.
+    """
+    accepted, refused, mismatches = [], [], []
+    for e in exports:
+        try:
+            if e['header'].endswith('.spec'):
+                if specs is None:
+                    raise Refused('.spec location cited but no source tree given')
+                sig = specs.signature(e['name'], e['header'], e['line'],
+                                      e['returns_void'])
+            else:
+                sig = headers.signature(e['name'])
+        except Refused as ex:
+            refused.append((e['name'], ex.reason))
+            continue
+        # The spec's numbers are claims. Wine's headers are the fact.
+        if sig['nargs'] != e['nargs']:
+            mismatches.append("%s: spec says %d args, %s:%s says %d  [%s]"
+                              % (e['name'], e['nargs'], sig['header'],
+                                 sig['line'], sig['nargs'], sig['qualtype']))
+        if sig['returns_void'] != e['returns_void']:
+            mismatches.append("%s: spec says returns %s, %s:%s says %s  [%s]"
+                              % (e['name'], 'void' if e['returns_void'] else 'int',
+                                 sig['header'], sig['line'],
+                                 'void' if sig['returns_void'] else 'int',
+                                 sig['qualtype']))
+        if (sig['header'] != e['header']) or (sig['line'] != e['line']):
+            mismatches.append("%s: spec cites %s:%d, clang found it at %s:%s"
+                              % (e['name'], e['header'], e['line'],
+                                 sig['header'], sig['line']))
+        e = dict(e)
+        e['sig'] = sig
+        e['desc'] = wine_sig.descriptor(sig)
+        accepted.append(e)
+    if mismatches:
+        sys.exit("FATAL: spec disagrees with Wine's headers:\n  "
+                 + "\n  ".join(mismatches))
+    return accepted, refused
+
+
+# --------------------------------------------------------------------------
+# stub bodies
+# --------------------------------------------------------------------------
+
+def stub_bytes(mode, imm):
+    """Exactly STRIDE bytes of x86-64 for one stub slot."""
+    if mode == 'direct':
+        body = b'\xb8' + struct.pack('<I', imm) + b'\xc3'     # mov eax,imm32; ret
+    elif mode == 'trap':
+        # mov r10, rcx  -- SYSCALL clobbers RCX, which is MS-x64 arg0.
+        body = b'\x49\x89\xca' + b'\x0f\x05'                 # mov r10,rcx; syscall
+    else:
+        raise ValueError(mode)
+    assert len(body) <= STRIDE
+    return body + b'\xcc' * (STRIDE - len(body))              # int3 padding
+
+
+# --------------------------------------------------------------------------
+# assembly / def emission
+# --------------------------------------------------------------------------
+
+def emit_asm(dll, exports, mode):
+    out = []
+    a = out.append
+    a('\t# generated by tools/spec2thunk -- do not edit')
+    a('\t# dll=%s body=%s stride=%d info_version=%d trap_off=%d'
+      % (dll, mode, STRIDE, INFO_VERSION, TRAP_OFF[mode]))
+    a('')
+    a('\t.section\t.thunk,"xr"')
+    a('\t.balign\t%d' % STRIDE)
+    a('wine_thunk_stubs:')
+    for i, e in enumerate(exports):
+        b = stub_bytes(mode, e['imm'])
+        a('\t.globl\twine_thunk_stub_%d' % i)
+        a('wine_thunk_stub_%d:\t\t# %s' % (i, e['name']))
+        a('\t.byte\t' + ','.join('0x%02X' % c for c in b))
+    a('wine_thunk_stubs_end:')
+    a('')
+    a('\t.section\t.rdata,"dr"')
+    a('\t.balign\t8')
+    a('\t.globl\twine_thunk_info')
+    a('wine_thunk_info:')
+    a('\t.long\t%d\t\t\t# version' % INFO_VERSION)
+    a('\t.long\t%d\t\t\t# count' % len(exports))
+    a('\t.long\twine_thunk_stub_0@IMGREL\t# stubs_rva')
+    a('\t.long\t%d\t\t\t# stride' % STRIDE)
+    a('\t.long\twine_thunk_namev@IMGREL\t# names_rva')
+    a('\t.long\twine_thunk_sigv@IMGREL\t# sigs_rva')
+    a('\t.long\t%d\t\t\t# trap_off' % TRAP_OFF[mode])
+    a('')
+    a('\t.balign\t4')
+    a('wine_thunk_namev:')
+    for i in range(len(exports)):
+        a('\t.long\twine_thunk_name_%d@IMGREL' % i)
+    a('')
+    a('\t.balign\t4')
+    a('wine_thunk_sigv:')
+    for i, e in enumerate(exports):
+        s = e['sig']
+        a('\t.long\t0x%08X\t# %d %-24s %d arg%s, returns %s  (%s:%s)'
+          % (e['desc'], i, e['name'], s['nargs'], '' if s['nargs'] == 1 else 's',
+             'void' if s['returns_void'] else s['ret'], s['header'], s['line']))
+    a('')
+    for i, e in enumerate(exports):
+        a('wine_thunk_name_%d:' % i)
+        a('\t.asciz\t"%s"' % e['name'])
+    a('')
+    a('\t# One absolute 64-bit pointer so the linker is forced to emit a')
+    a('\t# base relocation directory; Wine relocates this image.')
+    a('\t.balign\t8')
+    a('wine_thunk_self:')
+    a('\t.quad\twine_thunk_info')
+    a('')
+    return '\n'.join(out) + '\n'
+
+
+def emit_def(dll, exports):
+    out = ['LIBRARY %s' % dll, 'EXPORTS']
+    for i, e in enumerate(exports):
+        out.append('    %s = wine_thunk_stub_%d' % (e['name'], i))
+    out.append('    __wine_thunk_info = wine_thunk_info DATA')
+    return '\n'.join(out) + '\n'
+
+
+# --------------------------------------------------------------------------
+# post-link patch: stamp the Wine builtin signature at file offset 0x40
+# --------------------------------------------------------------------------
+
+def stamp_builtin_signature(path):
+    with open(path, 'rb') as f:
+        data = bytearray(f.read())
+    if data[:2] != b'MZ':
+        sys.exit("%s: not an MZ image" % path)
+    e_lfanew = struct.unpack_from('<I', data, 0x3c)[0]
+    end = SIG_OFF + len(BUILTIN_SIG)          # 0x51
+    if e_lfanew <= end:
+        sys.exit("FATAL: e_lfanew=0x%x <= 0x%x; stamping the builtin "
+                 "signature would clobber the PE header. Refusing."
+                 % (e_lfanew, end))
+    if len(data) < 96:
+        sys.exit("FATAL: image shorter than sizeof(IMAGE_DOS_HEADER)+32")
+    data[SIG_OFF:end] = BUILTIN_SIG
+    with open(path, 'wb') as f:
+        f.write(data)
+    return e_lfanew
+
+
+# --------------------------------------------------------------------------
+
+def run(cmd, verbose):
+    if verbose:
+        print('+ ' + ' '.join(cmd), file=sys.stderr)
+    r = subprocess.run(cmd)
+    if r.returncode != 0:
+        sys.exit("command failed (%d): %s" % (r.returncode, ' '.join(cmd)))
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--spec', required=True)
+    ap.add_argument('--body', choices=('direct', 'trap'), required=True)
+    # No default output location: a build tool writes where it is told.  The
+    # old defaults pointed into one developer's /tmp and were pure scaffolding.
+    ap.add_argument('--outdir', default=None,
+                    help='directory for the generated DLL; --out overrides it')
+    ap.add_argument('--builddir', default=None,
+                    help='directory for intermediates; defaults to a temporary '
+                         'one that is removed unless -v is given')
+    ap.add_argument('--out', help='explicit output path (overrides --outdir)')
+    ap.add_argument('--implib',
+                    help='import library path; defaults to '
+                         '<outdir>/<stem>.import.lib, which is deliberately '
+                         'mode-independent -- the export names are identical '
+                         'in direct and trap mode, so one implib serves both')
+    ap.add_argument('--wine-include', default=wine_sig.DEFAULT_INCLUDE)
+    ap.add_argument('--wine-generated', default=None,
+                    help='directory holding the widl-generated headers; '
+                         'defaults to ./include then the source include dir')
+    ap.add_argument('--wine-source', default=wine_sig.DEFAULT_SOURCE,
+                    help='Wine source root, used only to resolve a .spec '
+                         'location column (last-resort arity oracle)')
+    ap.add_argument('--strict', action='store_true',
+                    help='treat any refused export as a fatal error')
+    ap.add_argument('--clang', default='clang')
+    ap.add_argument('--linker', default='lld-link')
+    ap.add_argument('--crt-define', action='append', default=None,
+                    metavar='-D...',
+                    help='override the CRT-selection define(s) the header '
+                         'oracle probes with.  By default these are derived '
+                         'from the DLL line of the spec by Wine\'s own rule '
+                         '(tools/makedep.c get_crt_define): ucrt* -> -D_UCRT, '
+                         'msvcrt -> -D_MSVCR_VER=0, msvcr<N> -> '
+                         '-D_MSVCR_VER=<N>, anything else -> nothing.  Pass '
+                         'this only to probe a runtime other than the one the '
+                         'spec names; an empty string means "no define".')
+    ap.add_argument('-v', '--verbose', action='store_true')
+    args = ap.parse_args()
+
+    dll, spec_exports = parse_spec(args.spec)
+    stem = os.path.splitext(os.path.basename(dll))[0]
+    tmp_builddir = None
+    if not args.builddir:
+        tmp_builddir = args.builddir = tempfile.mkdtemp(prefix='spec2thunk-')
+    os.makedirs(args.builddir, exist_ok=True)
+
+    # Wine's include/msvcrt/ headers describe several different C runtimes out
+    # of one tree and default to UCRT's; reading msvcrt.dll's surface in that
+    # default mode hides __getmainargs/__set_app_type and substitutes UCRT
+    # inline forwarders for the real import declarations of vprintf/_vsnprintf.
+    # See the crt_defines_for_dll() banner in wine_sig.py.
+    crt_defines = ([d for d in args.crt_define if d]
+                   if args.crt_define is not None
+                   else wine_sig.crt_defines_for_dll(dll))
+
+    if not args.wine_generated:
+        args.wine_generated = wine_sig.find_generated_include()
+        if not args.wine_generated:
+            ap.error('cannot find the widl-generated headers (wtypes.h); run '
+                     'from the top of the build directory or pass '
+                     '--wine-generated <builddir>/include')
+    headers = wine_sig.WineHeaders(args.wine_include, args.wine_generated,
+                                   clang=args.clang,
+                                   workdir=os.path.join(args.builddir, 'sigprobe'),
+                                   defines=crt_defines)
+    headers.sanity()
+    specs = wine_sig.WineSpecs(args.wine_source)
+    exports, refused = resolve_signatures(spec_exports, headers, specs)
+
+    unverified = [e for e in exports if e['sig'].get('return_verified') is False]
+    if unverified:
+        print("!! RETURN KIND NOT VERIFIED -- Wine declares these in no header,")
+        print("!! so arity came from the cited .spec line but the int/void")
+        print("!! column below is a HUMAN ASSERTION taken from Wine's C source:")
+        for e in unverified:
+            print("  %-28s %-4s  %s:%d" % (e['name'],
+                                           'void' if e['returns_void'] else 'int',
+                                           e['sig']['header'], e['sig']['line']))
+        print()
+
+    if refused:
+        print("REFUSED EXPORTS (not emitted -- shape is not representable):")
+        for name, why in refused:
+            print("  %-28s %s" % (name, why))
+        print()
+        if args.strict:
+            sys.exit("FATAL: --strict and %d export(s) refused" % len(refused))
+    if not exports:
+        sys.exit("FATAL: every export was refused; nothing to emit")
+
+    if not args.out and not args.outdir:
+        ap.error('one of --out or --outdir is required')
+    outpath = args.out or os.path.join(args.outdir, dll)
+    os.makedirs(os.path.dirname(outpath), exist_ok=True)
+
+    tag = '%s.%s' % (stem, args.body)
+    spath = os.path.join(args.builddir, tag + '.s')
+    opath = os.path.join(args.builddir, tag + '.o')
+    dpath = os.path.join(args.builddir, tag + '.def')
+    lpath = args.implib or os.path.join(args.outdir or os.path.dirname(outpath),
+                                       stem + '.import.lib')
+    os.makedirs(os.path.dirname(lpath), exist_ok=True)
+
+    with open(spath, 'w') as f:
+        f.write(emit_asm(dll, exports, args.body))
+    with open(dpath, 'w') as f:
+        f.write(emit_def(dll, exports))
+
+    run([args.clang, '-target', 'x86_64-windows-gnu', '-c', spath, '-o', opath],
+        args.verbose)
+    run([args.linker, '/dll', '/machine:x64', '/nodefaultlib', '/noentry',
+         '/opt:noref', '/base:0x%x' % IMAGE_BASE, '/def:' + dpath,
+         '/implib:' + lpath, '/out:' + outpath, opath],
+        args.verbose)
+
+    e_lfanew = stamp_builtin_signature(outpath)
+
+    print("dll          : %s" % dll)
+    print("body mode    : %s" % args.body)
+    print("crt mode     : %s" % (' '.join(crt_defines) if crt_defines
+                                 else '(none -- not a C runtime module)'))
+    print("info version : %d" % INFO_VERSION)
+    print("output       : %s" % outpath)
+    print("e_lfanew     : 0x%x (signature stamped at 0x%02x..0x%02x)"
+          % (e_lfanew, SIG_OFF, SIG_OFF + len(BUILTIN_SIG) - 1))
+    print("trap_off     : %d" % TRAP_OFF[args.body])
+    print("import lib   : %s" % lpath)
+    if tmp_builddir and not args.verbose:
+        shutil.rmtree(tmp_builddir, ignore_errors=True)
+
+    print("idx  export                     imm32       desc    args ret   from")
+    for i, e in enumerate(exports):
+        s = e['sig']
+        print("%3d  %-26s 0x%08X  0x%05X %4d %-5s %s:%s"
+              % (i, e['name'], e['imm'], e['desc'], s['nargs'],
+                 'void' if s['returns_void'] else 'int', s['header'], s['line']))
+
+
+if __name__ == '__main__':
+    main()

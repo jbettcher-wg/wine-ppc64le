@@ -1,0 +1,260 @@
+# AMD64 thunk export spec -- msvcrt.dll.
+#
+# ---------------------------------------------------------------------------
+# GUEST ARGUMENT REGISTERS AT THE TRAP  (load-bearing ABI -- read this)
+# ---------------------------------------------------------------------------
+# x86-64 SYSCALL architecturally writes the address of the following
+# instruction into RCX and RFLAGS into R11.  RCX is MS-x64's FIRST argument
+# register, so a bare `0f 05` stub destroys arg0 before the host can see it.
+# (Measured: a trap in GetModuleHandleW arrived with rcx = RIP+2.)  Each trap
+# stub therefore rescues arg0 first, the same trick the Linux syscall ABI uses
+# for its own 4th argument:
+#
+#       49 89 ca    mov r10, rcx      ; arg0 out of the way
+#       0f 05       syscall           ; free to clobber rcx/r11
+#       cc ...      int3 padding to the 16-byte stride
+#
+# So the host-visible argument registers are:
+#
+#       arg0 -> R10   (rescued from RCX -- NOT RCX)
+#       arg1 -> RDX
+#       arg2 -> R8
+#       arg3 -> R9
+#       arg4+ -> [RSP + 8 + i*8]   (past the pushed return address and the
+#                                   32-byte shadow space)
+#
+# The trapping RIP is  stubs_rva + index*stride + trap_off  (trap_off = 3 in
+# trap mode, 0 in direct mode), published in __wine_thunk_info -- do not infer
+# it from the stub bytes.
+#
+# Every export here is __cdecl, not __stdcall.  That changes nothing above:
+# MS-x64 has a single calling convention and the decoration is inert on this
+# target.  It does mean the CALLER cleans the stack, so a wrong nargs is not
+# self-correcting the way a stdcall mistake would be -- it just corrupts the
+# guest's stack.  Hence the same rule as kernel32.thunks and ucrtbase.thunks:
+# the columns are assertions checked against Wine's headers, never hand-tuned
+# to pass.
+#
+# ---------------------------------------------------------------------------
+# ORDER IS ABI ONCE USED.  This file is new as of this commit, so the order
+# below was chosen freely (descending corpus demand, with the two .spec-sourced
+# entries sorted to the end).  From the first time the host-side dispatcher
+# consumes it, the order below IS the stub index order and is part of the ABI:
+# APPEND ONLY, NEVER REORDER, NEVER DELETE A LINE.
+#
+# Columns:
+#   <ExportName>  <imm32 returned by --body=direct>  <nargs>  <int|void>  <header>:<line>
+#
+# The last three columns are ASSERTIONS, not inputs.  gen_thunk_pe.py re-reads
+# each declaration out of Wine's own headers with clang and hard-fails if this
+# file disagrees.
+#
+# ---------------------------------------------------------------------------
+# WHY THESE TWENTY, AND WHERE THE CLIFF IS
+# ---------------------------------------------------------------------------
+# Computed over guest-corpus/imports (447 binaries, *surface* lists excluded;
+# 339 of them import msvcrt.dll, 354 distinct msvcrt symbols demanded):
+#
+#     339  strrchr strlen strcmp _vsnprintf _strdup __iob_func
+#     338  strncmp exit atoi _onexit _initterm __set_app_type __getmainargs
+#     337  printf
+#     336  vprintf setvbuf fflush _isatty _get_osfhandle _fileno
+#     335  puts
+#     ---- CLIFF: 335 -> 258, a 77-binary drop ----
+#     258  strcpy
+#     255  free
+#     251  strchr
+#     249  getenv fwrite
+#     ...
+#
+# The >=300 cut is not a judgement call here: the distribution is bimodal.
+# Twenty-one symbols sit in a 335..339 band (they are the mingw/MSVC CRT
+# startup-and-console preamble that essentially every corpus binary links),
+# then nothing at all until 258.  Any threshold anywhere in 259..335 selects
+# exactly the same twenty-one names.
+#
+# Twenty of the twenty-one are below.  printf is REFUSED -- see the banner
+# immediately following.
+#
+# ---------------------------------------------------------------------------
+# REFUSED: printf  -- 337 corpus binaries import it.
+# ---------------------------------------------------------------------------
+#     @ varargs printf(str)                     dlls/msvcrt/msvcrt.spec:1398
+#     __WINE_CRT_PRINTF_ATTR(1,2) int printf(const char *, ...)
+#                                               include/msvcrt/stdio.h
+# A true `...` variadic CANNOT be thunked by a fixed-arity stub.  The stub has
+# no way to learn how many arguments the caller pushed, so it cannot copy them
+# to the host, and it cannot synthesise a va_list to hand to a native vprintf
+# either.  A guessed arity here would silently read past the guest's argument
+# frame on every short call and corrupt the guest's stack on every long one.
+# So it is left out, deliberately, and 337 corpus binaries will fail to bind
+# msvcrt.dll!printf until a real variadic path exists.
+#
+# BE CLEAR ABOUT WHAT THAT COSTS.  Counted, not estimated: of the 339 corpus
+# binaries that import msvcrt, the number whose ENTIRE msvcrt import list is
+# satisfied by the twenty exports below is ZERO -- printf alone blocks 337 of
+# them, and the two that do not want printf want something else.  Emit printf
+# and it becomes 45.  Add the next tier (strcpy, free, strchr, getenv, fwrite,
+# strcspn, memmove, wcslen -- the 207..258 band just under the cliff) and it
+# becomes 92; add the 82..154 band (memset, memcmp, memcpy, malloc, wcscmp,
+# calloc) and it becomes 166.  This batch is a necessary floor, not a
+# sufficient one, and printf is the single largest blocker in the corpus.
+#
+# NOTE THE ASYMMETRY, IT IS NOT AN INCONSISTENCY: _vsnprintf and vprintf ARE
+# emitted below.  Those two are NOT variadic -- the caller has already built
+# the va_list and passes it as one ordinary pointer.  ppc64le ELFv2 va_list is
+# a plain pointer into a flat 8-byte-slot save area, structurally identical to
+# MS-x64's `char *`; measured end-to-end on the AC922, a guest-built va_list
+# was consumed correctly by native ppc64 formatting.  See the long va_list note
+# in wine_sig.py.  Refusing them too would be cargo-culting the printf rule.
+#
+# The fix for printf is a variadic forwarding path (host reads the guest's
+# format string, counts and classifies the conversions, and rebuilds the
+# argument list), NOT a fake arity in this file.
+#
+# ---------------------------------------------------------------------------
+# KNOWN LATENT HAZARD -- host->guest callback.  READ BEFORE DEBUGGING A CRASH
+# HERE.
+# ---------------------------------------------------------------------------
+# Three entries below traffic in GUEST function pointers that something later
+# CALLS.  We have no host->guest call path, so the native ppc64 implementation
+# would branch into x86-64 bytes and die.  They are emitted anyway because in
+# the common case nothing is ever registered and all three are no-ops:
+#
+#   _initterm(_PVFV *first, _PVFV *last)   -- walks an array of guest function
+#       pointers and calls each non-NULL entry IMMEDIATELY.  Harmless when the
+#       initialiser array is empty (first == last), which is the usual case for
+#       a C program with no static constructors.  A guest with real C++ static
+#       constructors WILL crash here.
+#
+#   _onexit(_onexit_t func)                -- STORES a guest function pointer;
+#       the call is deferred to exit() time.  Registration itself is safe; the
+#       bomb goes off later.
+#
+#   exit(int)                              -- and this is where it goes off.
+#       msvcrt's exit() runs the registered atexit/_onexit table.  If _onexit
+#       above ever succeeded in recording a guest pointer, exit() calls it.
+#       exit() is safe only for as long as that table stays empty.
+#
+# The descriptors for all three are CORRECT.  The missing piece is the callback
+# path, not the arity -- do not "fix" this by editing the columns.
+#
+# __getmainargs was checked for the same shape and DOES NOT HAVE IT.  Its
+# signature (dlls/msvcrt/data.c:497) is
+#     int CDECL __getmainargs(int *argc, char ***argv, char ***envp,
+#                             int expand_wildcards, _startupinfo *new_mode)
+# -- five pointer/int arguments, no function pointer anywhere.  It only WRITES
+# out-parameters, and guest and host share one address space, so the argv/envp
+# vectors it allocates need no marshalling.  It is ordinary.
+#
+DLL msvcrt.dll
+
+# ---------------------------------------------------------------------------
+# indices 0..17: the core, in descending corpus demand.  Every entry in this
+# file -- these eighteen and the two at 18..19 -- is clang-verified against
+# Wine's include/msvcrt/, return kind included; nothing here uses the .spec
+# arity fallback.  The dlls/msvcrt/msvcrt.spec lines in the trailing comments
+# are an independent corroboration of the arity only; the header is the source
+# of record.
+#
+# The oracle reads these headers in MSVCRT's CRT mode (-D_MSVCR_VER=0), which
+# is not the default -- see the banner at indices 18..19 before touching any
+# header:line below.
+# ---------------------------------------------------------------------------
+
+# indices 0..5: demanded by 339 of 339 msvcrt-importing binaries.
+strrchr             0x00000C01  2  int   string.h:65     # spec:1451 (str long)
+# strlen/strncmp return/take size_t, which is 64-bit here and fits one slot.
+strlen              0x00000C02  1  int   string.h:57     # spec:1443 (str)
+strcmp              0x00000C03  2  int   string.h:51     # spec:1435 (str str)
+# _vsnprintf(char *, size_t, const char *, va_list) -- FOUR ordinary slots.
+# NOT a variadic: the caller built the va_list.  See the printf banner above.
+_vsnprintf          0x00000C04  4  int   stdio.h:720     # spec:1072 (ptr long str ptr)
+# _strdup carries __WINE_MALLOC, which clang prints as a MacroQualifiedType and
+# which does not affect the declared shape.  Same situation as kernel32's
+# HeapAlloc.  The returned buffer is host heap that the guest frees with
+# msvcrt's own free() -- not yet in this file, see the append list.
+_strdup             0x00000C05  1  int   string.h:26     # spec:960 (str)
+# __iob_func() -> &__iob[0], the base of the real FILE array.  The header
+# declares it only in the non-__i386__ branch (stdio.h:66, inside
+# `#ifndef _STDIO_DEFINED / # ifdef __i386__ ... # else`); our target is
+# x86_64-windows, so that IS the branch that applies.  The FILE* it returns is
+# HOST memory the guest only ever hands back to other CRT exports (_fileno,
+# fflush, setvbuf); nothing dereferences it guest-side.
+__iob_func          0x00000C06  0  int   stdio.h:66      # spec:219 ()
+
+# indices 6..10: demanded by 338.  (__set_app_type and __getmainargs are also
+# 338 but have no header declaration; they sort to the end.)
+strncmp             0x00000C07  3  int   string.h:60     # spec:1446 (str str long)
+# exit is declared noreturn.  The descriptor has no bit for that and does not
+# need one -- the host implementation simply never returns to the dispatcher.
+# HAZARD: exit runs the _onexit/atexit table.  See the banner above.
+exit                0x00000C08  1  void  stdlib.h:223    # spec:1286 (long)
+atoi                0x00000C09  1  int   stdlib.h:214    # spec:1266 (str)
+# HAZARD: stores a GUEST function pointer.  See the banner above.
+_onexit             0x00000C0A  1  int   stdlib.h:186    # spec:847 (ptr)
+# HAZARD: CALLS guest function pointers immediately.  See the banner above.
+_initterm           0x00000C0B  2  void  corecrt_startup.h:29  # spec:561 (ptr ptr)
+
+# indices 11..16: demanded by 336.
+# vprintf is stdio.h:711, `_ACRTIMP int __cdecl vprintf(const char*,va_list)`
+# -- the real msvcrt import declaration.  stdio.h ALSO carries a UCRT-only
+# `static inline` vprintf at :409 that forwards to __stdio_common_vfprintf;
+# that one is not this DLL's export and is the wrong branch for us.  Probing
+# in the correct CRT mode is what keeps them apart -- see the banner at indices
+# 18..19.  Like _vsnprintf, NOT a variadic: the caller built the va_list.
+vprintf             0x00000C0C  2  int   stdio.h:711     # spec:1486 (str ptr)
+setvbuf             0x00000C0D  4  int   stdio.h:148     # spec:1419 (ptr str long long)
+fflush              0x00000C0E  1  int   stdio.h:119     # spec:1294 (ptr)
+_isatty             0x00000C0F  1  int   corecrt_io.h:127  # spec:570 (long)
+# _get_osfhandle returns intptr_t -- 64 bits here, fits the single-slot return.
+# The value is a real host HANDLE and needs no translation: same address space,
+# and handles are opaque scalars on both sides.
+_get_osfhandle      0x00000C10  1  int   corecrt_io.h:126  # spec:514 (long)
+_fileno             0x00000C11  1  int   stdio.h:80      # spec:444 (ptr)
+
+# index 17: demanded by 335 -- the last name above the cliff.
+puts                0x00000C12  1  int   stdio.h:143     # spec:1402 (str)
+
+# ---------------------------------------------------------------------------
+# indices 18..19: the two msvcrt-only startup entry points.  BOTH ARE FULLY
+# CLANG-VERIFIED, including their return kind -- no .spec fallback is used
+# anywhere in this file.  That is only true because the header oracle probes
+# in msvcrt's CRT mode; getting there needed a tooling fix, recorded here
+# because it is exactly the kind of thing that silently regresses:
+#
+#   Wine's include/msvcrt/ headers describe several C runtimes out of one tree
+#   and DEFAULT TO UCRT's (corecrt.h:48 sets _MSVCR_VER to 140, :52 turns that
+#   into _UCRT).  Both names below are declared only under `#ifndef _UCRT`
+#   (corecrt_startup.h:51 and :53+70), so in the default mode the oracle
+#   reported "no declaration found in Wine headers" for them -- a tooling gap
+#   presented as an ABI fact -- and vprintf/_vsnprintf resolved to UCRT
+#   `static inline` forwarders instead of msvcrt's real import declarations.
+#   gen_thunk_pe.py now derives the CRT define from this file's DLL line using
+#   Wine's own rule (tools/makedep.c get_crt_define), so msvcrt.dll is probed
+#   with -D_MSVCR_VER=0.  See crt_defines_for_dll() in wine_sig.py.
+#
+#   __getmainargs   corecrt_startup.h:51
+#       _ACRTIMP int __cdecl __getmainargs(int *, char ***, char ***, int, int *)
+#       Note Wine's own C definition (dlls/msvcrt/data.c:497) spells the last
+#       parameter `_startupinfo *` where the header says `int *`.  Harmless
+#       here and not worth an upstream patch: _startupinfo is a one-int struct
+#       (corecrt_startup.h), and either spelling is one pointer slot.  Cited to
+#       the header because the header is the source of record; msvcrt.spec:217
+#       `@ cdecl __getmainargs(ptr ptr ptr long ptr)` corroborates the arity.
+#
+#   __set_app_type  corecrt_startup.h:70
+#       Declared under a macro rename: corecrt_startup.h:53 does
+#       `#define _set_app_type __set_app_type`, and :70 then declares
+#       `_ACRTIMP void __cdecl _set_app_type(_crt_app_type)`, which after
+#       preprocessing IS the declaration of __set_app_type.  Line 70 is the
+#       expansion location clang reports, so that is what is cited.
+#       check_thunk_pe.py's independent regex scanner had to learn to follow
+#       object-like `#define ALIAS REAL` renames to see this; before that it
+#       reported a name Wine does declare as undeclared.  _crt_app_type is a
+#       plain enum, so it is integer class and passes in a register.
+#       msvcrt.spec:284 `@ cdecl __set_app_type(long)` corroborates the arity,
+#       and dlls/msvcrt/data.c:587 `void CDECL __set_app_type(int)` the void.
+# ---------------------------------------------------------------------------
+__set_app_type      0x00000C13  1  void  corecrt_startup.h:70
+__getmainargs       0x00000C14  5  int   corecrt_startup.h:51

@@ -1,0 +1,75 @@
+# AMD64 thunk export spec -- ntdll.dll.
+#
+# ---------------------------------------------------------------------------
+# GUEST ARGUMENT REGISTERS AT THE TRAP  (load-bearing ABI -- read this)
+# ---------------------------------------------------------------------------
+# x86-64 SYSCALL architecturally writes the address of the following
+# instruction into RCX and RFLAGS into R11.  RCX is MS-x64's FIRST argument
+# register, so a bare `0f 05` stub destroys arg0 before the host can see it.
+# (Measured: a trap in GetModuleHandleW arrived with rcx = RIP+2.)  Each trap
+# stub therefore rescues arg0 first, the same trick the Linux syscall ABI uses
+# for its own 4th argument:
+#
+#       49 89 ca    mov r10, rcx      ; arg0 out of the way
+#       0f 05       syscall           ; free to clobber rcx/r11
+#       cc ...      int3 padding to the 16-byte stride
+#
+# So the host-visible argument registers are:
+#
+#       arg0 -> R10   (rescued from RCX -- NOT RCX)
+#       arg1 -> RDX
+#       arg2 -> R8
+#       arg3 -> R9
+#       arg4+ -> [RSP + 8 + i*8]   (past the pushed return address and the
+#                                   32-byte shadow space)
+#
+# The trapping RIP is  stubs_rva + index*stride + trap_off  (trap_off = 3 in
+# trap mode, 0 in direct mode), published in __wine_thunk_info -- do not infer
+# it from the stub bytes.
+#
+# ---------------------------------------------------------------------------
+# THIS IS NOT THE REAL NTDLL.  It carries only the handful of ntdll exports a
+# guest binds directly, and specifically NOT the Nt*/Zw* syscall surface: a
+# guest reaching those goes through the syscall dispatcher, not through a
+# thunk export.  Everything here is an ordinary C entry point ntdll happens to
+# export because msvcrt-era code links against it.
+#
+# ---------------------------------------------------------------------------
+# The order of the export lines below IS the stub index order and is part of
+# the ABI: the host-side dispatcher uses it.  Append only, never reorder.
+#
+# Columns:
+#   <ExportName>  <imm32 returned by --body=direct>  <nargs>  <int|void>  <header>:<line>
+#
+# The last three columns are ASSERTIONS, not inputs.  gen_thunk_pe.py re-reads
+# each declaration out of Wine's own headers with clang and hard-fails if this
+# file disagrees.
+#
+DLL ntdll.dll
+
+# index 0: the one ntdll import of programs/winepath.exe
+# (guest-corpus/imports/programs/winepath.txt).
+#
+#   static inline int __cdecl _vsnprintf(char *buffer, size_t size,
+#                                        const char *format, va_list args)
+#
+# Two things about this entry are worth writing down:
+#
+#   * The declaration is `static inline` in include/msvcrt/stdio.h -- Wine
+#     inlines it onto __stdio_common_vsprintf for its own builds -- but ntdll
+#     also exports a real out-of-line one (dlls/ntdll/ntdll.spec:1628,
+#     `@ cdecl -norelay _vsnprintf(ptr long str ptr)`), which is what the
+#     guest's import binds to and what the host will call.  The header is
+#     still the signature oracle; the .spec line only corroborates arity 4.
+#     A `static inline` declaration is invisible to a scan that expects an
+#     _ACRTIMP/WINAPI-decorated prototype, so an independent checker may not
+#     find it -- that is a checker limitation, not a missing declaration.
+#
+#   * The va_list is ONE ordinary pointer argument, not a varargs tail.  This
+#     function is not itself variadic: its caller already built the list.
+#     MS-x64 va_list is `char *` into a flat run of 8-byte slots and ppc64le
+#     ELFv2 va_list is likewise a bare pointer into the parameter save area.
+#     Measured end-to-end on the AC922, not assumed -- a guest-built MS-x64
+#     va_list formatted "%d-%s-%d" into "4242-AB-77" through native ppc64
+#     code.  See the long note in wine_sig.py before changing this back.
+_vsnprintf                    0x00000C01  4  int   stdio.h:180

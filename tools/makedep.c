@@ -168,6 +168,7 @@ static const char *sfnt2fon;
 static const char *winebuild;
 static const char *winegcc;
 static const char *elf2pe;
+static const char *spec2thunk;
 static const char *widl;
 static const char *wrc;
 static const char *wmc;
@@ -3490,6 +3491,42 @@ static void output_source_nls( struct makefile *make, struct incl_file *source, 
 
 
 /*******************************************************************
+ *         output_source_thunks
+ *
+ * A .thunks file lists which of this module's exports a guest x86-64 image may
+ * import.  tools/spec2thunk turns it into an AMD64 PE whose every export is a
+ * stub that traps into the host, where ntdll marshals MS-x64 to ELFv2 and calls
+ * the identically-named export of this same module built for the native arch.
+ * See get_machine_system_dir() in dlls/ntdll/loader.c for how one is served to
+ * a guest image.
+ *
+ * The guest arch is deliberately NOT a configured PE arch: none of Wine is
+ * built for it, and putting it in PE_ARCHS would try to.  So the output dir is
+ * named directly rather than coming from arch_pe_dirs[], and the target is
+ * registered against the native arch purely so that "make" builds it.
+ *
+ * The export list is source for now.  It should end up derived from the
+ * module's own .spec file, at which point these files go away -- nothing here
+ * depends on them being hand-written.
+ */
+static void output_source_thunks( struct makefile *make, struct incl_file *source, const char *obj )
+{
+    const char *dir = "x86_64-windows";
+    const char *name = strmake( "%s/%s.dll", dir, obj );
+
+    if (make->disabled[0]) return;
+
+    strarray_add( &make->all_targets[0], name );
+    install_data_file( make, strmake( "%s.dll", obj ), name,
+                       strmake( "$(libdir)/wine/%s", dir ), NULL );
+
+    output( "%s: %s %s\n", obj_dir_path( make, name ), source->filename, spec2thunk );
+    output( "\t%s%s --spec %s --body=trap --out $@\n",
+            cmd_prefix( "THUNK" ), spec2thunk, source->filename );
+}
+
+
+/*******************************************************************
  *         output_source_dat
  */
 static void output_source_dat( struct makefile *make, struct incl_file *source, const char *obj )
@@ -3957,6 +3994,7 @@ static const struct
     { "in", output_source_in },
     { "x", output_source_x },
     { "spec", output_source_spec },
+    { "thunks", output_source_thunks },
     { "xml", output_source_xml },
     { "winmd", output_source_winmd },
     { "asm", output_source_nasm },
@@ -5220,6 +5258,7 @@ int main( int argc, char *argv[] )
     winebuild   = tools_path( "winebuild" );
     winegcc     = tools_path( "winegcc" );
     elf2pe      = root_src_dir_path( "tools/elf2pe" );
+    spec2thunk  = root_src_dir_path( "tools/spec2thunk/spec2thunk" );
     widl        = tools_path( "widl" );
     wrc         = tools_path( "wrc" );
     wmc         = tools_path( "wmc" );
