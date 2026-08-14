@@ -1,0 +1,328 @@
+diff --git a/demos/demo_xcb.h b/demos/demo_xcb.h
+index f296721d..08e7684a 100644
+--- a/demos/demo_xcb.h
++++ b/demos/demo_xcb.h
+@@ -19,6 +19,7 @@
+ 
+ #define VK_USE_PLATFORM_XCB_KHR
+ #include <vkd3d.h>
++#include <vkd3d_native_event_handle.h>
+ #include <vkd3d_sonames.h>
+ #include <vkd3d_swapchain_factory.h>
+ #include <xcb/xcb_event.h>
+@@ -443,7 +444,11 @@ static inline struct demo_swapchain *demo_swapchain_create(ID3D12CommandQueue *c
+     if (FAILED(IDXGIVkSwapChain_SetFrameLatency(swapchain->swapchain, 2)))
+         goto fail;
+ 
+-    swapchain->fd = (int)(intptr_t)IDXGIVkSwapChain_GetFrameLatencyEvent(swapchain->swapchain);
++    /* Tagged now -- see include/vkd3d_native_event_handle.h. The bare cast
++     * that used to be here could not tell a real handle from any other
++     * pointer-sized value, and lost fd 0 outright. */
++    swapchain->fd = vkd3d_native_event_handle_fd(
++            IDXGIVkSwapChain_GetFrameLatencyEvent(swapchain->swapchain));
+     acquire_eventfd(swapchain->fd);
+ 
+     if (factory)
+@@ -494,17 +499,18 @@ static inline void demo_swapchain_present(struct demo_swapchain *swapchain)
+ 
+ static inline HANDLE demo_create_event(void)
+ {
+-    return (HANDLE)(intptr_t)eventfd(0, EFD_CLOEXEC);
++    int fd = eventfd(0, EFD_CLOEXEC);
++    return fd >= 0 ? vkd3d_native_event_handle_from_fd(fd) : NULL;
+ }
+ 
+ static inline unsigned int demo_wait_event(HANDLE event)
+ {
+     uint64_t v;
+-    read((int)(intptr_t)event, &v, sizeof(v));
++    read(vkd3d_native_event_handle_fd(event), &v, sizeof(v));
+     return 0;
+ }
+ 
+ static inline void demo_destroy_event(HANDLE event)
+ {
+-    close((int)(intptr_t)event);
++    close(vkd3d_native_event_handle_fd(event));
+ }
+diff --git a/include/private/vkd3d_native_sync_handle.h b/include/private/vkd3d_native_sync_handle.h
+index 1e5eb62c..c7548ab8 100644
+--- a/include/private/vkd3d_native_sync_handle.h
++++ b/include/private/vkd3d_native_sync_handle.h
+@@ -32,6 +32,7 @@ typedef struct { HANDLE handle; enum vkd3d_native_sync_handle_type type; } vkd3d
+ #include <sys/eventfd.h>
+ #include <sys/poll.h>
+ #include <unistd.h>
++#include "vkd3d_native_event_handle.h"   /* include/, not include/private/ */
+ typedef struct { int fd; enum vkd3d_native_sync_handle_type type; } vkd3d_native_sync_handle;
+ #endif
+ 
+@@ -52,11 +53,37 @@ static inline vkd3d_native_sync_handle vkd3d_native_sync_handle_wrap(HANDLE os_h
+     handle.handle = os_handle;
+     handle.type = os_handle ? type : VKD3D_NATIVE_SYNC_HANDLE_TYPE_NONE;
+ #else
+-    handle.fd = (int)(intptr_t)os_handle;
+-    /* Treats FD 0 as invalid. FD 0 is technically valid since it's STDIN by default.
+-     * Calling code can ensure that FD 0 is not used for an eventfd()
+-     * through dup() and then closing fd 0. */
+-    handle.type = os_handle && handle.fd >= 0 ? type : VKD3D_NATIVE_SYNC_HANDLE_TYPE_NONE;
++    /* A TAGGED eventfd handle, not a bare fd cast. See
++     * include/private/vkd3d_native_event_handle.h for the argument; the short
++     * version is that a bare fd is indistinguishable from any other HANDLE
++     * this function is handed, so an untranslated guest handle arriving here
++     * would become an eight-byte write(2) into an unrelated descriptor. The
++     * same tag and layout are used by this port's DXVK, so a handle minted by
++     * one library is understood by the other.
++     *
++     * An untagged non-NULL handle is REFUSED rather than guessed at. Callers
++     * that legitimately pass something else pass NULL -- the blocking/latch
++     * path in vkd3d_waiting_event_signal and the MULTI_ANY case in
++     * d3d12_device_SetEventOnMultipleFenceCompletion both do -- and NULL is
++     * not tagged, so it lands on the same NONE it always did.
++     *
++     * fd 0 is now a perfectly good event: the tagged handle for it is not
++     * zero. Upstream's note about stdin, and the dup() dances it required in
++     * GetFrameLatencyEvent and in tests/d3d12_crosstest.h, are gone with it. */
++    if (vkd3d_native_event_handle_is_tagged(os_handle))
++    {
++        handle.fd = vkd3d_native_event_handle_fd(os_handle);
++        handle.type = handle.fd >= 0 ? type : VKD3D_NATIVE_SYNC_HANDLE_TYPE_NONE;
++    }
++    else
++    {
++        if (os_handle)
++            ERR("Refusing untagged event handle %p; it is not a "
++                "vkd3d_native_event_handle_from_fd() value and writing to it "
++                "as an fd would corrupt an unrelated descriptor.\n", os_handle);
++        handle.fd = -1;
++        handle.type = VKD3D_NATIVE_SYNC_HANDLE_TYPE_NONE;
++    }
+ #endif
+     return handle;
+ }
+diff --git a/include/vkd3d_native_event_handle.h b/include/vkd3d_native_event_handle.h
+new file mode 100644
+index 00000000..2698b1f2
+--- /dev/null
++++ b/include/vkd3d_native_event_handle.h
+@@ -0,0 +1,116 @@
++/*
++ * Tagged eventfd handles for the native (non-Windows) build.
++ *
++ * Copyright 2026 the powerpc64le-ports project
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
++ */
++
++/*
++ * WHY THIS EXISTS
++ * ---------------
++ * On the non-Windows build a `HANDLE` that crosses vkd3d's public boundary as
++ * an event is an eventfd, and upstream encodes it as a bare cast:
++ *
++ *     handle.fd = (int)(intptr_t)os_handle;                 (wrap)
++ *     return (HANDLE)(intptr_t)fd;                          (GetFrameLatencyEvent)
++ *
++ * That has two consequences this port cannot live with.
++ *
++ *  1. A bare fd is indistinguishable from every other HANDLE the library is
++ *     handed. In this port a D3D12 caller may be an emulated x86-64 PE reached
++ *     across a FEX thunk, where HANDLE crosses as an untranslated 8-byte
++ *     scalar: what arrives is a *Wine* handle, a small integer with no host
++ *     meaning and squarely inside the range of live fd numbers. Wrapping it
++ *     bare turns `SetEventOnCompletion(fence, v, (HANDLE)0x2c)` into
++ *     `write(44, &one, 8)` -- eight bytes injected into whatever file or
++ *     socket the process has open at fd 44, silently. Tagging turns that into
++ *     a refusal.
++ *
++ *  2. It carries an fd-0 hazard that upstream documents and then works around
++ *     in every caller. `vkd3d_native_sync_handle_wrap` treats fd 0 as invalid
++ *     ("FD 0 is technically valid since it's STDIN by default. Calling code
++ *     can ensure that FD 0 is not used for an eventfd() through dup() and then
++ *     closing fd 0"), and `dxgi_vk_swap_chain_GetFrameLatencyEvent` and
++ *     `tests/d3d12_crosstest.h` each carry their own dup() dance for it. A
++ *     tagged handle for fd 0 is not zero, so the hazard and all three
++ *     workarounds go away.
++ *
++ * THE SAME TAG AS DXVK
++ * --------------------
++ * The layout here is byte-identical to
++ * `dxvk-ppc64le/src/include/native/windows/dxvk_native_event.h` (that project's
++ * `dxvk-patches/0003`) and to `dxvk-ppc64le/thunk/runtime/dxvk_guest_event.h`,
++ * so a handle minted by either library is understood by the other. That
++ * matters because both are reached from the same emulated guest through the
++ * same boundary, and a port where the two graphics stacks disagree about what
++ * a HANDLE is has simply moved the bug.
++ *
++ * The three copies exist because the three are built independently. They are
++ * only safe because disagreement is a build failure:
++ * `vkd3d-ppc64le/probes/tagged_handle_probe.c` and
++ * `dxvk-ppc64le/probes/guest_event_translate.cpp` each include two of them and
++ * assert equality, and both probes are in their projects' gates.
++ *
++ * The tag occupies bits 63..32. It cannot collide with a Linux user-space
++ * pointer (below 2^48), nor with a 32-bit Wine handle. A tagged value is not a
++ * canonical address either, so code that mistakes one for a pointer faults
++ * loudly rather than reading garbage.
++ */
++
++/*
++ * THIS IS A PUBLIC HEADER, deliberately. The tagged handle is what a caller of
++ * ID3D12Fence::SetEventOnCompletion or IDXGIVkSwapChain::GetFrameLatencyEvent
++ * must produce and consume on the native path, so it cannot live under
++ * include/private/ -- the demos are built with vkd3d_public_includes only
++ * (demos/meson.build), and so is every real external consumer. Upstream's
++ * bare-fd convention was public too; it was simply never written down.
++ *
++ * Include it after vkd3d_windows.h, which is where HANDLE comes from.
++ */
++#ifndef __VKD3D_NATIVE_EVENT_HANDLE_H
++#define __VKD3D_NATIVE_EVENT_HANDLE_H
++
++#ifndef _WIN32
++
++#include <stdbool.h>
++#include <stdint.h>
++
++/* 'EVFD', in bits 63..32. */
++#define VKD3D_NATIVE_EVENT_TAG   0x4556464400000000ull
++#define VKD3D_NATIVE_EVENT_MASK  0xffffffff00000000ull
++
++/* fd -> HANDLE. Valid for any fd in [0, INT32_MAX]; the result is never NULL,
++ * so fd 0 survives every `if (handle)` test a caller may perform. */
++static inline HANDLE vkd3d_native_event_handle_from_fd(int fd)
++{
++    return (HANDLE)(uintptr_t)(VKD3D_NATIVE_EVENT_TAG | (uint64_t)(uint32_t)fd);
++}
++
++/* Is this HANDLE one of ours? Cheap, and it never dereferences. */
++static inline bool vkd3d_native_event_handle_is_tagged(HANDLE handle)
++{
++    return (((uint64_t)(uintptr_t)handle) & VKD3D_NATIVE_EVENT_MASK) == VKD3D_NATIVE_EVENT_TAG;
++}
++
++/* HANDLE -> fd. Only meaningful when vkd3d_native_event_handle_is_tagged(). */
++static inline int vkd3d_native_event_handle_fd(HANDLE handle)
++{
++    return (int)(int32_t)(uint32_t)(uint64_t)(uintptr_t)handle;
++}
++
++#endif /* !_WIN32 */
++
++#endif /* __VKD3D_NATIVE_EVENT_HANDLE_H */
+diff --git a/libs/vkd3d/swapchain.c b/libs/vkd3d/swapchain.c
+index 5f2e9355..4e14ef55 100644
+--- a/libs/vkd3d/swapchain.c
++++ b/libs/vkd3d/swapchain.c
+@@ -739,15 +739,23 @@ static HANDLE STDMETHODCALLTYPE dxgi_vk_swap_chain_GetFrameLatencyEvent(IDXGIVkS
+         return NULL;
+     }
+ #else
+-    /* Ensure that we don't return fd 0 which would confuse the caller. */
++    /* Tagged, so the caller can tell this HANDLE apart from every other one it
++     * holds, and so that fd 0 is usable.
++     *
++     * This also removes a defect. The old fd-0 workaround was
++     *     fd = dup(fd); close(fd);
++     * which duplicates fd 0, closes the duplicate, and then returns the number
++     * of the descriptor it has just closed -- while leaking fd 0 itself. The
++     * caller got a HANDLE naming a closed fd, so its very first wait failed
++     * with EBADF. It only ever ran when an eventfd landed on fd 0, which is
++     * why it survived. A tagged fd 0 is not NULL, so there is nothing left to
++     * step around and the whole branch goes.
++     *
++     * The dup() itself stays. The caller owns what it is handed and closes it,
++     * and this swapchain keeps using its own. */
+     fd = dup(swapchain->frame_latency_event.fd);
+-    if (fd == 0)
+-    {
+-        fd = dup(fd);
+-        close(fd);
+-    }
+ 
+-    duplicated_handle = fd >= 0 ? (HANDLE)(intptr_t)fd : NULL;
++    duplicated_handle = fd >= 0 ? vkd3d_native_event_handle_from_fd(fd) : NULL;
+ #endif
+ 
+     return duplicated_handle;
+diff --git a/tests/d3d12_crosstest.h b/tests/d3d12_crosstest.h
+index 6d921a3d..14e0e68d 100644
+--- a/tests/d3d12_crosstest.h
++++ b/tests/d3d12_crosstest.h
+@@ -54,6 +54,9 @@
+ #include <unistd.h>
+ #include <sys/poll.h>
+ #include <sys/eventfd.h>
++/* The tests speak the same tagged-HANDLE convention the library now requires;
++ * an untagged fd is refused by vkd3d_native_sync_handle_wrap(). */
++#include "vkd3d_native_event_handle.h"
+ #endif
+ 
+ #include "d3d12_test_utils.h"
+@@ -108,28 +111,25 @@ static inline void destroy_event(HANDLE event)
+ 
+ static inline HANDLE create_event(void)
+ {
+-    HANDLE handle;
+     int fd;
+ 
+     fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+     if (fd < 0)
+         return NULL;
+ 
+-    /* No way this should happen unless stdin is closed for some reason ...
+-     * When casting to a HANDLE null will be considered no handle. */
+-    if (fd == 0)
+-    {
+-        fd = dup(0);
+-        close(0);
+-    }
+-
+-    handle = (HANDLE)(intptr_t)fd;
+-    return handle;
++    /* Tagged, which is what vkd3d_native_sync_handle_wrap() now requires --
++     * see include/private/vkd3d_native_event_handle.h. The fd-0 dance that
++     * used to be here is gone with the hazard: a tagged fd 0 is not NULL, so
++     * "stdin happens to be closed" is no longer a reason to lose an event.
++     * (The old code was also wrong when it fired -- it dup()'d fd 0 and then
++     * closed fd 0's *duplicate* number, leaving the test using a descriptor it
++     * had just released.) */
++    return vkd3d_native_event_handle_from_fd(fd);
+ }
+ 
+ static inline unsigned int wait_event(HANDLE event, unsigned int milliseconds)
+ {
+-    int fd = (int)(intptr_t)event;
++    int fd = vkd3d_native_event_handle_fd(event);
+     struct pollfd pfd;
+     uint64_t dummy;
+     int timeout;
+@@ -157,14 +157,14 @@ static inline unsigned int wait_event(HANDLE event, unsigned int milliseconds)
+ 
+ static inline void signal_event(HANDLE event)
+ {
+-    int fd = (int)(intptr_t)event;
++    int fd = vkd3d_native_event_handle_fd(event);
+     const uint64_t value = 1;
+     write(fd, &value, sizeof(value));
+ }
+ 
+ static inline void destroy_event(HANDLE event)
+ {
+-    close((int)(intptr_t)event);
++    close(vkd3d_native_event_handle_fd(event));
+ }
+ #endif
+ 
