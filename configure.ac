@@ -379,7 +379,7 @@ AS_VAR_SET_IF([enable_archs],
      for arch
      do
          case $arch in
-           i386|x86_64|arm|aarch64|arm64ec) cross_archs="$cross_archs $arch" ;;
+           i386|x86_64|arm|aarch64|arm64ec|ppc64) cross_archs="$cross_archs $arch" ;;
            no|none) PE_ARCHS=none ;;
            *) AC_MSG_ERROR([Unknown cross-compilation architecture '$arch']) ;;
          esac
@@ -388,6 +388,10 @@ AS_VAR_SET_IF([enable_archs],
      case $HOST_ARCH-$host_os in
        unknown-*) PE_ARCHS=none ;;
        *-mingw32*) AS_VAR_SET(${HOST_ARCH}_CC,$CC) ;;
+       dnl ppc64 needs no mingw: its PE modules are built with the native
+       dnl toolchain and translated from ELF afterwards (see below), so
+       dnl --without-mingw must not switch them off.
+       ppc64-*) ;;
        x86_64-darwin*|arm-*|aarch64-*|*-cygwin*) AS_VAR_IF([with_mingw],[no],
                  [AC_MSG_ERROR([The --without-mingw option is not supported on $HOST_ARCH-$host_os.])]) ;;
        *) AS_VAR_IF([with_mingw],[no],[cross_archs=""],
@@ -396,6 +400,28 @@ Use the --without-mingw option if you really want a non-PE build."]) ;;
      esac])
 
 AS_VAR_IF([PE_ARCHS],[none],[cross_archs=])
+
+dnl **** Architectures with no PE toolchain at all ****
+dnl
+dnl No compiler on earth targets ppc64 PE/COFF, and no Microsoft ABI has ever
+dnl been specified for PowerPC64.  Such an arch is still a PE arch here: its
+dnl modules are compiled and linked by the *native* ELF toolchain exactly as
+dnl the native arch builds its builtins, and the linked shared object is then
+dnl translated into a PE32+ image by tools/elf2pe.  So it must skip every cross
+dnl compiler probe below (there is nothing to probe) and inherit the native
+dnl flags, which are not known until much later in this file.
+
+AC_SUBST(TRANSLATED_ARCHS,"")
+AC_SUBST(SO_BUILTIN_SUBDIRS,"")
+wine_pe_archs=
+for arch in $cross_archs
+do
+  case $arch in
+    ppc64) TRANSLATED_ARCHS="$TRANSLATED_ARCHS $arch" ;;
+    *)     wine_pe_archs="$wine_pe_archs $arch" ;;
+  esac
+done
+cross_archs=$wine_pe_archs
 
 saved_CC=$CC
 saved_CXX=$CXX
@@ -2444,10 +2470,77 @@ case $host_cpu in
   *arm*)            WINE_CHECK_DEFINE([__arm__]) ;;
 esac
 
+dnl *** Set up the architectures that have no PE toolchain ***
+dnl
+dnl These inherit the native compiler and its final flags verbatim: a module of
+dnl such an arch is an ordinary ELF builtin until tools/elf2pe rewrites the
+dnl linked shared object into a PE32+ image (makedep emits that step).  Nothing
+dnl above may have been probed for them, hence this runs after every native
+dnl flag check.  Anything that cannot be expressed as a PE image at all stays a
+dnl .so builtin and is named in SO_BUILTIN_SUBDIRS.
+
+for wine_arch in $TRANSLATED_ARCHS
+do
+    AS_VAR_SET([${wine_arch}_CC],[$CC])
+    AS_VAR_SET([${wine_arch}_CXX],[$CXX])
+    AS_VAR_SET([${wine_arch}_CFLAGS],[$CFLAGS])
+    AS_VAR_SET([${wine_arch}_CXXFLAGS],[$CXXFLAGS])
+    AS_VAR_SET([${wine_arch}_LDFLAGS],[$LDFLAGS])
+    AS_VAR_SET([${wine_arch}_EXTRACFLAGS],[$EXTRACFLAGS])
+    AS_VAR_SET([${wine_arch}_EXTRACXXFLAGS],[$EXTRACXXFLAGS])
+    AS_VAR_SET([${wine_arch}_TARGET],[$host])
+    AS_VAR_SET([${wine_arch}_STRIP],[$STRIP])
+    dnl the PE image carries the ELF module's dwarf, there is nothing to split out
+    AS_VAR_SET([${wine_arch}_DEBUG],[])
+    dnl delay imports go through winebuild's ELF delay-load stubs, as natively
+    AS_VAR_SET([${wine_arch}_DELAYLOADFLAG],["-Wl,-delayload,"])
+    AS_VAR_APPEND([PE_ARCHS],[" $wine_arch"])
+    dnl compiler-rt is only ever linked into real PE images (winegcc adds it in
+    dnl PE mode); a translated arch links as ELF and uses libgcc as the native
+    dnl arch does, so it stays off exactly as it is on a non-PE build.  C++ is
+    dnl likewise left off (enable_cplusplus is untouched): the native g++ does
+    dnl not compile Wine's msvcrt C++ headers, so libs/c++ never built here
+    dnl before this arch existed either.
+    enable_compiler_rt=${enable_compiler_rt:-no}
+    case $wine_arch in
+      dnl ntdll's PE side owns the only PT_TLS in the tree (the TEB lives in an
+      dnl initial-exec thread-local, since ppc64 has no register to steal for
+      dnl it).  A PE image has nowhere to put a static TLS block, so ntdll is
+      dnl the one module that must stay an ELF builtin; the unix loader already
+      dnl falls back to ntdll.dll.so when the PE is missing.
+      ppc64) SO_BUILTIN_SUBDIRS="$SO_BUILTIN_SUBDIRS dlls/ntdll" ;;
+    esac
+done
+
 dnl *** Check for modules to disable by default
 
 enable_vcruntime140_1=${enable_vcruntime140_1:-x86_64,arm64ec}
 
+dnl The four lists below name the arch that *hosts* the emulator, not the arch
+dnl being emulated, so ppc64 would belong in wow64/wow64win and not in the two
+dnl CPU-backend modules.  It is deliberately absent from all four anyway.
+dnl Measured on the AC922, compiling each source standalone with the ppc64 PE
+dnl flags the build uses:
+dnl   dlls/wow64win  all 3 sources compile clean for ppc64.
+dnl   dlls/wow64     7 of 8 compile clean; syscall.c does not.  raise_exception,
+dnl                  wow64_syscall and cpu_simulate (and their unwind handlers)
+dnl                  have an __aarch64__ arm and an x86-64 #else, and ppc64
+dnl                  falls into the #else: 83 assembler errors, x86-64 opcodes
+dnl                  plus .seh_stackalloc/.seh_endprologue/.seh_handler, which
+dnl                  no PowerPC assembler implements.  ppc64 needs its own arm,
+dnl                  and it cannot be a transliteration -- this port has no PE
+dnl                  unwind format at all, so the .seh_handler mechanism those
+dnl                  three rely on has to be replaced, not ported.
+dnl   dlls/wow64cpu  fails in C, not asm (context->SegCs et al).  It is x86-64
+dnl                  segment-switching code; a ppc64 host needs a different
+dnl                  backend DLL, not this one built for ppc64.
+dnl   dlls/xtajit64  the arm64ec x86-64 emulator; not ours.
+dnl Enabling wow64win alone would build a module whose only consumer is
+dnl wow64.dll, so it would be dead weight.  Beyond the build, an amd64 guest on
+dnl a ppc64 host is same-bitness, and dlls/ntdll/unix/env.c sets WowTebOffset
+dnl only for a 32-bit main image -- so nothing in this group is reached for such
+dnl a guest whatever is built.  Turning these on is downstream of deciding how a
+dnl same-bitness guest is hosted, not a prerequisite for it.
 if test -n "$PE_ARCHS"
 then
     enable_wow64=${enable_wow64:-aarch64,x86_64}
