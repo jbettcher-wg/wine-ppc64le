@@ -687,8 +687,25 @@ static NTSTATUS context_to_server( struct context_data *to, USHORT to_machine, c
         return STATUS_SUCCESS;
     }
 
+    /* Emulated pairs.  Unlike AMD64<->I386 or ARM64<->ARMNT, where the narrow
+     * machine's registers really are a window onto the wide one's, there is no
+     * correspondence at all here: the guest's registers live in the emulator,
+     * not in this thread.  So the conversion is a no-op that reports success,
+     * leaving to->flags at 0 from the memset above -- the server is told "no
+     * registers for that machine", which is true, rather than being handed the
+     * host's registers relabelled.  Filling the guest context is the CPU
+     * backend's job.  ARM64/I386 is upstream's; POWERPC64/AMD64 is ours.
+     *
+     * Both orderings of each pair are needed.  contexts_to_server() reaches
+     * (native, wow) through its "native_machine != main_image_info.Machine"
+     * arm, and set_thread_context() reaches (wow, native) when a caller passes
+     * an explicit machine.  Note the ppc64 pair is same-bitness, so the
+     * WowTebOffset-gated paths are not what brings it here -- only
+     * main_image_info.Machine differing from native_machine is. */
     case MAKELONG( IMAGE_FILE_MACHINE_ARM64, IMAGE_FILE_MACHINE_I386 ):
     case MAKELONG( IMAGE_FILE_MACHINE_I386, IMAGE_FILE_MACHINE_ARM64 ):
+    case MAKELONG( IMAGE_FILE_MACHINE_POWERPC64, IMAGE_FILE_MACHINE_AMD64 ):
+    case MAKELONG( IMAGE_FILE_MACHINE_AMD64, IMAGE_FILE_MACHINE_POWERPC64 ):
         return STATUS_SUCCESS;
 
     default:
@@ -1178,8 +1195,18 @@ static NTSTATUS context_from_server( void *dst, const struct context_data *from,
         return STATUS_SUCCESS;
     }
 
+    /* See the matching arm in context_to_server().  Nothing is written to dst,
+     * so ContextFlags is left exactly as the caller set it and no bit is
+     * claimed to have been filled -- which is what stops the PPC64 DWORD64
+     * ContextFlags from mattering here: it is never touched.  The hazard, and
+     * it is upstream's too, is that dst is left untouched while the caller is
+     * told SUCCESS; get_thread_context()'s "no context blocks at all" guard
+     * does not fire, because a block did come back, just for the other machine.
+     * The CPU backend has to be the one that fills the guest context. */
     case MAKELONG( IMAGE_FILE_MACHINE_ARM64, IMAGE_FILE_MACHINE_I386 ):
     case MAKELONG( IMAGE_FILE_MACHINE_I386, IMAGE_FILE_MACHINE_ARM64 ):
+    case MAKELONG( IMAGE_FILE_MACHINE_POWERPC64, IMAGE_FILE_MACHINE_AMD64 ):
+    case MAKELONG( IMAGE_FILE_MACHINE_AMD64, IMAGE_FILE_MACHINE_POWERPC64 ):
         return STATUS_SUCCESS;
 
     default:
