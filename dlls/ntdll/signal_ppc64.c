@@ -968,12 +968,45 @@ void __cdecl NTDLL_longjmp( _JUMP_BUFFER *buf, int retval )
 
 
 /***********************************************************************
+ *           thread_start_is_guest_code
+ *
+ * TRUE when the thread entry point lies inside an image the native CPU
+ * cannot execute (an x86-64 main exe on this ppc64le port).  Deliberately
+ * scoped to the main image: every other start routine Wine creates points
+ * at native (translated-PE or builtin) code.  Guest-created threads whose
+ * start routine lies elsewhere in guest memory are future work and will
+ * fault exactly as before this check existed.
+ */
+static BOOL thread_start_is_guest_code( const void *entry )
+{
+    const char *base = (const char *)NtCurrentTeb()->Peb->ImageBaseAddress;
+    const IMAGE_NT_HEADERS *nt = RtlImageNtHeader( NtCurrentTeb()->Peb->ImageBaseAddress );
+
+    if (!nt || nt->FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64) return FALSE;
+    return (const char *)entry >= base && (const char *)entry < base + nt->OptionalHeader.SizeOfImage;
+}
+
+/***********************************************************************
  *           RtlUserThreadStart (NTDLL.@)
  */
 void WINAPI RtlUserThreadStart( PRTL_THREAD_START_ROUTINE entry, void *arg )
 {
     __TRY
     {
+        if (thread_start_is_guest_code( entry ))
+        {
+            struct emu_run_entry_params params = { (void *)entry, arg, 0 };
+            NTSTATUS status = WINE_UNIX_CALL( unix_emu_run_entry, &params );
+
+            TRACE_(relay)( "\1Guest AMD64 entry %p returned rax=%s status=%08x\n",
+                           entry, wine_dbgstr_longlong(params.retval), (UINT)status );
+            if (status)
+            {
+                ERR( "failed to emulate AMD64 entry point %p, status %08x\n", entry, (UINT)status );
+                NtTerminateProcess( GetCurrentProcess(), status );
+            }
+            RtlExitUserThread( (ULONG)params.retval );
+        }
         pBaseThreadInitThunk( 0, (LPTHREAD_START_ROUTINE)entry, arg );
     }
     __EXCEPT( call_unhandled_exception_filter )

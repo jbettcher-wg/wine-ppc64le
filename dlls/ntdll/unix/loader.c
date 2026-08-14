@@ -1011,6 +1011,58 @@ static NTSTATUS unwind_builtin_dll( void *args )
 #endif /* SO_DLLS_SUPPORTED */
 
 
+/***********************************************************************
+ *           unixcall_emu_run_entry
+ *
+ * Run an x86-64 guest entry point through the embedded emulator bridge.
+ * The bridge is a native ELF shared object (default libfexbridge.so,
+ * overridable through WINEFEXBRIDGE) embedding FEXCore without its Linux
+ * frontend; see fexbridge/ in the port tree.  Loaded lazily so processes
+ * with a native main image never pay for it, and RTLD_LOCAL so the
+ * emulator's internal allocator and C++ runtime symbols never interpose
+ * on the rest of the process.
+ */
+static NTSTATUS unixcall_emu_run_entry( void *args )
+{
+    static int (*p_fexbridge_run_entry)( void *entry, void *arg,
+                                         ULONGLONG *rax, /* same width as the
+                                         bridge's unsigned long long on LP64 */
+                                         char *err, unsigned int errlen );
+    struct emu_run_entry_params *params = args;
+    char err[256] = "";
+    int ret;
+
+    if (!p_fexbridge_run_entry)
+    {
+        const char *name = getenv( "WINEFEXBRIDGE" );
+        void *so;
+
+        if (!name || !name[0]) name = "libfexbridge.so";
+        if (!(so = dlopen( name, RTLD_NOW | RTLD_LOCAL )))
+        {
+            ERR( "cannot load emulator bridge %s: %s\n", name, dlerror() );
+            return STATUS_DLL_NOT_FOUND;
+        }
+        if (!(p_fexbridge_run_entry = dlsym( so, "fexbridge_run_entry" )))
+        {
+            ERR( "%s has no fexbridge_run_entry: %s\n", name, dlerror() );
+            dlclose( so );
+            return STATUS_ENTRYPOINT_NOT_FOUND;
+        }
+        TRACE( "loaded emulator bridge %s\n", name );
+    }
+
+    ret = p_fexbridge_run_entry( params->entry, params->arg, &params->retval,
+                                 err, sizeof(err) );
+    if (ret)
+    {
+        ERR( "emulator bridge failed (%d): %s\n", ret, err );
+        return STATUS_UNSUCCESSFUL;
+    }
+    return STATUS_SUCCESS;
+}
+
+
 static const unixlib_entry_t unix_call_funcs[] =
 {
     load_so_dll,
@@ -1021,6 +1073,7 @@ static const unixlib_entry_t unix_call_funcs[] =
     unixcall_wine_server_handle_to_fd,
     unixcall_wine_spawnvp,
     system_time_precise,
+    unixcall_emu_run_entry,
 };
 
 
@@ -1028,6 +1081,8 @@ static const unixlib_entry_t unix_call_funcs[] =
 
 static NTSTATUS wow64_load_so_dll( void *args ) { return STATUS_INVALID_IMAGE_FORMAT; }
 static NTSTATUS wow64_unwind_builtin_dll( void *args ) { return STATUS_UNSUCCESSFUL; }
+
+static NTSTATUS wow64_emu_run_entry( void *args ) { return STATUS_NOT_SUPPORTED; }
 
 const unixlib_entry_t unix_call_wow64_funcs[] =
 {
@@ -1039,6 +1094,7 @@ const unixlib_entry_t unix_call_wow64_funcs[] =
     wow64_wine_server_handle_to_fd,
     wow64_wine_spawnvp,
     system_time_precise,
+    wow64_emu_run_entry,
 };
 
 #endif  /* _WIN64 */

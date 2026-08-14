@@ -53,6 +53,16 @@ static UNICODE_STRING *get_machine_name( USHORT machine, UNICODE_STRING *str )
     case IMAGE_FILE_MACHINE_AMD64: RtlInitUnicodeString( str, L"AMD64" ); break;
     case IMAGE_FILE_MACHINE_ARMNT: RtlInitUnicodeString( str, L"ARM" ); break;
     case IMAGE_FILE_MACHINE_ARM64: RtlInitUnicodeString( str, L"ARM64" ); break;
+    /* This, not the server's supported-machines list, is why %PROCESSOR_ARCHITECTURE%
+     * read "Unknown" on this port: current_machine is POWERPC64 for a native process
+     * whatever else the prefix advertises, and it had no arm here.  There is no
+     * Microsoft-assigned string for it -- Windows NT/PowerPC used "PPC" and was
+     * 32-bit big-endian -- so "PPC64" is ours, chosen to match the build arch name
+     * (ppc64_CC, ppc64-windows) and the PROCESSOR_ARCHITECTURE_PPC64 extension in
+     * winnt.h.  Nothing outside this tree consumes it, so it is still cheap to change.
+     * An emulated amd64 guest is unaffected either way: current_machine is AMD64 in
+     * the guest's own ntdll, so it takes the AMD64 arm above. */
+    case IMAGE_FILE_MACHINE_POWERPC64: RtlInitUnicodeString( str, L"PPC64" ); break;
     default:                       RtlInitUnicodeString( str, L"Unknown" ); break;
     }
     return str;

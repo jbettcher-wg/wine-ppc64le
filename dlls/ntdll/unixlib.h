@@ -66,6 +66,19 @@ struct unwind_builtin_dll_params
     CONTEXT                    *context;
 };
 
+/* Runs an x86-64 guest entry point through the embedded emulator and returns
+ * when the guest returns to its caller.  ppc64le-only: the native machine
+ * cannot execute the main image's code, and the WoW64 machinery is 32-on-64
+ * by construction, so a 64-bit guest image is dispatched here instead —
+ * from RtlUserThreadStart, the last common chokepoint before the first guest
+ * instruction would run.  See dlls/ntdll/signal_ppc64.c. */
+struct emu_run_entry_params
+{
+    void      *entry;    /* guest entry point (MS-x64: arg in RCX) */
+    void      *arg;      /* single argument (PEB for the main thread) */
+    ULONGLONG  retval;   /* out: guest RAX when the entry returned */
+};
+
 enum ntdll_unix_funcs
 {
     unix_load_so_dll,
@@ -76,6 +89,7 @@ enum ntdll_unix_funcs
     unix_wine_server_handle_to_fd,
     unix_wine_spawnvp,
     unix_system_time_precise,
+    unix_emu_run_entry,
 };
 
 extern unixlib_handle_t __wine_unixlib_handle;
