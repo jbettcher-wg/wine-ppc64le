@@ -29,8 +29,8 @@ Honest, and in progress.
 | PE-side `ntdll.dll` | stays an ELF builtin — see below |
 | `wineboot -u` | **works** — full prefix, services registered, and the prefix runs programs |
 | Wine's own test suite | `version:info`, `version:install`, `advapi32:lsa` pass |
-| Running an x86-64 PE | **works** for import-free guests: loads, executes, propagates its exit code |
-| Guest imports → native code | **works** for a first set of `kernel32` exports (see below) |
+| Running an x86-64 PE | **works** — a real Windows program runs and prints correct output |
+| Guest imports → native code | **works**, generated at build time by `tools/spec2thunk` |
 
 `ntdll` cannot be a PE and never will be: its TEB lives in an initial-exec
 `__thread`, and a PE image has nowhere to put a static TLS block. It is built as
@@ -56,18 +56,35 @@ directory (`C:\windows\sysx8664\`, alongside Wine's existing `syswow64` and
 marshals MS-x64 → ELFv2 and calls the real native ppc64 implementation. Nothing
 about the mechanism is specific to `kernel32`.
 
-Working today, returning real values to guest code: `GetCurrentProcessId`,
-`GetCurrentThreadId`, `GetModuleHandleW`, `GetProcAddress`,
-`GetEnvironmentVariableW`, `MultiByteToWideChar` — covering integer, pointer,
-wide-string and stack-passed arguments.
+Those modules are **ordinary build output**. `tools/spec2thunk` generates them
+from a `.thunks` list plus Wine's own headers — signatures come from clang
+parsing the real headers, never from the `.spec` file, which carries no return
+type and whose `ARG_LONG` is 32 bits. Anything unrepresentable is refused at
+generation time with the compiler's own reason rather than mis-marshalled. They
+are not staged into the prefix: like every other Wine builtin, they resolve from
+the build or install directory.
 
-**Current work.** Native calls made from a guest trap currently run on the
-emulator's stack, so anything that validates against `Tib.StackBase` /
-`StackLimit` — an NT syscall, or raising an exception — fails there. That is the
-single blocker in front of most of the API surface, and switching stacks around
-the native call is what is being built now. Separately, handles crossing the
-boundary are still native-namespace values, so `GetProcAddress` hands the guest
-a pointer it must not call.
+The proof it works end to end is Wine's own `winepath.exe`, built as an x86-64
+PE and run under the port:
+
+```
+$ wine winepath.exe -u 'C:\windows'
+/tmp/.../drive_c/windows
+```
+
+Byte-identical to what the native ppc64 build of the same program prints. That
+run covers a real CRT startup, 42 imports across three modules, and
+`GetProcAddress` returning a pointer the guest then calls — the last of which
+only works because handles are translated into the caller's own namespace, so a
+guest asking for a proc address gets the stub in *its* module rather than a
+native ppc64 address it would crash on.
+
+**Known gaps.** Calls in the other direction — native code invoking a guest
+callback — are unhandled, which is why `winepath` prints correctly and then
+crashes in an `atexit` destructor. Guest-created threads still run native.
+True variadics (`printf`) need a marker in the descriptor before they can
+forward. And the emulator bridge cannot yet be `dlopen`ed without a
+`GLIBC_TUNABLES` static-TLS workaround.
 
 ## The interesting part: r2 across unwound frames
 
