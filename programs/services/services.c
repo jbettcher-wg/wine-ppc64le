@@ -1034,8 +1034,24 @@ found:
     if (!environment && OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_DUPLICATE, &token))
     {
         WCHAR val[16];
-        CreateEnvironmentBlock(&environment, token, FALSE);
-        if (GetEnvironmentVariableW( L"WINEBOOTSTRAPMODE", val, ARRAY_SIZE(val) ))
+        /* CreateEnvironmentBlock() fails, leaving environment NULL, whenever
+         * HKLM\System\CurrentControlSet\Control\Session Manager\Environment is
+         * not there yet -- which is the normal state of a fresh prefix until
+         * wine.inf has created it, i.e. exactly when wineboot -u starts the
+         * first services.  RtlSetEnvironmentVariable() then dereferences that
+         * NULL in get_env_length(), and the resulting access violation is
+         * swallowed by the RPC server's exception filter, which unwinds out of
+         * svcctl_StartServiceW() *holding* the scmdatabase critical section.
+         * Every later service start then blocks on that section forever
+         * ("wait timed out ... blocked by <dead thread>, retrying (60 sec)"),
+         * so services.exe never answers again and wineboot never finishes.
+         * Measured on ppc64le, but nothing about it is port-specific.
+         * When the block could not be built, leave environment NULL and let
+         * CreateProcessW() inherit ours -- which already carries
+         * WINEBOOTSTRAPMODE, that being where we just read it from. */
+        if (!CreateEnvironmentBlock(&environment, token, FALSE))
+            environment = NULL;
+        else if (GetEnvironmentVariableW( L"WINEBOOTSTRAPMODE", val, ARRAY_SIZE(val) ))
         {
             UNICODE_STRING name = RTL_CONSTANT_STRING(L"WINEBOOTSTRAPMODE");
             UNICODE_STRING value;
