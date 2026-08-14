@@ -77,6 +77,16 @@ struct emu_run_entry_params
     void      *entry;    /* guest entry point (MS-x64: arg in RCX) */
     void      *arg;      /* single argument (PEB for the main thread) */
     ULONGLONG  retval;   /* out: guest RAX when the entry returned */
+    /* PE-side entry for a guest trap.  Resolving the call needs the module
+     * list and the export tables, which only the PE loader has, and the
+     * functions it dispatches to are Win32 code -- so it is entered on the
+     * Win32 stack through call_user_mode_callback() and returns through
+     * NtCallbackReturn, with the same (id, args, len) shape as
+     * KiUserCallbackDispatcher.  args holds one pointer: the AMD64 CONTEXT the
+     * emulator marshalled, whose Rip the dispatcher owns.  Returning
+     * STATUS_SUCCESS resumes the guest, anything else ends the run.  See
+     * emu_trap_dispatch() in dlls/ntdll/signal_ppc64.c. */
+    void     (*trap_dispatcher)( ULONG id, void *args, ULONG len );
 };
 
 enum ntdll_unix_funcs

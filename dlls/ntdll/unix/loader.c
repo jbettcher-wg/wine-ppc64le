@@ -1012,6 +1012,59 @@ static NTSTATUS unwind_builtin_dll( void *args )
 
 
 /***********************************************************************
+ *           emu_trap_thunk
+ *
+ * The emulator's trap callback.  Runs on the kernel stack, as all unix code
+ * does, so it does no work itself: it hands the trap straight to the PE-side
+ * dispatcher on the Win32 stack.  See call_emu_trap_dispatcher().
+ *
+ * The bridge's handler is process-global, so the PE entry point is kept here
+ * rather than in the per-run parameters; it is the same function for every
+ * thread and every run.
+ */
+static void (*p_emu_trap_dispatcher)( ULONG id, void *args, ULONG len );
+
+static int  (*p_fexbridge_process_init)(void);
+static int  (*p_fexbridge_thread_init)( void **thread_out );
+static void (*p_fexbridge_thread_term)( void *thread );
+static void *(*p_fexbridge_current_thread)(void);
+static int  (*p_fexbridge_set_gs_base)( void *thread, ULONGLONG base );
+static int  (*p_fexbridge_fault_is_jit)( const void *host_ucontext );
+static int  (*p_fexbridge_fault_unwind)( void *host_ucontext );
+
+static int emu_trap_thunk( void *thread, void *ctx, void *user )
+{
+    /* FEXBRIDGE_TRAP_CONTINUE / _EXIT */
+    return call_emu_trap_dispatcher( p_emu_trap_dispatcher, ctx ) ? 1 : 0;
+}
+
+
+/***********************************************************************
+ *           emu_handle_fault
+ *
+ * A fault taken inside the emulator's JIT belongs to the guest, not to us.
+ *
+ * Nothing else can tell the difference.  The JIT is unix code and runs on the
+ * kernel stack, so a guest fault looks exactly like a fault taken inside a
+ * syscall, and handle_syscall_fault swallows it into a bare c0000005 with no
+ * guest state at all -- which is why a guest crash used to report nothing
+ * useful and had to be found by disassembling the guest by hand.
+ *
+ * The bridge reconstructs the guest register file from the host fault context
+ * and unwinds to the innermost fexbridge_run, which returns RUN_FAULT with
+ * Rip at the faulting guest instruction.  fexbridge_fault_unwind does not
+ * return when it succeeds.  Called from a signal handler: it touches only
+ * function pointers resolved once at bridge load.
+ */
+BOOL emu_handle_fault( void *sigcontext )
+{
+    if (!p_fexbridge_fault_is_jit || !p_fexbridge_fault_unwind) return FALSE;
+    if (!p_fexbridge_fault_is_jit( sigcontext )) return FALSE;
+    return p_fexbridge_fault_unwind( sigcontext ) != 0;
+}
+
+
+/***********************************************************************
  *           unixcall_emu_run_entry
  *
  * Run an x86-64 guest entry point through the embedded emulator bridge.
@@ -1028,7 +1081,11 @@ static NTSTATUS unixcall_emu_run_entry( void *args )
                                          ULONGLONG *rax, /* same width as the
                                          bridge's unsigned long long on LP64 */
                                          char *err, unsigned int errlen );
+    static void (*p_fexbridge_set_trap_handler)( int (*cb)( void *thread, void *ctx, void *user ),
+                                                 void *user );
     struct emu_run_entry_params *params = args;
+    void *thread = NULL;
+    BOOL own_thread = FALSE;
     char err[256] = "";
     int ret;
 
@@ -1049,11 +1106,61 @@ static NTSTATUS unixcall_emu_run_entry( void *args )
             dlclose( so );
             return STATUS_ENTRYPOINT_NOT_FOUND;
         }
+        /* Optional: an older bridge exports only the one-shot entry.  Without
+         * it the guest still runs, but any call into a thunk module traps with
+         * no handler and ends the run, so fail loudly rather than silently. */
+        p_fexbridge_set_trap_handler = dlsym( so, "fexbridge_set_trap_handler" );
+        /* ABI 2 additions.  All optional: an older bridge simply cannot give
+         * the guest a TEB or hand us its faults, and we say so rather than
+         * misbehaving. */
+        p_fexbridge_process_init   = dlsym( so, "fexbridge_process_init" );
+        p_fexbridge_thread_init    = dlsym( so, "fexbridge_thread_init" );
+        p_fexbridge_thread_term    = dlsym( so, "fexbridge_thread_term" );
+        p_fexbridge_current_thread = dlsym( so, "fexbridge_current_thread" );
+        p_fexbridge_set_gs_base    = dlsym( so, "fexbridge_set_gs_base" );
+        p_fexbridge_fault_is_jit   = dlsym( so, "fexbridge_fault_is_jit" );
+        p_fexbridge_fault_unwind   = dlsym( so, "fexbridge_fault_unwind" );
         TRACE( "loaded emulator bridge %s\n", name );
     }
 
+    if (params->trap_dispatcher)
+    {
+        if (!p_fexbridge_set_trap_handler)
+        {
+            ERR( "emulator bridge has no fexbridge_set_trap_handler, guest imports cannot work\n" );
+            return STATUS_ENTRYPOINT_NOT_FOUND;
+        }
+        p_emu_trap_dispatcher = params->trap_dispatcher;
+        p_fexbridge_set_trap_handler( emu_trap_thunk, NULL );
+    }
+
+    /* Give the guest a TEB.  Every real x86-64 Windows image reaches it
+     * through GS -- the CRT startup reads gs:[0x30] before main to find its
+     * own PE header, and SEH, stack probes and TLS all do the same -- so
+     * without this a real binary faults on its first TEB access.  Wine's
+     * 64-bit TEB is the NT layout the guest expects, so this thread's own TEB
+     * serves directly.
+     *
+     * The bridge sets the base per guest thread, and run_entry adopts an
+     * existing one rather than making a transient one, so create it here
+     * first.  Anything missing means an ABI-1 bridge: the guest still runs,
+     * but only until it touches GS. */
+    if (p_fexbridge_set_gs_base && p_fexbridge_thread_init && p_fexbridge_process_init)
+    {
+        /* process_init before thread_init: run_entry would do it for us, but we
+         * need the thread to exist before it runs so that the base is set
+         * before the first guest instruction.  Both are idempotent. */
+        if (p_fexbridge_process_init()) WARN( "emulator process init failed\n" );
+        if (p_fexbridge_current_thread) thread = p_fexbridge_current_thread();
+        if (!thread && !p_fexbridge_thread_init( &thread )) own_thread = TRUE;
+        if (thread) p_fexbridge_set_gs_base( thread, (ULONG_PTR)NtCurrentTeb() );
+        else WARN( "no guest thread, GS will be unset\n" );
+    }
+    else WARN( "emulator bridge cannot set a guest GS base; TEB access will fault\n" );
+
     ret = p_fexbridge_run_entry( params->entry, params->arg, &params->retval,
                                  err, sizeof(err) );
+    if (own_thread && p_fexbridge_thread_term) p_fexbridge_thread_term( thread );
     if (ret)
     {
         ERR( "emulator bridge failed (%d): %s\n", ret, err );
@@ -1436,6 +1543,7 @@ static const WCHAR *get_machine_wow64_dir( WORD machine )
     static const WCHAR system32[] = {'\\','?','?','\\','C',':','\\','w','i','n','d','o','w','s','\\','s','y','s','t','e','m','3','2','\\',0};
     static const WCHAR syswow64[] = {'\\','?','?','\\','C',':','\\','w','i','n','d','o','w','s','\\','s','y','s','w','o','w','6','4','\\',0};
     static const WCHAR sysarm32[] = {'\\','?','?','\\','C',':','\\','w','i','n','d','o','w','s','\\','s','y','s','a','r','m','3','2','\\',0};
+    static const WCHAR sysx8664[] = {'\\','?','?','\\','C',':','\\','w','i','n','d','o','w','s','\\','s','y','s','x','8','6','6','4','\\',0};
 
     if (machine == native_machine) machine = IMAGE_FILE_MACHINE_TARGET_HOST;
 
@@ -1444,6 +1552,16 @@ static const WCHAR *get_machine_wow64_dir( WORD machine )
     case IMAGE_FILE_MACHINE_TARGET_HOST: return system32;
     case IMAGE_FILE_MACHINE_I386:        return syswow64;
     case IMAGE_FILE_MACHINE_ARMNT:       return sysarm32;
+    /* x86-64 as a non-native machine, i.e. emulated: it needs a system
+     * directory of its own so that its modules are a separate universe from
+     * the native ones, exactly as syswow64 is for i386.  Unreachable when
+     * x86-64 is native, since that is mapped to TARGET_HOST above.  On ARM64
+     * the pair belongs to ARM64EC instead, whose x86-64 modules are hybrid
+     * images living in system32, so leave that alone.  Must agree with
+     * get_machine_system_dir() in the PE loader. */
+    case IMAGE_FILE_MACHINE_AMD64:
+        if (native_machine == IMAGE_FILE_MACHINE_ARM64) return NULL;
+        return sysx8664;
     default: return NULL;
     }
 }
@@ -1874,6 +1992,12 @@ static void load_wow64_ntdll( USHORT machine )
     WCHAR *path;
 
     if (machine == current_machine) return;
+    /* WoW64 is 32-on-64 by construction.  A guest machine of the same word
+     * size as ours is served by an embedded emulator instead, and has no
+     * ntdll of its own to load -- its modules are thunks that call the native
+     * ones.  Without this, adding a system directory for such a machine (see
+     * get_machine_wow64_dir) makes this fatal_error on every guest image. */
+    if (is_machine_64bit( machine ) == is_machine_64bit( current_machine )) return;
     if (!(wow64_dir = get_machine_wow64_dir( machine ))) return;
 
     path = malloc( sizeof("\\??\\C:\\windows\\system32\\ntdll.dll") * sizeof(WCHAR) );

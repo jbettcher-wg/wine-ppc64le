@@ -89,6 +89,72 @@ static const WCHAR system_dir[] = L"C:\\windows\\system32\\";
 /* system search path */
 static const WCHAR system_path[] = L"C:\\windows\\system32;C:\\windows\\system;C:\\windows";
 
+/***********************************************************************
+ *           get_machine_system_dir
+ *
+ * System directory holding the modules of a machine that this process
+ * supports but cannot execute natively, with a trailing backslash.  Must
+ * agree with get_machine_wow64_dir() in the unix loader, which is what
+ * turns such a path back into a machine when a builtin is searched for.
+ *
+ * Returns NULL for the current machine, whose modules live in system_dir,
+ * and for any machine that has no directory of its own.  Note that the
+ * i386/ARMNT cases are unreachable on the platforms that use them, since
+ * there those modules are loaded by their own ntdll's loader, not this one.
+ */
+static const WCHAR *get_machine_system_dir( USHORT machine )
+{
+    if (!machine || machine == current_machine) return NULL;
+    switch (machine)
+    {
+    case IMAGE_FILE_MACHINE_I386:  return L"C:\\windows\\syswow64\\";
+    case IMAGE_FILE_MACHINE_ARMNT: return L"C:\\windows\\sysarm32\\";
+    case IMAGE_FILE_MACHINE_AMD64:
+        /* on ARM64 this pair belongs to ARM64EC, whose x86-64 modules are
+         * hybrid images living in system32 next to the native ones rather
+         * than in a namespace of their own; leave that path alone */
+        if (current_machine == IMAGE_FILE_MACHINE_ARM64) return NULL;
+        return L"C:\\windows\\sysx8664\\";
+    }
+    return NULL;
+}
+
+/***********************************************************************
+ *           get_machine_pe_dir
+ *
+ * The builtin subdirectory holding a machine's PE modules, e.g. the
+ * x86_64-windows next to the ppc64-windows this build produces.  Mirrors
+ * get_pe_dir() in the unix loader.  Returns the current machine's dir for 0,
+ * so native callers need not care.
+ */
+static const WCHAR *get_machine_pe_dir( USHORT machine )
+{
+    if (!machine || machine == current_machine) return pe_dir;
+    switch (machine)
+    {
+    case IMAGE_FILE_MACHINE_I386:        return L"\\i386-windows";
+    case IMAGE_FILE_MACHINE_AMD64:       return L"\\x86_64-windows";
+    case IMAGE_FILE_MACHINE_ARMNT:       return L"\\arm-windows";
+    case IMAGE_FILE_MACHINE_ARM64:       return L"\\aarch64-windows";
+    case IMAGE_FILE_MACHINE_POWERPC64:   return L"\\ppc64-windows";
+    }
+    return pe_dir;
+}
+
+
+/***********************************************************************
+ *           get_image_machine
+ *
+ * Machine of an already mapped image.  Zero if it cannot be determined,
+ * which callers must treat as "the current machine".
+ */
+static USHORT get_image_machine( HMODULE module )
+{
+    const IMAGE_NT_HEADERS *nt = RtlImageNtHeader( module );
+
+    return nt ? nt->FileHeader.Machine : 0;
+}
+
 static BOOL is_prefix_bootstrap;  /* are we bootstrapping the prefix? */
 static BOOL imports_fixup_done = FALSE;  /* set once the imports have been fixed up, before attaching them */
 static BOOL process_detaching = FALSE;  /* set on process detach to avoid deadlocks with thread detach */
@@ -192,7 +258,8 @@ static WINE_MODREF *last_failed_modref;
 
 static LDR_DDAG_NODE *node_ntdll, *node_kernel32;
 
-static NTSTATUS load_dll( const WCHAR *load_path, const WCHAR *libname, DWORD flags, WINE_MODREF** pwm, BOOL system );
+static NTSTATUS load_dll( const WCHAR *load_path, const WCHAR *libname, DWORD flags, USHORT machine,
+                          WINE_MODREF** pwm, BOOL system );
 static NTSTATUS process_attach( LDR_DDAG_NODE *node, LPVOID lpReserved );
 static FARPROC find_ordinal_export( HMODULE module, const IMAGE_EXPORT_DIRECTORY *exports,
                                     DWORD exp_size, DWORD ordinal, LPCWSTR load_path,
@@ -561,12 +628,15 @@ static ULONG hash_basename( const UNICODE_STRING *basename )
 }
 
 /* build NT name for dll in system directory */
-static void build_sysdir_nt_name( const WCHAR *name, UNICODE_STRING *nt_name )
+static void build_sysdir_nt_name( const WCHAR *name, USHORT machine, UNICODE_STRING *nt_name )
 {
-    nt_name->Length = (4 + wcslen(system_dir) + wcslen(name)) * sizeof(WCHAR);
+    const WCHAR *dir = get_machine_system_dir( machine );
+
+    if (!dir) dir = system_dir;
+    nt_name->Length = (4 + wcslen(dir) + wcslen(name)) * sizeof(WCHAR);
     nt_name->Buffer = RtlAllocateHeap( GetProcessHeap(), 0, nt_name->Length + sizeof(WCHAR) );
     wcscpy( nt_name->Buffer, L"\\??\\" );
-    wcscat( nt_name->Buffer, system_dir );
+    wcscat( nt_name->Buffer, dir );
     wcscat( nt_name->Buffer, name );
 }
 
@@ -595,14 +665,20 @@ static WINE_MODREF *get_modref( HMODULE hmod )
  * Find a module from its base name.
  * The loader_section must be locked while calling this function
  */
-static WINE_MODREF *find_basename_module( LPCWSTR name )
+static WINE_MODREF *find_basename_module( LPCWSTR name, USHORT machine )
 {
     PLIST_ENTRY mark, entry;
     UNICODE_STRING name_str;
 
+    if (!machine) machine = current_machine;
+
     RtlInitUnicodeString( &name_str, name );
 
+    /* a base name is only unique within one machine: a guest image and a
+     * native one can both be loaded as e.g. kernel32.dll, from different
+     * system directories, and must never be substituted for each other. */
     if (cached_modref && !(cached_modref->ldr.Flags & LDR_REDIRECTED)
+        && get_image_machine( cached_modref->ldr.DllBase ) == machine
         && RtlEqualUnicodeString( &name_str, &cached_modref->ldr.BaseDllName, TRUE ))
         return cached_modref;
 
@@ -611,6 +687,7 @@ static WINE_MODREF *find_basename_module( LPCWSTR name )
     {
         WINE_MODREF *mod = CONTAINING_RECORD(entry, WINE_MODREF, ldr.HashLinks);
         if (!mod->system && !(mod->ldr.Flags & LDR_REDIRECTED)
+            && get_image_machine( mod->ldr.DllBase ) == machine
             && RtlEqualUnicodeString( &name_str, &mod->ldr.BaseDllName, TRUE ))
         {
             cached_modref = CONTAINING_RECORD(mod, WINE_MODREF, ldr);
@@ -962,11 +1039,11 @@ static FARPROC find_forwarded_export( HMODULE module, const char *forward, LPCWS
     if (!end) return NULL;
     if (build_import_name( importer, mod_name, forward, end - forward )) return NULL;
 
-    if (!(wm = find_basename_module( mod_name )))
+    if (!(wm = find_basename_module( mod_name, get_image_machine( module ) )))
     {
         WINE_MODREF *imp = get_modref( module );
         TRACE( "delay loading %s for '%s'\n", debugstr_w(mod_name), forward );
-        if (load_dll( load_path, mod_name, 0, &wm, imp->system ) != STATUS_SUCCESS)
+        if (load_dll( load_path, mod_name, 0, get_image_machine( module ), &wm, imp->system ) != STATUS_SUCCESS)
         {
             ERR( "module not found for forward '%s' used by %s\n",
                  forward, debugstr_w(imp->ldr.FullDllName.Buffer) );
@@ -1173,7 +1250,7 @@ static BOOL import_dll( WINE_MODREF *wm, const IMAGE_IMPORT_DESCRIPTOR *descr, L
     }
 
     status = build_import_name( wm, buffer, name, len );
-    if (!status) status = load_dll( load_path, buffer, 0, &wmImp, system );
+    if (!status) status = load_dll( load_path, buffer, 0, get_image_machine( module ), &wmImp, system );
 
     if (status)
     {
@@ -1456,7 +1533,7 @@ static NTSTATUS fixup_imports_ilonly( WINE_MODREF *wm, LPCWSTR load_path, void *
     wm->ldr.Flags &= ~LDR_DONT_RESOLVE_REFS;
 
     assert( !wm->ldr.DdagNode->Dependencies.Tail );
-    if (!(status = load_dll( load_path, L"mscoree.dll", 0, &imp, FALSE ))
+    if (!(status = load_dll( load_path, L"mscoree.dll", 0, 0, &imp, FALSE ))
           && !add_module_dependency_after( wm->ldr.DdagNode, imp->ldr.DdagNode, NULL ))
         status = STATUS_NO_MEMORY;
     if (status)
@@ -2513,12 +2590,57 @@ static BOOL has_chpe_metadata( HANDLE file, const SECTION_IMAGE_INFORMATION *inf
     return !!loadcfg.CHPEMetadataPointer;
 }
 
+/***********************************************************************
+ *           is_emulated_machine
+ *
+ * Whether images of this machine run under an embedded emulator rather than
+ * on the host cpu.  Such a machine is advertised in the process's supported
+ * machine list but is not the current one, and has the same word size, which
+ * is what rules WoW64 out: WoW64 is 32-on-64 by construction, so a 64-bit
+ * guest on a 64-bit host can only be served this way.  Deliberately narrow,
+ * so that on x86-64 (where i386 is supported but is a WoW64 machine) this is
+ * false for every machine and nothing below changes.
+ */
+static BOOL is_emulated_machine( USHORT machine )
+{
+    static SYSTEM_SUPPORTED_PROCESSOR_ARCHITECTURES_INFORMATION machines[8];
+    static BOOL queried;
+    ULONG i;
+
+    if (!machine || machine == current_machine) return FALSE;
+    if (!get_machine_system_dir( machine )) return FALSE;
+    switch (machine)  /* same word size as us, i.e. not a WoW64 machine */
+    {
+    case IMAGE_FILE_MACHINE_AMD64:
+    case IMAGE_FILE_MACHINE_ARM64:
+    case IMAGE_FILE_MACHINE_POWERPC64:
+        break;
+    default:
+        return FALSE;
+    }
+    if (!queried)  /* the supported set cannot change, so query it once */
+    {
+        HANDLE process = GetCurrentProcess();
+
+        if (NtQuerySystemInformationEx( SystemSupportedProcessorArchitectures, &process, sizeof(process),
+                                        machines, sizeof(machines), NULL ))
+            memset( machines, 0, sizeof(machines) );
+        queried = TRUE;
+    }
+    for (i = 0; i < ARRAY_SIZE(machines) && machines[i].Machine; i++)
+        if (machines[i].Machine == machine) return TRUE;
+    return FALSE;
+}
+
 /* On WoW64 setups, an image mapping can also be created for the other 32/64 CPU */
 /* but it cannot necessarily be loaded as a dll, so we need some additional checks */
 static BOOL is_valid_binary( HANDLE file, const SECTION_IMAGE_INFORMATION *info )
 {
     if (info->Machine == current_machine) return TRUE;
     if (NtCurrentTeb()->WowTebOffset) return TRUE;
+    /* an emulated machine's images are real dlls, bound only to modules of
+     * their own machine; see get_machine_system_dir */
+    if (is_emulated_machine( info->Machine )) return TRUE;
     /* support ARM64EC binaries on x86-64 */
     if (current_machine == IMAGE_FILE_MACHINE_AMD64 && has_chpe_metadata( file, info )) return TRUE;
     /* support 32-bit IL-only images on 64-bit */
@@ -2773,7 +2895,7 @@ static NTSTATUS open_known_dll( const WCHAR *libname, UNICODE_STRING *nt_name, W
     RtlInitUnicodeString( &str, libname );
     InitializeObjectAttributes( &attr, &str, OBJ_CASE_INSENSITIVE, known_dlls_ntdir, NULL );
     if ((status = NtOpenSection( mapping, MAXIMUM_ALLOWED, &attr ))) return status;
-    build_sysdir_nt_name( libname, nt_name );
+    build_sysdir_nt_name( libname, 0, nt_name );
     if ((*pwm = find_fullname_module( nt_name )))
     {
         NtClose( *mapping );
@@ -3147,10 +3269,11 @@ static NTSTATUS get_env_var( const WCHAR *name, SIZE_T extra, UNICODE_STRING *re
  * Find a builtin dll when the corresponding file cannot be found in the prefix.
  * This is used during prefix bootstrap.
  */
-static NTSTATUS find_builtin_without_file( const WCHAR *name, UNICODE_STRING *new_name,
+static NTSTATUS find_builtin_without_file( const WCHAR *name, USHORT machine, UNICODE_STRING *new_name,
                                            WINE_MODREF **pwm, HANDLE *mapping,
                                            SECTION_IMAGE_INFORMATION *image_info, struct file_id *id )
 {
+    const WCHAR *pe_subdir = get_machine_pe_dir( machine );
     const WCHAR *ext;
     WCHAR dllpath[32];
     DWORD i, len;
@@ -3159,19 +3282,22 @@ static NTSTATUS find_builtin_without_file( const WCHAR *name, UNICODE_STRING *ne
 
     if (contains_path( name )) return status;
 
-    if (!is_prefix_bootstrap)
+    /* A guest machine's modules are only ever builtins: nothing installs them
+     * into the prefix, exactly as nothing installs a native builtin there, so
+     * this is the normal way to find one rather than a bootstrap special case. */
+    if (!is_prefix_bootstrap && !get_machine_system_dir( machine ))
     {
         /* 16-bit files can't be loaded from the prefix */
         if (!name[1] || wcscmp( name + wcslen(name) - 2, L"16" )) return status;
     }
 
-    if (!get_env_var( L"WINEBUILDDIR", 20 + 2 * wcslen(name) + wcslen(pe_dir), new_name ))
+    if (!get_env_var( L"WINEBUILDDIR", 20 + 2 * wcslen(name) + wcslen(pe_subdir), new_name ))
     {
         len = new_name->Length;
         RtlAppendUnicodeToString( new_name, L"\\dlls\\" );
         RtlAppendUnicodeToString( new_name, name );
         if ((ext = wcsrchr( name, '.' )) && !wcscmp( ext, L".dll" )) new_name->Length -= 4 * sizeof(WCHAR);
-        RtlAppendUnicodeToString( new_name, pe_dir );
+        RtlAppendUnicodeToString( new_name, pe_subdir );
         RtlAppendUnicodeToString( new_name, L"\\" );
         RtlAppendUnicodeToString( new_name, name );
         status = open_dll_file( new_name, pwm, mapping, image_info, id );
@@ -3180,7 +3306,7 @@ static NTSTATUS find_builtin_without_file( const WCHAR *name, UNICODE_STRING *ne
         new_name->Length = len;
         RtlAppendUnicodeToString( new_name, L"\\programs\\" );
         RtlAppendUnicodeToString( new_name, name );
-        RtlAppendUnicodeToString( new_name, pe_dir );
+        RtlAppendUnicodeToString( new_name, pe_subdir );
         RtlAppendUnicodeToString( new_name, L"\\" );
         RtlAppendUnicodeToString( new_name, name );
         status = open_dll_file( new_name, pwm, mapping, image_info, id );
@@ -3191,9 +3317,9 @@ static NTSTATUS find_builtin_without_file( const WCHAR *name, UNICODE_STRING *ne
     for (i = 0; ; i++)
     {
         swprintf( dllpath, ARRAY_SIZE(dllpath), L"WINEDLLDIR%u", i );
-        if (get_env_var( dllpath, wcslen(pe_dir) + wcslen(name) + 1, new_name )) break;
+        if (get_env_var( dllpath, wcslen(pe_subdir) + wcslen(name) + 1, new_name )) break;
         len = new_name->Length;
-        RtlAppendUnicodeToString( new_name, pe_dir );
+        RtlAppendUnicodeToString( new_name, pe_subdir );
         RtlAppendUnicodeToString( new_name, L"\\" );
         RtlAppendUnicodeToString( new_name, name );
         status = open_dll_file( new_name, pwm, mapping, image_info, id );
@@ -3210,7 +3336,7 @@ static NTSTATUS find_builtin_without_file( const WCHAR *name, UNICODE_STRING *ne
 
 done:
     RtlFreeUnicodeString( new_name );
-    if (!status) build_sysdir_nt_name( name, new_name );
+    if (!status) build_sysdir_nt_name( name, machine, new_name );
     return status;
 }
 
@@ -3271,10 +3397,12 @@ done:
  *
  * Find the file (or already loaded module) for a given dll name.
  */
-static NTSTATUS find_dll_file( const WCHAR *load_path, const WCHAR *libname, UNICODE_STRING *nt_name,
+static NTSTATUS find_dll_file( const WCHAR *load_path, const WCHAR *libname, USHORT machine,
+                               UNICODE_STRING *nt_name,
                                WINE_MODREF **pwm, HANDLE *mapping, SECTION_IMAGE_INFORMATION *image_info,
                                struct file_id *id, BOOL *redirected, BOOL find_loaded )
 {
+    const WCHAR *machine_dir = get_machine_system_dir( machine );
     WCHAR *fullname = NULL;
     NTSTATUS status;
     ULONG wow64_old_value = 0;
@@ -3282,6 +3410,28 @@ static NTSTATUS find_dll_file( const WCHAR *load_path, const WCHAR *libname, UNI
     *pwm = NULL;
     *redirected = FALSE;
     nt_name->Buffer = NULL;
+
+    /* An image the host cannot execute natively must bind only to modules of
+     * its own machine, which live in their own system directory.  Binding it
+     * to a native module would splice host instructions into a guest call --
+     * that is exactly the c0000005 this exists to prevent -- so nothing else
+     * on the search path can be right for it, and not finding a module of the
+     * right machine has to be a hard failure rather than a silent fallback.
+     * KnownDlls and the apiset map are deliberately not consulted: both are
+     * populated with native modules. */
+    if (machine_dir && !contains_path( libname ))
+    {
+        if ((*pwm = find_basename_module( libname, machine ))) return STATUS_SUCCESS;
+        if (find_loaded) return STATUS_DLL_NOT_FOUND;
+        status = search_dll_file( machine_dir, libname, nt_name, pwm, mapping, image_info, id );
+        /* Nothing stages guest modules into the prefix -- they are builtins and
+         * live in the build or install tree like every other one -- so not
+         * finding a file there is the normal case, not a failure. */
+        if (status == STATUS_DLL_NOT_FOUND)
+            status = find_builtin_without_file( libname, machine, nt_name, pwm, mapping, image_info, id );
+        if (status == STATUS_NOT_SUPPORTED) status = STATUS_INVALID_IMAGE_FORMAT;
+        return status;
+    }
 
     if (!contains_path( libname ))
     {
@@ -3302,7 +3452,7 @@ static NTSTATUS find_dll_file( const WCHAR *load_path, const WCHAR *libname, UNI
         else
         {
             if (status != STATUS_SXS_KEY_NOT_FOUND) return status;
-            if ((*pwm = find_basename_module( libname ))) return STATUS_SUCCESS;
+            if ((*pwm = find_basename_module( libname, machine ))) return STATUS_SUCCESS;
             if (find_loaded)
             {
                 TRACE( "Skipping file search for %s.\n", debugstr_w(libname) );
@@ -3319,7 +3469,7 @@ static NTSTATUS find_dll_file( const WCHAR *load_path, const WCHAR *libname, UNI
     {
         status = search_dll_file( load_path, libname, nt_name, pwm, mapping, image_info, id );
         if (status == STATUS_DLL_NOT_FOUND)
-            status = find_builtin_without_file( libname, nt_name, pwm, mapping, image_info, id );
+            status = find_builtin_without_file( libname, 0, nt_name, pwm, mapping, image_info, id );
     }
     else if (!(status = RtlDosPathNameToNtPathName_U_WithStatus( libname, nt_name, NULL, NULL )))
         status = open_dll_file( nt_name, pwm, mapping, image_info, id );
@@ -3338,7 +3488,8 @@ static NTSTATUS find_dll_file( const WCHAR *load_path, const WCHAR *libname, UNI
  * Load a PE style module according to the load order.
  * The loader_section must be locked while calling this function.
  */
-static NTSTATUS load_dll( const WCHAR *load_path, const WCHAR *libname, DWORD flags, WINE_MODREF** pwm, BOOL system )
+static NTSTATUS load_dll( const WCHAR *load_path, const WCHAR *libname, DWORD flags, USHORT machine,
+                          WINE_MODREF** pwm, BOOL system )
 {
     UNICODE_STRING nt_name;
     struct file_id id;
@@ -3350,12 +3501,12 @@ static NTSTATUS load_dll( const WCHAR *load_path, const WCHAR *libname, DWORD fl
 
     TRACE( "looking for %s in %s\n", debugstr_w(libname), debugstr_w(load_path) );
 
-    if (system && system_dll_path.Buffer)
+    if (system && system_dll_path.Buffer && !get_machine_system_dir( machine ))
         nts = search_dll_file( system_dll_path.Buffer, libname, &nt_name, pwm, &mapping, &image_info, &id );
 
     if (nts)
     {
-        nts = find_dll_file( load_path, libname, &nt_name, pwm, &mapping, &image_info, &id,
+        nts = find_dll_file( load_path, libname, machine, &nt_name, pwm, &mapping, &image_info, &id,
                              &redirected, FALSE );
         system = FALSE;
     }
@@ -3480,7 +3631,7 @@ NTSTATUS WINAPI DECLSPEC_HOTPATCH LdrLoadDll(LPCWSTR search_path, DWORD *load_fl
 
     RtlEnterCriticalSection( &loader_section );
 
-    nts = load_dll( path_name, dllname ? dllname : libname->Buffer, flags, &wm, FALSE );
+    nts = load_dll( path_name, dllname ? dllname : libname->Buffer, flags, 0, &wm, FALSE );
 
     if (nts == STATUS_SUCCESS)
     {
@@ -3561,7 +3712,7 @@ NTSTATUS WINAPI LdrGetDllHandleEx( ULONG flags, LPCWSTR load_path, ULONG *dll_ch
 
     RtlEnterCriticalSection( &loader_section );
 
-    status = find_dll_file( load_path, dllname ? dllname : name->Buffer,
+    status = find_dll_file( load_path, dllname ? dllname : name->Buffer, 0,
                             &nt_name, &wm, &mapping, &image_info, &id, &redirected, TRUE );
 
     if (wm) *base = wm->ldr.DllBase;
@@ -4300,7 +4451,7 @@ static void load_arm64ec_module(void)
         NtClose( key );
     }
 
-    if ((status = load_dll( NULL, module, 0, &wm, FALSE )) ||
+    if ((status = load_dll( NULL, module, 0, 0, &wm, FALSE )) ||
         (status = arm64ec_process_init( wm->ldr.DllBase )))
     {
         ERR( "could not load %s, status %lx\n", debugstr_w(module), status );
@@ -4342,7 +4493,7 @@ static void init_wow64( CONTEXT *context )
         build_wow64_main_module();
         build_ntdll_module();
 
-        if ((status = load_dll( NULL, wow64_path, 0, &wm, FALSE )))
+        if ((status = load_dll( NULL, wow64_path, 0, 0, &wm, FALSE )))
         {
             ERR( "could not load %s, status %lx\n", debugstr_w(wow64_path), status );
             NtTerminateProcess( GetCurrentProcess(), status );
@@ -4497,7 +4648,7 @@ void loader_init( CONTEXT *context, void **entry )
         update_load_config( wm->ldr.DllBase );
 #endif
 
-        if ((status = load_dll( NULL, L"kernel32.dll", 0, &kernel32, FALSE )) != STATUS_SUCCESS)
+        if ((status = load_dll( NULL, L"kernel32.dll", 0, 0, &kernel32, FALSE )) != STATUS_SUCCESS)
         {
             MESSAGE( "wine: could not load kernel32.dll, status %lx\n", status );
             NtTerminateProcess( GetCurrentProcess(), status );
