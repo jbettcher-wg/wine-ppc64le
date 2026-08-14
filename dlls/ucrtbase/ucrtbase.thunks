@@ -1,0 +1,164 @@
+# AMD64 thunk export spec -- ucrtbase.dll.
+#
+# ---------------------------------------------------------------------------
+# GUEST ARGUMENT REGISTERS AT THE TRAP  (load-bearing ABI -- read this)
+# ---------------------------------------------------------------------------
+# x86-64 SYSCALL architecturally writes the address of the following
+# instruction into RCX and RFLAGS into R11.  RCX is MS-x64's FIRST argument
+# register, so a bare `0f 05` stub destroys arg0 before the host can see it.
+# (Measured: a trap in GetModuleHandleW arrived with rcx = RIP+2.)  Each trap
+# stub therefore rescues arg0 first, the same trick the Linux syscall ABI uses
+# for its own 4th argument:
+#
+#       49 89 ca    mov r10, rcx      ; arg0 out of the way
+#       0f 05       syscall           ; free to clobber rcx/r11
+#       cc ...      int3 padding to the 16-byte stride
+#
+# So the host-visible argument registers are:
+#
+#       arg0 -> R10   (rescued from RCX -- NOT RCX)
+#       arg1 -> RDX
+#       arg2 -> R8
+#       arg3 -> R9
+#       arg4+ -> [RSP + 8 + i*8]   (past the pushed return address and the
+#                                   32-byte shadow space)
+#
+# The trapping RIP is  stubs_rva + index*stride + trap_off  (trap_off = 3 in
+# trap mode, 0 in direct mode), published in __wine_thunk_info -- do not infer
+# it from the stub bytes.
+#
+# Note that every export here is __cdecl, not __stdcall.  That changes nothing
+# above: MS-x64 has a single calling convention and the decoration is inert on
+# this target.  It does mean the CALLER cleans the stack, so a wrong nargs is
+# not self-correcting the way a stdcall mistake would be -- it just corrupts
+# the guest's stack.  Hence the same rule as kernel32.thunks: the columns are
+# assertions checked against Wine's headers, never hand-tuned to pass.
+#
+# ---------------------------------------------------------------------------
+# The order of the export lines below IS the stub index order and is part of
+# the ABI: the host-side dispatcher uses it.  Append only, never reorder.
+#
+# Columns:
+#   <ExportName>  <imm32 returned by --body=direct>  <nargs>  <int|void>  <header>:<line>
+#
+# The last three columns are ASSERTIONS, not inputs.  gen_thunk_pe.py re-reads
+# each declaration out of Wine's own headers with clang and hard-fails if this
+# file disagrees.  Wine .spec files are NOT usable for this: they carry no
+# return type at all and their ARG_LONG is 32 bits.  dlls/ucrtbase/ucrtbase.spec
+# was used only to confirm these nine names really are ucrtbase exports; every
+# signature below comes from include/msvcrt/.
+#
+DLL ucrtbase.dll
+
+# indices 0..1: the __p_* accessors.  No arguments, and the return is a
+# pointer to the CRT's real variable, so the guest dereferences host memory
+# directly -- nothing to marshal.
+__p___argc                    0x00000A01  0  int   stdlib.h:93
+__p___wargv                   0x00000A02  0  int   stdlib.h:95
+
+# index 2: the one export here with a va_list.
+#   int __stdio_common_vswprintf(unsigned __int64 options, wchar_t *buffer,
+#                                size_t count, const wchar_t *format,
+#                                _locale_t locale, va_list arglist)
+# This is NOT variadic itself -- the caller already built the va_list -- so it
+# is six ordinary 64-bit arguments.  The va_list travels through untouched:
+# MS-x64 va_list is `char *` into a contiguous run of 8-byte argument slots
+# (the callee homes RCX/RDX/R8/R9 into the shadow space) and ppc64le ELFv2
+# va_list is likewise a bare pointer into the parameter save area.  Measured
+# on the AC922, not assumed -- see the long comment in wine_sig.py.
+__stdio_common_vswprintf      0x00000A03  6  int   corecrt_wstdio.h:92
+
+# indices 3..6: the CRT startup sequence a real mainCRTStartup walks.
+# _crt_argv_mode and _crt_app_type are plain enums (corecrt_startup.h:31,38),
+# so they are integer class and pass in a register like any other int.
+# errno_t is a typedef for int (corecrt.h).
+_configure_wide_argv          0x00000A04  1  int   corecrt_startup.h:58
+_get_initial_wide_environment 0x00000A05  0  int   corecrt_startup.h:63
+_initialize_wide_environment  0x00000A06  0  int   corecrt_startup.h:68
+_set_app_type                 0x00000A07  1  void  corecrt_startup.h:70
+
+# index 7: exit is declared __attribute__((noreturn)).  The descriptor has no
+# bit for that and does not need one -- the host implementation simply never
+# returns to the dispatcher.
+exit                          0x00000A08  1  void  stdlib.h:223
+
+# index 8: plain string compare, three integer/pointer arguments.
+wcsncmp                       0x00000A09  3  int   corecrt_wstring.h:66
+
+# ---------------------------------------------------------------------------
+# indices 9..30: the ucrtbase half of programs/winepath.exe's import table
+# (guest-corpus/imports/programs/winepath.txt).  The seven names winepath also
+# imports that are already above -- __p___argc, __p___wargv,
+# _configure_wide_argv, _get_initial_wide_environment,
+# _initialize_wide_environment, _set_app_type, exit -- are NOT repeated.
+#
+# All 22 are clang-verified against include/msvcrt/.  _setmode needed
+# include/msvcrt/io.h added to wine_sig.py's PROBE_SRC (it is declared in
+# corecrt_io.h, which nothing already in the probe pulled in), and the four
+# size_t-returning entries -- fwrite, strcspn, strlen, wcslen -- needed the
+# clang-predefined-sugar respelling added to wine_sig.py; see the SUGAR_SPELLING
+# note there.  Neither change relaxes a check.
+# ---------------------------------------------------------------------------
+
+# index 9: __acrt_iob_func(i) -> &__iob[i], the real FILE* for stdin/stdout/
+# stderr.  The returned FILE* is HOST memory the guest only ever hands back to
+# other CRT exports (fwrite, _fileno); it never dereferences it itself.
+__acrt_iob_func               0x00000A0A  1  int   corecrt_wstdio.h:48
+
+# indices 10..11: the narrow-char siblings of __stdio_common_vswprintf at
+# index 2, and the same va_list reasoning applies -- the CALLER built the
+# va_list, so these are 5 and 6 ordinary 64-bit slots, not variadics.
+# Measured end-to-end on the AC922: a guest-built MS-x64 va_list was consumed
+# correctly by native ppc64 formatting ("%d-%s-%d" -> "4242-AB-77").
+__stdio_common_vfprintf       0x00000A0B  5  int   stdio.h:158
+__stdio_common_vsprintf       0x00000A0C  6  int   stdio.h:160
+
+# index 12: _crt_atexit takes _PVFV, a GUEST function pointer, and only
+# RECORDS it -- the call happens at exit() time.  Same host->guest callback
+# hazard as _initterm below, deferred rather than immediate.
+_crt_atexit                   0x00000A0D  1  int   corecrt_startup.h:60
+
+_fileno                       0x00000A0E  1  int   stdio.h:80
+
+# ---------------------------------------------------------------------------
+# indices 13..14: KNOWN LATENT HAZARD -- host->guest callback.
+# _initterm(_PVFV *first, _PVFV *last) and _initterm_e(_PIFV *, _PIFV *) walk
+# an array of FUNCTION POINTERS and CALL each non-NULL entry.  Those pointers
+# point at GUEST x86-64 code, so the native ppc64 implementation would branch
+# into x86-64 bytes and die.  We cannot do host->guest calls yet.
+# They are emitted anyway because the common case -- and winepath's case -- is
+# an EMPTY initialiser array (first == last), where neither function calls
+# anything and both are pure no-ops.  A guest with real C++ static
+# constructors or /GS-style initialisers WILL crash here.  Fix is a real
+# host->guest call path, not a change to this descriptor: the descriptor is
+# correct, the callback is what is missing.
+# ---------------------------------------------------------------------------
+_initterm                     0x00000A0F  2  void  corecrt_startup.h:29
+_initterm_e                   0x00000A10  2  int   corecrt_startup.h:30
+
+_setmode                      0x00000A11  2  int   corecrt_io.h:137
+
+# indices 16..18: the allocator trio.  _strdup's declaration carries
+# __WINE_MALLOC (a MacroQualifiedType), which changes nothing about its shape:
+# one pointer argument, char* return.  Same situation as kernel32's HeapAlloc.
+_strdup                       0x00000A12  1  int   string.h:26
+free                          0x00000A13  1  void  corecrt_malloc.h:30
+malloc                        0x00000A14  1  int   corecrt_malloc.h:31
+
+# index 19: fwrite returns size_t -- 64 bits on this target, so it fits the
+# single-slot return.  4 args (buf, size, count, FILE*).
+fwrite                        0x00000A15  4  int   stdio.h:136
+
+getenv                        0x00000A16  1  int   stdlib.h:224
+memmove                       0x00000A17  3  int   corecrt_wstring.h:31
+putchar                       0x00000A18  1  int   stdio.h:142
+puts                          0x00000A19  1  int   stdio.h:143
+
+# indices 24..29: plain string primitives.  strcspn/strlen/wcslen return
+# size_t; the rest return int or char*.
+strchr                        0x00000A1A  2  int   string.h:50
+strcmp                        0x00000A1B  2  int   string.h:51
+strcpy                        0x00000A1C  2  int   string.h:53
+strcspn                       0x00000A1D  2  int   string.h:55
+strlen                        0x00000A1E  1  int   string.h:57
+wcslen                        0x00000A1F  1  int   corecrt_wstring.h:63

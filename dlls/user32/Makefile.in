@@ -8,6 +8,7 @@ DELAYIMPORTS = imm32 combase
 VER_PRODUCTVERSION = 5,1,2600,2180
 
 SOURCES = \
+	user32.thunks \
 	button.c \
 	class.c \
 	clipboard.c \

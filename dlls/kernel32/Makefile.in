@@ -8,6 +8,7 @@ i386_EXTRADLLFLAGS = -Wl,--image-base,0x7b800000
 x86_64_EXTRADLLFLAGS = -Wl,--image-base,0x178000000
 
 SOURCES = \
+	kernel32.thunks \
 	atom.c \
 	comm.c \
 	computername.c \

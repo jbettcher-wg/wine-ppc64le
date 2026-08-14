@@ -1,0 +1,165 @@
+# AMD64 thunk export spec.
+#
+# ---------------------------------------------------------------------------
+# GUEST ARGUMENT REGISTERS AT THE TRAP  (load-bearing ABI -- read this)
+# ---------------------------------------------------------------------------
+# x86-64 SYSCALL architecturally writes the address of the following
+# instruction into RCX and RFLAGS into R11.  RCX is MS-x64's FIRST argument
+# register, so a bare `0f 05` stub destroys arg0 before the host can see it.
+# (Measured: a trap in GetModuleHandleW arrived with rcx = RIP+2.)  Each trap
+# stub therefore rescues arg0 first, the same trick the Linux syscall ABI uses
+# for its own 4th argument:
+#
+#       49 89 ca    mov r10, rcx      ; arg0 out of the way
+#       0f 05       syscall           ; free to clobber rcx/r11
+#       cc ...      int3 padding to the 16-byte stride
+#
+# So the host-visible argument registers are:
+#
+#       arg0 -> R10   (rescued from RCX -- NOT RCX)
+#       arg1 -> RDX
+#       arg2 -> R8
+#       arg3 -> R9
+#       arg4+ -> [RSP + 8 + i*8]   (past the pushed return address and the
+#                                   32-byte shadow space)
+#
+# The trapping RIP is  stubs_rva + index*stride + trap_off  (trap_off = 3 in
+# trap mode, 0 in direct mode), published in __wine_thunk_info -- do not infer
+# it from the stub bytes.
+#
+# ---------------------------------------------------------------------------
+# THE CORPUS IMPORT LISTS ARE NOT THE WHOLE SURFACE.
+# ---------------------------------------------------------------------------
+# guest-corpus/imports/ is built from import TABLES, so it sees only what the
+# loader binds.  A guest that resolves an export at run time --
+#
+#     GetProcAddress(GetModuleHandleA("KERNEL32"), "wine_get_unix_file_name")
+#
+# -- appears in no import table anywhere, and winepath.exe does exactly that
+# for both wine_get_*_file_name (programs/winepath/winepath.c:162,173; it
+# exit(3)s with "cannot get the address of ..." if the lookup returns NULL).
+# Dynamic resolution is a SECOND discovery channel the corpus cannot cover.
+# When adding a program, grep its source for GetProcAddress/LoadLibrary as
+# well as diffing its import list.  Such an export needs nothing special --
+# just to be present here, so the host's GetProcAddress override can hand back
+# the address of the stub in the guest's own thunk module.
+#
+# ---------------------------------------------------------------------------
+# The order of the export lines below IS the stub index order and is part of
+# the ABI: the host-side dispatcher uses it.  Append only, never reorder.
+#
+# Columns:
+#   <ExportName>  <imm32 returned by --body=direct>  <nargs>  <int|void>  <header>:<line>
+#
+# The last three columns are ASSERTIONS, not inputs.  gen_thunk_pe.py re-reads
+# each declaration out of Wine's own headers with clang and hard-fails if this
+# file disagrees.  Wine .spec files are NOT usable for this: they carry no
+# return type at all and their ARG_LONG is 32 bits.
+#
+DLL kernel32.dll
+
+GetCurrentProcessId       0x1234      0  int   processthreadsapi.h:254
+GetCurrentThreadId        0x00005678  0  int   processthreadsapi.h:256
+Sleep                     0x0000BEEF  1  void  winbase.h:2294
+GetModuleHandleW          0x0000CAFE  1  int   winbase.h:1818
+GetProcAddress            0x0000D00D  2  int   winbase.h:1861
+GetEnvironmentVariableW   0x0000FEED  3  int   winbase.h:1774
+# index 6: first export with >4 arguments -- exercises the [RSP+...] path.
+MultiByteToWideChar       0x0000B00C  6  int   winnls.h:982
+
+# indices 7..11: the stack fix.  These are the exports that could not work
+# while the dispatcher ran on the kernel stack.
+#   IsBadReadPtr raises an access violation and catches it in native code (SEH)
+#   the rest each go through an NT syscall (NtCreateEvent/NtSetEvent/
+#   NtWaitForSingleObject/NtClose)
+IsBadReadPtr              0x0000BAD1  2  int   winbase.h:2003
+CreateEventW              0x0000E7E0  4  int   winbase.h:1493
+SetEvent                  0x00005E7E  1  int   winbase.h:2236
+WaitForSingleObject       0x0000A17F  2  int   winbase.h:2346
+CloseHandle               0x0000C105  1  int   winbase.h:1454
+# index 12: raises with NO handler anywhere inside the callback, so the unwind
+# has to leave the switched stack and reach RtlUserThreadStart.  A wrong FDE
+# here hangs rather than crashes -- see probes/a_unwind.c.
+RaiseException            0x0000BEE7  4  void  winbase.h:2169
+
+# ---------------------------------------------------------------------------
+# indices 13..: the kernel32 half of the /tmp/realprog/hostname.exe import
+# table.  GetModuleHandleW (index 3) is already above and is NOT repeated.
+# Appended in the order the import table lists them, minus the two delay-load
+# entry points, which sort to the end because they need the .spec fallback.
+# ---------------------------------------------------------------------------
+GetComputerNameW          0x0000C0B7  2  int   winbase.h:1740
+GetOEMCP                  0x00000E30  0  int   winnls.h:938
+GetStdHandle              0x00005DA1  1  int   winbase.h:1894
+# HeapAlloc's declaration carries __WINE_MALLOC (winnt.h:225), which clang
+# prints as a MacroQualifiedType.  Its declared shape is unaffected: three
+# integer/pointer arguments, LPVOID return.
+HeapAlloc                 0x0000A110  3  int   winbase.h:1966
+HeapFree                  0x0000F4EE  3  int   winbase.h:1965
+# 8 arguments: four in registers, four at [RSP + 8 + i*8].
+WideCharToMultiByte       0x0000B2C0  8  int   winnls.h:997
+WriteConsoleW             0x0000C025  5  int   consoleapi.h:87
+WriteFile                 0x0000F11E  5  int   winbase.h:2361
+
+# ---------------------------------------------------------------------------
+# indices 21..22: the delay-load pair.  NEITHER IS DECLARED IN ANY WINE
+# HEADER -- grep include/ for them and you get nothing; delayloadhandler.h
+# has only the callback typedefs.  So the header oracle cannot see them and
+# the location column below cites Wine's .spec instead, which pins the arity
+# and the argument classes but NOT the return type.  The int/void column for
+# these two is a human assertion read off Wine's C source:
+#
+#   DelayLoadFailureHook   dlls/kernelbase/loader.c:205
+#       FARPROC WINAPI DelayLoadFailureHook( LPCSTR name, LPCSTR function )
+#       -> 2 pointer args, FARPROC (function pointer, 64-bit) return.
+#
+#   ResolveDelayLoadedAPI  is a pure .spec forward to NTDLL.LdrResolveDelayLoadedAPI,
+#       defined at dlls/ntdll/loader.c:3958:
+#       void* WINAPI LdrResolveDelayLoadedAPI( void* base,
+#                        const IMAGE_DELAYLOAD_DESCRIPTOR* desc,
+#                        PDELAYLOAD_FAILURE_DLL_CALLBACK dllhook,
+#                        PDELAYLOAD_FAILURE_SYSTEM_ROUTINE syshook,
+#                        IMAGE_THUNK_DATA* addr, ULONG flags )
+#       -> 6 integer/pointer args, void* return.
+#
+# Both C definitions agree with their .spec arities exactly, which is the only
+# cross-check available here.  If Wine ever grows real declarations for these,
+# move the citation to the header and drop them out of the banner.
+DelayLoadFailureHook      0x0000D1A0  2  int   kernel32.spec:366
+ResolveDelayLoadedAPI     0x0000D1A1  6  int   kernel32.spec:1326
+
+# ---------------------------------------------------------------------------
+# indices 23..29: the kernel32 half of programs/winepath.exe's import table
+# (guest-corpus/imports/programs/winepath.txt).  The five names winepath also
+# imports that are already above -- GetModuleHandleW, GetProcAddress,
+# HeapAlloc, HeapFree, WideCharToMultiByte -- are NOT repeated.
+# Every one of these has a real Wine header declaration, so all seven are
+# fully clang-verified; none needs the .spec fallback.
+# ---------------------------------------------------------------------------
+GetLongPathNameW          0x00000B01  3  int   winbase.h:1809
+GetModuleHandleA          0x00000B02  1  int   winbase.h:1817
+GetShortPathNameW         0x00000B03  3  int   winbase.h:1890
+# GetTickCount lives in sysinfoapi.h, not winbase.h -- winbase.h only #includes it.
+GetTickCount              0x00000B04  0  int   sysinfoapi.h:97
+# 4 args (handle, flags, old block, new size) -- one more than HeapAlloc.
+HeapReAlloc               0x00000B05  4  int   winbase.h:1971
+IsBadStringPtrW           0x00000B06  2  int   winbase.h:2005
+lstrcmpiW                 0x00000B07  2  int   winbase.h:2387
+
+# ---------------------------------------------------------------------------
+# indices 30..31: winepath's two RUN-TIME-resolved exports.  These are in NO
+# import table -- see the "corpus import lists are not the whole surface"
+# banner above -- but winepath dies with exit(3) if GetProcAddress cannot find
+# them, so they have to be real exports of this thunk module.
+#
+# Shape-wise they are unremarkable: one const pointer in, one heap pointer
+# out, which the caller releases with HeapFree.  Guest and host share the
+# address space, so the returned pointer needs no marshalling.  Both
+# declarations carry __WINE_DEALLOC(HeapFree,3) __WINE_MALLOC, which clang
+# prints as a MacroQualifiedType and which does not affect the declared shape
+# (same situation as HeapAlloc at index 16).
+#
+# Both ARE declared in a Wine header, so both are fully clang-verified; the
+# kernel32.spec lines (1737/1738) only corroborate the arity.
+wine_get_unix_file_name   0x00000B08  1  int   winbase.h:2507
+wine_get_dos_file_name    0x00000B09  1  int   winbase.h:2508

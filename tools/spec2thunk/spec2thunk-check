@@ -1,0 +1,712 @@
+#!/usr/bin/env python3
+"""
+check_thunk_pe.py -- independently verify a generated AMD64 thunk PE.
+
+This parses the finished file from raw bytes with its own minimal PE reader.
+It shares NO code with the generator and trusts nothing the generator claims.
+
+In particular the signature descriptors are RE-DERIVED HERE by a completely
+different mechanism from the one that produced them: the generator drives
+clang (JSON AST + a compiled _Static_assert probe) over Wine's real headers;
+this checker does a plain regex scan of the header TEXT.  Two unrelated
+readings of the same headers having to agree is the point -- a shared helper
+module would have made the cross-check worthless.
+
+Prints PASS/FAIL per property; exits nonzero if anything FAILed.
+"""
+
+import argparse
+import os
+import re
+import struct
+import sys
+
+STRIDE = 16
+INFO_VERSION = 3
+# Byte offset of the trapping instruction inside a stub, per body mode.
+# trap mode prefixes `mov r10, rcx` (49 89 ca) because x86-64 SYSCALL
+# architecturally overwrites RCX -- which is MS-x64 argument 0 -- with RIP+2.
+TRAP_OFF = {'direct': 0, 'trap': 3}
+TRAP_INSN = b'\x0f\x05'
+BUILTIN_SIG = b"Wine builtin DLL\x00"
+SIG_OFF = 0x40
+
+IMAGE_FILE_RELOCS_STRIPPED = 0x0001
+IMAGE_FILE_DLL = 0x2000
+IMAGE_SCN_CNT_CODE = 0x00000020
+IMAGE_SCN_MEM_EXECUTE = 0x20000000
+IMAGE_SCN_MEM_WRITE = 0x80000000
+DIR_EXPORT = 0
+DIR_BASERELOC = 5
+
+DEFAULT_WINE_SOURCE = \
+    '~/Development/powerpc64le-ports/hangover-ppc64le/wine-upstream'
+DEFAULT_WINE_INCLUDE = DEFAULT_WINE_SOURCE + '/include'
+
+
+class Fail(Exception):
+    pass
+
+
+class Report:
+    def __init__(self):
+        self.bad = 0
+        self.n = 0
+
+    def check(self, ok, label, detail=''):
+        self.n += 1
+        if not ok:
+            self.bad += 1
+        print("%-4s %-58s %s" % ('PASS' if ok else 'FAIL', label, detail))
+        return ok
+
+    def note(self, label, detail=''):
+        print("%-4s %-58s %s" % ('info', label, detail))
+
+
+# ---------------------------------------------------------------- PE reader
+
+class PE:
+    def __init__(self, path):
+        with open(path, 'rb') as f:
+            self.d = f.read()
+        d = self.d
+        if d[:2] != b'MZ':
+            raise Fail('no MZ magic')
+        self.e_lfanew = struct.unpack_from('<I', d, 0x3c)[0]
+        p = self.e_lfanew
+        if d[p:p + 4] != b'PE\0\0':
+            raise Fail('no PE signature at e_lfanew=0x%x' % p)
+        (self.machine, self.nsections, _, _, _,
+         self.size_opt, self.characteristics) = struct.unpack_from('<HHIIIHH', d, p + 4)
+        o = p + 24                                  # optional header
+        self.opt_magic = struct.unpack_from('<H', d, o)[0]
+        self.entry = struct.unpack_from('<I', d, o + 16)[0]
+        if self.opt_magic == 0x20b:
+            self.image_base = struct.unpack_from('<Q', d, o + 24)[0]
+            self.nrva = struct.unpack_from('<I', d, o + 108)[0]
+            dd = o + 112
+        else:
+            self.image_base = struct.unpack_from('<I', d, o + 28)[0]
+            self.nrva = struct.unpack_from('<I', d, o + 92)[0]
+            dd = o + 96
+        self.dirs = [struct.unpack_from('<II', d, dd + 8 * i) for i in range(self.nrva)]
+        self.sections = []
+        s = p + 24 + self.size_opt
+        for i in range(self.nsections):
+            raw = d[s + 40 * i: s + 40 * (i + 1)]
+            name = raw[:8].rstrip(b'\0').decode('latin1')
+            vsize, vaddr, rsize, raddr = struct.unpack_from('<IIII', raw, 8)
+            flags = struct.unpack_from('<I', raw, 36)[0]
+            self.sections.append(dict(name=name, vsize=vsize, vaddr=vaddr,
+                                      rsize=rsize, raddr=raddr, flags=flags))
+
+    def dir(self, i):
+        return self.dirs[i] if i < len(self.dirs) else (0, 0)
+
+    def section_of(self, rva):
+        for s in self.sections:
+            if s['vaddr'] <= rva < s['vaddr'] + max(s['vsize'], s['rsize']):
+                return s
+        return None
+
+    def off(self, rva):
+        s = self.section_of(rva)
+        if s is None:
+            raise Fail('RVA 0x%x is not in any section' % rva)
+        o = s['raddr'] + (rva - s['vaddr'])
+        if o >= len(self.d):
+            raise Fail('RVA 0x%x maps past EOF' % rva)
+        return o
+
+    def read(self, rva, n):
+        o = self.off(rva)
+        b = self.d[o:o + n]
+        if len(b) != n:
+            raise Fail('short read at RVA 0x%x' % rva)
+        return b
+
+    def u32(self, rva):
+        return struct.unpack_from('<I', self.read(rva, 4))[0]
+
+    def cstr(self, rva):
+        o = self.off(rva)
+        e = self.d.index(b'\0', o)
+        return self.d[o:e].decode('latin1')
+
+    def exports(self):
+        va, sz = self.dir(DIR_EXPORT)
+        if not va:
+            raise Fail('no export directory')
+        hdr = self.read(va, 40)
+        (_, _, _, _, name_rva, _ordbase, naddr, nnames,
+         addr_rva, names_rva, ords_rva) = struct.unpack_from('<IIHHIIIIIII', hdr, 0)
+        eat = [self.u32(addr_rva + 4 * i) for i in range(naddr)]
+        out = {}
+        for i in range(nnames):
+            nm = self.cstr(self.u32(names_rva + 4 * i))
+            ordi = struct.unpack_from('<H', self.read(ords_rva + 2 * i, 2))[0]
+            out[nm] = eat[ordi]
+        return self.cstr(name_rva), out, (va, sz)
+
+
+# ------------------------------------------- independent header text scanner
+
+DECORATORS = {'extern', 'static', 'inline', 'FORCEINLINE', 'const', 'struct',
+              'DECLSPEC_NORETURN', 'DECLSPEC_HOTPATCH', '__declspec(dllimport)'}
+# Calling-convention token that sits between the return type and the name.
+# CDECL is Wine's own spelling of __cdecl (include/minwindef.h:160) and is what
+# the wine_get_*_file_name extensions in winbase.h use:
+#
+#     extern char * CDECL wine_get_unix_file_name( const WCHAR * ) ...
+#
+# Leaving it out of this alternation made check 11c report those as "no
+# declaration in Wine headers" when winbase.h declares both -- a scanner blind
+# spot, not a missing declaration.  \b on each side so a longer identifier that
+# merely ENDS in a convention name (X__cdecl, MY_CDECL) cannot be split into a
+# bogus return-type / convention pair.
+CONV = (r'\b(?:WINAPI|APIENTRY|WINAPIV|CALLBACK|CDECL'
+        r'|__cdecl|__stdcall|__clrcall|__fastcall)\b')
+
+
+def strip_comments(text):
+    """Blank comments out WITHOUT changing the line numbering -- the cited
+    header:line has to survive this, so newlines inside a block comment are
+    preserved rather than collapsed."""
+    text = re.sub(r'/\*.*?\*/',
+                  lambda m: '\n' * m.group(0).count('\n') or ' ',
+                  text, flags=re.DOTALL)
+    return re.sub(r'//[^\n]*', ' ', text)
+
+
+def split_top(text):
+    out, depth, cur = [], 0, ''
+    for ch in text:
+        if ch in '([':
+            depth += 1
+        elif ch in ')]':
+            depth -= 1
+        if ch == ',' and depth == 0:
+            out.append(cur.strip())
+            cur = ''
+        else:
+            cur += ch
+    if cur.strip():
+        out.append(cur.strip())
+    return out
+
+
+def clean_ret(spelling):
+    """Drop API-export macros and storage class from a return spelling."""
+    toks = [t for t in spelling.replace('*', ' * ').split() if t]
+    keep = [t for t in toks
+            if t not in DECORATORS and not re.fullmatch(r'[A-Z][A-Z0-9_]*API', t)
+            and not re.fullmatch(r'DECLSPEC_[A-Z_]+', t)
+            # CRT import decoration: _ACRTIMP, _ACRTIMP_ALT, _CRTIMP, _SECIMP.
+            # Without this every include/msvcrt declaration reads as returning
+            # "_ACRTIMP void" and so is scored as NON-void.
+            and not re.fullmatch(r'_[A-Z][A-Z0-9_]*IMP(_ALT)?', t)]
+    return ' '.join(keep).replace(' *', '*')
+
+
+class HeaderScan:
+    """Regex scan of Wine's header TEXT. Deliberately not the generator's method."""
+
+    # Subdirectories of include/ that hold declarations a thunk spec may cite.
+    # NOT a full walk: include/ddk and include/wine are private/driver headers
+    # that redeclare Win32 names with different shapes, and pulling them in
+    # would manufacture bogus 11d conflicts.  msvcrt/ is where the CRT lives
+    # and is the only one a ucrtbase spec needs.
+    SUBDIRS = ('msvcrt',)
+
+    def __init__(self, include_dir):
+        self.dir = os.path.abspath(os.path.expanduser(include_dir))
+        # paths relative to self.dir, so "msvcrt/corecrt_startup.h"
+        files = [f for f in os.listdir(self.dir) if f.endswith('.h')]
+        for sub in self.SUBDIRS:
+            d = os.path.join(self.dir, sub)
+            if not os.path.isdir(d):
+                continue
+            files += [os.path.join(sub, f) for f in os.listdir(d)
+                      if f.endswith('.h')]
+        self.files = sorted(files)
+
+    # An object-like rename is a real declaration mechanism in Wine's CRT
+    # headers, and a plain text scan is blind to it:
+    #
+    #     include/msvcrt/corecrt_startup.h:53   #define _set_app_type __set_app_type
+    #     include/msvcrt/corecrt_startup.h:70   _ACRTIMP void __cdecl _set_app_type(_crt_app_type);
+    #
+    # After preprocessing, line 70 declares __set_app_type -- which is what
+    # msvcrt.dll actually exports and what clang reports (at line 70, the
+    # macro's expansion location).  The token `__set_app_type` never appears in
+    # front of a `(` anywhere, so without this the scan reported "no
+    # declaration in Wine headers" for a name Wine does declare: a scanner
+    # blind spot, the same class as the missing CDECL token in CONV above.
+    ALIAS_RE = re.compile(r'^[ \t]*#[ \t]*define[ \t]+'
+                          r'(?P<alias>[A-Za-z_][A-Za-z_0-9]*)[ \t]+'
+                          r'(?P<real>[A-Za-z_][A-Za-z_0-9]*)[ \t]*$',
+                          re.MULTILINE)
+
+    def _aliases(self, names):
+        """-> {alias_token: real_export_name} for `#define ALIAS REAL` renames.
+
+        Only renames whose TARGET is an export we were asked about are
+        collected, so this cannot invent hits for anything else, and a spec
+        that names no macro-renamed export gets an empty map and byte-identical
+        behaviour to before.
+        """
+        want, out = set(names), {}
+        for relpath in self.files:
+            p = os.path.join(self.dir, relpath)
+            try:
+                with open(p, errors='replace') as fh:
+                    raw = fh.read()
+            except OSError:
+                continue
+            if not any(n in raw for n in want):
+                continue
+            for m in self.ALIAS_RE.finditer(strip_comments(raw)):
+                alias, real = m.group('alias'), m.group('real')
+                if real in want and alias != real and alias not in want:
+                    out[alias] = real
+        return out
+
+    def find(self, names):
+        """-> {name: [ {file,line,nargs,ret,void,variadic}, ... ]}"""
+        alias = self._aliases(names)
+        tokens = list(names) + sorted(alias)
+        pat = re.compile(
+            r'(?P<ret>[A-Za-z_][A-Za-z_0-9 \t\*\(\)]*?)\s*' + CONV +
+            r'\s+(?P<name>' + '|'.join(re.escape(n) for n in tokens) + r')\s*\(')
+        found = {n: [] for n in names}
+        for relpath in self.files:
+            fn = os.path.basename(relpath)   # spec files cite the basename
+            p = os.path.join(self.dir, relpath)
+            try:
+                with open(p, errors='replace') as fh:
+                    raw = fh.read()
+            except OSError:
+                continue
+            if not any(n in raw for n in tokens):
+                continue
+            text = strip_comments(raw)
+            for m in pat.finditer(text):
+                depth, j = 1, m.end()
+                while j < len(text) and depth:
+                    if text[j] == '(':
+                        depth += 1
+                    elif text[j] == ')':
+                        depth -= 1
+                    j += 1
+                inner = text[m.end():j - 1]
+                args = split_top(inner)
+                if len(args) == 1 and args[0].strip() in ('void', 'VOID', ''):
+                    args = []
+                ret = clean_ret(m.group('ret'))
+                tok = m.group('name')
+                found[alias.get(tok, tok)].append(dict(
+                    file=fn, line=text[:m.start('name')].count('\n') + 1,
+                    nargs=len(args), ret=ret, void=(ret in ('void', 'VOID')),
+                    variadic=any(a.strip() == '...' for a in args),
+                    via=(tok if tok in alias else None)))
+        return found
+
+
+class SpecScan:
+    """Independent re-reading of a cited Wine .spec line.
+
+    Only for the handful of exports Wine declares in NO header (kernel32's
+    delay-load entry points), which the thunk spec cites as
+    '<name>.spec:<line>'.  A .spec pins the ARITY and the argument classes and
+    nothing else -- no return type at all -- so this can confirm the argument
+    count in the descriptor but CANNOT confirm the void bit.  Entries checked
+    this way are reported as such rather than silently counted as verified.
+    """
+
+    NON_SLOT = ('double', 'float', 'int128')
+
+    def __init__(self, source_root):
+        self.root = os.path.abspath(os.path.expanduser(source_root))
+
+    def arity(self, name, specname, lineno):
+        """-> (nargs, detail) or raises Fail."""
+        import glob
+        hits = glob.glob(os.path.join(self.root, 'dlls', '*', specname))
+        if os.path.isfile(os.path.join(self.root, specname)):
+            hits = [os.path.join(self.root, specname)]
+        if len(hits) != 1:
+            raise Fail('%s: %d candidates under %s/dlls'
+                       % (specname, len(hits), self.root))
+        with open(hits[0], errors='replace') as fh:
+            lines = fh.readlines()
+        if not (1 <= lineno <= len(lines)):
+            raise Fail('%s has no line %d' % (specname, lineno))
+        raw = lines[lineno - 1].split('#', 1)[0].strip()
+        m = re.match(r'^@\s+\w+\s+(?:-\S+\s+)*(?P<name>[A-Za-z_][\w@.]*)\s*'
+                     r'\((?P<args>[^)]*)\)', raw)
+        if not m:
+            raise Fail('%s:%d is not a parsable export line: %r'
+                       % (specname, lineno, raw[:80]))
+        if m.group('name') != name:
+            raise Fail('%s:%d declares %r, not %r'
+                       % (specname, lineno, m.group('name'), name))
+        args = m.group('args').split()
+        bad = [a for a in args if a in self.NON_SLOT]
+        if bad:
+            raise Fail('%s:%d has non-slot argument(s) %s'
+                       % (specname, lineno, ', '.join(bad)))
+        return len(args), '%s:%d %s(%s)' % (specname, lineno, name,
+                                            ' '.join(args))
+
+
+# ---------------------------------------------------------------- spec
+
+def parse_spec(path):
+    dll, exports = None, []
+    with open(path) as f:
+        for raw in f:
+            line = raw.split('#', 1)[0].strip()
+            if not line:
+                continue
+            parts = line.split()
+            if parts[0].upper() == 'DLL':
+                dll = parts[1]
+                continue
+            if len(parts) != 5:
+                raise SystemExit('%s: malformed export line: %s' % (path, line))
+            name, imm, nargs, retkind, loc = parts
+            hdr, _, ln = loc.rpartition(':')
+            exports.append(dict(name=name, imm=int(imm, 0), nargs=int(nargs, 0),
+                                void=(retkind == 'void'), header=hdr, line=int(ln)))
+    return dll, exports
+
+
+def expect_stub(mode, imm):
+    if mode == 'direct':
+        body = b'\xb8' + struct.pack('<I', imm) + b'\xc3'
+    else:
+        body = b'\x49\x89\xca' + TRAP_INSN          # mov r10,rcx ; syscall
+    return body + b'\xcc' * (STRIDE - len(body))
+
+
+# ---------------------------------------------------------------- main
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('image')
+    ap.add_argument('--spec', required=True)
+    ap.add_argument('--body', choices=('direct', 'trap'), required=True)
+    ap.add_argument('--image-base', default='0x180000000')
+    ap.add_argument('--wine-include', default=DEFAULT_WINE_INCLUDE)
+    ap.add_argument('--wine-source', default=DEFAULT_WINE_SOURCE,
+                    help='Wine source root, used only to re-read a .spec line '
+                         'cited by an export that no header declares')
+    args = ap.parse_args()
+
+    r = Report()
+    print("=== checking %s (body=%s) ===" % (args.image, args.body))
+    spec_dll, spec_exports = parse_spec(args.spec)
+    spec_names = [e['name'] for e in spec_exports]
+
+    try:
+        pe = PE(args.image)
+    except Fail as e:
+        print("FAIL unable to parse image: %s" % e)
+        return 1
+
+    # -- 1. machine / PE32+
+    r.check(pe.machine == 0x8664, '1a FileHeader.Machine == 0x8664 (AMD64)',
+            '0x%04x' % pe.machine)
+    r.check(pe.opt_magic == 0x20b, '1b OptionalHeader.Magic == 0x20b (PE32+)',
+            '0x%04x' % pe.opt_magic)
+    r.check(bool(pe.characteristics & IMAGE_FILE_DLL),
+            '2  IMAGE_FILE_DLL set', 'Characteristics=0x%04x' % pe.characteristics)
+    r.check(pe.entry == 0, '3  OptionalHeader.AddressOfEntryPoint == 0',
+            '0x%08x' % pe.entry)
+
+    got = pe.d[SIG_OFF:SIG_OFF + len(BUILTIN_SIG)]
+    r.check(got == BUILTIN_SIG, '4a bytes[0x40..0x50] == "Wine builtin DLL\\0"',
+            repr(bytes(got)))
+    r.check(pe.e_lfanew > SIG_OFF + len(BUILTIN_SIG),
+            '4b e_lfanew > 0x51 (signature cannot clobber PE hdr)',
+            'e_lfanew=0x%x' % pe.e_lfanew)
+    r.check(len(pe.d) >= 96, '4c image >= 96 bytes (sizeof mz struct)',
+            '%d bytes' % len(pe.d))
+
+    try:
+        dllname, exp, (edir_va, edir_sz) = pe.exports()
+    except Fail as e:
+        print("FAIL export directory: %s" % e)
+        return 1
+    r.note('export dir', '%s, %d entries, dir=0x%x+0x%x'
+           % (dllname, len(exp), edir_va, edir_sz))
+    r.check(dllname.lower() == spec_dll.lower(),
+            '5a export directory Name matches spec DLL name', dllname)
+    missing = [n for n in spec_names if n not in exp]
+    r.check(not missing, '5b all spec functions exported BY NAME',
+            'missing=%s' % missing if missing else '%d names' % len(spec_names))
+    r.check('__wine_thunk_info' in exp, '8a __wine_thunk_info exported by name',
+            '0x%08x' % exp.get('__wine_thunk_info', 0))
+    stub_rvas = [exp[n] for n in spec_names if n in exp]
+    r.check(len(set(stub_rvas)) == len(stub_rvas),
+            '5c each named export has its own distinct slot',
+            '%d distinct of %d' % (len(set(stub_rvas)), len(stub_rvas)))
+
+    br_va, br_sz = pe.dir(DIR_BASERELOC)
+    r.check(br_va != 0 and br_sz != 0,
+            '9a IMAGE_DIRECTORY_ENTRY_BASERELOC non-empty',
+            'rva=0x%x size=0x%x' % (br_va, br_sz))
+    r.check(not (pe.characteristics & IMAGE_FILE_RELOCS_STRIPPED),
+            '9b IMAGE_FILE_RELOCS_STRIPPED NOT set', '')
+    if br_va:
+        try:
+            blk_rva, blk_sz = struct.unpack_from('<II', pe.read(br_va, 8))
+            nent = (blk_sz - 8) // 2 if blk_sz >= 8 else 0
+            r.check(blk_sz >= 8 and nent > 0, '9c first .reloc block has >=1 entry',
+                    'page=0x%x size=%d entries=%d' % (blk_rva, blk_sz, nent))
+        except Fail as e:
+            r.check(False, '9c first .reloc block readable', str(e))
+
+    want_base = int(args.image_base, 0)
+    r.check(pe.image_base == want_base,
+            '10 OptionalHeader.ImageBase == 0x%x' % want_base, '0x%x' % pe.image_base)
+
+    # -- 8. __wine_thunk_info
+    info_rva = exp.get('__wine_thunk_info')
+    fields = None
+    if info_rva:
+        try:
+            fields = struct.unpack_from('<IIIIIII', pe.read(info_rva, 28))
+        except Fail as e:
+            r.check(False, '8b __wine_thunk_info readable', str(e))
+    if not fields:
+        print("\n%d checks, %d FAIL" % (r.n, r.bad + 1))
+        return 1
+
+    version, count, stubs_rva, stride, names_rva, sigs_rva, trap_off = fields
+    r.note('__wine_thunk_info',
+           'ver=%d count=%d stubs_rva=0x%x stride=%d names_rva=0x%x '
+           'sigs_rva=0x%x trap_off=%d' % fields)
+    r.check(version == INFO_VERSION, '8b __wine_thunk_info.version == 3', str(version))
+    r.check(count == len(spec_names), '8c count == number of stubs',
+            '%d vs %d' % (count, len(spec_names)))
+    r.check(stride == STRIDE, '8d stride == 16', str(stride))
+    for tag, rva in (('__wine_thunk_info', info_rva), ('names_rva', names_rva),
+                     ('sigs_rva', sigs_rva)):
+        s = pe.section_of(rva)
+        r.check(s is not None and not (s['flags'] & IMAGE_SCN_MEM_WRITE),
+                '8e %s is in a non-writable section' % tag,
+                ('%s flags=0x%08x' % (s['name'], s['flags'])) if s else 'no section')
+
+    walked = []
+    try:
+        for i in range(count):
+            walked.append(pe.cstr(pe.u32(names_rva + 4 * i)))
+    except Fail as e:
+        r.check(False, '8f walk names_rva -> name strings', str(e))
+    if len(walked) == count:
+        r.check(walked == spec_names, '8f names_rva[] names match spec order',
+                ','.join(walked) if walked != spec_names else '%d names' % count)
+        r.check(all(n in exp for n in walked),
+                '8g every names_rva[] name is in the export directory')
+        bad = ['%s: 0x%x != 0x%x' % (n, exp.get(n, 0), stubs_rva + i * STRIDE)
+               for i, n in enumerate(walked) if exp.get(n) != stubs_rva + i * STRIDE]
+        r.check(not bad, '8h export RVA == stubs_rva + index*16 for every name',
+                '; '.join(bad) if bad else 'all %d ok' % count)
+
+    # -- 6. section holding the stubs
+    sec = pe.section_of(stubs_rva)
+    r.check(sec is not None and sec['name'] == '.thunk',
+            '6a stubs live in a section named ".thunk"', sec['name'] if sec else 'none')
+    if sec:
+        r.check(bool(sec['flags'] & IMAGE_SCN_MEM_EXECUTE), '6b .thunk is executable',
+                'flags=0x%08x' % sec['flags'])
+        r.check(bool(sec['flags'] & IMAGE_SCN_CNT_CODE), '6c .thunk is IMAGE_SCN_CNT_CODE',
+                'flags=0x%08x' % sec['flags'])
+        span = max(sec['vsize'], sec['rsize'])
+        r.check(stubs_rva + count * STRIDE <= sec['vaddr'] + span,
+                '6d all %d stubs fit inside .thunk' % count,
+                'need 0x%x, sec 0x%x+0x%x' % (count * STRIDE, sec['vaddr'], span))
+        r.check(stubs_rva % STRIDE == 0, '6e stubs_rva is 16-byte aligned',
+                '0x%x' % stubs_rva)
+
+    # -- 7. stub bodies, byte for byte
+    immmap = {e['name']: e['imm'] for e in spec_exports}
+    bad = []
+    for i, n in enumerate(spec_names[:count]):
+        rva = stubs_rva + i * STRIDE
+        try:
+            g = pe.read(rva, STRIDE)
+        except Fail as e:
+            bad.append('%s: %s' % (n, e))
+            continue
+        w = expect_stub(args.body, immmap[n])
+        if g != w:
+            bad.append('%s@0x%x: got %s want %s' % (n, rva, g.hex(), w.hex()))
+    r.check(not bad, '7  every stub body matches --body=%s exactly' % args.body,
+            '; '.join(bad) if bad else '%d stubs verified' % count)
+    r.check(all(exp[spec_names[i]] + STRIDE == exp[spec_names[i + 1]]
+                for i in range(len(spec_names) - 1)
+                if spec_names[i] in exp and spec_names[i + 1] in exp),
+            '6f stubs are contiguous at 16-byte stride')
+
+    # -- 12. published trap site
+    want_off = TRAP_OFF[args.body]
+    r.check(trap_off == want_off,
+            '12a trap_off == %d for --body=%s' % (want_off, args.body),
+            str(trap_off))
+    if args.body == 'trap':
+        bad = []
+        for i in range(count):
+            rva = stubs_rva + i * STRIDE + trap_off
+            try:
+                g = pe.read(rva, len(TRAP_INSN))
+            except Fail as e:
+                bad.append('stub %d: %s' % (i, e))
+                continue
+            if g != TRAP_INSN:
+                bad.append('stub %d @0x%x: %s not %s'
+                           % (i, rva, g.hex(), TRAP_INSN.hex()))
+        r.check(not bad,
+                '12b published trap site really holds SYSCALL (0f 05)',
+                '; '.join(bad) if bad else
+                '%d sites at stubs_rva+i*16+%d' % (count, trap_off))
+        bad = []
+        for i in range(count):
+            try:
+                g = pe.read(stubs_rva + i * STRIDE, 3)
+            except Fail as e:
+                bad.append('stub %d: %s' % (i, e))
+                continue
+            if g != b'\x49\x89\xca':
+                bad.append('stub %d: %s not 4989ca' % (i, g.hex()))
+        r.check(not bad,
+                '12c every trap stub starts with mov r10,rcx (49 89 ca)',
+                '; '.join(bad) if bad else 'arg0 rescued in all %d stubs' % count)
+        # nothing before the trap site may itself trap or return
+        r.check(TRAP_INSN not in pe.read(stubs_rva, trap_off),
+                '12d no earlier SYSCALL before the published trap site')
+    else:
+        r.check(trap_off == 0, '12b direct mode publishes no trap site',
+                'trap_off=%d' % trap_off)
+
+    # -- 11. signature descriptors, re-derived from Wine's headers by regex
+    descs = []
+    try:
+        descs = [pe.u32(sigs_rva + 4 * i) for i in range(count)]
+    except Fail as e:
+        r.check(False, '11a sigs_rva[] readable', str(e))
+    if len(descs) == count:
+        r.note('sigs_rva[]', ' '.join('0x%05x' % d for d in descs))
+        bad = ['%s=0x%08x' % (walked[i] if i < len(walked) else i, d)
+               for i, d in enumerate(descs) if d >> 9]
+        r.check(not bad, '11a descriptor reserved bits 9..31 are zero',
+                '; '.join(bad) if bad else 'all %d clean' % count)
+        bad = ['%s nargs=%d' % (walked[i], d & 0xff)
+               for i, d in enumerate(descs) if (d & 0xff) > 16]
+        r.check(not bad, '11b descriptor nargs <= 16',
+                '; '.join(bad) if bad else 'all %d in range' % count)
+
+        # Exports the thunk spec deliberately cites to a .spec file rather than
+        # a header: Wine declares them nowhere, so the header scan cannot and
+        # should not be expected to find them.  They get 11g instead of 11c.
+        by_spec = {e['name'] for e in spec_exports if e['header'].endswith('.spec')}
+
+        scan = HeaderScan(args.wine_include)
+        hits = scan.find(spec_names)
+        r.note('header scan', '%d headers in %s' % (len(scan.files), scan.dir))
+        nodecl = [n for n in spec_names if n not in by_spec and not hits[n]]
+        r.check(not nodecl, '11c every export has a declaration in Wine headers',
+                'not found: %s' % nodecl if nodecl else
+                '%d found (%d cited to a .spec instead)'
+                % (len(spec_names) - len(by_spec), len(by_spec)))
+        if by_spec:
+            sscan = SpecScan(args.wine_source)
+            bad = []
+            for i, e in enumerate(spec_exports):
+                if e['name'] not in by_spec:
+                    continue
+                try:
+                    n_args, detail = sscan.arity(e['name'], e['header'], e['line'])
+                except Fail as ex:
+                    bad.append(str(ex))
+                    continue
+                if i < len(descs) and (descs[i] & 0xff) != n_args:
+                    bad.append('%s: image says %d args, %s'
+                               % (e['name'], descs[i] & 0xff, detail))
+                elif e['nargs'] != n_args:
+                    bad.append('%s: thunk spec claims %d args, %s'
+                               % (e['name'], e['nargs'], detail))
+                else:
+                    r.note('  %-24s desc=0x%03x -> %d arg(s), return kind '
+                           'UNVERIFIABLE' % (e['name'], descs[i], n_args),
+                           'arity from %s' % detail)
+            r.check(not bad, '11g .spec-cited exports: arity matches the '
+                             'cited .spec line',
+                    '; '.join(bad) if bad else
+                    '%d confirmed (return kind NOT checked -- a .spec has none)'
+                    % len(by_spec))
+        conflict, mism, locbad = [], [], []
+        for i, e in enumerate(spec_exports):
+            n = e['name']
+            hs = hits[n]
+            if not hs:
+                continue
+            shapes = {(h['nargs'], h['void'], h['variadic']) for h in hs}
+            if len(shapes) != 1:
+                conflict.append('%s: %s' % (n, sorted(shapes)))
+                continue
+            nargs, void, variadic = shapes.pop()
+            if variadic:
+                mism.append('%s: header says varargs, must not have been emitted' % n)
+                continue
+            want = (nargs & 0xff) | (0x100 if void else 0)
+            if i < len(descs) and descs[i] != want:
+                mism.append('%s: image 0x%03x, headers say 0x%03x (%d args, ret %s)'
+                            % (n, descs[i], want, nargs, 'void' if void else 'non-void'))
+            # the spec's own claim, and the file:line it cites
+            if e['nargs'] != nargs or e['void'] != void:
+                mism.append('%s: spec claims %d args/%s, headers say %d args/%s'
+                            % (n, e['nargs'], 'void' if e['void'] else 'int',
+                               nargs, 'void' if void else 'int'))
+            if not any(h['file'] == e['header'] and h['line'] == e['line'] for h in hs):
+                locbad.append('%s: spec cites %s:%d, scan found %s'
+                              % (n, e['header'], e['line'],
+                                 ', '.join('%s:%d' % (h['file'], h['line']) for h in hs)))
+        r.check(not conflict, '11d Wine headers self-consistent for each export',
+                '; '.join(conflict) if conflict else 'no conflicting declarations')
+        r.check(not mism, '11e descriptor matches Wine headers (regex re-derivation)',
+                '; '.join(mism) if mism else '%d descriptors confirmed' % count)
+        r.check(not locbad, '11f spec cites a header:line that really declares it',
+                '; '.join(locbad) if locbad else 'all %d locations confirmed' % count)
+        for i, e in enumerate(spec_exports):
+            if hits[e['name']] and i < len(descs):
+                # Several headers can declare the same CRT name (stdio.h has
+                # both a UCRT `static inline` and the real msvcrt import
+                # declaration of _vsnprintf; process.h redeclares exit).  11d
+                # already proved every hit has the SAME shape, so any of them
+                # is correct for the descriptor -- but reporting hits[0] here
+                # printed a location the spec does not cite and that the reader
+                # then cannot find.  Show the CITED declaration when it is
+                # among the hits, and fall back to the first otherwise.
+                h = next((x for x in hits[e['name']]
+                          if x['file'] == e['header'] and x['line'] == e['line']),
+                         hits[e['name']][0])
+                via = '  (via %s)' % h['via'] if h.get('via') else ''
+                r.note('  %-24s desc=0x%03x -> %d arg(s), returns %s'
+                       % (e['name'], descs[i], descs[i] & 0xff,
+                          'void' if descs[i] & 0x100 else 'value'),
+                       'from %s:%d  %s%s' % (h['file'], h['line'], h['ret'], via))
+
+    print()
+    print("%d checks, %d FAIL" % (r.n, r.bad))
+    return 1 if r.bad else 0
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except Fail as e:
+        print("FAIL fatal: %s" % e)
+        sys.exit(1)

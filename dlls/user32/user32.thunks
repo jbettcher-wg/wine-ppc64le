@@ -1,0 +1,11 @@
+# Generalisation + refusal demonstration.  Two representable exports, three
+# that are not: a struct passed by value, a float argument, and varargs.
+# The unrepresentable three are REFUSED, not described.  Columns for a refused
+# export are never read (resolution refuses before the assertions are checked).
+DLL user32.dll
+
+GetSystemMetrics   0x0000A001  1  int   winuser.h:4304
+MessageBoxW        0x0000A002  4  int   winuser.h:4461
+MonitorFromPoint   0x0000A003  2  int   winuser.h:4472
+AngleArc           0x0000A004  6  int   wingdi.h:3784
+wsprintfW          0x0000A005  2  int   winuser.h:0
