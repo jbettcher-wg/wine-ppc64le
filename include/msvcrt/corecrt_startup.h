@@ -48,8 +48,8 @@ extern "C" {
 #endif
 
 #ifndef _UCRT
-_ACRTIMP void __cdecl __getmainargs(int *, char ***, char ***, int, int *);
-_ACRTIMP void __cdecl __wgetmainargs(int *, wchar_t ***, wchar_t ***, int, int *);
+_ACRTIMP int __cdecl __getmainargs(int *, char ***, char ***, int, int *);
+_ACRTIMP int __cdecl __wgetmainargs(int *, wchar_t ***, wchar_t ***, int, int *);
 #define _set_app_type __set_app_type
 #endif /* _UCRT */
 
