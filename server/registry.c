@@ -1819,7 +1819,22 @@ static void init_supported_machines(void)
         supported_machines[count++] = IMAGE_FILE_MACHINE_AMD64;
     }
 #elif defined(__powerpc64__)
-    if (prefix_type == PREFIX_64BIT) supported_machines[count++] = IMAGE_FILE_MACHINE_POWERPC64;
+    if (prefix_type == PREFIX_64BIT)
+    {
+        supported_machines[count++] = IMAGE_FILE_MACHINE_POWERPC64;
+        /* Advertised for the same reason aarch64 advertises AMD64: this list is
+         * what is_machine_supported() consults, and it is the gate an x86-64
+         * guest image has to clear before any emulator is ever asked to run it.
+         * As on aarch64 it is unconditional -- it says the prefix will accept
+         * such an image, not that a backend is present, and it is only the
+         * first entry that has to be real (native_machine below).
+         * I386 is deliberately not here.  It is not merely an unused extra: the
+         * init_registry() loops downstream key off this list, so adding it also
+         * creates drive_c/windows/syswow64 and marks Software\Classes\
+         * Wow6432Node shared.  AMD64 triggers neither.  Add I386 when there is
+         * a 32-bit guest story, not before. */
+        supported_machines[count++] = IMAGE_FILE_MACHINE_AMD64;
+    }
 #else
 #error Unsupported machine
 #endif
