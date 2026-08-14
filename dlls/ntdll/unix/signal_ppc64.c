@@ -1875,8 +1875,8 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                     * dispatcher is entered by an ordinary call, so the caller has
                     * already written it off; f31 is not, and using it here silently
                     * replaced the caller's f31 with the FPSCR on every syscall. */
-                   "mffs 31\n\t"                    /* GATE-SABOTAGE */
-                   "stfd 31, 0x128(31)\n\t"            /* GATE-SABOTAGE */
+                   "mffs 0\n\t"
+                   "stfd 0, 0x128(31)\n\t"
                    /* non-volatile VRs; stvx needs an index register, and r11 is
                     * free now that the syscall id is in the frame */
                    "li 11, 0x390\n\t"               /* 0x250 + 20*16 */
@@ -2269,8 +2269,8 @@ __ASM_GLOBAL_FUNC( __wine_unix_call_dispatcher,
                    "stfd 30, 0x240(31)\n\t"
                    "stfd 31, 0x248(31)\n\t"
                    /* FPSCR through a volatile FPR -- see __wine_syscall_dispatcher */
-                   "mffs 31\n\t"                    /* GATE-SABOTAGE */
-                   "stfd 31, 0x128(31)\n\t"            /* GATE-SABOTAGE */
+                   "mffs 0\n\t"
+                   "stfd 0, 0x128(31)\n\t"
                    "li 11, 0x390\n\t"
                    "stvx 20, 31, 11\n\t"
                    "addi 11, 11, 16\n\t"
