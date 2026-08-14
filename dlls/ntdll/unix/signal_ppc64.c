@@ -1037,6 +1037,69 @@ NTSTATUS KeUserModeCallback( ULONG id, const void *args, ULONG len, void **ret_p
 
 
 /***********************************************************************
+ *           call_emu_trap_dispatcher
+ *
+ * Hand a guest trap to the PE-side dispatcher.
+ *
+ * The embedded emulator is unix code: it runs on this thread's kernel stack,
+ * and so does the trap callback it invokes.  But a guest import thunk resolves
+ * to Win32 code, which must not run there.  The syscall dispatcher would reuse
+ * the syscall frame that still describes the unix call the emulator is running
+ * inside, and switch r1 back into the live frames below it -- so a callee that
+ * syscalled or raised silently corrupted the kernel stack underneath the
+ * emulator.  Pushing a syscall frame of our own is therefore as necessary as
+ * moving to the Win32 stack, and KeUserModeCallback already does exactly both
+ * for user callbacks, so enter user mode the same way it does.
+ *
+ * frame->gpr[1] is the Win32 stack pointer this thread had when it made the
+ * unix call the emulator is running inside; everything below it is free.
+ */
+NTSTATUS call_emu_trap_dispatcher( void *func, void *ctx )
+{
+    static int on_kernel_stack = -1;
+
+    struct thread_data *data = get_thread_data();
+    struct syscall_frame *frame = get_syscall_frame( data );
+    ULONG len = sizeof(ctx);
+    ULONG_PTR user_sp = frame->gpr[1];
+    struct callback_stack_layout *stack;
+    void *ret_ptr;
+    ULONG ret_len;
+    ULONG_PTR sp;
+
+    if (!func) return STATUS_INVALID_PARAMETER;
+    if ((char *)get_kernel_stack( data ) + min_kernel_stack > (char *)&frame) return STATUS_STACK_OVERFLOW;
+
+    /* Verification hook.  WINEEMUKERNELSTACK=1 enters the dispatcher on the
+     * kernel stack it was called on instead, which is what happened before this
+     * function existed, so that the tests proving the switch matters have a
+     * negative control that changes nothing else about the entry path.
+     * See probes/check-guest-imports.sh. */
+    if (on_kernel_stack == -1)
+    {
+        const char *str = getenv( "WINEEMUKERNELSTACK" );
+        on_kernel_stack = (str && *str == '1');
+    }
+    if (on_kernel_stack) user_sp = (ULONG_PTR)&ret_len;
+
+    sp = (user_sp - PPC64_RED_ZONE -
+          offsetof( struct callback_stack_layout, args_data[sizeof(ctx)] )) & ~15;
+    stack = (struct callback_stack_layout *)sp;
+
+    memset( stack->linkage, 0, sizeof(stack->linkage) );
+    stack->linkage[0] = user_sp;        /* back chain, so an unwind walks out */
+    stack->args = stack->args_data;
+    stack->len  = len;
+    stack->id   = 0;
+    stack->lr   = frame->lr;
+    stack->sp   = user_sp;
+    stack->pc   = frame->pc;
+    memcpy( stack->args_data, &ctx, len );
+    return call_user_mode_callback( sp, &ret_ptr, &ret_len, func, data->teb );
+}
+
+
+/***********************************************************************
  *           NtCallbackReturn  (NTDLL.@)
  */
 NTSTATUS WINAPI NtCallbackReturn( void *ret_ptr, ULONG ret_len, NTSTATUS status )
@@ -1426,6 +1489,12 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
         if (!virtual_handle_fault( data, &rec, (void *)SP_sig(context) )) return;
         break;
     }
+
+    /* Must precede handle_syscall_fault: the emulator's JIT is unix code on
+     * the kernel stack, so a guest fault is indistinguishable from a fault
+     * inside a syscall and would be swallowed into a bare status code with
+     * the guest state thrown away.  Does not return when it takes the fault. */
+    if (emu_handle_fault( context )) return;
 
     if (handle_syscall_fault( data, context, &rec )) return;
     if (faultdump_enabled()) faultdump( signal, siginfo, context );

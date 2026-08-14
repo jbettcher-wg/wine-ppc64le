@@ -987,6 +987,366 @@ static BOOL thread_start_is_guest_code( const void *entry )
 }
 
 /***********************************************************************
+ *           guest import thunks
+ *
+ * A guest AMD64 image binds its imports to AMD64 thunk modules served from
+ * that machine's own system directory (see get_machine_system_dir() in
+ * loader.c), whose exported functions are nothing but a five-byte stub ending
+ * in the emulator bridge's trap opcode.  Executing one traps out with the
+ * complete guest register file, which at that instant is exactly the MS-x64
+ * argument-passing state of the call the guest just made -- so converting it
+ * to an ELFv2 call is a plain C call with the arguments read out of the
+ * CONTEXT.  Nothing has to be copied: the emulator runs guest code in this
+ * process's address space, so a guest pointer IS a host pointer and a guest
+ * UTF-16 string IS a WCHAR string.
+ *
+ * The native implementation is then the same-named export of the same-named
+ * module in the native machine's namespace, which the two are kept in by the
+ * same directory split that chose the thunk in the first place.
+ */
+
+/* Published by a thunk module through its __wine_thunk_info export. */
+struct thunk_info
+{
+    UINT version;      /* 3 */
+    UINT count;        /* number of stubs */
+    UINT stubs_rva;    /* stub i is at stubs_rva + i * stride */
+    UINT stride;
+    UINT names_rva;    /* count RVAs of NUL-terminated ASCII export names */
+    UINT sigs_rva;     /* count descriptors, see below */
+    UINT trap_off;     /* offset of the trapping instruction within a stub */
+};
+
+#define THUNK_INFO_VERSION   3
+#define THUNK_SIG_ARGC(sig)  ((sig) & 0xff)   /* integer/pointer arguments */
+#define THUNK_SIG_RESERVED   0xfffffe00u      /* must be zero; bit 8 = void return */
+
+#define THUNK_MAX_ARGS 16
+
+/* FEXBRIDGE_TRAP_* */
+#define GUEST_TRAP_CONTINUE 0
+#define GUEST_TRAP_EXIT     1
+
+/***********************************************************************
+ *           guest namespace overrides
+ *
+ * Almost every thunked export is pass-through: read the guest's arguments out
+ * of the CONTEXT and call the identically-named native export, since guest
+ * memory is host memory and a HANDLE is an opaque token either way.
+ *
+ * A few cannot be, because what they return only means anything in one
+ * machine's namespace.  GetProcAddress is the sharp one: pass-through hands
+ * the guest the address of native ppc64 code, which the guest then CALLs --
+ * ppc64 bytes decoded as x86-64.  What the guest actually asked for is the
+ * address of the matching stub in its OWN thunk module, which is a perfectly
+ * good guest-callable address.  So these few are implemented here against the
+ * guest module list instead of being forwarded.
+ *
+ * An override takes the already-marshalled argument slots, so it sees exactly
+ * what the guest passed.
+ */
+typedef ULONG_PTR (*thunk_override_func)( const ULONG_PTR *a );
+
+struct thunk_override
+{
+    const WCHAR         *module;
+    const char          *name;
+    UINT                 argc;
+    thunk_override_func  func;
+};
+
+/***********************************************************************
+ *           find_guest_module
+ *
+ * A loaded module of the guest machine, by base name.  Deliberately does not
+ * fall back to the native namespace: a guest asking for "kernel32" must get
+ * its own kernel32 or nothing.
+ */
+static HMODULE find_guest_module( const WCHAR *name )
+{
+    WCHAR buf[64];
+    UNICODE_STRING want;
+    LIST_ENTRY *mark, *entry;
+
+    if (!wcschr( name, '.' ))  /* GetModuleHandle appends .dll when there is no extension */
+    {
+        if (wcslen( name ) + 5 > ARRAY_SIZE(buf)) return NULL;
+        wcscpy( buf, name );
+        wcscat( buf, L".dll" );
+        name = buf;
+    }
+    RtlInitUnicodeString( &want, name );
+
+    mark = &NtCurrentTeb()->Peb->LdrData->InMemoryOrderModuleList;
+    for (entry = mark->Flink; entry != mark; entry = entry->Flink)
+    {
+        LDR_DATA_TABLE_ENTRY *mod = CONTAINING_RECORD( entry, LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks );
+        const IMAGE_NT_HEADERS *nt = RtlImageNtHeader( mod->DllBase );
+
+        if (!nt || nt->FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64) continue;
+        if (RtlEqualUnicodeString( &want, &mod->BaseDllName, TRUE )) return mod->DllBase;
+    }
+    return NULL;
+}
+
+static ULONG_PTR emu_GetModuleHandleW( const ULONG_PTR *a )
+{
+    /* NULL means "the main image", which is the guest exe either way */
+    if (!a[0]) return (ULONG_PTR)NtCurrentTeb()->Peb->ImageBaseAddress;
+    return (ULONG_PTR)find_guest_module( (const WCHAR *)a[0] );
+}
+
+static ULONG_PTR emu_GetModuleHandleA( const ULONG_PTR *a )
+{
+    UNICODE_STRING str;
+    ANSI_STRING ansi;
+    ULONG_PTR ret;
+
+    if (!a[0]) return (ULONG_PTR)NtCurrentTeb()->Peb->ImageBaseAddress;
+    RtlInitAnsiString( &ansi, (const char *)a[0] );
+    if (RtlAnsiStringToUnicodeString( &str, &ansi, TRUE )) return 0;
+    ret = (ULONG_PTR)find_guest_module( str.Buffer );
+    RtlFreeUnicodeString( &str );
+    return ret;
+}
+
+static ULONG_PTR emu_GetProcAddress( const ULONG_PTR *a )
+{
+    const IMAGE_NT_HEADERS *nt = RtlImageNtHeader( (HMODULE)a[0] );
+    ANSI_STRING name;
+    void *proc;
+
+    /* The result is going to be CALLED by guest code, so only a guest module
+     * can answer.  Handing back a native address would crash later and a long
+     * way from here, so refuse instead -- the guest sees NULL, which is a
+     * documented outcome its caller already has to handle. */
+    if (!nt || nt->FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64)
+    {
+        WARN( "GetProcAddress(%p) is not a guest module, refusing\n", (void *)a[0] );
+        return 0;
+    }
+    if (a[1] >> 16)
+    {
+        RtlInitAnsiString( &name, (const char *)a[1] );
+        if (LdrGetProcedureAddress( (HMODULE)a[0], &name, 0, &proc )) return 0;
+    }
+    else if (LdrGetProcedureAddress( (HMODULE)a[0], NULL, (ULONG)a[1], &proc )) return 0;
+
+    return (ULONG_PTR)proc;
+}
+
+static const struct thunk_override thunk_overrides[] =
+{
+    { L"kernel32.dll", "GetProcAddress",    2, emu_GetProcAddress },
+    { L"kernel32.dll", "GetModuleHandleW",  1, emu_GetModuleHandleW },
+    { L"kernel32.dll", "GetModuleHandleA",  1, emu_GetModuleHandleA },
+};
+
+/***********************************************************************
+ *           find_guest_thunk_target
+ *
+ * Resolve a trapping guest address to the native function it stands for, or
+ * to the override that stands in for it.
+ */
+static void *find_guest_thunk_target( ULONG_PTR rip, UINT *argc, thunk_override_func *override )
+{
+    LIST_ENTRY *mark, *entry;
+
+    mark = &NtCurrentTeb()->Peb->LdrData->InMemoryOrderModuleList;
+    for (entry = mark->Flink; entry != mark; entry = entry->Flink)
+    {
+        LDR_DATA_TABLE_ENTRY *mod = CONTAINING_RECORD( entry, LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks );
+        const IMAGE_NT_HEADERS *nt = RtlImageNtHeader( mod->DllBase );
+        ULONG_PTR base = (ULONG_PTR)mod->DllBase;
+        ANSI_STRING func_name;
+        struct thunk_info *info;
+        const UINT *names, *sigs;
+        HMODULE native;
+        void *proc;
+        UINT idx, sig, i;
+
+        if (!nt || nt->FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64) continue;
+        if (rip < base || rip >= base + nt->OptionalHeader.SizeOfImage) continue;
+
+        RtlInitAnsiString( &func_name, "__wine_thunk_info" );
+        if (LdrGetProcedureAddress( mod->DllBase, &func_name, 0, (void **)&info ))
+        {
+            ERR( "%s is a guest module but exports no __wine_thunk_info\n",
+                 debugstr_w(mod->BaseDllName.Buffer) );
+            return NULL;
+        }
+        if (info->version != THUNK_INFO_VERSION || !info->stride)
+        {
+            ERR( "%s has thunk info version %u, expected %u\n",
+                 debugstr_w(mod->BaseDllName.Buffer), info->version, THUNK_INFO_VERSION );
+            return NULL;
+        }
+
+        /* The stub rescues the guest's first argument before trapping, so the
+         * trap is at a fixed offset inside the stub rather than at its start;
+         * the module publishes that offset.  Requiring an exact hit keeps a
+         * stray trap from anywhere else in the image out of the dispatch. */
+        if (rip < base + info->stubs_rva + info->trap_off) return NULL;
+        idx = (rip - (base + info->stubs_rva + info->trap_off)) / info->stride;
+        if (idx >= info->count) return NULL;
+        if (base + info->stubs_rva + info->trap_off + (ULONG_PTR)idx * info->stride != rip) return NULL;
+
+        names = (const UINT *)(base + info->names_rva);
+        sigs  = (const UINT *)(base + info->sigs_rva);
+        sig = sigs[idx];
+        if ((sig & THUNK_SIG_RESERVED) || THUNK_SIG_ARGC(sig) > THUNK_MAX_ARGS)
+        {
+            ERR( "%s stub %u has unusable signature %08x\n",
+                 debugstr_w(mod->BaseDllName.Buffer), idx, sig );
+            return NULL;
+        }
+
+        *argc = THUNK_SIG_ARGC(sig);
+
+        /* An export whose answer only means something in one machine's
+         * namespace is answered here rather than forwarded; see above. */
+        for (i = 0; i < ARRAY_SIZE(thunk_overrides); i++)
+        {
+            if (strcmp( (char *)(base + names[idx]), thunk_overrides[i].name )) continue;
+            if (wcsicmp( mod->BaseDllName.Buffer, thunk_overrides[i].module )) continue;
+            if (THUNK_SIG_ARGC(sig) != thunk_overrides[i].argc)
+            {
+                ERR( "%s.%s override expects %u args, thunk says %u\n",
+                     debugstr_w(mod->BaseDllName.Buffer), thunk_overrides[i].name,
+                     thunk_overrides[i].argc, THUNK_SIG_ARGC(sig) );
+                return NULL;
+            }
+            TRACE( "%s.%s -> override (%u args)\n", debugstr_w(mod->BaseDllName.Buffer),
+                   thunk_overrides[i].name, thunk_overrides[i].argc );
+            *override = thunk_overrides[i].func;
+            return NULL;
+        }
+
+        /* The native namespace: same base name, resolved for our own machine.
+         * Nothing native necessarily references it -- a guest process may be
+         * the only reason the module is wanted at all -- so load it if it is
+         * not already present rather than treating that as a failure. */
+        if (LdrGetDllHandle( NULL, 0, &mod->BaseDllName, &native ) &&
+            LdrLoadDll( NULL, 0, &mod->BaseDllName, &native ))
+        {
+            ERR( "no native %s to implement guest imports\n", debugstr_w(mod->BaseDllName.Buffer) );
+            return NULL;
+        }
+        RtlInitAnsiString( &func_name, (char *)(base + names[idx]) );
+        if (LdrGetProcedureAddress( native, &func_name, 0, &proc ))
+        {
+            ERR( "native %s has no %s\n", debugstr_w(mod->BaseDllName.Buffer), func_name.Buffer );
+            return NULL;
+        }
+
+        TRACE( "%s.%s -> %p (%u args)\n", debugstr_w(mod->BaseDllName.Buffer),
+               (char *)(base + names[idx]), proc, THUNK_SIG_ARGC(sig) );
+        return proc;
+    }
+    return NULL;
+}
+
+/***********************************************************************
+ *           call_native_thunk
+ *
+ * MS-x64 -> ELFv2.  Extra arguments are harmless on ELFv2 (the callee simply
+ * ignores the high registers), so a single widest-form call covers every
+ * arity; only the arguments the function actually has are read, since the
+ * stack ones past the shadow space would otherwise be uninitialised memory.
+ *
+ * Argument 0 comes from R10, not RCX.  The trap opcode is x86-64 SYSCALL,
+ * which architecturally overwrites RCX with the address of the following
+ * instruction (and R11 with the flags) -- and RCX is precisely where MS-x64
+ * puts the first argument.  The stub therefore does `mov r10, rcx` before
+ * trapping, the same rescue the Linux syscall ABI performs for its own
+ * fourth argument.  R10 is not an MS-x64 argument register and SYSCALL does
+ * not touch it.  Both RCX and R11 are volatile under MS-x64, so the guest
+ * cannot observe the damage after the call returns.
+ */
+static void marshal_thunk_args( const AMD64_CONTEXT *ctx, UINT argc, ULONG_PTR *a )
+{
+    UINT i;
+
+    for (i = 0; i < argc; i++)
+    {
+        switch (i)
+        {
+        case 0: a[0] = ctx->R10; break;
+        case 1: a[1] = ctx->Rdx; break;
+        case 2: a[2] = ctx->R8;  break;
+        case 3: a[3] = ctx->R9;  break;
+        /* the caller's stack arguments sit past the pushed return address and
+         * the 32 bytes of shadow space MS-x64 reserves for the register ones */
+        default: a[i] = *(ULONG_PTR *)(ULONG_PTR)(ctx->Rsp + 8 + i * 8); break;
+        }
+    }
+}
+
+static ULONG_PTR call_native_thunk( void *proc, const ULONG_PTR *a )
+{
+    return ((ULONG_PTR (*)( ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR,
+                            ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR,
+                            ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR ))proc)
+        ( a[0], a[1], a[2],  a[3],  a[4],  a[5],  a[6],  a[7],
+          a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15] );
+}
+
+/***********************************************************************
+ *           emu_trap_dispatch
+ *
+ * Entered on the Win32 stack through call_user_mode_callback(), the same way
+ * KiUserCallbackDispatcher is, and returns through NtCallbackReturn.
+ *
+ * It cannot simply be called from the emulator's trap callback.  The emulator
+ * is unix code and runs on this thread's kernel stack, whereas the functions
+ * this dispatches to are Win32 code.  Running them on the kernel stack is not
+ * just a convention violation: the syscall dispatcher would reuse the very
+ * syscall frame that still describes the unix call the emulator is running
+ * inside, and would switch r1 back into the live frames below it.  So any
+ * callee that made an NT syscall or raised an exception corrupted the kernel
+ * stack under the emulator -- measured as a glibc stack-protector abort
+ * followed by "Exception frame is not in stack limits".
+ */
+void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
+{
+    AMD64_CONTEXT *ctx = *(AMD64_CONTEXT **)args;
+    thunk_override_func override = NULL;
+    NTSTATUS status = STATUS_SUCCESS;
+    ULONG_PTR a[THUNK_MAX_ARGS] = { 0 };
+    UINT argc = 0;
+    ULONG_PTR ret;
+    void *proc;
+
+    proc = find_guest_thunk_target( ctx->Rip, &argc, &override );
+    if (!proc && !override)
+    {
+        ERR( "unhandled guest trap at %p\n", (void *)(ULONG_PTR)ctx->Rip );
+        status = STATUS_ILLEGAL_INSTRUCTION;
+    }
+    else
+    {
+        TRACE( "trap at %p: arg0(r10)=%p rdx=%p r8=%p r9=%p guest rsp=%p; host sp ~%p in %p-%p\n",
+               (void *)(ULONG_PTR)ctx->Rip, (void *)(ULONG_PTR)ctx->R10, (void *)(ULONG_PTR)ctx->Rdx,
+               (void *)(ULONG_PTR)ctx->R8, (void *)(ULONG_PTR)ctx->R9, (void *)(ULONG_PTR)ctx->Rsp,
+               &argc, NtCurrentTeb()->Tib.StackLimit, NtCurrentTeb()->Tib.StackBase );
+
+        marshal_thunk_args( ctx, argc, a );
+        ret = override ? override( a ) : call_native_thunk( proc, a );
+
+        /* return to the guest's caller: the trap fired with Rip still on the
+         * trap opcode and Rsp still pointing at the return address its CALL
+         * pushed */
+        ctx->Rip = *(DWORD64 *)(ULONG_PTR)ctx->Rsp;
+        ctx->Rsp += 8;
+        ctx->Rax = ret;
+    }
+
+    status = NtCallbackReturn( NULL, 0, status );
+    RtlRaiseStatus( status );
+}
+
+
+/***********************************************************************
  *           RtlUserThreadStart (NTDLL.@)
  */
 void WINAPI RtlUserThreadStart( PRTL_THREAD_START_ROUTINE entry, void *arg )
@@ -995,11 +1355,16 @@ void WINAPI RtlUserThreadStart( PRTL_THREAD_START_ROUTINE entry, void *arg )
     {
         if (thread_start_is_guest_code( entry ))
         {
-            struct emu_run_entry_params params = { (void *)entry, arg, 0 };
+            struct emu_run_entry_params params = { (void *)entry, arg, 0, emu_trap_dispatch };
+
             NTSTATUS status = WINE_UNIX_CALL( unix_emu_run_entry, &params );
 
-            TRACE_(relay)( "\1Guest AMD64 entry %p returned rax=%s status=%08x\n",
-                           entry, wine_dbgstr_longlong(params.retval), (UINT)status );
+            /* not wine_dbgstr_longlong(): on this port PE-side code is built by
+             * the native ELF compiler, so its `unsigned long` is 64 bits and the
+             * helper takes its single-%lx branch -- which ntdll's MSVC-style
+             * printf then truncates to 32 bits.  %p is formatted by width. */
+            TRACE_(relay)( "\1Guest AMD64 entry %p returned rax=%p status=%08x\n",
+                           entry, (void *)(ULONG_PTR)params.retval, (UINT)status );
             if (status)
             {
                 ERR( "failed to emulate AMD64 entry point %p, status %08x\n", entry, (UINT)status );

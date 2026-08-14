@@ -423,6 +423,10 @@ extern NTSTATUS call_user_apc_dispatcher( CONTEXT *context_ptr, unsigned int fla
 extern NTSTATUS call_user_exception_dispatcher( struct thread_data *data, EXCEPTION_RECORD *rec,
                                                 CONTEXT *context );
 extern void call_raise_user_exception_dispatcher( struct thread_data *data );
+#ifdef __powerpc64__
+extern NTSTATUS call_emu_trap_dispatcher( void *func, void *ctx );
+extern BOOL emu_handle_fault( void *sigcontext );
+#endif
 
 #define IMAGE_DLLCHARACTERISTICS_PREFER_NATIVE 0x0010 /* Wine extension */
 
