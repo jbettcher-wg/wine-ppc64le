@@ -24,14 +24,50 @@ Honest, and in progress.
 |---|---|
 | `configure` and the build system | works |
 | winebuild PowerPC64 codegen | **done** — import, delayed-import, relay and stub thunks, ELFv2 |
-| Unix-side libraries | 33 unixlib `.so` build; `wineserver` and the loader run |
-| Windows-side modules | **597 `.dll.so`, 792 `.exe.so`** link, including `kernel32`, `oleaut32`, `vcruntime140`, and `mshtml` at 27 MB |
-| PE-side `ntdll.dll` | builds |
-| `wineboot -u` | **not yet** — unix-side signal support is being written |
-| Wine's own test suite | not yet |
+| Unix-side libraries | `wineserver` and the loader run |
+| Windows-side modules | **built as real PEs**, machine `0x01f3`, via `tools/elf2pe` |
+| PE-side `ntdll.dll` | stays an ELF builtin — see below |
+| `wineboot -u` | **works** — full prefix, services registered, and the prefix runs programs |
+| Wine's own test suite | `version:info`, `version:install`, `advapi32:lsa` pass |
+| Running an x86-64 PE | **works** for import-free guests: loads, executes, propagates its exit code |
+| Guest imports → native code | **works** for a first set of `kernel32` exports (see below) |
+
+`ntdll` cannot be a PE and never will be: its TEB lives in an initial-exec
+`__thread`, and a PE image has nowhere to put a static TLS block. It is built as
+an ELF builtin deliberately, not as a stepping stone.
 
 Nothing here is stubbed silently: anything incomplete is recorded as incomplete
 in the design notes.
+
+### Running x86-64 Windows binaries
+
+The native port is only half the point. The other half is that an **x86-64 PE
+runs as the main image**, with the x86-64 emulator embedded as a library rather
+than the whole environment being emulated.
+
+This does **not** go through WoW64. WoW64 is 32-on-64 by construction, but
+`is_machine_64bit(AMD64)` is true, so `WowTebOffset` stays 0 and that path is
+never entered. Instead the prefix advertises AMD64 in the server's supported
+machines, and `RtlUserThreadStart` hands a guest entry point to the emulator.
+
+Guest imports bind to **AMD64 thunk PEs** served from a per-machine system
+directory (`C:\windows\sysx8664\`, alongside Wine's existing `syswow64` and
+`sysarm32`). Each thunk stub traps into the embedded emulator's callback, which
+marshals MS-x64 → ELFv2 and calls the real native ppc64 implementation. Nothing
+about the mechanism is specific to `kernel32`.
+
+Working today, returning real values to guest code: `GetCurrentProcessId`,
+`GetCurrentThreadId`, `GetModuleHandleW`, `GetProcAddress`,
+`GetEnvironmentVariableW`, `MultiByteToWideChar` — covering integer, pointer,
+wide-string and stack-passed arguments.
+
+**Current work.** Native calls made from a guest trap currently run on the
+emulator's stack, so anything that validates against `Tib.StackBase` /
+`StackLimit` — an NT syscall, or raising an exception — fails there. That is the
+single blocker in front of most of the API surface, and switching stacks around
+the native call is what is being built now. Separately, handles crossing the
+boundary are still native-namespace values, so `GetProcAddress` hands the guest
+a pointer it must not call.
 
 ## The interesting part: r2 across unwound frames
 
@@ -54,14 +90,37 @@ marker from the wrong frame and silently loads stack garbage into r2.
 
 ## Building
 
+Build on a ppc64le host. There is no cross-build path.
+
 ```
 ./configure --enable-win64
-make -j 4
+make -j 64
 ```
 
-Use a modest `-j`. Also note `ninja` — used by some subprojects — does **not**
-read `MAKEFLAGS`, so pass `-j` to it explicitly or it will spawn roughly
-core-count+2 jobs.
+That is the whole thing — the PE modules are produced by `tools/elf2pe`, which
+the build drives itself, so no extra toolchain or flag is needed for them.
+
+`-j` should match the machine; these are large builds and the developer machine
+is a 176-thread AC922. Note that `ninja` — used by some subprojects — does
+**not** read `MAKEFLAGS`, so pass it `-j` explicitly or it spawns roughly
+core-count+2 jobs and is bounded by RAM rather than cores.
+
+Then run programs straight out of the build directory, as with upstream Wine:
+
+```
+./wine notepad
+```
+
+To run an **x86-64** binary, point `WINEFEXBRIDGE` at a built
+[fastppcx86](https://github.com/daedalao/fastppcx86) bridge library, which the
+loader dlopens on demand:
+
+```
+WINEFEXBRIDGE=/path/to/libfexbridge.so ./wine program.exe
+```
+
+Without it, native ppc64 Windows binaries still run normally — the emulator is
+loaded only when a guest image is actually encountered.
 
 ## Design notes
 
