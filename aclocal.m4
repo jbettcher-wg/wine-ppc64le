@@ -300,7 +300,13 @@ wine_fn_config_makefile ()
     case "$enable" in
       no) AS_VAR_APPEND([DISABLED_SUBDIRS],[" $[1]"]) ;;
       yes) ;;
-      *aarch64*|*arm*|*i386*|*x86_64*)
+dnl An arch list naming none of these substrings matches no arm of the case at
+dnl all, so nothing is appended to any *_DISABLED_SUBDIRS and the module ends up
+dnl enabled for *every* PE arch -- silently, and the opposite of what the list
+dnl asked for.  ppc64 is the one arch name that no other pattern happens to
+dnl cover ("arm64ec" is caught by *arm*), so it has to be listed here for a
+dnl ppc64-only enable list to mean anything.
+      *aarch64*|*arm*|*i386*|*x86_64*|*ppc64*)
         if test -n "$PE_ARCHS" -a "$PE_ARCHS" != none
         then
             for i in $PE_ARCHS

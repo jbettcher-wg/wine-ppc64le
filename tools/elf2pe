@@ -1,0 +1,960 @@
+#!/usr/bin/env python3
+"""
+elf2pe.py -- translate a ppc64le ELF shared object into a PE32+ image that
+Wine's PE loader can map, relocate, and export symbols from.
+
+WHY A FLAT IMAGE.  ELFv2 code reaches its TOC through the *global entry point*
+prologue:
+
+    addis r2,r12,<hi>
+    addi  r2,r2,<lo>
+
+i.e. the distance from a function's entry address to the module's TOC base is
+baked into the instruction stream at link time.  Nothing in a PE image knows
+about a TOC, and there is no relocation we could apply to fix that distance up.
+So the one hard invariant of this translation is:
+
+    every byte of the ELF memory image must keep its position relative to every
+    other byte.
+
+The cheapest way to guarantee that is to not rearrange anything at all: lay the
+ELF's PT_LOAD segments into one flat buffer indexed by virtual address, and emit
+that buffer at a constant RVA shift.  Relative distances are then preserved by
+construction, and the r2 prologue keeps working with no help from the loader.
+The buffer may still be *split* into several PE sections for W^X, as long as
+every byte keeps its RVA: section boundaries fall on the ELF's own page-aligned
+segment boundaries and the split changes protections only, never positions.
+
+WHY IMPORTS ARE ALMOST FREE.  An ELFv2 .plt is not code -- it is an array of
+8-byte function pointers, and the call stub that the linker plants in .text is
+
+    std   r2,24(r1)
+    ld    r12,<plt slot>(r2)
+    mtctr r12
+    bctr
+
+i.e. "load a pointer out of a table and jump to it".  That is exactly what a PE
+import address table is.  So we do not rewrite any code to translate an import:
+we point the PE's FirstThunk at the .plt slot and let Wine's loader write the
+resolved address into the cell the ELF stub was already going to read.
+
+WINE BUILTIN MODE.  A Wine `.dll.so` builtin carries a fake PE header
+(`__wine_spec_nt_header`, visible in .dynsym) that winebuild links into .data.
+In the ELF world, ntdll's map_so_dll() massages it in place at load time:
+data-directory RVAs are stored relative to the nt header symbol, export
+function addresses and the entry point are stored as ELF-relocated absolute
+pointers, import thunks hold nt-header-relative values.  In builtin mode this
+translator performs exactly that massage statically:
+
+  - data-directory RVAs               += rva(__wine_spec_nt_header)
+  - export dir fields / name RVAs     += same
+  - export function pointer array     compacted u64 -> u32 PE RVAs (and the
+                                      base relocations on those cells dropped)
+  - AddressOfEntryPoint (pointer-size, overlapping BaseOfCode) -> outer
+    PE entry point, so the loader calls __wine_spec_dll_entry -> DllMain
+  - import descriptors + 8-byte thunks += same delta (ordinal entries kept)
+  - resource directory data entries    += same delta
+  - embedded ImageBase re-baked to the preferred base and left relocatable,
+    so winecrt0's get_image_base() stays correct at run time
+
+The module's Win32 imports therefore come straight from the winebuild import
+directory, and Wine's normal PE import resolution fills the same IAT cells the
+winebuild thunks already read.
+
+THE LIBC SURFACE.  Measured over all 601 .dll.so modules in the tree, the
+complete set of non-weak undefined ELF symbols is `dladdr1` (every module;
+winecrt0's __wine_init_so_dll uses it to find its own link_map so it can run
+the ELF constructors at DLL_PROCESS_ATTACH -- Wine renames DT_INIT{,_ARRAY} to
+private tags so dlopen will not run them early) and `fabsf` (42 modules).
+Both are satisfied by a small appended stub section:
+
+  - dladdr1 -> a stub returning a translator-baked fake `struct link_map`
+    whose l_addr is the PE slide and l_ld the real embedded .dynamic, so
+    __wine_init_so_dll runs the module's real constructors, unmodified;
+  - fabsf   -> `fabs f1,f1; blr`;
+  - llabs   -> a 4-instruction branchless absolute value.
+
+Weak undefined symbols (__cxa_finalize, __gmon_start__, _ITM_*) resolve to 0
+exactly as an ELF loader without libc would; the ELF FINI path that would call
+them never runs under PE (unload is DllMain(DETACH), not DT_FINI).
+
+WHAT IS NOT TRANSLATED.  TLS, lazy binding, delay imports.  Any dynamic
+relocation type not listed above, any PT_TLS, and any unstubbed non-weak
+undefined symbol in builtin mode is a hard error -- this tool must never paper
+over something it did not translate.
+
+Usage:
+    elf2pe.py input.so output.dll [-v] [--image-base 0x...]
+                                  [--import-dll kernel32.dll] [--no-relocs]
+                                  [--flat-rwx]
+"""
+
+import argparse
+import struct
+import sys
+
+# ---------------------------------------------------------------- ELF constants
+
+ET_DYN = 3
+EM_PPC64 = 21
+PT_LOAD = 1
+PT_DYNAMIC = 2
+PT_INTERP = 3
+PT_TLS = 7
+
+PF_X, PF_W, PF_R = 1, 2, 4
+
+SHT_RELA = 4
+SHT_DYNSYM = 11
+
+STB_GLOBAL, STB_WEAK = 1, 2
+STT_OBJECT, STT_FUNC = 1, 2
+STV_DEFAULT, STV_PROTECTED = 0, 3
+SHN_UNDEF, SHN_ABS = 0, 0xfff1
+
+R_PPC64_RELATIVE = 22
+R_PPC64_ADDR64 = 38
+R_PPC64_UADDR64 = 43       # same as ADDR64, just not 8-byte aligned
+R_PPC64_JMP_SLOT = 21
+R_PPC64_TPREL64 = 73
+R_PPC64_DTPMOD64 = 68
+R_PPC64_DTPREL64 = 78
+R_PPC64_IRELATIVE = 248
+
+RELOC_NAMES = {
+    21: "R_PPC64_JMP_SLOT",
+    22: "R_PPC64_RELATIVE",
+    38: "R_PPC64_ADDR64",
+    43: "R_PPC64_UADDR64",
+    68: "R_PPC64_DTPMOD64",
+    73: "R_PPC64_TPREL64",
+    78: "R_PPC64_DTPREL64",
+    248: "R_PPC64_IRELATIVE",
+}
+
+# ----------------------------------------------------------------- PE constants
+
+IMAGE_FILE_MACHINE_POWERPC64 = 0x01f3   # Wine extension, see include/winnt.h
+
+IMAGE_FILE_EXECUTABLE_IMAGE = 0x0002
+IMAGE_FILE_LARGE_ADDRESS_AWARE = 0x0020
+IMAGE_FILE_DLL = 0x2000
+
+IMAGE_SCN_CNT_CODE = 0x00000020
+IMAGE_SCN_CNT_INITIALIZED_DATA = 0x00000040
+IMAGE_SCN_MEM_DISCARDABLE = 0x02000000
+IMAGE_SCN_MEM_EXECUTE = 0x20000000
+IMAGE_SCN_MEM_READ = 0x40000000
+IMAGE_SCN_MEM_WRITE = 0x80000000
+
+IMAGE_REL_BASED_ABSOLUTE = 0
+IMAGE_REL_BASED_DIR64 = 10
+
+IMAGE_ORDINAL_FLAG64 = 1 << 63
+
+SECTION_ALIGN = 0x1000
+FILE_ALIGN = 0x200
+SHIFT = 0x1000          # RVA = elf_vaddr - base_va + SHIFT; constant, so distances hold
+
+
+def align_up(v, a):
+    return (v + a - 1) & ~(a - 1)
+
+
+def align_down(v, a):
+    return v & ~(a - 1)
+
+
+class Elf:
+    def __init__(self, data):
+        self.data = data
+        if data[:4] != b"\x7fELF":
+            raise SystemExit("not an ELF file")
+        if data[4] != 2 or data[5] != 1:
+            raise SystemExit("not a 64-bit little-endian ELF")
+        (self.e_type, self.e_machine, _ver, self.e_entry, self.e_phoff,
+         self.e_shoff, _flags, _ehsize, self.e_phentsize, self.e_phnum,
+         self.e_shentsize, self.e_shnum, self.e_shstrndx) = struct.unpack_from(
+            "<HHIQQQIHHHHHH", data, 16)
+
+        self.phdrs = []
+        for i in range(self.e_phnum):
+            o = self.e_phoff + i * self.e_phentsize
+            p_type, p_flags, p_offset, p_vaddr, _p_paddr, p_filesz, p_memsz, p_align = \
+                struct.unpack_from("<IIQQQQQQ", data, o)
+            self.phdrs.append(dict(type=p_type, flags=p_flags, offset=p_offset,
+                                   vaddr=p_vaddr, filesz=p_filesz,
+                                   memsz=p_memsz, align=p_align))
+
+        self.shdrs = []
+        for i in range(self.e_shnum):
+            o = self.e_shoff + i * self.e_shentsize
+            (sh_name, sh_type, sh_flags, sh_addr, sh_offset, sh_size, sh_link,
+             sh_info, sh_addralign, sh_entsize) = struct.unpack_from("<IIQQQQIIQQ", data, o)
+            self.shdrs.append(dict(name=sh_name, type=sh_type, flags=sh_flags,
+                                   addr=sh_addr, offset=sh_offset, size=sh_size,
+                                   link=sh_link, info=sh_info,
+                                   addralign=sh_addralign, entsize=sh_entsize))
+        shstr = self.shdrs[self.e_shstrndx]
+        strtab = data[shstr["offset"]:shstr["offset"] + shstr["size"]]
+        for s in self.shdrs:
+            end = strtab.index(b"\0", s["name"])
+            s["sname"] = strtab[s["name"]:end].decode()
+
+    def section(self, name):
+        for s in self.shdrs:
+            if s["sname"] == name:
+                return s
+        return None
+
+
+def read_dynsym(elf):
+    """Return the list of .dynsym entries as dicts."""
+    sh = elf.section(".dynsym")
+    if sh is None:
+        return []
+    strtab_sh = elf.shdrs[sh["link"]]
+    strdata = elf.data[strtab_sh["offset"]:strtab_sh["offset"] + strtab_sh["size"]]
+    syms = []
+    for i in range(sh["size"] // 24):
+        o = sh["offset"] + i * 24
+        st_name, st_info, st_other, st_shndx, st_value, st_size = \
+            struct.unpack_from("<IBBHQQ", elf.data, o)
+        end = strdata.index(b"\0", st_name)
+        syms.append(dict(idx=i,
+                         name=strdata[st_name:end].decode(),
+                         bind=st_info >> 4, type=st_info & 0xf,
+                         vis=st_other & 3, other=st_other,
+                         shndx=st_shndx, value=st_value, size=st_size))
+    return syms
+
+
+def read_relocs(elf):
+    """Return [(offset, type, symidx, addend)] from every SHT_RELA section."""
+    out = []
+    for s in elf.shdrs:
+        if s["type"] != SHT_RELA:
+            continue
+        for i in range(s["size"] // 24):
+            o = s["offset"] + i * 24
+            r_offset, r_info, r_addend = struct.unpack_from("<QQq", elf.data, o)
+            out.append((r_offset, r_info & 0xffffffff, r_info >> 32, r_addend, s["sname"]))
+    return out
+
+
+# --------------------------------------------------------------- the stub blob
+#
+# Hand-assembled ppc64le.  The dladdr1 stub locates its own literal pool with
+# the LR trick (mflr/bcl/mflr) so it does not depend on the caller having set
+# r12 -- gcc does set it for indirect calls, but a 5-instruction insurance
+# policy beats an ABI assumption.
+
+def build_stub_blob(image_base, xtra_rva, slide, dyn_rva):
+    """Return (blob, {name: rva}, [dir64 rvas]).  slide/dyn_rva may be None if
+    there is no dynamic section (then no dladdr1 stub is possible)."""
+    blob = bytearray()
+    rvas = {}
+    dir64 = []
+
+    def ins(*words):
+        for w in words:
+            blob.extend(struct.pack("<I", w))
+
+    def quad(v, reloc=False):
+        while len(blob) % 8:
+            blob.append(0)
+        if reloc:
+            dir64.append(xtra_rva + len(blob))
+        blob.extend(struct.pack("<Q", v))
+
+    if dyn_rva is not None:
+        # int dladdr1(void *addr /*r3*/, Dl_info *info /*r4*/,
+        #             void **extra /*r5*/, int flags /*r6*/)
+        # -> *extra = &fake_link_map; return 1.  info is never read by
+        # __wine_init_so_dll, so it is left untouched.
+        rvas["dladdr1"] = xtra_rva + len(blob)
+        base = len(blob)
+        ins(0x7C0802A6,              # mflr  r0
+            0x429F0005,              # bcl   20,31,$+4      (LR = next insn)
+            0x7D6802A6,              # mflr  r11            (r11 = base+8)
+            0x7C0803A6,              # mtlr  r0
+            0xE96B0018,              # ld    r11, 0x18(r11) -> literal at base+0x20
+            0xF9650000,              # std   r11, 0(r5)
+            0x38600001,              # li    r3, 1
+            0x4E800020)              # blr
+        assert len(blob) - base == 0x20
+        quad(image_base + xtra_rva + len(blob) + 8, reloc=True)  # -> link_map below
+        # struct link_map { l_addr, l_name, l_ld, l_next, l_prev }
+        quad(image_base + slide, reloc=True)   # l_addr: run-time slide
+        quad(0)                                # l_name
+        quad(image_base + dyn_rva, reloc=True) # l_ld: the real .dynamic
+        quad(0)                                # l_next
+        quad(0)                                # l_prev
+
+    # float fabsf(float): fabs works on the single-precision value in f1 too
+    # (it only clears the sign bit).
+    while len(blob) % 16:
+        blob.append(0)
+    rvas["fabsf"] = xtra_rva + len(blob)
+    ins(0xFC200A10,                  # fabs  f1,f1
+        0x4E800020)                  # blr
+
+    # long long llabs(long long): branchless |r3|.  gcc emits a libc call for
+    # this in a handful of test modules (kernel32, dmime, mf).
+    while len(blob) % 16:
+        blob.append(0)
+    rvas["llabs"] = xtra_rva + len(blob)
+    ins(0x7C60FE76,                  # sradi r0,r3,63
+        0x7C630278,                  # xor   r3,r3,r0
+        0x7C601850,                  # subf  r3,r0,r3
+        0x4E800020)                  # blr
+
+    return bytes(blob), rvas, dir64
+
+
+# ------------------------------------------------------- builtin header massage
+
+class Image:
+    """The flat memory image plus the base-relocation ledger."""
+    def __init__(self, buf, base_va, image_base):
+        self.buf = buf
+        self.base_va = base_va
+        self.image_base = image_base
+        self.dir64 = {}          # elf vaddr -> True
+
+    def off(self, vaddr):
+        return vaddr - self.base_va
+
+    def rva(self, vaddr):
+        return vaddr - self.base_va + SHIFT
+
+    def r16(self, vaddr):
+        return struct.unpack_from("<H", self.buf, self.off(vaddr))[0]
+
+    def r32(self, vaddr):
+        return struct.unpack_from("<I", self.buf, self.off(vaddr))[0]
+
+    def r64(self, vaddr):
+        return struct.unpack_from("<Q", self.buf, self.off(vaddr))[0]
+
+    def w32(self, vaddr, v):
+        struct.pack_into("<I", self.buf, self.off(vaddr), v & 0xffffffff)
+
+    def w64(self, vaddr, v):
+        struct.pack_into("<Q", self.buf, self.off(vaddr), v)
+
+    def bake(self, vaddr, value):
+        """Store an absolute address and register a DIR64 base relocation."""
+        self.w64(vaddr, value)
+        self.dir64[vaddr] = True
+
+    def unbake(self, vaddr):
+        """Drop the base relocation for a cell that no longer holds a pointer."""
+        if vaddr not in self.dir64:
+            raise SystemExit("expected a relocated cell at %#x, found none" % vaddr)
+        del self.dir64[vaddr]
+
+
+def massage_builtin_header(img, nt_vaddr, verbose):
+    """Statically perform ntdll map_so_dll()'s in-place fixups on the embedded
+    winebuild PE header.  Returns a dict of header fields for the outer PE.
+    All spec-relative RVAs are relative to the nt header symbol itself
+    (.L__wine_spec_rva_base), so the delta is simply the nt header's RVA."""
+    delta = img.rva(nt_vaddr)
+
+    if img.r32(nt_vaddr) != 0x4550:
+        raise SystemExit("__wine_spec_nt_header has no PE signature")
+    machine = img.r16(nt_vaddr + 4)
+    if machine != IMAGE_FILE_MACHINE_POWERPC64:
+        raise SystemExit("embedded header machine %#x != %#x"
+                         % (machine, IMAGE_FILE_MACHINE_POWERPC64))
+    characteristics = img.r16(nt_vaddr + 22)
+    opt = nt_vaddr + 24
+    if img.r16(opt) != 0x20b:
+        raise SystemExit("embedded optional header is not PE32+")
+
+    # AddressOfEntryPoint is pointer-sized (overlapping BaseOfCode) and holds
+    # the ELF-relocated absolute address of the init func (__wine_spec_dll_entry
+    # for a dll).  Convert to an RVA, mirroring fixup_rva_ptrs.
+    entry_abs = img.r64(opt + 16)
+    entry_rva = 0
+    if entry_abs:
+        entry_rva = entry_abs - img.image_base
+        img.unbake(opt + 16)
+    img.w64(opt + 16, entry_rva)     # low dword = RVA, high (BaseOfCode) = 0
+
+    # The embedded ImageBase holds &__wine_spec_pe_header; winecrt0's
+    # get_image_base() rounds it up to 64k.  Re-bake it to the preferred outer
+    # base and keep it relocatable: the PE loader then maintains it as the
+    # actual (64k-aligned) load address, which rounds to itself.
+    img.bake(opt + 24, img.image_base)
+
+    subsys_major = img.r16(opt + 48)
+    subsys_minor = img.r16(opt + 50)
+    subsystem = img.r16(opt + 68)
+    dll_charact = img.r16(opt + 70)
+    stack_reserve = img.r64(opt + 72)
+    stack_commit = img.r64(opt + 80)
+    heap_reserve = img.r64(opt + 88)
+    heap_commit = img.r64(opt + 96)
+
+    # ---- data directories: spec-relative dword RVAs -> real PE RVAs ---------
+    ndirs = img.r32(opt + 108)
+    dirs = []
+    for i in range(min(ndirs, 16)):
+        d = opt + 112 + 8 * i
+        rva, size = img.r32(d), img.r32(d + 4)
+        if rva:
+            rva += delta
+            img.w32(d, rva)
+        dirs.append((rva, size))
+    while len(dirs) < 16:
+        dirs.append((0, 0))
+
+    def fixup_dwords(vaddr, count):
+        for i in range(count):
+            v = img.r32(vaddr + 4 * i)
+            if v:
+                img.w32(vaddr + 4 * i, v + delta)
+
+    # ---- export directory ---------------------------------------------------
+    if dirs[0][1]:
+        ed = nt_vaddr + (dirs[0][0] - delta)   # back to a vaddr
+        fixup_dwords(ed + 12, 1)               # Name
+        nfuncs = img.r32(ed + 20)
+        nnames = img.r32(ed + 24)
+        funcs_rel = img.r32(ed + 28)
+        names_rel = img.r32(ed + 32)
+        ords_rel = img.r32(ed + 36)
+        fixup_dwords(ed + 28, 3)
+        # The function array is pointer-sized ELF-relocated absolutes; compact
+        # in place to dword RVAs (map_so_dll's fixup_rva_ptrs) and drop the
+        # base relocations those cells carried.  (All spec-relative values are
+        # relative to the nt header, not to the directory that holds them.)
+        arr = nt_vaddr + funcs_rel
+        rvas = []
+        for i in range(nfuncs):
+            v = img.r64(arr + 8 * i)
+            if v:
+                img.unbake(arr + 8 * i)
+                rvas.append(v - img.image_base)
+            else:
+                rvas.append(0)
+        for i, v in enumerate(rvas):
+            img.w32(arr + 4 * i, v)
+        for o in range(4 * nfuncs, 8 * nfuncs):     # tidy the stale tail
+            img.buf[img.off(arr) + o] = 0
+        if nnames:
+            fixup_dwords(nt_vaddr + names_rel, nnames)
+        if verbose:
+            print("builtin exports: %d functions, %d names, dir %#x+%#x"
+                  % (nfuncs, nnames, dirs[0][0], dirs[0][1]))
+
+    # ---- import directory ---------------------------------------------------
+    if dirs[1][1]:
+        desc = nt_vaddr + (dirs[1][0] - delta)
+        ndlls = 0
+        while img.r32(desc + 12):              # Name
+            for field in (0, 12, 16):          # OriginalFirstThunk, Name, FirstThunk
+                fixup_dwords(desc + field, 1)
+            for field in (0, 16):
+                t_rel = img.r32(desc + field)
+                if not t_rel:
+                    continue
+                t = nt_vaddr + (t_rel - delta)
+                while True:
+                    v = img.r64(t)
+                    if not v:
+                        break
+                    if not (v & IMAGE_ORDINAL_FLAG64):
+                        img.w64(t, v + delta)
+                    t += 8
+            ndlls += 1
+            desc += 20
+        if verbose:
+            print("builtin imports: %d descriptor(s)" % ndlls)
+
+    # ---- resource directory -------------------------------------------------
+    if dirs[2][1]:
+        root = nt_vaddr + (dirs[2][0] - delta)
+
+        def walk(dvaddr):
+            n = img.r16(dvaddr + 12) + img.r16(dvaddr + 14)
+            for i in range(n):
+                e = dvaddr + 16 + 8 * i
+                off = img.r32(e + 4)
+                if off & 0x80000000:
+                    walk(root + (off & 0x7fffffff))
+                else:
+                    fixup_dwords(root + off, 1)    # DATA_ENTRY.OffsetToData
+        walk(root)
+
+    # ---- delay-import directory ---------------------------------------------
+    # IMAGE_DELAYLOAD_DESCRIPTOR: 8 dwords.  The delay IAT holds ELF-relocated
+    # absolute pointers to winecrt0's delay-load resolver thunks; those cells
+    # were already baked (and keep their DIR64 relocs) by the generic pass, so
+    # only the descriptor RVAs and the name-table entries need the delta --
+    # exactly map_so_dll's fixups.  winecrt0's resolver finds the module base
+    # via get_image_base(), which reads the embedded ImageBase field we re-baked
+    # above, so it stays correct at run time.
+    if dirs[13][1]:
+        desc = nt_vaddr + (dirs[13][0] - delta)
+        while img.r32(desc + 4):               # DllNameRVA
+            for field in (4, 8, 12, 16, 20, 24):
+                fixup_dwords(desc + field, 1)
+            int_rel = img.r32(desc + 16)       # ImportNameTableRVA (post-fixup)
+            t = nt_vaddr + (int_rel - delta)
+            while True:
+                v = img.r64(t)
+                if not v:
+                    break
+                if not (v & IMAGE_ORDINAL_FLAG64):
+                    img.w64(t, v + delta)
+                t += 8
+            desc += 32
+
+    # ---- the rest -----------------------------------------------------------
+    for i in (3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15):
+        if dirs[i][1]:
+            raise SystemExit("embedded data directory %d present: not translated" % i)
+
+    return dict(entry_rva=entry_rva, characteristics=characteristics,
+                subsystem=subsystem, subsys_ver=(subsys_major, subsys_minor),
+                dll_charact=dll_charact,
+                stack=(stack_reserve, stack_commit), heap=(heap_reserve, heap_commit),
+                export=dirs[0], imports=dirs[1], resource=dirs[2], delay=dirs[13])
+
+
+# ------------------------------------------------------------------------ build
+
+def build(path_in, path_out, image_base, verbose, import_dll="kernel32.dll",
+          emit_relocs=True, allow_no_exports=False, flat_rwx=False):
+    data = open(path_in, "rb").read()
+    elf = Elf(data)
+
+    if elf.e_type != ET_DYN:
+        raise SystemExit("input is not ET_DYN (need a shared object)")
+    if elf.e_machine != EM_PPC64:
+        raise SystemExit("input is not EM_PPC64 (machine=%d)" % elf.e_machine)
+
+    loads = [p for p in elf.phdrs if p["type"] == PT_LOAD]
+    if not loads:
+        raise SystemExit("no PT_LOAD segments")
+    dyn_vaddr = None
+    for p in elf.phdrs:
+        if p["type"] == PT_TLS:
+            raise SystemExit("PT_TLS present: TLS is out of scope for this prototype")
+        if p["type"] == PT_INTERP:
+            raise SystemExit("PT_INTERP present: not a plain shared object")
+        if p["type"] == PT_DYNAMIC:
+            dyn_vaddr = p["vaddr"]
+
+    # ---- flat memory image, indexed by ELF virtual address ------------------
+    lo = min(p["vaddr"] for p in loads)
+    hi = max(p["vaddr"] + p["memsz"] for p in loads)
+    # The image is indexed by (vaddr - base_va), and every RVA is
+    # (vaddr - base_va + SHIFT).  base_va is subtracted from everything
+    # uniformly, so inter-section distances -- and therefore the TOC prologue --
+    # are unaffected.
+    base_va = lo & ~(SECTION_ALIGN - 1)
+    buf = bytearray(hi - base_va)
+    for p in loads:
+        off = p["vaddr"] - base_va
+        buf[off:off + p["filesz"]] = data[p["offset"]:p["offset"] + p["filesz"]]
+    img = Image(buf, base_va, image_base)
+
+    # ---- symbols ------------------------------------------------------------
+    syms = read_dynsym(elf)
+    nt_sym = next((s for s in syms if s["name"] == "__wine_spec_nt_header"
+                   and s["shndx"] not in (SHN_UNDEF,)), None)
+    builtin = nt_sym is not None
+
+    exports = sorted(
+        (s for s in syms
+         if s["name"] and s["shndx"] not in (SHN_UNDEF,)
+         and s["bind"] in (STB_GLOBAL, STB_WEAK)
+         and s["type"] in (STT_FUNC, STT_OBJECT)
+         and s["vis"] in (STV_DEFAULT, STV_PROTECTED)),
+        key=lambda s: s["name"])
+    if not exports and not builtin and not allow_no_exports:
+        raise SystemExit("no exportable dynamic symbols found")
+
+    # ---- the stub section layout is needed before relocation ----------------
+    flat_rva = SHIFT
+    flat_vsize = hi - base_va
+    xtra_rva = align_up(flat_rva + flat_vsize, SECTION_ALIGN)
+    slide = SHIFT - base_va                      # runtime addr = base + slide + vaddr
+    xtra, stub_rvas, xtra_dir64 = build_stub_blob(
+        image_base, xtra_rva,
+        slide if dyn_vaddr is not None else None,
+        (dyn_vaddr - base_va + SHIFT) if dyn_vaddr is not None else None)
+    stubbed_names = set(stub_rvas)
+
+    # ---- relocations --------------------------------------------------------
+    relocs = read_relocs(elf)
+    jmp_slots = []
+    stubs_used = set()
+    seen_types = {}
+    for r_offset, r_type, r_sym, r_addend, secname in relocs:
+        seen_types[r_type] = seen_types.get(r_type, 0) + 1
+        if r_type in (R_PPC64_JMP_SLOT, R_PPC64_ADDR64, R_PPC64_UADDR64):
+            s = syms[r_sym] if r_sym else None
+            if s is not None and s["shndx"] == SHN_UNDEF and s["name"]:
+                # An undefined symbol: a .plt cell or a scattered .got cell.
+                # Both are function-pointer cells; three ways to fill them.
+                if s["bind"] == STB_WEAK:
+                    # Unresolved weak (__cxa_finalize, __gmon_start__...): the
+                    # ELF loader stores 0 and callers test for it; ELF FINI --
+                    # the only caller -- never runs under PE anyway.
+                    img.w64(r_offset, 0)
+                elif s["name"] in stubbed_names:
+                    img.bake(r_offset, image_base + stub_rvas[s["name"]])
+                    stubs_used.add(s["name"])
+                elif builtin:
+                    raise SystemExit("builtin module has unstubbed undefined "
+                                     "symbol %r -- extend the stub blob" % s["name"])
+                else:
+                    jmp_slots.append((r_offset, s["name"]))
+                continue
+            if r_type == R_PPC64_JMP_SLOT:
+                raise SystemExit("R_PPC64_JMP_SLOT against a defined symbol at %#x"
+                                 % r_offset)
+        if r_type == R_PPC64_RELATIVE:
+            target = r_addend
+        elif r_type in (R_PPC64_ADDR64, R_PPC64_UADDR64):
+            s = syms[r_sym]
+            target = s["value"] + r_addend
+        else:
+            raise SystemExit(
+                "unhandled relocation type %d (%s) at %#x in %s -- this prototype "
+                "only translates R_PPC64_RELATIVE/R_PPC64_ADDR64"
+                % (r_type, RELOC_NAMES.get(r_type, "?"), r_offset, secname))
+        if r_offset < base_va or r_offset - base_va + 8 > len(buf):
+            raise SystemExit("relocation at %#x is outside the loaded image" % r_offset)
+        # Bake the absolute address at the preferred base; the PE base
+        # relocation then adds (actual_base - image_base) at load time.
+        img.bake(r_offset, image_base + (target - base_va) + SHIFT)
+
+    # Every undefined dynamic symbol must have been claimed; if one was not,
+    # something references it in a way we have no answer for.
+    jmp_slots.sort()
+    imported = set(n for _, n in jmp_slots) | stubs_used
+    orphan = [s["name"] for s in syms
+              if s["shndx"] == SHN_UNDEF and s["name"]
+              and s["bind"] != STB_WEAK and s["name"] not in imported]
+    if orphan:
+        raise SystemExit("undefined dynamic symbol(s) with no pointer cell: "
+                         + ", ".join(orphan))
+
+    # ---- the builtin header massage -----------------------------------------
+    hdr = None
+    if builtin:
+        hdr = massage_builtin_header(img, nt_sym["value"], verbose)
+
+    if verbose:
+        print("relocation types seen: " + (", ".join(
+            "%s x%d" % (RELOC_NAMES.get(t, str(t)), n) for t, n in sorted(seen_types.items()))
+            or "(none)"))
+        if stubs_used:
+            print("stubbed libc symbols: " + ", ".join(sorted(stubs_used)))
+        if builtin:
+            print("builtin mode: nt header at vaddr %#x, entry rva %#x"
+                  % (nt_sym["value"], hdr["entry_rva"]))
+        elif exports:
+            print("exports: " + ", ".join(s["name"] for s in exports))
+        if jmp_slots:
+            print("imports from %s: %d cell(s): %s"
+                  % (import_dll, len(jmp_slots),
+                     ", ".join(sorted(set(n for _, n in jmp_slots)))))
+
+    # ---- section layout -----------------------------------------------------
+    #   flat image (split R-E/RW on segment page boundaries unless --flat-rwx)
+    #   .xtra  : libc stubs + fake link_map
+    #   .edata : export directory                 (legacy mode only)
+    #   .idata : import directory                 (legacy mode only)
+    #   .reloc : base relocations
+    edata_rva = align_up(xtra_rva + max(len(xtra), 1), SECTION_ALIGN)
+
+    edata = b""
+    if not builtin and exports:
+        n = len(exports)
+        dll_name = path_out.rsplit("/", 1)[-1].encode() + b"\0"
+        ed_size = 40
+        addr_funcs = edata_rva + ed_size
+        addr_names = addr_funcs + 4 * n
+        addr_ords = addr_names + 4 * n
+        name_strs = addr_ords + 2 * n
+        blob = bytearray()
+        name_rvas = []
+        strings = bytearray()
+        for s in exports:
+            name_rvas.append(name_strs + len(strings))
+            strings += s["name"].encode() + b"\0"
+        dllname_rva = name_strs + len(strings)
+        strings += dll_name
+
+        blob += struct.pack("<IIHHIIIIIII",
+                            0, 0, 0, 0,
+                            dllname_rva,      # Name
+                            1,                # Base ordinal
+                            n, n,
+                            addr_funcs, addr_names, addr_ords)
+        for s in exports:
+            blob += struct.pack("<I", s["value"] - base_va + SHIFT)
+        for rva in name_rvas:
+            blob += struct.pack("<I", rva)
+        for i in range(n):
+            blob += struct.pack("<H", i)
+        blob += strings
+        edata = bytes(blob)
+
+    # ---- legacy import directory --------------------------------------------
+    # FirstThunk is aliased straight onto the ELF .plt cells; the ILT and the
+    # name strings live in a section of our own.  An IAT must be a contiguous
+    # array, so each maximal contiguous run of cells gets its own descriptor;
+    # PE allows any number of descriptors naming the same DLL.
+    idata_rva = align_up(edata_rva + max(len(edata), 1), SECTION_ALIGN)
+    idata = b""
+    iat_rva = iat_size = 0
+    n_desc = 0
+    if jmp_slots:
+        runs = []
+        for cell in jmp_slots:
+            if runs and cell[0] == runs[-1][-1][0] + 8:
+                runs[-1].append(cell)
+            else:
+                runs.append([cell])
+        iat_rva = jmp_slots[0][0] - base_va + SHIFT
+        iat_size = (jmp_slots[-1][0] - jmp_slots[0][0]) + 8
+        n_desc = len(runs)
+        desc_size = 20 * (n_desc + 1)
+        ilt_rva = idata_rva + desc_size
+        ilt_size = 8 * (len(jmp_slots) + n_desc)
+        names_rva = ilt_rva + ilt_size
+
+        strings = bytearray()
+        name_rva_of = {}
+        for off, name in jmp_slots:
+            if name not in name_rva_of:
+                if len(strings) & 1:
+                    strings += b"\0"
+                name_rva_of[name] = names_rva + len(strings)
+                strings += struct.pack("<H", 0) + name.encode() + b"\0"  # hint + name
+        if len(strings) & 1:
+            strings += b"\0"
+        dll_rva = names_rva + len(strings)
+        strings += import_dll.encode() + b"\0"
+
+        descs = bytearray()
+        ilts = bytearray()
+        cursor = ilt_rva
+        for run in runs:
+            descs += struct.pack("<IIIII", cursor, 0, 0, dll_rva,
+                                 run[0][0] - base_va + SHIFT)
+            for _off, name in run:
+                ilts += struct.pack("<Q", name_rva_of[name])   # import by name
+            ilts += struct.pack("<Q", 0)                       # ILT terminator
+            cursor += 8 * (len(run) + 1)
+        descs += struct.pack("<IIIII", 0, 0, 0, 0, 0)          # descriptor terminator
+        assert len(descs) == desc_size and len(ilts) == ilt_size
+        idata = bytes(descs + ilts + strings)
+
+    # ---- base relocation blocks (PE reloc pages are always 4096) ------------
+    dir64 = sorted([img.rva(v) for v in img.dir64] + xtra_dir64)
+    reloc_rva = align_up(idata_rva + max(len(idata), 1), SECTION_ALIGN)
+    blocks = {}
+    for rva in dir64:
+        blocks.setdefault(rva & ~0xfff, []).append(rva & 0xfff)
+    rel = bytearray()
+    for page in sorted(blocks):
+        entries = sorted(blocks[page])
+        if len(entries) & 1:
+            entries = entries + [None]      # pad to 4-byte alignment
+        rel += struct.pack("<II", page, 8 + 2 * len(entries))
+        for e in entries:
+            rel += struct.pack("<H", 0 if e is None
+                               else (IMAGE_REL_BASED_DIR64 << 12) | e)
+    reloc = bytes(rel) if emit_relocs else b""
+
+    size_of_image = align_up(reloc_rva + max(len(reloc), 1), SECTION_ALIGN)
+
+    # ---- carve the flat image into PE sections ------------------------------
+    # Same bytes at the same RVAs either way; the split only assigns per-page
+    # protections along the ELF's own segment boundaries, so every baked
+    # code<->TOC distance is untouched.
+    sections = []
+    if flat_rwx:
+        sections.append((b".flat\0\0\0", flat_rva, flat_vsize, bytes(buf),
+                         IMAGE_SCN_CNT_CODE | IMAGE_SCN_CNT_INITIALIZED_DATA |
+                         IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE))
+    else:
+        # page -> OR of segment protections
+        npages = flat_vsize // SECTION_ALIGN + (1 if flat_vsize % SECTION_ALIGN else 0)
+        pages = [0] * npages
+        for p in loads:
+            first = align_down(p["vaddr"] - base_va, SECTION_ALIGN) // SECTION_ALIGN
+            last = align_up(p["vaddr"] + p["memsz"] - base_va, SECTION_ALIGN) // SECTION_ALIGN
+            for i in range(first, last):
+                pages[i] |= p["flags"]
+        runs = []
+        for i, fl in enumerate(pages):
+            if runs and runs[-1][1] == fl:
+                runs[-1][2] = i + 1
+            else:
+                runs.append([i, fl, i + 1])
+        names = {}
+        for first, fl, end in runs:
+            if not fl:
+                continue                       # hole between segments
+            chars = IMAGE_SCN_MEM_READ
+            base_name = ".rdata"
+            if fl & PF_X:
+                chars |= IMAGE_SCN_MEM_EXECUTE | IMAGE_SCN_CNT_CODE
+                base_name = ".text"
+            else:
+                chars |= IMAGE_SCN_CNT_INITIALIZED_DATA
+            if fl & PF_W:
+                chars |= IMAGE_SCN_MEM_WRITE
+                base_name = ".data"
+            idx = names.get(base_name, 0)
+            names[base_name] = idx + 1
+            name = (base_name + (str(idx) if idx else "")).encode()
+            start = first * SECTION_ALIGN
+            size = min(end * SECTION_ALIGN, flat_vsize) - start
+            sections.append((name.ljust(8, b"\0"), flat_rva + start, size,
+                             bytes(buf[start:start + size]), chars))
+
+    sections.append((b".xtra\0\0\0", xtra_rva, max(len(xtra), 1), xtra or b"\0",
+                     IMAGE_SCN_CNT_CODE | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_EXECUTE))
+    if edata:
+        sections.append((b".edata\0\0", edata_rva, len(edata), edata,
+                         IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ))
+    if idata:
+        sections.append((b".idata\0\0", idata_rva, len(idata), idata,
+                         IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ))
+    if reloc:
+        sections.append((b".reloc\0\0", reloc_rva, len(reloc), reloc,
+                         IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ |
+                         IMAGE_SCN_MEM_DISCARDABLE))
+
+    # ---- outer header fields ------------------------------------------------
+    entry_rva = hdr["entry_rva"] if hdr else 0
+    characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE
+    if hdr:
+        # winebuild sets IMAGE_FILE_DLL in the embedded header for a dll and
+        # leaves it clear for an exe; forcing it on makes CreateProcess reject
+        # the image with "Bad format", so take it from there and nowhere else.
+        characteristics |= hdr["characteristics"]
+    else:
+        characteristics |= IMAGE_FILE_DLL
+    subsystem = hdr["subsystem"] if hdr else 3
+    subsys_ver = hdr["subsys_ver"] if hdr and any(hdr["subsys_ver"]) else (4, 0)
+    # server/mapping.c:get_image_params rejects any non-x86 64-bit image that
+    # lacks NX_COMPAT|DYNAMIC_BASE, and any SectionAlignment below a host page.
+    dll_charact = (hdr["dll_charact"] if hdr else 0) | 0x0020 | 0x0040 | 0x0100
+    stack = hdr["stack"] if hdr else (0x100000, 0x1000)
+    heap = hdr["heap"] if hdr else (0x100000, 0x1000)
+
+    dirs = [(0, 0)] * 16
+    if hdr:
+        dirs[0] = hdr["export"]
+        dirs[1] = hdr["imports"]
+        dirs[2] = hdr["resource"]
+        dirs[13] = hdr["delay"]
+    else:
+        if edata:
+            dirs[0] = (edata_rva, len(edata))
+        if idata:
+            dirs[1] = (idata_rva, 20 * (n_desc + 1))
+            dirs[12] = (iat_rva, iat_size)
+    if reloc:
+        dirs[5] = (reloc_rva, len(reloc))
+
+    # ---- emit ---------------------------------------------------------------
+    hdr_size = 0x40 + 0x40 + 4 + 20 + 240 + 40 * len(sections)
+    size_of_headers = align_up(hdr_size, FILE_ALIGN)
+
+    out = bytearray()
+
+    # DOS header + stub
+    dos = bytearray(0x80)
+    struct.pack_into("<H", dos, 0, 0x5a4d)
+    struct.pack_into("<I", dos, 0x3c, 0x80)
+    out += dos
+
+    out += struct.pack("<I", 0x4550)                       # "PE\0\0"
+    out += struct.pack("<HHIIIHH",
+                       IMAGE_FILE_MACHINE_POWERPC64,
+                       len(sections),
+                       0,                                  # TimeDateStamp
+                       0, 0,                               # symbol table
+                       240,                                # SizeOfOptionalHeader
+                       characteristics)
+
+    code_size = sum(align_up(len(b), FILE_ALIGN)
+                    for _n, _r, _v, b, ch in sections if ch & IMAGE_SCN_MEM_EXECUTE)
+    base_of_code = min((r for _n, r, _v, _b, ch in sections
+                        if ch & IMAGE_SCN_MEM_EXECUTE), default=flat_rva)
+    opt = bytearray()
+    opt += struct.pack("<HBB", 0x20b, 14, 0)               # PE32+ magic, linker ver
+    opt += struct.pack("<III", code_size, len(edata) + len(reloc), 0)
+    opt += struct.pack("<I", entry_rva)                    # AddressOfEntryPoint
+    opt += struct.pack("<I", base_of_code)                 # BaseOfCode
+    opt += struct.pack("<Q", image_base)
+    opt += struct.pack("<II", SECTION_ALIGN, FILE_ALIGN)
+    opt += struct.pack("<HHHHHH", 1, 0, 0, 0, *subsys_ver) # OS/image/subsystem versions
+    opt += struct.pack("<I", 0)                            # Win32VersionValue
+    opt += struct.pack("<II", size_of_image, size_of_headers)
+    opt += struct.pack("<I", 0)                            # CheckSum
+    opt += struct.pack("<HH", subsystem, dll_charact)
+    opt += struct.pack("<QQQQ", stack[0], stack[1], heap[0], heap[1])
+    opt += struct.pack("<II", 0, 16)                       # LoaderFlags, NumberOfRvaAndSizes
+    for rva, sz in dirs:
+        opt += struct.pack("<II", rva, sz)
+    assert len(opt) == 240, len(opt)
+    out += opt
+
+    raw_off = size_of_headers
+    sec_hdrs = bytearray()
+    bodies = []
+    for name, rva, vsize, body, chars in sections:
+        raw_size = align_up(len(body), FILE_ALIGN)
+        sec_hdrs += struct.pack("<8sIIIIIIHHI", name, vsize, rva, raw_size,
+                                raw_off if raw_size else 0, 0, 0, 0, 0, chars)
+        bodies.append((raw_off, body + b"\0" * (raw_size - len(body))))
+        raw_off += raw_size
+    out += sec_hdrs
+    out += b"\0" * (size_of_headers - len(out))
+    for off, body in bodies:
+        assert off == len(out), (off, len(out))
+        out += body
+
+    open(path_out, "wb").write(bytes(out))
+    if verbose:
+        print("wrote %s: %d bytes, SizeOfImage=%#x, %d section(s), %d DIR64 relocs, entry %#x"
+              % (path_out, len(out), size_of_image, len(sections), len(dir64), entry_rva))
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("input")
+    ap.add_argument("output")
+    ap.add_argument("--image-base", default="0x180000000")
+    ap.add_argument("--import-dll", default="kernel32.dll",
+                    help="DLL that every undefined symbol is imported from "
+                         "(legacy specimens only)")
+    ap.add_argument("--no-relocs", action="store_true",
+                    help="omit the base relocation table (negative control: "
+                         "proves the relocations are doing real work)")
+    ap.add_argument("--flat-rwx", action="store_true",
+                    help="single RWX section instead of the W^X split "
+                         "(the original prototype layout)")
+    ap.add_argument("-v", "--verbose", action="store_true")
+    a = ap.parse_args()
+    build(a.input, a.output, int(a.image_base, 0), a.verbose,
+          import_dll=a.import_dll, emit_relocs=not a.no_relocs,
+          flat_rwx=a.flat_rwx)
+
+
+if __name__ == "__main__":
+    main()

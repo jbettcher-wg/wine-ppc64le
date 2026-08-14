@@ -790,6 +790,8 @@ DLLFLAGS
 OPENGL_LIBS
 I386_LIBS
 DLLEXT
+SO_BUILTIN_SUBDIRS
+TRANSLATED_ARCHS
 PE_ARCHS
 MSGFMT
 ICOTOOL
@@ -7328,7 +7330,7 @@ then :
      for arch
      do
          case $arch in
-           i386|x86_64|arm|aarch64|arm64ec) cross_archs="$cross_archs $arch" ;;
+           i386|x86_64|arm|aarch64|arm64ec|ppc64) cross_archs="$cross_archs $arch" ;;
            no|none) PE_ARCHS=none ;;
            *) as_fn_error $? "Unknown cross-compilation architecture '$arch'" "$LINENO" 5 ;;
          esac
@@ -7338,6 +7340,7 @@ else case e in #(
      case $HOST_ARCH-$host_os in
        unknown-*) PE_ARCHS=none ;;
        *-mingw32*) eval "${HOST_ARCH}_CC=\$CC" ;;
+                            ppc64-*) ;;
        x86_64-darwin*|arm-*|aarch64-*|*-cygwin*) if test "x$with_mingw" = xno
 then :
   as_fn_error $? "The --without-mingw option is not supported on $HOST_ARCH-$host_os." "$LINENO" 5
@@ -7358,6 +7361,21 @@ if test "x$PE_ARCHS" = xnone
 then :
   cross_archs=
 fi
+
+
+TRANSLATED_ARCHS=""
+
+SO_BUILTIN_SUBDIRS=""
+
+wine_pe_archs=
+for arch in $cross_archs
+do
+  case $arch in
+    ppc64) TRANSLATED_ARCHS="$TRANSLATED_ARCHS $arch" ;;
+    *)     wine_pe_archs="$wine_pe_archs $arch" ;;
+  esac
+done
+cross_archs=$wine_pe_archs
 
 saved_CC=$CC
 saved_CXX=$CXX
@@ -12360,7 +12378,7 @@ wine_fn_config_makefile ()
     case "$enable" in
       no) as_fn_append DISABLED_SUBDIRS " $1" ;;
       yes) ;;
-      *aarch64*|*arm*|*i386*|*x86_64*)
+      *aarch64*|*arm*|*i386*|*x86_64*|*ppc64*)
         if test -n "$PE_ARCHS" -a "$PE_ARCHS" != none
         then
             for i in $PE_ARCHS
@@ -13201,7 +13219,7 @@ else case e in #(
   e)
                 case $HOST_ARCH in
                   aarch64|ppc64)
-                                                                                                                                    as_fn_append WINEPRELOADER_LDFLAGS " -static -Wl,-Ttext=0x7d7d000000" ;;
+                                                                                                                        as_fn_append WINEPRELOADER_LDFLAGS " -static -Wl,-Ttext=0x7d7d000000" ;;
                   *)
                     as_fn_append WINEPRELOADER_LDFLAGS " -static -Wl,-Ttext=0x7d7d00000000" ;;
                 esac
@@ -22465,6 +22483,27 @@ fi ;;
 esac
 
 
+for wine_arch in $TRANSLATED_ARCHS
+do
+    eval "${wine_arch}_CC=\$CC"
+    eval "${wine_arch}_CXX=\$CXX"
+    eval "${wine_arch}_CFLAGS=\$CFLAGS"
+    eval "${wine_arch}_CXXFLAGS=\$CXXFLAGS"
+    eval "${wine_arch}_LDFLAGS=\$LDFLAGS"
+    eval "${wine_arch}_EXTRACFLAGS=\$EXTRACFLAGS"
+    eval "${wine_arch}_EXTRACXXFLAGS=\$EXTRACXXFLAGS"
+    eval "${wine_arch}_TARGET=\$host"
+    eval "${wine_arch}_STRIP=\$STRIP"
+        eval "${wine_arch}_DEBUG="
+        eval "${wine_arch}_DELAYLOADFLAG=\"-Wl,-delayload,\""
+    as_fn_append PE_ARCHS " $wine_arch"
+                            enable_compiler_rt=${enable_compiler_rt:-no}
+    case $wine_arch in
+                                    ppc64) SO_BUILTIN_SUBDIRS="$SO_BUILTIN_SUBDIRS dlls/ntdll" ;;
+    esac
+done
+
+
 enable_vcruntime140_1=${enable_vcruntime140_1:-x86_64,arm64ec}
 
 if test -n "$PE_ARCHS"
@@ -24675,6 +24714,8 @@ CONVERT = $CONVERT
 ICOTOOL = $ICOTOOL
 MSGFMT = $MSGFMT
 PE_ARCHS = $PE_ARCHS
+TRANSLATED_ARCHS = $TRANSLATED_ARCHS
+SO_BUILTIN_SUBDIRS = $SO_BUILTIN_SUBDIRS
 DLLEXT = $DLLEXT
 I386_LIBS = $I386_LIBS
 OPENGL_LIBS = $OPENGL_LIBS

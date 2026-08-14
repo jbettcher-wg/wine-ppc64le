@@ -167,12 +167,14 @@ static const char *make_xftmpl;
 static const char *sfnt2fon;
 static const char *winebuild;
 static const char *winegcc;
+static const char *elf2pe;
 static const char *widl;
 static const char *wrc;
 static const char *wmc;
 static bool so_dll_supported;
 static bool symlinks_supported;
 static bool unix_lib_supported;
+static struct strarray so_builtin_dirs;
 /* per-architecture global variables */
 static const char *dll_ext[MAX_ARCHS];
 static const char *arch_dirs[MAX_ARCHS];
@@ -188,6 +190,10 @@ static struct strarray extra_cxxflags[MAX_ARCHS];
 static struct strarray disabled_dirs[MAX_ARCHS];
 static unsigned int native_archs[MAX_ARCHS];
 static unsigned int hybrid_archs[MAX_ARCHS];
+/* archs that have no PE toolchain: modules are compiled and linked with the
+ * native ELF toolchain exactly as for the native arch, and the linked .so is
+ * then translated into a PE image by tools/elf2pe (see TRANSLATED_ARCHS). */
+static bool translated_archs[MAX_ARCHS];
 static struct strarray hybrid_target_flags[MAX_ARCHS];
 
 struct makefile
@@ -220,6 +226,7 @@ struct makefile
     bool            external;
     bool            is_win16;
     bool            is_exe;
+    bool            so_builtin;
     bool            disabled[MAX_ARCHS];
 
     /* values generated at output time */
@@ -2315,6 +2322,39 @@ static struct makefile *get_static_lib( const char *name )
 
 
 /*******************************************************************
+ *         is_so_builtin_lib
+ *
+ * Check whether a static library is imported by a .so builtin module, which in
+ * a multiarch tree is the only thing left that still needs a native build of an
+ * external static lib (those are otherwise PE-arch only).
+ */
+static bool is_so_builtin_lib( const struct makefile *make )
+{
+    static struct strarray libs;
+    static bool done;
+    unsigned int i;
+
+    if (!make->staticlib) return false;
+    if (!done)
+    {
+        done = true;
+        for (i = 0; i < subdirs.count; i++)
+        {
+            if (!submakes[i]->so_builtin) continue;
+            STRARRAY_FOR_EACH( name, &submakes[i]->imports )
+            {
+                const char *basename = (name[0] == '-') ? name + 2 : get_base_name( name );
+                struct makefile *lib;
+                if (name[0] == '-' && name[1] != 'l') continue;
+                if ((lib = get_static_lib( basename ))) strarray_add_uniq( &libs, lib->staticlib );
+            }
+        }
+    }
+    return strarray_exists( libs, make->staticlib );
+}
+
+
+/*******************************************************************
  *         get_native_unix_lib
  */
 static const char *get_native_unix_lib( const struct makefile *make, const char *name )
@@ -2867,9 +2907,27 @@ static void output_winegcc_command( struct makefile *make, unsigned int arch )
     output_filenames( target_flags[arch] );
     if (native_archs[arch] && !make->disabled[native_archs[arch]])
         output_filenames( hybrid_target_flags[arch] );
-    if (arch) return;
+    if (arch && !translated_archs[arch]) return;
     output_filename( "-mno-cygwin" );
     output_filenames( lddll_flags );
+}
+
+
+/*******************************************************************
+ *         output_translate_command
+ *
+ * For a translated arch, winegcc has just linked an ELF shared object named
+ * "<module>.so"; turn it into the PE image that the rule actually builds.
+ */
+static void output_translate_command( struct makefile *make, unsigned int arch, const char *module )
+{
+    if (!translated_archs[arch]) return;
+    /* a data-only module has no code, so winebuild writes the PE file itself */
+    if (make->data_only) return;
+    strarray_add( &make->clean_files, strmake( "%s.so", module ));
+    /* rm first: a half-written PE left by a failed run must not look up to date */
+    output( "\t%srm -f $@ && %s %s.so $@ && %s --builtin $@\n", cmd_prefix( "ELF2PE" ), elf2pe,
+            obj_dir_path( make, module ), winebuild );
 }
 
 
@@ -3579,6 +3637,7 @@ static void output_source_testdll( struct makefile *make, struct incl_file *sour
         output_filenames( all_libs );
         output_filename( arch_make_variable( "LDFLAGS", link_arch ));
         output( "\n" );
+        output_translate_command( make, arch, dll_name );
     }
 }
 
@@ -3664,7 +3723,11 @@ static void output_source_one_arch( struct makefile *make, struct incl_file *sou
 
     if (arch)
     {
-        if (source->file->flags & FLAG_C_UNIX) return;
+        /* a translated arch links its modules as ELF shared objects, so the
+         * static libs it uses need the .so-builtin entry points that winecrt0
+         * marks "unix" (dll_entry, dll_soinit, exe_entry, exe_main, ...) */
+        if ((source->file->flags & FLAG_C_UNIX) &&
+            !(translated_archs[arch] && make->staticlib)) return;
         if (!is_multiarch( arch )) return;
         if (!is_using_msvcrt( make ) && !make->staticlib && !(source->file->flags & FLAG_C_IMPLIB)) return;
         if ((source->file->flags & FLAG_C_CXX) && !get_expanded_arch_var( make, "CXX", arch )) return;
@@ -3679,22 +3742,23 @@ static void output_source_one_arch( struct makefile *make, struct incl_file *sou
          * that architecture; on a single-arch (ELF builtin) build the native
          * architecture is the module architecture, so they have to be built
          * here or they are silently dropped from the module */
-        if (archs.count > 1) return;
+        if (archs.count > 1 && !make->so_builtin) return;
     }
     else if (source->file->flags & FLAG_C_ASM)
     {
         return;
     }
-    else if (archs.count > 1 && is_using_msvcrt( make ))
+    else if (archs.count > 1 && is_using_msvcrt( make ) && !make->so_builtin)
     {
         if (!so_dll_supported) return;
-        if (!(source->file->flags & FLAG_C_IMPLIB) && (!make->staticlib || make->external)) return;
+        if (!(source->file->flags & FLAG_C_IMPLIB) &&
+            (!make->staticlib || (make->external && !is_so_builtin_lib( make )))) return;
     }
 
     obj_name = strmake( "%s%s.o", source->arch ? "" : arch_dirs[arch], obj );
     strarray_add( targets, obj_name );
 
-    if (source->file->flags & FLAG_C_UNIX)
+    if ((source->file->flags & FLAG_C_UNIX) && !arch)
         strarray_add( &make->unixobj_files, obj_name );
     else if (source->file->flags & FLAG_C_IMPLIB)
         strarray_add( &make->implib_files[arch], obj_name );
@@ -3730,8 +3794,10 @@ static void output_source_one_arch( struct makefile *make, struct incl_file *sou
             strarray_addall( &cflags, extra_cflags[arch] );
     }
 
-    if (!arch)
+    if (!arch || translated_archs[arch])
     {
+        /* a translated arch is compiled by the native toolchain, so it needs the
+         * same PIC/msvcrt flags the native arch uses for its builtin modules */
         if (source->file->flags & FLAG_C_UNIX)
         {
             strarray_addall( &cflags, unix_dllflags );
@@ -4017,8 +4083,10 @@ static void output_module( struct makefile *make, unsigned int arch )
     output_filenames( all_libs );
     output_filename( arch_make_variable( "LDFLAGS", link_arch ));
     output( "\n" );
+    output_translate_command( make, arch, module_name );
 
-    if (!make->data_only && !arch && unix_lib_supported) output_fake_module( make, spec_file );
+    if (!make->data_only && !arch && unix_lib_supported && archs.count == 1)
+        output_fake_module( make, spec_file );
 }
 
 
@@ -4147,6 +4215,7 @@ static void output_test_module( struct makefile *make, unsigned int arch )
     output_filenames( all_libs );
     output_filename( arch_make_variable( "LDFLAGS", link_arch ));
     output( "\n" );
+    output_translate_command( make, arch, testmodule );
     output( "%s:\n", obj_dir_path( make, stripped ));
     output_winegcc_command( make, link_arch );
     output_filename( "-s" );
@@ -4158,6 +4227,7 @@ static void output_test_module( struct makefile *make, unsigned int arch )
     output_filenames( all_libs );
     output_filename( arch_make_variable( "LDFLAGS", link_arch ));
     output( "\n" );
+    output_translate_command( make, arch, stripped );
     output( "%s %s:", obj_dir_path( make, testmodule ), obj_dir_path( make, stripped ));
     output_filenames_obj_dir( make, make->object_files[arch] );
     if (link_arch != arch) output_filenames_obj_dir( make, make->object_files[link_arch] );
@@ -4440,14 +4510,15 @@ static void output_sources( struct makefile *make )
     if (make->staticlib)
     {
         for (arch = 0; arch < archs.count; arch++)
-            if (is_multiarch( arch ) || (so_dll_supported && !make->external))
+            if (is_multiarch( arch ) ||
+                (so_dll_supported && (!make->external || (!arch && is_so_builtin_lib( make )))))
                 output_static_lib( make, arch );
     }
     else if (make->module)
     {
         for (arch = 0; arch < archs.count; arch++)
         {
-            if (is_multiarch( arch )) output_module( make, arch );
+            if (is_multiarch( arch ) || (!arch && make->so_builtin)) output_module( make, arch );
             if (make->importlib && (is_multiarch( arch ) || (!arch && !is_native_arch_disabled( make ))))
                 output_import_lib( make, arch );
         }
@@ -4762,6 +4833,7 @@ static void output_silent_rules(void)
         "BUILD",
         "CC",
         "CCLD",
+        "ELF2PE",
         "FLEX",
         "GEN",
         "LN",
@@ -4928,8 +5000,13 @@ static void load_sources( struct makefile *make )
     if (make->obj_dir)
     {
         make->disabled[0] = strarray_exists( disabled_dirs[0], make->obj_dir );
+        /* a .so builtin has no PE version at all: it stays a native ELF module
+         * even in a multiarch build, and is disabled for every PE arch */
+        make->so_builtin = so_dll_supported && archs.count > 1 && !make->disabled[0] &&
+                           strarray_exists( so_builtin_dirs, make->obj_dir );
         for (arch = 1; arch < archs.count; arch++)
-            make->disabled[arch] = make->disabled[0] || strarray_exists( disabled_dirs[arch], make->obj_dir );
+            make->disabled[arch] = make->disabled[0] || make->so_builtin ||
+                                   strarray_exists( disabled_dirs[arch], make->obj_dir );
     }
     make->external   = make->obj_dir && strarray_exists( external_dirs, make->obj_dir );
     make->is_win16   = strarray_exists( make->extradllflags, "-m16" );
@@ -5142,6 +5219,7 @@ int main( int argc, char *argv[] )
     sfnt2fon    = tools_path( "sfnt2fon" );
     winebuild   = tools_path( "winebuild" );
     winegcc     = tools_path( "winegcc" );
+    elf2pe      = root_src_dir_path( "tools/elf2pe" );
     widl        = tools_path( "widl" );
     wrc         = tools_path( "wrc" );
     wmc         = tools_path( "wmc" );
@@ -5152,6 +5230,13 @@ int main( int argc, char *argv[] )
 
     strarray_add( &archs, get_expanded_make_variable( top_makefile, "HOST_ARCH" ));
     strarray_addall( &archs, get_expanded_make_var_array( top_makefile, "PE_ARCHS" ));
+
+    so_builtin_dirs = get_expanded_make_var_array( top_makefile, "SO_BUILTIN_SUBDIRS" );
+    {
+        struct strarray translated = get_expanded_make_var_array( top_makefile, "TRANSLATED_ARCHS" );
+        for (arch = 1; arch < archs.count; arch++)
+            translated_archs[arch] = strarray_exists( translated, archs.str[arch] );
+    }
 
     /* check for ARM64X setup */
     if ((ec_arch = find_pe_arch( "arm64ec" )) && (arch = find_pe_arch( "aarch64" )))
@@ -5168,12 +5253,21 @@ int main( int argc, char *argv[] )
     for (arch = 1; arch < archs.count; arch++)
     {
         target = get_expanded_arch_var( top_makefile, "TARGET", arch );
-        strarray_add( &target_flags[arch], "-b" );
-        strarray_add( &target_flags[arch], target );
+        if (translated_archs[arch])
+        {
+            /* no cross toolchain: the native one is used verbatim, so no -b flag,
+             * and the installed PE can only be re-stamped, never stripped */
+            strip_progs[arch] = strmake( "--strip-program=\"%s --builtin\"", winebuild );
+        }
+        else
+        {
+            strarray_add( &target_flags[arch], "-b" );
+            strarray_add( &target_flags[arch], target );
+            strip_progs[arch] = strmake( "--strip-program=\"%s --builtin --strip-cmd=%s\"",
+                                         winebuild, get_expanded_arch_var( top_makefile, "STRIP", arch ));
+        }
         arch_dirs[arch] = strmake( "%s-windows/", archs.str[arch] );
         arch_install_dirs[arch] = strmake( "$(libdir)/wine/%s-windows", archs.str[arch] );
-        strip_progs[arch] = strmake( "--strip-program=\"%s --builtin --strip-cmd=%s\"",
-                                     winebuild, get_expanded_arch_var( top_makefile, "STRIP", arch ));
         dll_ext[arch] = "";
     }
 
