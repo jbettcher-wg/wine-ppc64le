@@ -334,3 +334,13 @@ _snprintf           0x00000C16  3  int   stdio.h:778     variadic=_vsnprintf  # 
 # pointers, not a function pointer.
 GUEST-IMPL   _initterm                        __wine_guest__initterm
 GUEST-IMPL   _initterm_e                      __wine_guest__initterm_e
+
+# _lock/_unlock are exported by this module but declared only in its private
+# mtdll.h, so the oracle refused them as "no declaration in any Wine header"
+# and a game's SDL2.dll got a sentinel for them at PROCESS_ATTACH.
+# PROBE-EXTRA appends to the oracle's default translation unit rather than
+# replacing it, which is what a module needs when its surface is in Wine's
+# public headers AND in a private header of its own.
+INCLUDE-DIR   .
+PROBE-EXTRA   mtdll.h
+PROBE-EXTRA   msvcrt.h        # _amsg_exit, __dllonexit

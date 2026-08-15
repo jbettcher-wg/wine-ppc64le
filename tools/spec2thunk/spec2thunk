@@ -203,6 +203,12 @@ def parse_spec(path):
                           vkd3d-proton's own widl output) keeps the oracle
                           pointed at the headers its implementation was
                           actually compiled from.
+        probe_extra    -- PROBE-EXTRA <header>: APPENDED to the oracle's
+                          default translation unit, unlike PROBE-INCLUDE which
+                          replaces it.  For a module whose surface is declared
+                          in Wine's headers but ALSO in a private header of its
+                          own (msvcrt's mtdll.h declares _lock/_unlock, which
+                          no public header does).  Pair with INCLUDE-DIR.
         include_dirs   -- INCLUDE-DIR <dir>: extra -I directories for the
                           oracle, searched before Wine's include tree.
     Relative paths are relative to the .thunks file that names them.
@@ -224,7 +230,7 @@ def parse_spec(path):
     excludes = []
     exports = []          # (name, imm32, nargs, returns_void, header, line)
     extra = dict(from_def=None, com_json=None, probe_includes=[],
-                 include_dirs=[], guest_impl={}, guest_refuse={},
+                 probe_extra=[], include_dirs=[], guest_impl={}, guest_refuse={},
                  guest_pass={})
     with open(path) as f:
         for lineno, raw in enumerate(f, 1):
@@ -293,6 +299,12 @@ def parse_spec(path):
                     sys.exit("%s:%d: PROBE-INCLUDE needs exactly one header"
                              % (path, lineno))
                 extra['probe_includes'].append(parts[1])
+                continue
+            if parts[0].upper() == 'PROBE-EXTRA':
+                if len(parts) != 2:
+                    sys.exit("%s:%d: PROBE-EXTRA needs exactly one header"
+                             % (path, lineno))
+                extra['probe_extra'].append(parts[1])
                 continue
             if parts[0].upper() == 'INCLUDE-DIR':
                 if len(parts) != 2:
@@ -1421,7 +1433,7 @@ def main():
     # ---------------- where the export list comes from
     dll, spec_exports, from_spec, excludes = None, [], None, []
     extra = dict(from_def=None, com_json=None, probe_includes=[],
-                 include_dirs=[])
+                 probe_extra=[], include_dirs=[])
     if args.spec:
         dll, spec_exports, from_spec, excludes, extra = parse_spec(args.spec)
 
@@ -1522,11 +1534,13 @@ def main():
     if extra['probe_includes']:
         probe_src = ''.join('#include <%s>\n' % h
                             for h in extra['probe_includes'])
+    probe_extra = ''.join('#include <%s>\n' % h for h in extra['probe_extra'])
     headers = wine_sig.WineHeaders(args.wine_include, args.wine_generated,
                                    clang=args.clang,
                                    workdir=os.path.join(args.builddir, 'sigprobe'),
                                    defines=crt_defines,
                                    probe_src=probe_src,
+                                   probe_extra=probe_extra,
                                    extra_includes=[spec_relative(d) for d in
                                                    extra['include_dirs']])
     headers.sanity()

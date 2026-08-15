@@ -233,6 +233,7 @@ void throw_bad_alloc(void);
 
 void __cdecl _purecall(void);
 void __cdecl _amsg_exit(int errnum);
+_onexit_t __cdecl __dllonexit(_onexit_t func, _onexit_t **start, _onexit_t **end);
 
 extern char **MSVCRT__environ;
 extern wchar_t **MSVCRT__wenviron;

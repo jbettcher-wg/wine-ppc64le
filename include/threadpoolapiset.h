@@ -58,6 +58,7 @@ WINBASEAPI BOOL        WINAPI SetThreadpoolThreadMinimum(PTP_POOL,DWORD);
 WINBASEAPI void        WINAPI SetThreadpoolTimer(PTP_TIMER,FILETIME*,DWORD,DWORD);
 WINBASEAPI void        WINAPI SetThreadpoolWait(PTP_WAIT,HANDLE,FILETIME *);
 WINBASEAPI void        WINAPI StartThreadpoolIo(TP_IO*);
+WINBASEAPI BOOL        WINAPI CallbackMayRunLong(TP_CALLBACK_INSTANCE*);
 WINBASEAPI void        WINAPI SubmitThreadpoolWork(PTP_WORK);
 WINBASEAPI BOOL        WINAPI TrySubmitThreadpoolCallback(PTP_SIMPLE_CALLBACK,void*,TP_CALLBACK_ENVIRON*);
 WINBASEAPI void        WINAPI WaitForThreadpoolIoCallbacks(TP_IO*,BOOL);

@@ -155,6 +155,52 @@ INTEGER_CLASSES = (1,   # integer_type_class
                    4,   # boolean_type_class
                    5)   # pointer_type_class
 
+RECORD_CLASS = 12       # record_type_class  (struct)
+UNION_CLASS  = 13       # union_type_class
+
+# ---------------------------------------------------------------------------
+# SMALL AGGREGATES PASSED BY VALUE.  ONE GPR IN BOTH ABIS.  NAMED, NOT INFERRED.
+# ---------------------------------------------------------------------------
+# MS-x64 passes an aggregate of 1, 2, 4 or 8 bytes BY VALUE in one integer
+# register (anything else goes by reference).  ppc64le ELFv2 places an
+# aggregate of <= 8 bytes in one GPR, its bytes in memory order, which on
+# little-endian is the same eight bytes in the same register.  The trap stub
+# already captures the guest's slot as a 64-bit value and the host passes it as
+# a ULONG_PTR, landing in r3 -- exactly where ELFv2 wants the aggregate -- so
+# nothing in the generated code changes.  This is purely what the oracle will
+# ACCEPT.
+#
+# The exception, and the reason this is a named set rather than a size rule:
+# ELFv2 passes a HOMOGENEOUS FLOAT AGGREGATE in FPRs, while MS-x64 keeps it in
+# a GPR.  struct { float x, y; } is 8 bytes and would sail through a pure size
+# test while landing in the wrong register file.  Proving "no floating-point
+# member anywhere, recursively" needs the record's own definition, and stage 1
+# indexes FunctionDecls only -- so until it also indexes RecordDecls, each type
+# here is one somebody read.  Adding to this list means reading the struct and
+# writing down what is in it.
+#
+#   POINT           struct { LONG x, y; }                    8 bytes, 2x int32
+#   POINTS          struct { SHORT x, y; }                   4 bytes, 2x int16
+#   SIZE            struct { LONG cx, cy; }                  8 bytes, 2x int32
+#   LARGE_INTEGER   union of { DWORD,LONG } and LONGLONG     8 bytes, integer
+#   ULARGE_INTEGER  union of { DWORD,DWORD } and ULONGLONG   8 bytes, integer
+#
+# The generated probe still asserts sizeof <= 8 AND that the type really is a
+# struct or union, so a type that changes shape under this list fails the build
+# rather than silently passing in the wrong register file.
+AGGREGATE_SLOT_TYPES = frozenset((
+    'POINT', 'POINTS', 'SIZE', 'LARGE_INTEGER', 'ULARGE_INTEGER',
+))
+
+
+def _bare_type(spelling):
+    """Strip cv-qualifiers so a whitelist lookup sees the type itself."""
+    t = spelling.strip()
+    for q in ('const ', 'volatile '):
+        while t.startswith(q):
+            t = t[len(q):].strip()
+    return t
+
 # The translation unit the oracle reads.  windows.h alone is not enough: its
 # include closure reaches only the CRT headers that corecrt.h happens to drag
 # in (ctype/stddef/string/time/stdlib), so ucrtbase startup and stdio
@@ -174,6 +220,12 @@ INTEGER_CLASSES = (1,   # integer_type_class
 # must never do.  Each line below says which exports it is there for.
 PROBE_SRC = (
     "#include <stdarg.h>\n"
+    # BEFORE windows.h, and this order is load-bearing: windows.h pulls in the
+    # winsock v1 winsock.h, and ws2def.h then redefines struct sockaddr with a
+    # different definition.  Gets ws2_32's inet_pton/inet_ntop/getaddrinfo and
+    # the WSA* surface that winsock.h alone does not declare.
+    "#include <winsock2.h>\n"
+    "#include <ws2tcpip.h>\n"
     "#include <windows.h>\n"
     "#include <stdlib.h>\n"           # __p___argc, __p___wargv, exit
     "#include <stdio.h>\n"            # corecrt_stdio_config.h, corecrt_wstdio.h
@@ -201,6 +253,12 @@ PROBE_SRC = (
     "#include <perflib.h>\n"          # advapi32: PerfStartProvider*, PerfStopProvider, ...
     "#include <ntsecapi.h>\n"         # advapi32: LsaOpenPolicy, LsaClose, LsaLookup*,
                                       # LsaQueryInformationPolicy, ...
+    "#include <threadpoolapiset.h>\n" # kernel32/kernelbase: CallbackMayRunLong
+    "#include <signal.h>\n"           # msvcrt/ucrtbase: signal, raise
+    "#include <shlobj.h>\n"           # shell32: SHGetKnownFolderPath, SHGetFolderPath*
+    "#include <evntprov.h>\n"         # advapi32: EventRegister, EventWriteTransfer,
+                                      # EventSetInformation
+
     # The 2026-08-15 first-real-game set.  Each of these modules refused 100% of
     # its exports as "no declaration found in Wine headers" -- the tooling gap
     # this list exists to close, not an ABI fact about the module.
@@ -456,7 +514,7 @@ def crt_defines_for_dll(dll):
 class WineHeaders:
     def __init__(self, include_dir, generated_dir=None, clang='clang',
                  target='x86_64-windows-gnu', workdir=None, defines=(),
-                 batch=None, probe_src=None, extra_includes=()):
+                 batch=None, probe_src=None, probe_extra='', extra_includes=()):
         """probe_src: the translation unit the oracle reads, when the module's
         declarations do not live in Wine's headers at all.  The d3d12 thunk is
         the motivating case: its surface is vkd3d-proton's own widl output
@@ -476,7 +534,9 @@ class WineHeaders:
         self.target = target
         self.workdir = workdir or tempfile.mkdtemp(prefix='winesig-')
         os.makedirs(self.workdir, exist_ok=True)
-        self.probe_src = probe_src if probe_src is not None else PROBE_SRC
+        # probe_extra APPENDS; probe_src REPLACES.  A module can need both:
+        # the Wine-centric default plus a private header of its own.
+        self.probe_src = (probe_src if probe_src is not None else PROBE_SRC) + probe_extra
         self._probe = os.path.join(self.workdir, 'wt_probe.c')
         with open(self._probe, 'w') as f:
             f.write(self.probe_src)
@@ -704,8 +764,15 @@ class WineHeaders:
         L.append('void wt_use%s(void) { (void)wt_reconstructed%s; }\n' % (tag, tag))
 
         def intcheck(what, spelling):
+            classes = INTEGER_CLASSES
+            if _bare_type(spelling) in AGGREGATE_SLOT_TYPES:
+                # A reviewed one-GPR aggregate (see AGGREGATE_SLOT_TYPES).  It
+                # must still BE a struct or union of at most 8 bytes: if the
+                # type is ever redefined out from under the review, this fails
+                # the build instead of passing in the wrong register file.
+                classes = (RECORD_CLASS, UNION_CLASS)
             ors = ' || '.join('__builtin_classify_type(*(%s)0) == %d'
-                              % (_ptr_to(spelling), c) for c in INTEGER_CLASSES)
+                              % (_ptr_to(spelling), c) for c in classes)
             L.append('_Static_assert(%s, "%s: %s is not integer/pointer class");\n'
                      % (ors, name, what))
             L.append('_Static_assert(sizeof(%s) <= 8, "%s: %s is wider than 64 bits");\n'
