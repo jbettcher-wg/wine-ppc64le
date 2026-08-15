@@ -169,6 +169,7 @@ static const char *winebuild;
 static const char *winegcc;
 static const char *elf2pe;
 static const char *spec2thunk;
+static const char *spec2thunk_sig;
 static const char *widl;
 static const char *wrc;
 static const char *wmc;
@@ -3520,7 +3521,8 @@ static void output_source_thunks( struct makefile *make, struct incl_file *sourc
     install_data_file( make, strmake( "%s.dll", obj ), name,
                        strmake( "$(libdir)/wine/%s", dir ), NULL );
 
-    output( "%s: %s %s\n", obj_dir_path( make, name ), source->filename, spec2thunk );
+    output( "%s: %s %s %s\n", obj_dir_path( make, name ), source->filename,
+            spec2thunk, spec2thunk_sig );
     output( "\t%s%s --spec %s --body=trap --out $@\n",
             cmd_prefix( "THUNK" ), spec2thunk, source->filename );
 }
@@ -5259,6 +5261,10 @@ int main( int argc, char *argv[] )
     winegcc     = tools_path( "winegcc" );
     elf2pe      = root_src_dir_path( "tools/elf2pe" );
     spec2thunk  = root_src_dir_path( "tools/spec2thunk/spec2thunk" );
+    /* spec2thunk imports this, and every descriptor it emits comes out of it,
+     * so a thunk module built before an edit to it is stale.  Without it in
+     * the prerequisites, changing the signature oracle rebuilt nothing. */
+    spec2thunk_sig = root_src_dir_path( "tools/spec2thunk/wine_sig.py" );
     widl        = tools_path( "widl" );
     wrc         = tools_path( "wrc" );
     wmc         = tools_path( "wmc" );

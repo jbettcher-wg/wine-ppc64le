@@ -44,6 +44,11 @@
 #
 # Columns:
 #   <ExportName>  <imm32 returned by --body=direct>  <nargs>  <int|void>  <header>:<line>
+#   <ExportName>  <imm32>  <nfixed>  <int|void>  <header>:<line>  variadic=<v-variant>
+#
+# The sixth column is optional and is the ONLY way to describe a true `...`
+# export; five columns mean exactly what they always meant.  For a variadic the
+# <nargs> column is the number of FIXED arguments -- where the `...` begins.
 #
 # The last three columns are ASSERTIONS, not inputs.  gen_thunk_pe.py re-reads
 # each declaration out of Wine's own headers with clang and hard-fails if this
@@ -73,44 +78,70 @@
 # then nothing at all until 258.  Any threshold anywhere in 259..335 selects
 # exactly the same twenty-one names.
 #
-# Twenty of the twenty-one are below.  printf is REFUSED -- see the banner
-# immediately following.
+# All twenty-one are below: the twenty at indices 0..19, and printf, which was
+# refused when this file was written and is now emitted at index 20 -- see the
+# variadic banner immediately following.
 #
 # ---------------------------------------------------------------------------
-# REFUSED: printf  -- 337 corpus binaries import it.
+# VARIADIC EXPORTS (index 20 onwards).  THIS SUPERSEDES THE OLD "printf IS
+# REFUSED" BANNER; THE REASONING THAT PRODUCED THAT REFUSAL IS RECORDED HERE SO
+# NOBODY REINSTATES IT.
 # ---------------------------------------------------------------------------
 #     @ varargs printf(str)                     dlls/msvcrt/msvcrt.spec:1398
 #     __WINE_CRT_PRINTF_ATTR(1,2) int printf(const char *, ...)
-#                                               include/msvcrt/stdio.h
-# A true `...` variadic CANNOT be thunked by a fixed-arity stub.  The stub has
-# no way to learn how many arguments the caller pushed, so it cannot copy them
-# to the host, and it cannot synthesise a va_list to hand to a native vprintf
-# either.  A guessed arity here would silently read past the guest's argument
-# frame on every short call and corrupt the guest's stack on every long one.
-# So it is left out, deliberately, and 337 corpus binaries will fail to bind
-# msvcrt.dll!printf until a real variadic path exists.
+#                                               include/msvcrt/stdio.h:701
 #
-# BE CLEAR ABOUT WHAT THAT COSTS.  Counted, not estimated: of the 339 corpus
-# binaries that import msvcrt, the number whose ENTIRE msvcrt import list is
-# satisfied by the twenty exports below is ZERO -- printf alone blocks 337 of
-# them, and the two that do not want printf want something else.  Emit printf
-# and it becomes 45.  Add the next tier (strcpy, free, strchr, getenv, fwrite,
-# strcspn, memmove, wcslen -- the 207..258 band just under the cliff) and it
-# becomes 92; add the 82..154 band (memset, memcmp, memcpy, malloc, wcscmp,
-# calloc) and it becomes 166.  This batch is a necessary floor, not a
-# sufficient one, and printf is the single largest blocker in the corpus.
+# The old objection was that a fixed-arity stub cannot forward `...`, because
+# it cannot learn how many arguments the caller pushed.  That much is true and
+# still is.  The error was concluding that the stub must therefore CALL the
+# variadic function.  It does not.  The host calls that function's own
+# v-variant --
 #
-# NOTE THE ASYMMETRY, IT IS NOT AN INCONSISTENCY: _vsnprintf and vprintf ARE
-# emitted below.  Those two are NOT variadic -- the caller has already built
-# the va_list and passes it as one ordinary pointer.  ppc64le ELFv2 va_list is
-# a plain pointer into a flat 8-byte-slot save area, structurally identical to
-# MS-x64's `char *`; measured end-to-end on the AC922, a guest-built va_list
-# was consumed correctly by native ppc64 formatting.  See the long va_list note
-# in wine_sig.py.  Refusing them too would be cargo-culting the printf rule.
+#       printf     -> vprintf         (1 fixed arg  -> 2 args)
+#       _snprintf  -> _vsnprintf      (3 fixed args -> 4 args)
 #
-# The fix for printf is a variadic forwarding path (host reads the guest's
-# format string, counts and classifies the conversions, and rebuilds the
-# argument list), NOT a fake arity in this file.
+# -- handing it a va_list synthesised from the guest's own argument frame
+# starting at slot <nfixed>.  No argument count is ever needed: the v-variant
+# walks the list under the format string's control, exactly as it does for a
+# native caller.
+#
+# WHY THAT IS SOUND HERE AND WOULD NOT BE ELSEWHERE.  MS-x64 homes RCX/RDX/R8/R9
+# into the caller's 32-byte shadow space, so from the first vararg onward the
+# guest's arguments are a flat run of 8-byte slots and a pointer to the first
+# of them IS an MS-x64 va_list.  ppc64le ELFv2 va_list is likewise a plain
+# pointer into a flat 8-byte-slot parameter save area -- there is no
+# register-save-area half to reconstruct, unlike SysV x86-64, where this would
+# require rebuilding a __va_list_tag and would not work.  MEASURED end to end on
+# the AC922: a guest-built MS-x64 va_list consumed correctly by native ppc64
+# _vsnprintf, "%d-%s-%d" -> "4242-AB-77".
+#
+# The sibling project ~/Development/powerpc64le-ports/wine-spec-thunk refuses
+# va_list outright.  That refusal was written for a different boundary and is
+# not an ABI fact about this one.  Do not copy it back.
+#
+# THE SIXTH COLUMN, variadic=<impl>, IS AN ASSERTION LIKE EVERY OTHER COLUMN,
+# and spec2thunk checks it in both directions before emitting anything:
+#   * a variadic WITHOUT variadic= is still refused, exactly as before;
+#   * variadic= on a function clang says is NOT variadic is a hard error;
+#   * the named v-variant is resolved by the oracle and must take exactly
+#     nfixed+1 arguments (va_list is one ordinary pointer parameter to it).
+# The v-variant name is never derived by munging the export name.  It is
+# carried to the host in impl_names_rva[], new in __wine_thunk_info version 4.
+#
+# WHAT IT UNLOCKS.  Counted, not estimated: of the 339 corpus binaries that
+# import msvcrt, the number whose ENTIRE msvcrt import list is satisfied by
+# indices 0..19 alone is ZERO -- printf alone blocked 337 of them.  With printf
+# it is 45.  Adding the next tier (strcpy, free, strchr, getenv, fwrite,
+# strcspn, memmove, wcslen -- the 207..258 band just under the cliff) makes it
+# 92; adding the 82..154 band (memset, memcmp, memcpy, malloc, wcscmp, calloc)
+# makes it 166.
+#
+# NOTE THE OLD ASYMMETRY, WHICH WAS NEVER AN INCONSISTENCY: _vsnprintf and
+# vprintf are emitted at indices 3 and 11 as ORDINARY exports.  They are not
+# variadic -- the caller has already built the va_list and passes it as one
+# pointer -- so they carry no variadic= column and their descriptors have bit 9
+# clear.  They are also the impl targets of indices 20 and 21, which is why
+# those two v-variants must stay in this file.
 #
 # ---------------------------------------------------------------------------
 # KNOWN LATENT HAZARD -- host->guest callback.  READ BEFORE DEBUGGING A CRASH
@@ -258,3 +289,36 @@ puts                0x00000C12  1  int   stdio.h:143     # spec:1402 (str)
 # ---------------------------------------------------------------------------
 __set_app_type      0x00000C13  1  void  corecrt_startup.h:70
 __getmainargs       0x00000C14  5  int   corecrt_startup.h:51
+
+# ---------------------------------------------------------------------------
+# indices 20..21: the first true `...` variadics.  APPENDED, not inserted --
+# indices 0..19 above are ABI and a live dispatcher depends on them.
+# Read the variadic banner at the top of this file before touching either line.
+# ---------------------------------------------------------------------------
+#
+# printf -- demanded by 337 of the 339 msvcrt-importing corpus binaries, the
+# single largest blocker there is.  stdio.h:701 is the real msvcrt import
+# declaration, `_ACRTIMP int __cdecl printf(const char*,...)`, in the
+# `#else /* _UCRT && !_NO_CRT_STDIO_INLINE */` branch -- which is the branch
+# that applies because the oracle probes this file in msvcrt's own CRT mode
+# (-D_MSVCR_VER=0; see the banner at indices 18..19).  stdio.h:421 also spells
+# a `static inline printf` for the UCRT branch; that one is not this DLL's
+# export.  Pairs with vprintf, which is index 11 above: 1 fixed arg + va_list
+# == vprintf's 2 arguments, checked by the oracle, not asserted here.
+printf              0x00000C15  1  int   stdio.h:701     variadic=vprintf  # spec:1398 (str)
+#
+# _snprintf -- the verifiable one: it writes the formatted bytes into a caller
+# buffer, so a test can read them back instead of trusting stdout.  3 fixed
+# args (char*, size_t, const char*) + va_list == _vsnprintf's 4, and _vsnprintf
+# is index 3 above.
+#
+# FLAGGED, deliberately not hidden: in msvcrt CRT mode the only declaration of
+# _snprintf clang can see is the `static inline` forwarder at stdio.h:778 (it
+# calls _vsnprintf, which is exactly the pairing asserted here).  The
+# _ACRTIMP import declaration at stdio.h:817 is behind `_NO_CRT_STDIO_INLINE`,
+# which this build does not set, so it is not the visible one.  Both spell the
+# identical prototype, `int __cdecl _snprintf(char*,size_t,const char*,...)`,
+# and dlls/msvcrt/msvcrt.spec:917 `@ varargs _snprintf(ptr long str)`
+# corroborates the three fixed arguments independently.  msvcrt.dll really does
+# export _snprintf regardless of which declaration the header hands a caller.
+_snprintf           0x00000C16  3  int   stdio.h:778     variadic=_vsnprintf  # spec:917 (ptr long str)

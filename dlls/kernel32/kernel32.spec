@@ -1341,7 +1341,7 @@
 @ stdcall -arch=arm,x86_64 -norelay RtlRaiseException(ptr) NTDLL.RtlRaiseException
 @ cdecl -import RtlRestoreContext(ptr ptr)
 @ stdcall RtlUnwind(ptr ptr ptr long) NTDLL.RtlUnwind
-@ stdcall -arch=!i386 RtlUnwindEx(long long ptr long ptr) NTDLL.RtlUnwindEx
+@ stdcall -arch=!i386 RtlUnwindEx(ptr ptr ptr ptr ptr ptr) NTDLL.RtlUnwindEx
 @ stdcall -arch=!i386 RtlVirtualUnwind(long long long ptr ptr ptr ptr ptr) NTDLL.RtlVirtualUnwind
 @ stdcall -arch=x86_64 -norelay RtlIsEcCode(ptr) NTDLL.RtlIsEcCode
 @ stdcall RtlZeroMemory(ptr long) NTDLL.RtlZeroMemory
@@ -1603,7 +1603,7 @@
 @ stub ValidateLocale
 @ stdcall -import VerLanguageNameA(long str long)
 @ stdcall -import VerLanguageNameW(long wstr long)
-@ stdcall -ret64 VerSetConditionMask(long long long long) NTDLL.VerSetConditionMask
+@ stdcall -ret64 VerSetConditionMask(int64 long long) NTDLL.VerSetConditionMask
 @ stdcall VerifyConsoleIoHandle(long)
 # @ stub VerifyScripts
 @ stdcall VerifyVersionInfoA(ptr long int64)

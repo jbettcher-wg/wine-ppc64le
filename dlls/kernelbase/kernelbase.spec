@@ -1713,7 +1713,7 @@
 @ stdcall VerLanguageNameW(long wstr long)
 @ stdcall VerQueryValueA(ptr str ptr ptr)
 @ stdcall VerQueryValueW(ptr wstr ptr ptr)
-@ stdcall -ret64 VerSetConditionMask(long long long long) ntdll.VerSetConditionMask
+@ stdcall -ret64 VerSetConditionMask(int64 long long) ntdll.VerSetConditionMask
 # @ stub VerifyApplicationUserModelId
 # @ stub VerifyPackageFamilyName
 # @ stub VerifyPackageFullName

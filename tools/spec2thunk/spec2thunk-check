@@ -12,6 +12,19 @@ this checker does a plain regex scan of the header TEXT.  Two unrelated
 readings of the same headers having to agree is the point -- a shared helper
 module would have made the cross-check worthless.
 
+VARIADICS.  __wine_thunk_info version 4 added impl_names_rva: the name the
+host resolves in the NATIVE module, which differs from the export name only
+for a true `...` variadic, where it is that function's v-variant (printf ->
+vprintf).  This checker re-derives that pairing the same independent way it
+re-derives everything else -- a regex scan of the header TEXT -- and requires:
+
+  * descriptor bit 9 set  <=>  Wine's headers declare the export variadic;
+  * bits 0..7 == the number of FIXED arguments (the `...` is not counted);
+  * an impl name that is a readable ASCII string, non-empty, and different
+    from the export name exactly when bit 9 is set;
+  * the impl to be declared, NON-variadic, and to take exactly nfixed+1
+    arguments -- va_list is one ordinary pointer parameter.
+
 Prints PASS/FAIL per property; exits nonzero if anything FAILed.
 """
 
@@ -22,7 +35,11 @@ import struct
 import sys
 
 STRIDE = 16
-INFO_VERSION = 3
+INFO_VERSION = 4
+INFO_FIELDS = 8                 # version..impl_names_rva
+DESC_VOID = 0x100               # bit 8
+DESC_VARIADIC = 0x200           # bit 9
+DESC_RESERVED = 0xfffffc00      # bits 10..31, must be zero
 # Byte offset of the trapping instruction inside a stub, per body mode.
 # trap mode prefixes `mov r10, rcx` (49 89 ca) because x86-64 SYSCALL
 # architecturally overwrites RCX -- which is MS-x64 argument 0 -- with RIP+2.
@@ -313,6 +330,99 @@ class HeaderScan:
         return found
 
 
+class WineSpecList:
+    """Independent re-derivation of the ELIGIBLE export list of a Wine .spec.
+
+    The generator can now take its list from the module's own .spec instead of
+    a hand-written .thunks file.  That list is a claim like any other, so this
+    re-derives it here from the .spec TEXT, with its own parser, and requires
+    the image's names to be a SUBSEQUENCE of it -- same relative order, nothing
+    invented, nothing reordered.
+
+    WHAT THIS DELIBERATELY DOES NOT DO: decide which eligible export SHOULD have
+    been emitted.  That verdict is clang's, on Wine's real headers, and a regex
+    scanner re-deriving it would be guessing -- exactly what the generator's
+    docstring forbids.  So an export present in the .spec and absent from the
+    image is reported, with a count, and is a FAIL only under --require-complete.
+    Everything the image DOES assert is still re-derived here in full.
+    """
+
+    # tools/winebuild/build.h FLAG_CPU_WIN32 / FLAG_CPU_WIN64, and
+    # tools/tools.h get_cpu_from_name(), which matches by PREFIX.
+    CPU_NAMES = (('i386', 'i386'), ('i486', 'i386'), ('i586', 'i386'),
+                 ('i686', 'i386'), ('i786', 'i386'), ('x86_64', 'x86_64'),
+                 ('amd64', 'x86_64'), ('aarch64', 'arm64'),
+                 ('arm64ec', 'arm64ec'), ('arm64', 'arm64'), ('arm', 'arm'),
+                 ('ppc64', 'powerpc64'), ('powerpc64', 'powerpc64'))
+    WIN32 = frozenset(('i386', 'arm'))
+    WIN64 = frozenset(('x86_64', 'arm64', 'arm64ec', 'powerpc64'))
+    FUNC_TYPES = frozenset(('stdcall', 'cdecl', 'varargs', 'thiscall',
+                            'fastcall'))
+    LINE_RE = re.compile(r'^\s*(?:@|\d+)\s+(?P<type>\w+)\s+'
+                         r'(?P<flags>(?:-\S+\s+)*)'
+                         r'(?P<name>@|[A-Za-z_][\w.]*)\s*'
+                         r'(?:\((?P<args>[^)]*)\))?')
+
+    def __init__(self, path, cpu='x86_64'):
+        self.path = os.path.abspath(os.path.expanduser(path))
+        self.cpu = cpu
+
+    def _cpus(self, flags):
+        cpus, mask = set(), set()
+        for f in flags:
+            if f == '-i386':
+                cpus.add('i386')
+            elif f.startswith('-arch='):
+                for tok in f[len('-arch='):].split(','):
+                    if tok == 'win32':
+                        cpus |= self.WIN32
+                    elif tok == 'win64':
+                        cpus |= self.WIN64
+                    else:
+                        neg = tok.startswith('!')
+                        bare = tok[1:] if neg else tok
+                        for prefix, cpu in self.CPU_NAMES:
+                            if bare.startswith(prefix):
+                                (mask if neg else cpus).add(cpu)
+                                break
+                        else:
+                            raise Fail('%s: unknown architecture %r'
+                                       % (self.path, tok))
+        if 'x86_64' in cpus:
+            cpus.add('arm64ec')
+        if 'x86_64' in mask:
+            mask.add('arm64ec')
+        if mask:
+            cpus |= (self.WIN32 | self.WIN64) - mask
+        return cpus or None
+
+    def eligible(self):
+        """-> [dict(name, nargs, line), ...] in .spec order."""
+        out = []
+        with open(self.path, errors='replace') as fh:
+            for lineno, raw in enumerate(fh, 1):
+                line = raw.split('#', 1)[0].rstrip()
+                if not line.strip():
+                    continue
+                m = self.LINE_RE.match(line)
+                if not m or m.group('type') not in self.FUNC_TYPES:
+                    continue
+                flags = m.group('flags').split()
+                if '-noname' in flags or '-register' in flags:
+                    continue
+                name = m.group('name')
+                if name == '@':
+                    continue
+                cpus = self._cpus(flags)
+                if cpus is not None and self.cpu not in cpus:
+                    continue
+                out.append(dict(name=name, line=lineno,
+                                nargs=len((m.group('args') or '').split())))
+        if not out:
+            raise Fail('%s: no eligible export lines' % self.path)
+        return out
+
+
 class SpecScan:
     """Independent re-reading of a cited Wine .spec line.
 
@@ -363,7 +473,7 @@ class SpecScan:
 # ---------------------------------------------------------------- spec
 
 def parse_spec(path):
-    dll, exports = None, []
+    dll, exports, from_spec, excludes = None, [], None, []
     with open(path) as f:
         for raw in f:
             line = raw.split('#', 1)[0].strip()
@@ -373,13 +483,29 @@ def parse_spec(path):
             if parts[0].upper() == 'DLL':
                 dll = parts[1]
                 continue
-            if len(parts) != 5:
+            if parts[0].upper() == 'FROM-SPEC':
+                from_spec = parts[1]
+                continue
+            if parts[0].upper() == 'EXCLUDE':
+                excludes.append(parts[1])
+                continue
+            if len(parts) not in (5, 6):
                 raise SystemExit('%s: malformed export line: %s' % (path, line))
-            name, imm, nargs, retkind, loc = parts
+            name, imm, nargs, retkind, loc = parts[:5]
+            impl = None
+            if len(parts) == 6:
+                if not parts[5].startswith('variadic='):
+                    raise SystemExit('%s: unknown 6th token %r on: %s'
+                                     % (path, parts[5], line))
+                impl = parts[5][len('variadic='):]
+                if not impl:
+                    raise SystemExit('%s: empty variadic= on: %s' % (path, line))
             hdr, _, ln = loc.rpartition(':')
             exports.append(dict(name=name, imm=int(imm, 0), nargs=int(nargs, 0),
-                                void=(retkind == 'void'), header=hdr, line=int(ln)))
-    return dll, exports
+                                void=(retkind == 'void'), header=hdr,
+                                line=int(ln), variadic_impl=impl,
+                                asserted=True))
+    return dll, exports, from_spec, excludes
 
 
 def expect_stub(mode, imm):
@@ -395,7 +521,20 @@ def expect_stub(mode, imm):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('image')
-    ap.add_argument('--spec', required=True)
+    ap.add_argument('--spec', help='the .thunks file the image was built from')
+    ap.add_argument('--from-spec', metavar='<mod>.spec',
+                    help="the module's own Wine .spec, when the export list was "
+                         'derived from it.  Re-parsed here by this file\'s own '
+                         'reader; the image\'s names must be a subsequence of '
+                         'the eligible ones.')
+    ap.add_argument('--dll-name', help='expected export-directory DLL name; '
+                                       'defaults to the .thunks DLL line or the '
+                                       '.spec basename')
+    ap.add_argument('--require-complete', action='store_true',
+                    help='FAIL if the image omits any export the list has.  Off '
+                         'by default: the generator legitimately refuses what '
+                         "clang cannot prove is register-passable, and this "
+                         'file will not second-guess that with a regex.')
     ap.add_argument('--body', choices=('direct', 'trap'), required=True)
     ap.add_argument('--image-base', default='0x180000000')
     ap.add_argument('--wine-include', default=DEFAULT_WINE_INCLUDE)
@@ -403,16 +542,55 @@ def main():
                     help='Wine source root, used only to re-read a .spec line '
                          'cited by an export that no header declares')
     args = ap.parse_args()
+    if not args.spec and not args.from_spec:
+        ap.error('one of --spec or --from-spec is required')
 
     r = Report()
     print("=== checking %s (body=%s) ===" % (args.image, args.body))
-    spec_dll, spec_exports = parse_spec(args.spec)
-    spec_names = [e['name'] for e in spec_exports]
+    spec_dll, overrides, from_spec, excludes = None, [], None, []
+    if args.spec:
+        spec_dll, overrides, from_spec, excludes = parse_spec(args.spec)
+    if args.from_spec:
+        from_spec = args.from_spec
+    elif from_spec == 'auto':
+        from_spec = os.path.join(os.path.dirname(os.path.abspath(args.spec)),
+                                 os.path.splitext(os.path.basename(spec_dll))[0]
+                                 + '.spec')
+    elif from_spec and args.spec and not os.path.isabs(from_spec):
+        from_spec = os.path.join(os.path.dirname(os.path.abspath(args.spec)),
+                                 from_spec)
+
+    # `listed` is the full eligible list; `spec_exports` is the subset the image
+    # actually carries, in image order, each with whatever assertion columns a
+    # .thunks override gave it.
+    ov = {e['name']: e for e in overrides}
+    if from_spec:
+        eligible = [e for e in WineSpecList(from_spec).eligible()
+                    if e['name'] not in set(excludes)]
+        listed = []
+        for e in eligible:
+            o = ov.get(e['name'])
+            listed.append(dict(o, spec_nargs=e['nargs']) if o else
+                          dict(name=e['name'], imm=None, nargs=None, void=None,
+                               header=None, line=None, variadic_impl=None,
+                               asserted=False, spec_nargs=e['nargs']))
+        if not spec_dll:
+            spec_dll = os.path.splitext(os.path.basename(from_spec))[0] + '.dll'
+    else:
+        listed = [e for e in overrides if e['name'] not in set(excludes)]
+    if args.dll_name:
+        spec_dll = args.dll_name
+    listed_names = [e['name'] for e in listed]
 
     try:
         pe = PE(args.image)
     except Fail as e:
         print("FAIL unable to parse image: %s" % e)
+        return 1
+    except OSError as e:
+        # A missing or unreadable image is a FAIL like any other, not a
+        # traceback -- this runs unattended in build/verify loops.
+        print("FAIL unable to read image: %s" % e)
         return 1
 
     # -- 1. machine / PE32+
@@ -443,9 +621,58 @@ def main():
            % (dllname, len(exp), edir_va, edir_sz))
     r.check(dllname.lower() == spec_dll.lower(),
             '5a export directory Name matches spec DLL name', dllname)
-    missing = [n for n in spec_names if n not in exp]
-    r.check(not missing, '5b all spec functions exported BY NAME',
-            'missing=%s' % missing if missing else '%d names' % len(spec_names))
+
+    # ------------------------------------------------------------------
+    # WHAT THE IMAGE CARRIES vs WHAT THE LIST OFFERS.
+    # ------------------------------------------------------------------
+    # The generator REFUSES anything clang cannot prove is register-passable,
+    # so the image is a SUBSET of the list -- 3 of user32's 5 hand-written
+    # entries, and ~13% of a whole kernel32.spec.  Requiring equality (which
+    # this file used to) turns every honest refusal into a FAIL and made the
+    # checker unusable on exactly the runs that most need checking.
+    #
+    # The properties that still have to hold, and are checked here:
+    #   * every name the image exports is IN the list -- nothing invented;
+    #   * they appear in the list's own relative order -- nothing reordered,
+    #     which is what makes "index i" mean the same thing on both sides.
+    # An omission is reported and counted, and is a FAIL only under
+    # --require-complete; see the WineSpecList docstring for why this file
+    # does not re-derive the refusal decision itself.
+    img_names = [n for n, rva in sorted(exp.items(), key=lambda kv: kv[1])
+                 if n != '__wine_thunk_info']
+    pos_of = {e['name']: i for i, e in enumerate(listed)}
+    invented = [n for n in img_names if n not in pos_of]
+    r.check(not invented, '5b every exported name is in the export list',
+            'not in the list: %s' % invented[:10] if invented
+            else '%d name(s)' % len(img_names))
+    positions = [pos_of[n] for n in img_names if n in pos_of]
+    r.check(positions == sorted(positions),
+            '5b2 exported names keep the export list\'s relative order',
+            'out of order' if positions != sorted(positions)
+            else '%d name(s) in list order' % len(positions))
+    omitted = [n for n in listed_names if n not in set(img_names)]
+    if args.require_complete:
+        r.check(not omitted, '5b3 no export omitted (--require-complete)',
+                'omitted=%s' % omitted[:10] if omitted else '')
+    else:
+        r.note('omitted by the generator',
+               '%d of %d listed export(s) refused and not emitted%s'
+               % (len(omitted), len(listed_names),
+                  '' if not omitted else ': ' + ', '.join(omitted[:8])
+                  + (' ...' if len(omitted) > 8 else '')))
+
+    # From here on `spec_exports` is what the IMAGE carries, in image order,
+    # each carrying whatever assertion columns a .thunks line gave it.
+    by_name = {e['name']: e for e in listed}
+    spec_exports = [by_name[n] for n in img_names if n in by_name]
+    for e in spec_exports:
+        if e.get('imm') is None:
+            # A spec-derived entry has no hand-written imm32.  The generator
+            # numbers them by position in the eligible list; re-derive that
+            # rather than believe it, so --body=direct is still byte-checked.
+            e['imm'] = pos_of[e['name']]
+    spec_names = [e['name'] for e in spec_exports]
+
     r.check('__wine_thunk_info' in exp, '8a __wine_thunk_info exported by name',
             '0x%08x' % exp.get('__wine_thunk_info', 0))
     stub_rvas = [exp[n] for n in spec_names if n in exp]
@@ -477,23 +704,32 @@ def main():
     fields = None
     if info_rva:
         try:
-            fields = struct.unpack_from('<IIIIIII', pe.read(info_rva, 28))
+            fields = struct.unpack_from('<%dI' % INFO_FIELDS,
+                                        pe.read(info_rva, 4 * INFO_FIELDS))
         except Fail as e:
             r.check(False, '8b __wine_thunk_info readable', str(e))
     if not fields:
         print("\n%d checks, %d FAIL" % (r.n, r.bad + 1))
         return 1
 
-    version, count, stubs_rva, stride, names_rva, sigs_rva, trap_off = fields
+    (version, count, stubs_rva, stride, names_rva, sigs_rva, trap_off,
+     impl_names_rva) = fields
     r.note('__wine_thunk_info',
            'ver=%d count=%d stubs_rva=0x%x stride=%d names_rva=0x%x '
-           'sigs_rva=0x%x trap_off=%d' % fields)
-    r.check(version == INFO_VERSION, '8b __wine_thunk_info.version == 3', str(version))
-    r.check(count == len(spec_names), '8c count == number of stubs',
-            '%d vs %d' % (count, len(spec_names)))
+           'sigs_rva=0x%x trap_off=%d impl_names_rva=0x%x' % fields)
+    r.check(version == INFO_VERSION,
+            '8b __wine_thunk_info.version == %d' % INFO_VERSION, str(version))
+    # Against the EXPORT DIRECTORY, not against the list: the image is allowed
+    # to carry fewer than the list offers (refusals), but every function it
+    # exports must have a stub and every stub must be exported.
+    r.check(count == len(img_names),
+            '8c count == number of exported functions',
+            '%d vs %d' % (count, len(img_names)))
     r.check(stride == STRIDE, '8d stride == 16', str(stride))
+    r.check(impl_names_rva != 0, '8i impl_names_rva present (version 4)',
+            '0x%x' % impl_names_rva)
     for tag, rva in (('__wine_thunk_info', info_rva), ('names_rva', names_rva),
-                     ('sigs_rva', sigs_rva)):
+                     ('sigs_rva', sigs_rva), ('impl_names_rva', impl_names_rva)):
         s = pe.section_of(rva)
         r.check(s is not None and not (s['flags'] & IMAGE_SCN_MEM_WRITE),
                 '8e %s is in a non-writable section' % tag,
@@ -515,6 +751,25 @@ def main():
         r.check(not bad, '8h export RVA == stubs_rva + index*16 for every name',
                 '; '.join(bad) if bad else 'all %d ok' % count)
 
+    # -- impl_names_rva[] (version 4).  Walked and validated as bytes here;
+    # cross-checked against the descriptors and against Wine's headers at 11h.
+    impls = []
+    if impl_names_rva:
+        try:
+            for i in range(count):
+                impls.append(pe.cstr(pe.u32(impl_names_rva + 4 * i)))
+        except Fail as e:
+            r.check(False, '8j walk impl_names_rva -> impl name strings', str(e))
+    if len(impls) == count:
+        bad = ['[%d] %r' % (i, s) for i, s in enumerate(impls)
+               if not s or not all(0x21 <= ord(c) <= 0x7e for c in s)]
+        r.check(not bad, '8j impl_names_rva[] are non-empty printable ASCII',
+                '; '.join(bad) if bad else '%d strings' % count)
+        r.note('impl_names_rva[]',
+               ', '.join('%s->%s' % (walked[i], impls[i])
+                         for i in range(min(count, len(walked)))
+                         if i >= len(walked) or impls[i] != walked[i])
+               or 'every entry identical to its export name')
     # -- 6. section holding the stubs
     sec = pe.section_of(stubs_rva)
     r.check(sec is not None and sec['name'] == '.thunk',
@@ -598,23 +853,42 @@ def main():
     except Fail as e:
         r.check(False, '11a sigs_rva[] readable', str(e))
     if len(descs) == count:
-        r.note('sigs_rva[]', ' '.join('0x%05x' % d for d in descs))
+        r.note('sigs_rva[]',
+               ' '.join('0x%05x' % d for d in descs) if len(descs) <= 250
+               else '%d descriptors (dump suppressed; every one is re-derived '
+                    'at 11e below)' % len(descs))
         bad = ['%s=0x%08x' % (walked[i] if i < len(walked) else i, d)
-               for i, d in enumerate(descs) if d >> 9]
-        r.check(not bad, '11a descriptor reserved bits 9..31 are zero',
+               for i, d in enumerate(descs) if d & DESC_RESERVED]
+        r.check(not bad, '11a descriptor reserved bits 10..31 are zero',
                 '; '.join(bad) if bad else 'all %d clean' % count)
-        bad = ['%s nargs=%d' % (walked[i], d & 0xff)
-               for i, d in enumerate(descs) if (d & 0xff) > 16]
-        r.check(not bad, '11b descriptor nargs <= 16',
+        # A variadic costs one slot MORE than its fixed count -- the va_list the
+        # host synthesises -- and dlls/ntdll/signal_ppc64.c rejects a stub whose
+        # total exceeds THUNK_MAX_ARGS, so the same bound has to hold here or
+        # the image is one the dispatcher will refuse at runtime.
+        bad = ['%s nargs=%d%s' % (walked[i], d & 0xff,
+                                  '+va' if d & DESC_VARIADIC else '')
+               for i, d in enumerate(descs)
+               if (d & 0xff) + (1 if d & DESC_VARIADIC else 0) > 16]
+        r.check(not bad, '11b descriptor nargs (+va_list) <= 16',
                 '; '.join(bad) if bad else 'all %d in range' % count)
 
         # Exports the thunk spec deliberately cites to a .spec file rather than
         # a header: Wine declares them nowhere, so the header scan cannot and
         # should not be expected to find them.  They get 11g instead of 11c.
-        by_spec = {e['name'] for e in spec_exports if e['header'].endswith('.spec')}
+        by_spec = {e['name'] for e in spec_exports
+                   if (e['header'] or '').endswith('.spec')}
+
+        # The v-variants a variadic forwards to have to be scanned for too, so
+        # the nfixed+1 pairing can be re-derived here rather than believed.
+        # Several of them (vprintf, _vsnprintf) are already exports in their own
+        # right; scanning a name twice would only duplicate work.
+        want_names = list(spec_names)
+        for e in spec_exports:
+            if e['variadic_impl'] and e['variadic_impl'] not in want_names:
+                want_names.append(e['variadic_impl'])
 
         scan = HeaderScan(args.wine_include)
-        hits = scan.find(spec_names)
+        hits = scan.find(want_names)
         r.note('header scan', '%d headers in %s' % (len(scan.files), scan.dir))
         nodecl = [n for n in spec_names if n not in by_spec and not hits[n]]
         r.check(not nodecl, '11c every export has a declaration in Wine headers',
@@ -647,7 +921,7 @@ def main():
                     '; '.join(bad) if bad else
                     '%d confirmed (return kind NOT checked -- a .spec has none)'
                     % len(by_spec))
-        conflict, mism, locbad = [], [], []
+        conflict, mism, locbad, vbad = [], [], [], []
         for i, e in enumerate(spec_exports):
             n = e['name']
             hs = hits[n]
@@ -658,29 +932,132 @@ def main():
                 conflict.append('%s: %s' % (n, sorted(shapes)))
                 continue
             nargs, void, variadic = shapes.pop()
-            if variadic:
-                mism.append('%s: header says varargs, must not have been emitted' % n)
-                continue
-            want = (nargs & 0xff) | (0x100 if void else 0)
+            # A variadic's `...` is one of the tokens split_top() returned, so
+            # it has to come back off: the descriptor counts FIXED arguments.
+            nfixed = nargs - 1 if variadic else nargs
+            want = ((nfixed & 0xff) | (DESC_VOID if void else 0)
+                    | (DESC_VARIADIC if variadic else 0))
             if i < len(descs) and descs[i] != want:
-                mism.append('%s: image 0x%03x, headers say 0x%03x (%d args, ret %s)'
-                            % (n, descs[i], want, nargs, 'void' if void else 'non-void'))
-            # the spec's own claim, and the file:line it cites
-            if e['nargs'] != nargs or e['void'] != void:
-                mism.append('%s: spec claims %d args/%s, headers say %d args/%s'
-                            % (n, e['nargs'], 'void' if e['void'] else 'int',
-                               nargs, 'void' if void else 'int'))
-            if not any(h['file'] == e['header'] and h['line'] == e['line'] for h in hs):
-                locbad.append('%s: spec cites %s:%d, scan found %s'
-                              % (n, e['header'], e['line'],
-                                 ', '.join('%s:%d' % (h['file'], h['line']) for h in hs)))
+                mism.append('%s: image 0x%03x, headers say 0x%03x '
+                            '(%d %sargs, ret %s%s)'
+                            % (n, descs[i], want, nfixed,
+                               'fixed ' if variadic else '',
+                               'void' if void else 'non-void',
+                               ', VARIADIC' if variadic else ''))
+            # the spec's own claim, and the file:line it cites -- only a
+            # HAND-WRITTEN line makes those claims.  A spec-derived entry has
+            # no nargs/int|void/header:line column to be wrong about; what it
+            # does have is the Wine .spec's own argument list, checked below.
+            if e.get('asserted'):
+                if e['nargs'] != nfixed or e['void'] != void:
+                    mism.append('%s: spec claims %d args/%s, headers say %d args/%s'
+                                % (n, e['nargs'], 'void' if e['void'] else 'int',
+                                   nfixed, 'void' if void else 'int'))
+                if not any(h['file'] == e['header'] and h['line'] == e['line']
+                           for h in hs):
+                    locbad.append('%s: spec cites %s:%d, scan found %s'
+                                  % (n, e['header'], e['line'],
+                                     ', '.join('%s:%d' % (h['file'], h['line'])
+                                               for h in hs)))
+            elif e.get('spec_nargs') is not None and not variadic:
+                # Two independent readings of the module: the Wine .spec's
+                # argument list, re-parsed by WineSpecList, against the header
+                # text.  The generator refuses on this disagreement; anything
+                # that made it into the image must not have one.
+                if e['spec_nargs'] != nfixed:
+                    mism.append('%s: %s says %d arg(s), headers say %d'
+                                % (n, os.path.basename(from_spec or '.spec'),
+                                   e['spec_nargs'], nfixed))
+
+            # ---- 11h: the variadic contract, re-derived, in both directions.
+            declared_impl = impls[i] if i < len(impls) else None
+            if variadic != bool(e['variadic_impl']):
+                vbad.append('%s: headers say %svariadic, thunk spec says %s'
+                            % (n, '' if variadic else 'NOT ',
+                               'variadic=%s' % e['variadic_impl']
+                               if e['variadic_impl'] else 'nothing'))
+            if declared_impl is None:
+                vbad.append('%s: no impl_names_rva[%d] entry to check' % (n, i))
+            elif not variadic:
+                # Non-variadic: the host must resolve the export's own name.
+                if declared_impl != n:
+                    vbad.append('%s: not variadic, but impl name is %r'
+                                % (n, declared_impl))
+            else:
+                if declared_impl == n:
+                    vbad.append('%s: variadic, but its impl name is itself -- '
+                                'a fixed-arity call to a `...` function' % n)
+                if e['variadic_impl'] and declared_impl != e['variadic_impl']:
+                    vbad.append('%s: image says impl %r, thunk spec says %r'
+                                % (n, declared_impl, e['variadic_impl']))
+                # The v-variant takes the same fixed arguments plus one va_list,
+                # which is one ordinary pointer parameter, so nfixed+1 exactly.
+                ihs = hits.get(declared_impl) or []
+                if not ihs:
+                    vbad.append('%s: impl %r has no declaration in Wine headers'
+                                % (n, declared_impl))
+                else:
+                    ishapes = {(h['nargs'], h['void'], h['variadic']) for h in ihs}
+                    if len(ishapes) != 1:
+                        vbad.append('%s: impl %r declared inconsistently: %s'
+                                    % (n, declared_impl, sorted(ishapes)))
+                    else:
+                        ia, ivoid, ivar = ishapes.pop()
+                        if ivar:
+                            vbad.append('%s: impl %r is itself variadic'
+                                        % (n, declared_impl))
+                        elif ia != nfixed + 1:
+                            vbad.append('%s: %d fixed args need an impl of %d '
+                                        'args, but %r takes %d'
+                                        % (n, nfixed, nfixed + 1,
+                                           declared_impl, ia))
+                        if ivoid != void:
+                            vbad.append('%s returns %s but impl %r returns %s'
+                                        % (n, 'void' if void else 'a value',
+                                           declared_impl,
+                                           'void' if ivoid else 'a value'))
+
         r.check(not conflict, '11d Wine headers self-consistent for each export',
                 '; '.join(conflict) if conflict else 'no conflicting declarations')
         r.check(not mism, '11e descriptor matches Wine headers (regex re-derivation)',
                 '; '.join(mism) if mism else '%d descriptors confirmed' % count)
         r.check(not locbad, '11f spec cites a header:line that really declares it',
                 '; '.join(locbad) if locbad else 'all %d locations confirmed' % count)
+        nvar = sum(1 for d in descs if d & DESC_VARIADIC)
+        r.check(not vbad, '11h variadic bit, impl name and nfixed+1 pairing',
+                '; '.join(vbad) if vbad else
+                '%d variadic, %d plain, all impl names re-derived'
+                % (nvar, count - nvar))
+
+        # Exports whose declaration the scan could not see at all (cited to a
+        # .spec) never reach 11h's impl rules above, so police them here: they
+        # are non-variadic by construction -- a `@ varargs` .spec line cannot be
+        # described -- and their impl name must be their own.
+        vbad = []
         for i, e in enumerate(spec_exports):
+            if hits[e['name']]:
+                continue
+            if e['variadic_impl']:
+                vbad.append('%s: variadic= on an export with no header '
+                            'declaration' % e['name'])
+            if i < len(descs) and descs[i] & DESC_VARIADIC:
+                vbad.append('%s: variadic bit set with no header declaration'
+                            % e['name'])
+            if i < len(impls) and impls[i] != e['name']:
+                vbad.append('%s: impl name is %r' % (e['name'], impls[i]))
+        r.check(not vbad, '11i .spec-cited exports are plain, impl name == export',
+                '; '.join(vbad) if vbad else
+                '%d checked' % len([1 for e in spec_exports if not hits[e['name']]]))
+        # One info line per export is readable for a hand-written list and is
+        # 1100 lines of scrollback for a whole .spec, which buries the PASS/FAIL
+        # summary this file exists to print.  Everything above has already been
+        # CHECKED for all of them; this is only the human-readable echo.
+        if len(spec_exports) > 250:
+            r.note('per-export detail', 'suppressed for %d exports'
+                                        % len(spec_exports))
+        for i, e in enumerate(spec_exports):
+            if len(spec_exports) > 250:
+                break
             if hits[e['name']] and i < len(descs):
                 # Several headers can declare the same CRT name (stdio.h has
                 # both a UCRT `static inline` and the real msvcrt import
@@ -694,9 +1071,13 @@ def main():
                           if x['file'] == e['header'] and x['line'] == e['line']),
                          hits[e['name']][0])
                 via = '  (via %s)' % h['via'] if h.get('via') else ''
-                r.note('  %-24s desc=0x%03x -> %d arg(s), returns %s'
+                v = descs[i] & DESC_VARIADIC
+                r.note('  %-24s desc=0x%03x -> %d %sarg(s), returns %s%s'
                        % (e['name'], descs[i], descs[i] & 0xff,
-                          'void' if descs[i] & 0x100 else 'value'),
+                          'fixed ' if v else '',
+                          'void' if descs[i] & DESC_VOID else 'value',
+                          (', VARIADIC -> %s'
+                           % (impls[i] if i < len(impls) else '???')) if v else ''),
                        'from %s:%d  %s%s' % (h['file'], h['line'], h['ret'], via))
 
     print()
