@@ -157,6 +157,16 @@ INTEGER_CLASSES = (1,   # integer_type_class
 
 RECORD_CLASS = 12       # record_type_class  (struct)
 UNION_CLASS  = 13       # union_type_class
+REAL_CLASS   = 8        # real_type_class  (float, double, long double)
+
+# Floating point IS representable across this ABI pair, but only in the first
+# four argument positions.  MS-x64 has exactly XMM0-XMM3 for arguments and
+# passes a fifth floating-point argument on the STACK; the host reads its FP
+# arguments out of the guest's XMM registers, so it can only see the first
+# four.  A `long double` is refused whatever its position: it is 128-bit on
+# ppc64 and 64-bit on MS-x64, so the value would not survive.  sizeof <= 8 in
+# the probe below is what enforces that.
+MAX_FP_ARG_POS = 4
 
 # ---------------------------------------------------------------------------
 # SMALL AGGREGATES PASSED BY VALUE.  ONE GPR IN BOTH ABIS.  NAMED, NOT INFERRED.
@@ -259,6 +269,7 @@ PROBE_SRC = (
     "#include <conio.h>\n"            # msvcrt/ucrtbase: _getch, _kbhit, _cputs
     "#include <direct.h>\n"           # msvcrt/ucrtbase: _getcwd, _chdir, _mkdir
     "#include <assert.h>\n"           # msvcrt/ucrtbase: _wassert
+    "#include <math.h>\n"             # msvcrt/ucrtbase: the whole math surface
     "#include <signal.h>\n"           # msvcrt/ucrtbase: signal, raise
     "#include <shlobj.h>\n"           # shell32: SHGetKnownFolderPath, SHGetFolderPath*
     "#include <evntprov.h>\n"         # advapi32: EventRegister, EventWriteTransfer,
@@ -769,7 +780,7 @@ class WineHeaders:
         L.append('void wt_use%s(void) { (void)wt_reconstructed%s; }\n' % (tag, tag))
 
         def intcheck(what, spelling):
-            classes = INTEGER_CLASSES
+            classes = INTEGER_CLASSES + (REAL_CLASS,)
             if _bare_type(spelling) in AGGREGATE_SLOT_TYPES:
                 # A reviewed one-GPR aggregate (see AGGREGATE_SLOT_TYPES).  It
                 # must still BE a struct or union of at most 8 bytes: if the
@@ -1003,6 +1014,84 @@ class WineHeaders:
             result[k] = sizes
         return result
 
+    def fp_classes(self, requests):
+        """-> {key: [code, ...]} where code is 0 not-FP, 1 double, 2 float.
+
+        The same trick as widths(): one translation unit of char arrays whose
+        LENGTH is the answer, read back out of the LLVM IR.  Measured by the
+        same clang, target and headers that verified the signature, so a
+        typedef chain (FLOAT, DOUBLE, a HRESULT that is secretly a long) cannot
+        be misread the way a scan of type spellings would misread it.
+
+        The length encodes the class rather than the class being emitted
+        directly because an array bound is the only compile-time integer this
+        probe can get back out of the IR:
+
+            1 -> not floating point
+            2 -> floating point, 8 bytes  (double)
+            4 -> floating point, 4 bytes  (float)
+
+        Returns {} on any failure, and the caller must then publish no
+        floating-point information at all -- which refuses the export rather
+        than describing it wrongly.
+        """
+        items = [(k, list(ts)) for k, ts in requests if ts]
+        if not items:
+            return {}
+        return self._fp_batch(items)
+
+    def _fp_batch(self, items):
+        """One compile for `items`; on failure, bisect and retry each half.
+
+        A single unrepresentable type in a 1275-export module would otherwise
+        take the whole translation unit down, and the caller cannot treat "no
+        answer" as "no floating point" -- that is exactly how a double ends up
+        in a GPR.  So a failure has to be isolated to the export that caused
+        it, and bisection does that in O(log n) compiles when the bad types are
+        few, which they are.
+        """
+        got = self._fp_compile(items)
+        if got is not None:
+            return got
+        if len(items) == 1:
+            return {}          # this one export is the problem; caller refuses it
+        mid = len(items) // 2
+        out = self._fp_batch(items[:mid])
+        out.update(self._fp_batch(items[mid:]))
+        return out
+
+    def _fp_compile(self, items):
+        """-> {key: [code, ...]} or None if the probe did not compile."""
+        lines = [self.probe_src]
+        for n, (k, types) in enumerate(items):
+            for i, t in enumerate(types):
+                lines.append(
+                    'char wt_fp_%d_%d[1 + (__builtin_classify_type(*(%s)0) == 8)'
+                    ' + 2 * ((__builtin_classify_type(*(%s)0) == 8) && sizeof(%s) == 4)];\n'
+                    % (n, i, _ptr_to(t), _ptr_to(t), t))
+        path = os.path.join(self.workdir, 'wt_fp.c')
+        with open(path, 'w') as f:
+            f.write(''.join(lines))
+        out = os.path.join(self.workdir, 'wt_fp.ll')
+        cmd = [c for c in self._base() if c != '-fsyntax-only']
+        r = subprocess.run(cmd + ['-S', '-emit-llvm', '-o', out, path],
+                           capture_output=True, text=True)
+        self.stats['probe_compiles'] += 1
+        if r.returncode != 0:
+            return None
+        found = {}
+        with open(out) as f:
+            for m in re.finditer(r'@wt_fp_(\d+)_(\d+)\s*=[^\[]*\[(\d+) x i8\]',
+                                 f.read()):
+                found[(int(m.group(1)), int(m.group(2)))] = int(m.group(3))
+        result = {}
+        for n, (k, types) in enumerate(items):
+            lens = [found.get((n, i)) for i in range(len(types))]
+            if None in lens or any(l not in (1, 2, 4) for l in lens):
+                continue
+            result[k] = [{1: 0, 2: 1, 4: 2}[l] for l in lens]
+        return result
+
     def signature(self, name, allow_variadic=False):
         """-> dict(nargs, returns_void, variadic, header, line, ret, params).
 
@@ -1071,6 +1160,10 @@ class WineSpecs:
                 'float':  'float argument (SSE register on MS-x64, FPR on '
                           'ppc64le -- not a plain slot)',
                 'int128': 'int128 argument (wider than one 64-bit slot)'}
+    # The subset that is still refused on the .spec's word alone, before any
+    # header is consulted.  double/float are deliberately NOT here: they are
+    # representable now, and only the header oracle can decide the details.
+    PREFILTER_BAD_ARGS = {'int128': BAD_ARGS['int128']}
 
     def __init__(self, source_root):
         self.root = os.path.abspath(os.path.expanduser(source_root))

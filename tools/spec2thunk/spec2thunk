@@ -172,7 +172,7 @@ import wine_sig
 from wine_sig import Refused
 
 STRIDE = 16
-INFO_VERSION = 4
+INFO_VERSION = 5
 # Byte offset of the trapping instruction inside a stub, per body mode.
 TRAP_OFF = {'direct': 0, 'trap': 3}
 BUILTIN_SIG = b"Wine builtin DLL\x00"   # 17 bytes, must sit at file offset 0x40
@@ -1009,9 +1009,25 @@ def resolve_signatures(exports, headers, specs=None):
         # A .spec states the CLASS of each argument exactly, and that is one
         # thing it is authoritative about.  Refuse on it before spending a
         # header lookup, so the reason names the .spec that said so.
+        #
+        # Only int128 is refused here now.  `double` and `float` used to be,
+        # because a floating-point argument had nowhere to go; they are
+        # carried now (marshal_thunk_args_fp/call_native_thunk_fp in ntdll),
+        # so they have to reach the header oracle -- which is the only thing
+        # that can tell a double from a float, say whether the RETURN is
+        # floating point, and refuse an FP argument past XMM3.  The .spec
+        # cannot answer any of those, so refusing on it here would decide the
+        # question with the one source that does not know the answer.
         bad = [a for a in (e.get('spec_args') or [])
-               if a in wine_sig.WineSpecs.BAD_ARGS]
+               if a in wine_sig.WineSpecs.PREFILTER_BAD_ARGS]
         if bad and not e.get('asserted', True):
+            refused.append((e['name'], '%s (%s:%d)'
+                            % (wine_sig.WineSpecs.PREFILTER_BAD_ARGS[bad[0]],
+                               os.path.basename(e.get('spec_path', '.spec')),
+                               e['specline'])))
+            continue
+        bad = []
+        if False:
             refused.append((e['name'], '%s (%s:%d)'
                             % (wine_sig.WineSpecs.BAD_ARGS[bad[0]],
                                os.path.basename(e.get('spec_path', '.spec')),
@@ -1146,6 +1162,83 @@ def resolve_signatures(exports, headers, specs=None):
             sig['narrow_mask'] = mask
             e['sig'] = sig
             e['desc'] = wine_sig.descriptor(sig)
+
+    # ------------------------------------------------------------------
+    # Which arguments, and the return, are FLOATING POINT.
+    #
+    # The two ABIs disagree about where a float travels, so the host has to be
+    # told: MS-x64 puts argument i, if floating point, in XMMi -- indexed by
+    # POSITION -- while ppc64le ELFv2 puts the n'th floating-point argument in
+    # f(n+1), indexed by ORDER.  Neither can be inferred from the arity.
+    #
+    # Refused rather than described when the shape cannot be carried:
+    #   * a floating-point argument past position 3.  MS-x64 has only XMM0-3
+    #     for arguments and passes the fifth on the stack, where the host --
+    #     which reads its FP arguments out of the guest's XMM registers --
+    #     cannot see it.
+    #   * more than 8 floating-point arguments, which ELFv2 would start
+    #     spilling past f13's window as this port loads it.
+    #   * a probe that did not answer at all.  Publishing no FP word for an
+    #     export that has floating point would silently hand the host an
+    #     integer register file, so it is a refusal, never a default.
+    fp_types = []
+    for i, e in enumerate(accepted):
+        params = e['sig'].get('params')
+        if params is None:
+            continue
+        ret = e['sig'].get('ret')
+        fp_types.append((i, list(params) + ([ret] if ret and ret.strip() != 'void' else [])))
+    fp_answer = headers.fp_classes(fp_types) if fp_types else {}
+
+    still, newly_refused = [], []
+    for i, e in enumerate(accepted):
+        params = e['sig'].get('params')
+        ret = e['sig'].get('ret')
+        has_ret = bool(ret and ret.strip() != 'void')
+        if params is None:
+            still.append(e)
+            continue
+        nargs = e['sig']['nargs']
+        if not params and not has_ret:
+            # void f(void): there is nothing to ask about, and the probe is
+            # never given an empty request.  Trivially no floating point.
+            still.append(e)
+            continue
+        codes = fp_answer.get(i)
+        if codes is None or len(codes) != len(params) + (1 if has_ret else 0):
+            # No answer.  Only a problem if something here IS floating point,
+            # and without the probe we cannot know -- so refuse only when the
+            # acceptance probe already told us a float got through, which it
+            # does by the export existing at all.  Be conservative: keep the
+            # export only if the oracle saw no FP-classed type, which it
+            # cannot report here, so drop it.
+            newly_refused.append((e['name'], 'floating-point probe gave no answer'))
+            continue
+        arg_codes = codes[:len(params)][:nargs]
+        ret_code = codes[len(params)] if has_ret else 0
+        fp_mask = sum(1 << j for j, c in enumerate(arg_codes) if c)
+        if not fp_mask and not ret_code:
+            still.append(e)
+            continue
+        bad = [j for j, c in enumerate(arg_codes) if c and j >= wine_sig.MAX_FP_ARG_POS]
+        if bad:
+            newly_refused.append((e['name'],
+                                  'floating-point argument %d is past XMM3, which '
+                                  'MS-x64 passes on the stack' % bad[0]))
+            continue
+        if bin(fp_mask).count('1') > 8:
+            newly_refused.append((e['name'], 'more than 8 floating-point arguments'))
+            continue
+        if e['sig'].get('variadic'):
+            newly_refused.append((e['name'],
+                                  'floating point combined with variadic= is not described'))
+            continue
+        single = sum(1 << j for j, c in enumerate(arg_codes) if c == 2)
+        e['fp'] = fp_mask | (single << 8) | (ret_code << 16)
+        still.append(e)
+
+    accepted = still
+    refused = refused + newly_refused
     return accepted, refused
 
 
@@ -1280,7 +1373,17 @@ def emit_asm(dll, exports, mode, com_ifaces=None):
     a('\t.long\twine_thunk_sigv@IMGREL\t# sigs_rva')
     a('\t.long\t%d\t\t\t# trap_off' % TRAP_OFF[mode])
     a('\t.long\twine_thunk_implv@IMGREL\t# impl_names_rva  (version 4)')
+    a('\t.long\twine_thunk_fpv@IMGREL\t# fp_rva  (version 5)')
     a('')
+    # One floating-point descriptor per export; 0 for the overwhelming
+    # majority, which keeps them on the integer path unchanged.  See
+    # THUNK_FP_* in ntdll's signal_ppc64.c.
+    a('\t.balign\t4')
+    a('wine_thunk_fpv:')
+    for e in exports:
+        a('\t.long\t0x%08X\t\t# %s' % (e.get('fp', 0), e['name']))
+    a('')
+
     a('\t.balign\t4')
     a('wine_thunk_namev:')
     for i in range(len(exports)):
@@ -1650,6 +1753,13 @@ def main():
                 f.write('%s\texcluded\tEXCLUDE line in %s\n' % (n, args.spec))
             for e in exports:
                 s = e['sig']
+                if e.get('fp'):
+                    f.write('%s\temitted\tfp=0x%08X %d args, %s, %s:%s\n'
+                            % (e['name'], e['fp'], e['sig']['nargs'],
+                               'void' if e['sig']['returns_void'] else 'value',
+                               os.path.basename(str(e['sig'].get('header'))),
+                               e['sig'].get('line')))
+                    continue
                 f.write('%s\temitted\t%d args, %s, %s:%s\n'
                         % (e['name'], s['nargs'],
                            'void' if s['returns_void'] else 'value',

@@ -1065,9 +1065,14 @@ struct thunk_info
     UINT impl_names_rva;  /* count RVAs of the name to resolve natively: the
                              same string as names_rva except for a variadic,
                              where it names the callee's v-variant */
+    UINT fp_rva;          /* count floating-point descriptors, see THUNK_FP_*
+                             below.  Added at version 5; the version check is
+                             an exact match, so a module either has this field
+                             or is rejected outright -- there is no mixed
+                             build to be compatible with. */
 };
 
-#define THUNK_INFO_VERSION   4
+#define THUNK_INFO_VERSION   5
 #define THUNK_SIG_ARGC(sig)  ((sig) & 0xff)   /* for a variadic, the FIXED count */
 #define THUNK_SIG_VOID       0x100u           /* returns void */
 #define THUNK_SIG_VARIADIC   0x200u           /* synthesise a va_list, see below */
@@ -1089,7 +1094,30 @@ struct thunk_info
  * the LP64 PE side, not of this mask. */
 #define THUNK_SIG_NARROW(sig) (((sig) >> 16) & 0xffffu)
 
+/* ---------------------------------------------------------------------------
+ * The floating-point descriptor (version 5), one UINT per export.
+ * ---------------------------------------------------------------------------
+ * A separate word rather than more bits in `sig` because sig is full: bits
+ * 0-9 are arity and flags, 16-31 are the narrow mask, and what is left cannot
+ * hold a per-argument mask plus a return kind.
+ *
+ * Zero means "no floating point anywhere", which is every export this port
+ * emitted before version 5 and the overwhelming majority after it, so the
+ * integer path stays exactly as it was.
+ *
+ * Only the first 8 arguments can be floating point.  MS-x64 has just XMM0-3
+ * for arguments and ELFv2 stops at f13; the oracle refuses anything past the
+ * eighth rather than have this word silently describe less than the truth. */
+#define THUNK_FP_MASK(fp)    ((fp) & 0xffu)          /* bit i: argument i is FP */
+#define THUNK_FP_SINGLE(fp)  (((fp) >> 8) & 0xffu)   /* bit i: that FP arg is a
+                                                        float, not a double */
+#define THUNK_FP_RET(fp)     (((fp) >> 16) & 0x3u)   /* 0 none, 1 double, 2 float */
+#define THUNK_FP_RET_NONE    0u
+#define THUNK_FP_RET_DOUBLE  1u
+#define THUNK_FP_RET_FLOAT   2u
+
 #define THUNK_MAX_ARGS 16
+#define THUNK_MAX_FP_ARGS 8
 
 /* FEXBRIDGE_TRAP_* */
 #define GUEST_TRAP_CONTINUE 0
@@ -1510,9 +1538,32 @@ static __thread AMD64_CONTEXT *emu_current_trap_ctx;
  * CONTEXT pointer); TRACE'd when that decision is taken.  Order matters:
  * FIRST handlers prepend, others append, as RtlAddVectoredExceptionHandler
  * defines. */
-#define MAX_GUEST_VEH 32
-static void *guest_veh[MAX_GUEST_VEH];
-static UINT  guest_veh_count;
+/* Grown on demand, for the reason the atexit table is: a table sized for the
+ * probes that first exercised it silently stops registering once a real
+ * program goes past it, and a vectored handler that was never registered is
+ * invisible until the exception it was meant to see arrives.  Nothing here
+ * hands the array's address out, so unlike the callback trampolines this one
+ * can simply move. */
+static void **guest_veh;
+static UINT   guest_veh_count;
+static UINT   guest_veh_capacity;
+
+static BOOL guest_veh_reserve(void)
+{
+    UINT want;
+    void **grown;
+
+    if (guest_veh_count < guest_veh_capacity) return TRUE;
+    want = guest_veh_capacity ? guest_veh_capacity * 2 : 32;
+    grown = RtlReAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY,
+                               guest_veh, want * sizeof(*grown) );
+    if (!grown && !(grown = RtlAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY,
+                                             want * sizeof(*grown) )))
+        return FALSE;
+    guest_veh = grown;
+    guest_veh_capacity = want;
+    return TRUE;
+}
 
 static BOOL is_valid_guest_frame( ULONG_PTR frame, void *stack_base, void *stack_limit )
 {
@@ -1664,8 +1715,9 @@ static ULONG_PTR emu_AddVectoredExceptionHandler( const ULONG_PTR *a, void *nati
 
     LdrLockLoaderLock( 0, NULL, &magic );
     if (!handler) { /* nothing */ }
-    else if (guest_veh_count >= MAX_GUEST_VEH)
-        ERR( "more than %u guest vectored handlers; %p not registered\n", MAX_GUEST_VEH, handler );
+    else if (!guest_veh_reserve())
+        ERR( "cannot grow the guest vectored handler table past %u; %p not "
+             "registered\n", guest_veh_capacity, handler );
     else
     {
         if (first)
@@ -1798,10 +1850,32 @@ static ULONG_PTR emu_RtlUnwind( const ULONG_PTR *a, void *native )
  * (a window procedure, a comparator) needs a trampoline pool instead; that is
  * the generalisation this case happens not to need.
  */
-#define MAX_GUEST_ATEXIT 64
+/* Grown on demand rather than fixed.  64 was enough for a probe and is not
+ * remotely enough for a real program: a game's C++ static destructors, one
+ * _crt_atexit registration each, ran a Quake II build past it during startup
+ * and every handler past the 64th was DROPPED -- silently, since a refused
+ * registration only returns -1 to a CRT that mostly ignores it. */
+static void **guest_atexit_funcs;
+static UINT   guest_atexit_count;
+static UINT   guest_atexit_capacity;
 
-static void *guest_atexit_funcs[MAX_GUEST_ATEXIT];
-static UINT  guest_atexit_count;
+/* -> FALSE only if the table could not grow. */
+static BOOL guest_atexit_reserve(void)
+{
+    UINT want;
+    void **grown;
+
+    if (guest_atexit_count < guest_atexit_capacity) return TRUE;
+    want = guest_atexit_capacity ? guest_atexit_capacity * 2 : 64;
+    grown = RtlReAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY,
+                               guest_atexit_funcs, want * sizeof(*grown) );
+    if (!grown && !(grown = RtlAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY,
+                                             want * sizeof(*grown) )))
+        return FALSE;
+    guest_atexit_funcs = grown;
+    guest_atexit_capacity = want;
+    return TRUE;
+}
 
 static void run_guest_atexit_handlers(void)
 {
@@ -1861,9 +1935,9 @@ static ULONG_PTR emu_crt_atexit( const ULONG_PTR *a, void *native )
         if (!native) return -1;
         return ((int (*)( void * ))native)( fn );
     }
-    if (guest_atexit_count >= MAX_GUEST_ATEXIT)
+    if (!guest_atexit_reserve())
     {
-        ERR( "more than %u guest atexit handlers\n", MAX_GUEST_ATEXIT );
+        ERR( "cannot grow the guest atexit table past %u\n", guest_atexit_capacity );
         return -1;
     }
     /* Register the single native handler on the first guest registration, so
@@ -1906,9 +1980,9 @@ static ULONG_PTR emu_onexit( const ULONG_PTR *a, void *native )
         if (!native) return 0;
         return ((ULONG_PTR (*)( void * ))native)( fn );
     }
-    if (guest_atexit_count >= MAX_GUEST_ATEXIT)
+    if (!guest_atexit_reserve())
     {
-        ERR( "more than %u guest atexit handlers\n", MAX_GUEST_ATEXIT );
+        ERR( "cannot grow the guest atexit table past %u\n", guest_atexit_capacity );
         return 0;
     }
     if (!guest_atexit_count)
@@ -1976,10 +2050,37 @@ struct guest_callback_stub
     void *pad;           /* one cache line per slot */
 };
 
-#define MAX_GUEST_CALLBACKS 1024   /* a 64KB pool */
+/* Trampolines are handed OUT, so a full pool cannot be reallocated: native
+ * code and the guest both hold pointers into it.  Chain fresh blocks instead,
+ * which leaves every address already issued exactly where it was.
+ *
+ * A single 1024-entry block was enough while the only callbacks came from
+ * probes.  A real program blows through it -- a Quake II build exhausted it
+ * during startup -- and the old behaviour on exhaustion was to hand the RAW
+ * guest pointer to native code, i.e. to schedule a c0000005 for later rather
+ * than fail at the registration that caused it. */
+#define GUEST_CB_BLOCK 1024        /* stubs per block, a 64KB allocation */
+#define MAX_GUEST_CB_BLOCKS 64     /* 65536 callbacks before we genuinely stop */
 
-static struct guest_callback_stub *guest_cb_pool;
-static UINT guest_cb_count;
+static struct guest_callback_stub *guest_cb_block[MAX_GUEST_CB_BLOCKS];
+static UINT guest_cb_blocks;       /* blocks allocated */
+static UINT guest_cb_count;        /* stubs used in the LAST block */
+
+/* -> the block containing fn, or NULL.  Used for idempotence: a pointer that
+ * is already a trampoline must come back unchanged. */
+static BOOL guest_cb_owns( const void *fn )
+{
+    UINT b;
+
+    for (b = 0; b < guest_cb_blocks; b++)
+    {
+        const struct guest_callback_stub *base = guest_cb_block[b];
+        UINT used = (b + 1 == guest_cb_blocks) ? guest_cb_count : GUEST_CB_BLOCK;
+
+        if (fn >= (const void *)base && fn < (const void *)(base + used)) return TRUE;
+    }
+    return FALSE;
+}
 
 static ULONG_PTR guest_callback_dispatch( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
                                           ULONG_PTR a3, void *fn )
@@ -2048,8 +2149,7 @@ static void *wrap_guest_callback( void *fn )
      * returns the previous filter, which may be a trampoline the guest is now
      * restoring -- and wrapping a trampoline would run its ppc64 bytes as
      * x86-64. */
-    if (guest_cb_pool && fn >= (void *)guest_cb_pool &&
-        fn < (void *)(guest_cb_pool + guest_cb_count)) goto done;
+    if (guest_cb_owns( fn )) goto done;
 
     /* Classification is a CHECK here, never the mechanism: the thunk knows
      * its argument is a callback, which no address range can tell it. */
@@ -2067,30 +2167,41 @@ static void *wrap_guest_callback( void *fn )
         TRACE( "callback %p lies in no image, wrapping as guest code\n", fn );
     }
 
-    for (i = 0; i < guest_cb_count; i++)
-        if (guest_cb_pool[i].guest_fn == fn) { ret = &guest_cb_pool[i]; goto done; }
+    /* One stub per distinct target, across every block. */
+    {
+        UINT b;
+        for (b = 0; b < guest_cb_blocks; b++)
+        {
+            UINT used = (b + 1 == guest_cb_blocks) ? guest_cb_count : GUEST_CB_BLOCK;
+            for (i = 0; i < used; i++)
+                if (guest_cb_block[b][i].guest_fn == fn) { ret = &guest_cb_block[b][i]; goto done; }
+        }
+    }
 
-    if (!guest_cb_pool)
+    if (!guest_cb_blocks || guest_cb_count >= GUEST_CB_BLOCK)
     {
         void *mem = NULL;
-        SIZE_T size = MAX_GUEST_CALLBACKS * sizeof(struct guest_callback_stub);
-        NTSTATUS status = NtAllocateVirtualMemory( GetCurrentProcess(), &mem, 0, &size,
-                                                   MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE );
+        SIZE_T size = GUEST_CB_BLOCK * sizeof(struct guest_callback_stub);
+        NTSTATUS status;
+
+        if (guest_cb_blocks >= MAX_GUEST_CB_BLOCKS)
+        {
+            ERR( "more than %u guest callbacks; %p goes to native code raw\n",
+                 MAX_GUEST_CB_BLOCKS * GUEST_CB_BLOCK, fn );
+            goto done;
+        }
+        status = NtAllocateVirtualMemory( GetCurrentProcess(), &mem, 0, &size,
+                                          MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE );
         if (status)
         {
             ERR( "no memory for guest callback trampolines, status %08x\n", (UINT)status );
             goto done;   /* raw pointer: a diagnosed crash, not a dropped callback */
         }
-        guest_cb_pool = mem;
-    }
-    if (guest_cb_count >= MAX_GUEST_CALLBACKS)
-    {
-        ERR( "more than %u guest callbacks; %p goes to native code raw\n",
-             MAX_GUEST_CALLBACKS, fn );
-        goto done;
+        guest_cb_block[guest_cb_blocks++] = mem;
+        guest_cb_count = 0;
     }
 
-    stub = &guest_cb_pool[guest_cb_count];
+    stub = &guest_cb_block[guest_cb_blocks - 1][guest_cb_count];
     p = stub->code;
     p = emit_load_imm64( p, 7, (ULONG_PTR)fn );
     p = emit_load_imm64( p, 12, (ULONG_PTR)guest_callback_dispatch );
@@ -2314,11 +2425,14 @@ static BOOL find_guest_com_target( LDR_DATA_TABLE_ENTRY *mod, ULONG_PTR rip,
  * fills *com and returns NULL.
  */
 static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_override_func *override,
-                                      struct com_thunk_hit *com, UINT *cb_mask )
+                                      struct com_thunk_hit *com, UINT *cb_mask,
+                                      UINT *fp )
 {
     LIST_ENTRY *mark, *entry;
     void *ret = NULL;
     ULONG_PTR magic;
+
+    *fp = 0;
 
     /* The loader lock, not a private one: this walk calls LdrLoadDll below when
      * a guest module's native counterpart is not loaded yet, and that takes the
@@ -2371,6 +2485,7 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
         names = (const UINT *)(base + info->names_rva);
         sigs  = (const UINT *)(base + info->sigs_rva);
         impl_names = (const UINT *)(base + info->impl_names_rva);
+        *fp = ((const UINT *)(base + info->fp_rva))[idx];
         sig = sigs[idx];
         /* a variadic needs one slot beyond its fixed arguments for the va_list */
         if ((sig & THUNK_SIG_RESERVED) ||
@@ -2510,6 +2625,155 @@ static ULONG_PTR *marshal_thunk_va_list( const AMD64_CONTEXT *ctx, UINT nfixed )
     return home + nfixed;
 }
 
+/***********************************************************************
+ *           call_native_thunk_fp
+ *
+ * The floating-point form of call_native_thunk().  It cannot be written in C
+ * for the same reason libffi exists: ELFv2 decides which register an argument
+ * travels in from the callee's OWN prototype, and a generic call site does not
+ * have one.  Rather than a switch over every (arity x fp-mask x return-kind)
+ * shape, load the register files directly and branch -- one routine, every
+ * shape.
+ *
+ * The three ELFv2 rules it implements are MEASURED, not assumed; see the
+ * handbook's winebuild-ppc64-relays-stubs.md §2, which established them on this
+ * machine with a set of probe functions:
+ *
+ *   - a floating-point argument goes in the NEXT FREE FPR regardless of its
+ *     positional index, and its GPR slot is skipped;
+ *   - the FPRs run out at f13 (only f1-f8 are loaded here, which is every
+ *     shape this port's oracle will accept);
+ *   - argument i owns the doubleword at 32 + 8*i in the caller's parameter
+ *     save area whether or not it travels in a register.
+ *
+ * So the caller hands over two already-separated arrays -- gpr[] in ELFv2 GPR
+ * order, fpr[] in FPR order -- and this only has to load them.  The mapping
+ * from MS-x64's position-indexed XMM0-3 to ELFv2's order-indexed f1-f8 is
+ * marshal_thunk_args_fp()'s job, where it can be read.
+ *
+ * Loading order is load-bearing: the FPRs come from r5 and the GPRs from r4,
+ * both of which are themselves overwritten as argument registers, so f1-f8 are
+ * filled before r5 dies and r4 is read last of all.
+ *
+ * The two __ASM_CFI() directives are required for the reason spelled out above
+ * RtlRaiseException: an empty FDE claims CFA = current r1 with the return
+ * address still in lr, and glibc's forced unwind spins forever on such a frame.
+ * probes/check-empty-fde.sh gates this.
+ */
+extern ULONG_PTR call_native_thunk_fp( void *proc, const ULONG_PTR *gpr,
+                                       const double *fpr, double *fp_ret );
+__ASM_GLOBAL_FUNC( call_native_thunk_fp,
+                   "addis 2, 12, .TOC.-" __ASM_NAME("call_native_thunk_fp") "@ha\n\t"
+                   "addi 2, 2, .TOC.-" __ASM_NAME("call_native_thunk_fp") "@l\n\t"
+                   ".localentry " __ASM_NAME("call_native_thunk_fp") ", .-" __ASM_NAME("call_native_thunk_fp") "\n\t"
+                   "mflr 0\n\t"
+                   "std 0, 16(1)\n\t"
+                   __ASM_CFI(".cfi_offset 65, 16\n\t")
+                   "stdu 1, -160(1)\n\t"
+                   __ASM_CFI(".cfi_def_cfa_offset 160\n\t")
+                   /* 32(1)-96(1) is the callee's parameter save area; 96 up is
+                    * ours.  Keep our TOC and fp_ret above it. */
+                   "std 2, 104(1)\n\t"
+                   "std 6, 112(1)\n\t"           /* fp_ret, dead across the call */
+                   "mtctr 3\n\t"
+                   "mr 12, 3\n\t"                /* ELFv2 global entry wants r12 */
+                   "lfd 1, 0(5)\n\t"
+                   "lfd 2, 8(5)\n\t"
+                   "lfd 3, 16(5)\n\t"
+                   "lfd 4, 24(5)\n\t"
+                   "lfd 5, 32(5)\n\t"
+                   "lfd 6, 40(5)\n\t"
+                   "lfd 7, 48(5)\n\t"
+                   "lfd 8, 56(5)\n\t"
+                   "ld 10, 56(4)\n\t"
+                   "ld 9, 48(4)\n\t"
+                   "ld 8, 40(4)\n\t"
+                   "ld 7, 32(4)\n\t"
+                   "ld 6, 24(4)\n\t"
+                   "ld 5, 16(4)\n\t"
+                   "ld 3, 0(4)\n\t"
+                   "ld 4, 8(4)\n\t"              /* last: r4 is the base */
+                   "bctrl\n\t"
+                   "ld 2, 104(1)\n\t"            /* the callee may clobber r2 */
+                   "ld 11, 112(1)\n\t"
+                   "stfd 1, 0(11)\n\t"           /* f1 holds any FP return */
+                   "addi 1, 1, 160\n\t"
+                   "ld 0, 16(1)\n\t"
+                   "mtlr 0\n\t"
+                   "blr" )
+
+
+/***********************************************************************
+ *           marshal_thunk_args_fp
+ *
+ * Split the guest's argument list into the two register files ELFv2 wants.
+ *
+ * The two ABIs index their float registers differently, and that is the whole
+ * of the work here:
+ *
+ *   MS-x64 indexes by POSITION.  Argument i, if it is floating point, is in
+ *   XMMi -- and the matching integer register is skipped, so a (double, int)
+ *   pair puts the double in XMM0 and the int in RDX, not RCX.
+ *
+ *   ELFv2 indexes the FPRs by ORDER -- the n'th floating-point argument is in
+ *   f(n+1) whatever its position -- but the GPRs still by POSITION.  An FP
+ *   argument takes its FPR and SKIPS its GPR, leaving that register unused
+ *   rather than closing the integer arguments up behind it (handbook
+ *   winebuild-ppc64-relays-stubs.md §2, whose worked example annotates the
+ *   hole: "std 5, 120(1)  # arg2 long -> r5  (r4 skipped by arg1)").
+ *
+ * That asymmetry is the whole trap.  Packing the integers down instead put
+ * ldexp(double, int)'s exponent in r3 where the callee reads r4, so it saw 0
+ * and returned its input unscaled -- a wrong number, not a crash.  It is what
+ * probes/check-fp-marshal.sh exists to catch, and did.
+ *
+ * So this walks the arguments once, placing each in whichever file it
+ * belongs in.  A float (as opposed to double) argument arrives from the guest
+ * as 32 bits and is widened here, because ELFv2 passes single-precision
+ * arguments in an FPR as the double-precision value.
+ *
+ * Argument 0 comes from R10 rather than RCX for the reason marshal_thunk_args()
+ * gives: the trap opcode is SYSCALL and it destroys RCX.  An FP argument 0 is
+ * unaffected -- it was never in RCX to begin with.
+ */
+static void marshal_thunk_args_fp( const AMD64_CONTEXT *ctx, UINT argc, UINT narrow, UINT fp,
+                                   ULONG_PTR *gpr, double *fpr )
+{
+    const UINT fp_mask = THUNK_FP_MASK( fp ), single = THUNK_FP_SINGLE( fp );
+    UINT i, nfpr = 0;
+
+    memset( gpr, 0, THUNK_MAX_ARGS * sizeof(*gpr) );
+    memset( fpr, 0, THUNK_MAX_FP_ARGS * sizeof(*fpr) );
+
+    for (i = 0; i < argc; i++)
+    {
+        if (fp_mask & (1u << i))
+        {
+            /* XMMi, by position on the guest side.  The guest's XMM registers
+             * are in the context the bridge published; only the low 8 bytes
+             * carry the value.  gpr[i] stays zero: this argument's GPR slot is
+             * skipped, not filled by the next integer. */
+            const void *xmm = &ctx->FltSave.XmmRegisters[i];
+
+            if (nfpr < THUNK_MAX_FP_ARGS)
+                fpr[nfpr++] = (single & (1u << i)) ? (double)*(const float *)xmm
+                                                   : *(const double *)xmm;
+            continue;
+        }
+        if (i >= THUNK_MAX_ARGS) continue;
+        switch (i)
+        {
+        case 0: gpr[i] = ctx->R10; break;
+        case 1: gpr[i] = ctx->Rdx; break;
+        case 2: gpr[i] = ctx->R8;  break;
+        case 3: gpr[i] = ctx->R9;  break;
+        default: gpr[i] = *(ULONG_PTR *)(ULONG_PTR)(ctx->Rsp + 8 + i * 8); break;
+        }
+        if (narrow & (1u << i)) gpr[i] = (UINT)gpr[i];
+    }
+}
+
+
 static ULONG_PTR call_native_thunk( void *proc, const ULONG_PTR *a )
 {
     return ((ULONG_PTR (*)( ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR,
@@ -2543,7 +2807,7 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
     struct com_thunk_hit com = { 0 };
     NTSTATUS status = STATUS_SUCCESS;
     ULONG_PTR a[THUNK_MAX_ARGS] = { 0 };
-    UINT sig = 0, argc, cb_mask = 0;
+    UINT sig = 0, argc, cb_mask = 0, fp = 0;
     ULONG_PTR ret;
     void *proc;
 
@@ -2552,7 +2816,7 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
      * leaves the outer one intact */
     emu_current_trap_ctx = ctx;
 
-    proc = find_guest_thunk_target( ctx->Rip, &sig, &override, &com, &cb_mask );
+    proc = find_guest_thunk_target( ctx->Rip, &sig, &override, &com, &cb_mask, &fp );
     argc = THUNK_SIG_ARGC(sig);
     if (com.dispatch)
     {
@@ -2584,18 +2848,48 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
                (void *)(ULONG_PTR)ctx->R8, (void *)(ULONG_PTR)ctx->R9, (void *)(ULONG_PTR)ctx->Rsp,
                &argc, NtCurrentTeb()->Tib.StackLimit, NtCurrentTeb()->Tib.StackBase );
 
-        marshal_thunk_args( ctx, argc, THUNK_SIG_NARROW(sig), a );
-        /* registration-side interception of guest callbacks: swap each
-         * declared callback argument for a native trampoline BEFORE the
-         * native callee ever sees the pointer */
-        if (cb_mask) wrap_thunk_callback_args( a, argc, cb_mask );
-        if (sig & THUNK_SIG_VARIADIC)
+        if (fp && !override)
         {
-            /* the v-variant takes the fixed arguments plus one va_list */
-            a[argc] = (ULONG_PTR)marshal_thunk_va_list( ctx, argc );
-            argc++;
+            /* Floating point on either side: the arguments have to be split
+             * into ELFv2's two register files and the result may come back in
+             * f1 rather than r3.  See marshal_thunk_args_fp(). */
+            ULONG_PTR gpr[THUNK_MAX_ARGS];
+            double fpr[THUNK_MAX_FP_ARGS], fp_ret = 0.0;
+
+            marshal_thunk_args_fp( ctx, argc, THUNK_SIG_NARROW(sig), fp, gpr, fpr );
+            ret = call_native_thunk_fp( proc, gpr, fpr, &fp_ret );
+
+            /* MS-x64 returns a float or double in XMM0, not RAX.  Write the
+             * whole register: the guest reads 4 or 8 bytes of it and stale
+             * high bytes from a previous call would be visible to code that
+             * reads it wider than it wrote. */
+            switch (THUNK_FP_RET( fp ))
+            {
+            case THUNK_FP_RET_DOUBLE:
+                memset( &ctx->FltSave.XmmRegisters[0], 0, sizeof(ctx->FltSave.XmmRegisters[0]) );
+                *(double *)&ctx->FltSave.XmmRegisters[0] = fp_ret;
+                break;
+            case THUNK_FP_RET_FLOAT:
+                memset( &ctx->FltSave.XmmRegisters[0], 0, sizeof(ctx->FltSave.XmmRegisters[0]) );
+                *(float *)&ctx->FltSave.XmmRegisters[0] = (float)fp_ret;
+                break;
+            }
         }
-        ret = override ? override( a, proc ) : call_native_thunk( proc, a );
+        else
+        {
+            marshal_thunk_args( ctx, argc, THUNK_SIG_NARROW(sig), a );
+            /* registration-side interception of guest callbacks: swap each
+             * declared callback argument for a native trampoline BEFORE the
+             * native callee ever sees the pointer */
+            if (cb_mask) wrap_thunk_callback_args( a, argc, cb_mask );
+            if (sig & THUNK_SIG_VARIADIC)
+            {
+                /* the v-variant takes the fixed arguments plus one va_list */
+                a[argc] = (ULONG_PTR)marshal_thunk_va_list( ctx, argc );
+                argc++;
+            }
+            ret = override ? override( a, proc ) : call_native_thunk( proc, a );
+        }
 
         /* return to the guest's caller: the trap fired with Rip still on the
          * trap opcode and Rsp still pointing at the return address its CALL
