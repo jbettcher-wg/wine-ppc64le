@@ -1725,6 +1725,7 @@ enable_unwind
 enable_uuid
 enable_vkd3d
 enable_wbemuuid
+enable_winecom
 enable_winecrt0
 enable_wmcodecdspuuid
 enable_xml2
@@ -23674,6 +23675,7 @@ wine_fn_config_makefile libs/unwind enable_unwind
 wine_fn_config_makefile libs/uuid enable_uuid
 wine_fn_config_makefile libs/vkd3d enable_vkd3d
 wine_fn_config_makefile libs/wbemuuid enable_wbemuuid
+wine_fn_config_makefile libs/winecom enable_winecom
 wine_fn_config_makefile libs/winecrt0 enable_winecrt0
 wine_fn_config_makefile libs/wmcodecdspuuid enable_wmcodecdspuuid
 wine_fn_config_makefile libs/xml2 enable_xml2

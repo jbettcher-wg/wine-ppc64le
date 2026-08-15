@@ -1,10 +1,15 @@
 MODULE    = d3d12.dll
 UNIXLIB   = d3d12.so
 IMPORTLIB = d3d12
+IMPORTS   = winecom
 UNIX_LIBS = $(PTHREAD_LIBS)
 EXTRAINCL = -I$(srcdir)/../../ppc64le/vkd3d/generated-headers -I$(srcdir)/../../ppc64le/vkd3d/src/include
+UNIX_CFLAGS = -I$(srcdir)/../../ppc64le/vkd3d/generated-headers -I$(srcdir)/../../ppc64le/vkd3d/src/include \
+              -I$(srcdir)/../../ppc64le/vkd3d/src/khronos/Vulkan-Headers/include
 
 SOURCES = \
 	d3d12.thunks \
 	main.c \
-	unix.c
+	unix.c \
+	unix_present.c \
+	unix_win32u.c

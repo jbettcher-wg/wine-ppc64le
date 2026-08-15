@@ -353,3 +353,18 @@
 @ stdcall WindowsSubstringWithSpecifiedLength(ptr long long ptr)
 @ stdcall WindowsTrimStringEnd(ptr ptr ptr)
 @ stdcall WindowsTrimStringStart(ptr ptr ptr)
+
+# System COM for x86-64 guests (system-com-design.md): the ONE runtime
+# instance lives here; ole32/oleaut32 reach it through these exports.
+@ stdcall __wine_com_dispatch(long long ptr)
+@ stdcall __wine_com_wrap(ptr long)
+@ stdcall __wine_com_unwrap(ptr)
+@ stdcall __wine_com_translate_in(ptr ptr)
+@ stdcall __wine_com_wrap_out_iface(long ptr ptr)
+@ stdcall __wine_com_wrap_static(ptr long)
+@ stdcall __wine_com_iface_from_iid(ptr)
+@ stdcall __wine_com_refuse()
+@ stdcall __wine_guest_CoCreateInstance(ptr ptr long ptr ptr)
+@ stdcall __wine_guest_CoGetClassObject(ptr long ptr ptr ptr)
+@ stdcall __wine_guest_CreateStreamOnHGlobal(ptr long ptr)
+@ stdcall __wine_guest_GetHGlobalFromStream(ptr ptr)

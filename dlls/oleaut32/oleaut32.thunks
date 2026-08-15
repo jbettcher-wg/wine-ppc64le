@@ -7,3 +7,123 @@
 # per-symbol sentinel -- loadability first, surface closes from the data.
 DLL oleaut32.dll
 FROM-SPEC auto
+
+# --- system-COM interface roster + the flat-surface interception ---
+# (hangover-ppc64le/docs/system-com-design.md).  COM-JSON adds the
+# per-interface vtable stub arrays and __wine_com_thunk_info; the guest
+# gets proxies whose vtables are AMD64 trap stubs, dispatched by native
+# combase's __wine_com_dispatch.  Every flat export whose signature
+# carries an interface pointer is classified below; the build-time audit
+# (spec2thunk) FAILS if any is left to pass through silently.
+COM-JSON  ../../ppc64le/syscom/interfaces_syscom.json
+
+# audited pass-throughs: the interface-bearing type is inert here
+GUEST-PASS   VariantInit                      writes VT_EMPTY and reads no interface pointer
+
+# refused loudly (E_NOTIMPL) until their wrapper/walker lands -- never
+# a pass-through that would hand the guest a native vtable
+GUEST-REFUSE BstrFromVector
+GUEST-REFUSE CreateDispTypeInfo
+GUEST-REFUSE CreateErrorInfo
+GUEST-REFUSE CreateStdDispatch
+GUEST-REFUSE DispCallFunc
+GUEST-REFUSE DispGetIDsOfNames
+GUEST-REFUSE DispGetParam
+GUEST-REFUSE DispInvoke
+GUEST-REFUSE DllGetClassObject
+GUEST-REFUSE GetActiveObject
+GUEST-REFUSE GetErrorInfo
+GUEST-REFUSE GetRecordInfoFromGuids
+GUEST-REFUSE GetRecordInfoFromTypeInfo
+GUEST-REFUSE LPSAFEARRAY_UserFree
+GUEST-REFUSE LPSAFEARRAY_UserMarshal
+GUEST-REFUSE LPSAFEARRAY_UserSize
+GUEST-REFUSE LPSAFEARRAY_UserUnmarshal
+GUEST-REFUSE LoadRegTypeLib
+GUEST-REFUSE LoadTypeLib
+GUEST-REFUSE LoadTypeLibEx
+GUEST-REFUSE RegisterActiveObject
+GUEST-REFUSE RegisterTypeLib
+GUEST-REFUSE RegisterTypeLibForUser
+GUEST-REFUSE SafeArrayAccessData
+GUEST-REFUSE SafeArrayAllocData
+GUEST-REFUSE SafeArrayAllocDescriptor
+GUEST-REFUSE SafeArrayAllocDescriptorEx
+GUEST-REFUSE SafeArrayCopy
+GUEST-REFUSE SafeArrayCopyData
+GUEST-REFUSE SafeArrayCreate
+GUEST-REFUSE SafeArrayCreateEx
+GUEST-REFUSE SafeArrayCreateVector
+GUEST-REFUSE SafeArrayCreateVectorEx
+GUEST-REFUSE SafeArrayDestroy
+GUEST-REFUSE SafeArrayDestroyData
+GUEST-REFUSE SafeArrayDestroyDescriptor
+GUEST-REFUSE SafeArrayGetDim
+GUEST-REFUSE SafeArrayGetElement
+GUEST-REFUSE SafeArrayGetElemsize
+GUEST-REFUSE SafeArrayGetIID
+GUEST-REFUSE SafeArrayGetLBound
+GUEST-REFUSE SafeArrayGetRecordInfo
+GUEST-REFUSE SafeArrayGetUBound
+GUEST-REFUSE SafeArrayGetVartype
+GUEST-REFUSE SafeArrayLock
+GUEST-REFUSE SafeArrayPtrOfIndex
+GUEST-REFUSE SafeArrayPutElement
+GUEST-REFUSE SafeArrayRedim
+GUEST-REFUSE SafeArraySetIID
+GUEST-REFUSE SafeArraySetRecordInfo
+GUEST-REFUSE SafeArrayUnaccessData
+GUEST-REFUSE SafeArrayUnlock
+GUEST-REFUSE SetErrorInfo
+GUEST-REFUSE VARIANT_UserFree
+GUEST-REFUSE VARIANT_UserMarshal
+GUEST-REFUSE VARIANT_UserSize
+GUEST-REFUSE VARIANT_UserUnmarshal
+GUEST-REFUSE VarAbs
+GUEST-REFUSE VarAdd
+GUEST-REFUSE VarAnd
+GUEST-REFUSE VarBoolFromDisp
+GUEST-REFUSE VarBstrFromDisp
+GUEST-REFUSE VarCat
+GUEST-REFUSE VarCmp
+GUEST-REFUSE VarCyFromDisp
+GUEST-REFUSE VarDateFromDisp
+GUEST-REFUSE VarDecFromDisp
+GUEST-REFUSE VarDiv
+GUEST-REFUSE VarEqv
+GUEST-REFUSE VarFix
+GUEST-REFUSE VarFormat
+GUEST-REFUSE VarFormatCurrency
+GUEST-REFUSE VarFormatDateTime
+GUEST-REFUSE VarFormatFromTokens
+GUEST-REFUSE VarFormatNumber
+GUEST-REFUSE VarFormatPercent
+GUEST-REFUSE VarI1FromDisp
+GUEST-REFUSE VarI2FromDisp
+GUEST-REFUSE VarI4FromDisp
+GUEST-REFUSE VarI8FromDisp
+GUEST-REFUSE VarIdiv
+GUEST-REFUSE VarImp
+GUEST-REFUSE VarInt
+GUEST-REFUSE VarMod
+GUEST-REFUSE VarMul
+GUEST-REFUSE VarNeg
+GUEST-REFUSE VarNot
+GUEST-REFUSE VarNumFromParseNum
+GUEST-REFUSE VarOr
+GUEST-REFUSE VarPow
+GUEST-REFUSE VarR4FromDisp
+GUEST-REFUSE VarR8FromDisp
+GUEST-REFUSE VarRound
+GUEST-REFUSE VarSub
+GUEST-REFUSE VarUI1FromDisp
+GUEST-REFUSE VarUI2FromDisp
+GUEST-REFUSE VarUI4FromDisp
+GUEST-REFUSE VarUI8FromDisp
+GUEST-REFUSE VarXor
+GUEST-REFUSE VariantChangeType
+GUEST-REFUSE VariantChangeTypeEx
+GUEST-REFUSE VariantClear
+GUEST-REFUSE VariantCopy
+GUEST-REFUSE VariantCopyInd
+GUEST-REFUSE VectorFromBstr

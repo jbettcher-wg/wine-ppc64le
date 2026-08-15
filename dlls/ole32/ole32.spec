@@ -301,3 +301,12 @@
 @ stdcall WriteFmtUserTypeStg(ptr long ptr)
 @ stub WriteOleStg
 @ stub WriteStringStream
+
+# System COM: the guest ole32.dll thunk resolves these in native ole32; they
+# forward to combase's single runtime instance and wrapper bodies.
+@ stdcall __wine_com_dispatch(long long ptr) combase.__wine_com_dispatch
+@ stdcall __wine_com_refuse() combase.__wine_com_refuse
+@ stdcall __wine_guest_CoCreateInstance(ptr ptr long ptr ptr) combase.__wine_guest_CoCreateInstance
+@ stdcall __wine_guest_CoGetClassObject(ptr long ptr ptr ptr) combase.__wine_guest_CoGetClassObject
+@ stdcall __wine_guest_CreateStreamOnHGlobal(ptr long ptr) combase.__wine_guest_CreateStreamOnHGlobal
+@ stdcall __wine_guest_GetHGlobalFromStream(ptr ptr) combase.__wine_guest_GetHGlobalFromStream

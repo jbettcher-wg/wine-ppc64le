@@ -166,11 +166,15 @@ static NTSTATUS d3d12_unix_flat( void *args )
     return STATUS_SUCCESS;
 }
 
+/* unix_present.c: the presentation factory (design §4). */
+extern NTSTATUS d3d12_unix_present_factory( void *args );
+
 const unixlib_entry_t __wine_unix_call_funcs[] =
 {
     d3d12_unix_init,
     d3d12_unix_call,
     d3d12_unix_flat,
+    d3d12_unix_present_factory,
 };
 
 C_ASSERT( ARRAYSIZE(__wine_unix_call_funcs) == unix_funcs_count );

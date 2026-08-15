@@ -1,0 +1,6780 @@
+{
+  "surface": "wine-syscom",
+  "iface_ptr_aliases": {
+    "LPBC": "IBindCtx",
+    "LPBINDCTX": "IBindCtx",
+    "LPCLASSFACTORY": "IClassFactory",
+    "LPCONNECTIONPOINT": "IConnectionPoint",
+    "LPCONNECTIONPOINTCONTAINER": "IConnectionPointContainer",
+    "LPCREATEERRORINFO": "ICreateErrorInfo",
+    "LPDIRECTMUSIC": "IDirectMusic",
+    "LPDIRECTMUSICAUDIOPATH": "IDirectMusicAudioPath",
+    "LPDIRECTMUSICAUDIOPATH8": "IDirectMusicAudioPath",
+    "LPDIRECTMUSICBAND": "IDirectMusicBand",
+    "LPDIRECTMUSICBAND8": "IDirectMusicBand",
+    "LPDIRECTMUSICBUFFER": "IDirectMusicBuffer",
+    "LPDIRECTMUSICBUFFER8": "IDirectMusicBuffer",
+    "LPDIRECTMUSICDOWNLOADEDINSTRUMENT": "IDirectMusicDownloadedInstrument",
+    "LPDIRECTMUSICDOWNLOADEDINSTRUMENT8": "IDirectMusicDownloadedInstrument",
+    "LPDIRECTMUSICGETLOADER": "IDirectMusicGetLoader",
+    "LPDIRECTMUSICGETLOADER8": "IDirectMusicGetLoader",
+    "LPDIRECTMUSICGRAPH": "IDirectMusicGraph",
+    "LPDIRECTMUSICGRAPH8": "IDirectMusicGraph",
+    "LPDIRECTMUSICINSTRUMENT": "IDirectMusicInstrument",
+    "LPDIRECTMUSICINSTRUMENT8": "IDirectMusicInstrument",
+    "LPDIRECTMUSICLOADER": "IDirectMusicLoader",
+    "LPDIRECTMUSICLOADER8": "IDirectMusicLoader8",
+    "LPDIRECTMUSICOBJECT": "IDirectMusicObject",
+    "LPDIRECTMUSICOBJECT8": "IDirectMusicObject",
+    "LPDIRECTMUSICPERFORMANCE": "IDirectMusicPerformance",
+    "LPDIRECTMUSICPERFORMANCE8": "IDirectMusicPerformance8",
+    "LPDIRECTMUSICPORT": "IDirectMusicPort",
+    "LPDIRECTMUSICPORT8": "IDirectMusicPort",
+    "LPDIRECTMUSICSEGMENT": "IDirectMusicSegment",
+    "LPDIRECTMUSICSEGMENT8": "IDirectMusicSegment8",
+    "LPDIRECTMUSICSEGMENTSTATE": "IDirectMusicSegmentState",
+    "LPDIRECTMUSICTOOL": "IDirectMusicTool",
+    "LPDIRECTMUSICTRACK": "IDirectMusicTrack",
+    "LPDIRECTSOUND": "IDirectSound",
+    "LPDIRECTSOUNDBUFFER": "IDirectSoundBuffer",
+    "LPDISPATCH": "IDispatch",
+    "LPDMUS_BAND": "IDirectMusicBand",
+    "LPDMUS_LOADER": "IDirectMusicLoader",
+    "LPDMUS_OBJECT": "IDirectMusicObject",
+    "LPENUMCONNECTIONPOINTS": "IEnumConnectionPoints",
+    "LPENUMCONNECTIONS": "IEnumConnections",
+    "LPENUMMONIKER": "IEnumMoniker",
+    "LPENUMSTATSTG": "IEnumSTATSTG",
+    "LPENUMSTRING": "IEnumString",
+    "LPENUMUNKNOWN": "IEnumUnknown",
+    "LPERRORINFO": "IErrorInfo",
+    "LPGLOBALINTERFACETABLE": "IGlobalInterfaceTable",
+    "LPINSPECTABLE": "IInspectable",
+    "LPLOCKBYTES": "ILockBytes",
+    "LPMALLOC": "IMalloc",
+    "LPMARSHAL": "IMarshal",
+    "LPMONIKER": "IMoniker",
+    "LPMULTIQI": "IMultiQI",
+    "LPPERSIST": "IPersist",
+    "LPPERSISTFILE": "IPersistFile",
+    "LPPERSISTSTREAM": "IPersistStream",
+    "LPPERSISTSTREAMINIT": "IPersistStreamInit",
+    "LPRECORDINFO": "IRecordInfo",
+    "LPRUNNINGOBJECTTABLE": "IRunningObjectTable",
+    "LPSTORAGE": "IStorage",
+    "LPSTREAM": "IStream",
+    "LPSUPPORTERRORINFO": "ISupportErrorInfo",
+    "LPTYPECOMP": "ITypeComp",
+    "LPTYPEINFO": "ITypeInfo",
+    "LPTYPELIB": "ITypeLib",
+    "LPUNKNOWN": "IUnknown",
+    "PCONNECTIONPOINT": "IConnectionPoint",
+    "PCONNECTIONPOINTCONTAINER": "IConnectionPointContainer",
+    "PENUMCONNECTIONPOINTS": "IEnumConnectionPoints",
+    "PENUMCONNECTIONS": "IEnumConnections",
+    "PREFERENCECLOCK": "IReferenceClock"
+  },
+  "enums": [
+    "ACTIVATE_FLAGS",
+    "ACTIVATIONTYPE",
+    "ADVF",
+    "AMPROPERTY_PIN",
+    "AMTunerEventType",
+    "AMTunerModeType",
+    "AM_DVD_GRAPH_FLAGS",
+    "AM_DVD_STREAM_FLAGS",
+    "AM_FILESINK_FLAGS",
+    "AM_FILTER_FLAGS",
+    "AM_GRAPH_CONFIG_RECONNECT_FLAGS",
+    "AM_SEEKING_SEEKING_CAPABILITIES",
+    "AM_SEEKING_SEEKING_FLAGS",
+    "AM_STREAM_INFO_FLAGS",
+    "APTTYPE",
+    "APTTYPEQUALIFIER",
+    "BIND_FLAGS",
+    "CALLCONV",
+    "CALLTYPE",
+    "CHANGEKIND",
+    "CTRLINFO",
+    "DATADIR",
+    "DCOM_CALL_STATE",
+    "DESCKIND",
+    "DMUS_CHORDKEYF_FLAGS",
+    "DMUS_CLOCKTYPE",
+    "DMUS_COMMANDT_TYPES",
+    "DMUS_COMPOSEF_FLAGS",
+    "DMUS_CURVE_FLAGS",
+    "DMUS_NOTEF_FLAGS",
+    "DMUS_PLAYMODE_FLAGS",
+    "DMUS_PMSGF_FLAGS",
+    "DMUS_PMSGT_TYPES",
+    "DMUS_SEGF_FLAGS",
+    "DMUS_SHAPET_TYPES",
+    "DMUS_STYLET_TYPES",
+    "DMUS_TIME_RESOLVE_FLAGS",
+    "DMUS_TRACKF_FLAGS",
+    "DVASPECT2",
+    "DVASPECTINFOFLAG",
+    "DVD_AUDIO_APPMODE",
+    "DVD_AUDIO_FORMAT",
+    "DVD_AUDIO_LANG_EXT",
+    "DVD_CMD_FLAGS",
+    "DVD_DISC_SIDE",
+    "DVD_DOMAIN",
+    "DVD_FRAMERATE",
+    "DVD_KARAOKE_ASSIGNMENT",
+    "DVD_KARAOKE_CONTENTS",
+    "DVD_KARAOKE_DOWNMIX",
+    "DVD_MENU_ID",
+    "DVD_NavCmdType",
+    "DVD_OPTION_FLAG",
+    "DVD_PARENTAL_LEVEL",
+    "DVD_PREFERRED_DISPLAY_MODE",
+    "DVD_RELATIVE_BUTTON",
+    "DVD_SUBPICTURE_CODING",
+    "DVD_SUBPICTURE_LANG_EXT",
+    "DVD_SUBPICTURE_TYPE",
+    "DVD_TIMECODE_FLAGS",
+    "DVD_TITLE_APPMODE",
+    "DVD_VIDEO_COMPRESSION",
+    "EOLE_AUTHENTICATION_CAPABILITIES",
+    "EXTCONN",
+    "FILTER_STATE",
+    "FUNCFLAGS",
+    "FUNCKIND",
+    "GLOBALOPT_EH_VALUES",
+    "GLOBALOPT_PROPERTIES",
+    "GLOBALOPT_RO_FLAGS",
+    "GLOBALOPT_RPCTP_VALUES",
+    "GLOBALOPT_UNMARSHALING_POLICY_VALUES",
+    "GUIDKIND",
+    "HITRESULT",
+    "INVOKEKIND",
+    "InterleavingMode",
+    "LIBFLAGS",
+    "LOCKTYPE",
+    "MKRREDUCE",
+    "MKSYS",
+    "OLEDCFLAGS",
+    "PENDINGMSG",
+    "PENDINGTYPE",
+    "PICTUREATTRIBUTES",
+    "PIN_DIRECTION",
+    "PROPBAG2_TYPE",
+    "PROPPAGESTATUS",
+    "QACONTAINERFLAGS",
+    "QualityMessageType",
+    "READYSTATE",
+    "SERVERCALL",
+    "SF_TYPE",
+    "STGTY",
+    "STREAM_SEEK",
+    "SYSKIND",
+    "THDTYPE",
+    "TYMED",
+    "TYPEFLAGS",
+    "TYPEKIND",
+    "TrustLevel",
+    "TunerInputType",
+    "UASFLAGS",
+    "VALID_UOP_FLAG",
+    "VARFLAGS",
+    "VARKIND",
+    "VIEWSTATUS",
+    "VMRDeinterlacePrefs",
+    "VMRDeinterlaceTech",
+    "VMRMixerPrefs",
+    "VMRMode",
+    "VMRPresentationFlags",
+    "VMRRenderPrefs",
+    "VMRSurfaceAllocationFlags",
+    "VMR_ASPECT_RATIO_MODE",
+    "VideoProcAmpFlags",
+    "VideoProcAmpProperty",
+    "XFORMCOORDS"
+  ],
+  "unresolved_params": {},
+  "interfaces": {
+    "IActivationFactory": {
+      "uuid": "00000035-0000-0000-c000-000000000046",
+      "base": "IInspectable",
+      "header": "activation.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IInspectable",
+          "name": "GetIids",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG *iidCount",
+            "IID **iids"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IInspectable",
+          "name": "GetRuntimeClassName",
+          "ret": "HRESULT",
+          "params": [
+            "HSTRING *className"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IInspectable",
+          "name": "GetTrustLevel",
+          "ret": "HRESULT",
+          "params": [
+            "TrustLevel *trustLevel"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IActivationFactory",
+          "name": "ActivateInstance",
+          "ret": "HRESULT",
+          "params": [
+            "IInspectable **instance"
+          ]
+        }
+      ]
+    },
+    "IAgileObject": {
+      "uuid": "94ea2b94-e9cc-49e0-c0ff-ee64ca8f5b90",
+      "base": "IUnknown",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        }
+      ]
+    },
+    "IBindCtx": {
+      "uuid": "0000000e-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IBindCtx",
+          "name": "RegisterObjectBound",
+          "ret": "HRESULT",
+          "params": [
+            "IUnknown *punk"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IBindCtx",
+          "name": "RevokeObjectBound",
+          "ret": "HRESULT",
+          "params": [
+            "IUnknown *punk"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IBindCtx",
+          "name": "ReleaseBoundObjects",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 6,
+          "owner": "IBindCtx",
+          "name": "SetBindOptions",
+          "ret": "HRESULT",
+          "params": [
+            "BIND_OPTS *pbindopts"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IBindCtx",
+          "name": "GetBindOptions",
+          "ret": "HRESULT",
+          "params": [
+            "BIND_OPTS *pbindopts"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IBindCtx",
+          "name": "GetRunningObjectTable",
+          "ret": "HRESULT",
+          "params": [
+            "IRunningObjectTable **pprot"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IBindCtx",
+          "name": "RegisterObjectParam",
+          "ret": "HRESULT",
+          "params": [
+            "LPOLESTR pszKey",
+            "IUnknown *punk"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IBindCtx",
+          "name": "GetObjectParam",
+          "ret": "HRESULT",
+          "params": [
+            "LPOLESTR pszKey",
+            "IUnknown **ppunk"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IBindCtx",
+          "name": "EnumObjectParam",
+          "ret": "HRESULT",
+          "params": [
+            "IEnumString **ppenum"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IBindCtx",
+          "name": "RevokeObjectParam",
+          "ret": "HRESULT",
+          "params": [
+            "LPOLESTR pszKey"
+          ]
+        }
+      ]
+    },
+    "IClassFactory": {
+      "uuid": "00000001-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "unknwn.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IClassFactory",
+          "name": "CreateInstance",
+          "ret": "HRESULT",
+          "params": [
+            "IUnknown *pUnkOuter",
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IClassFactory",
+          "name": "LockServer",
+          "ret": "HRESULT",
+          "params": [
+            "BOOL fLock"
+          ]
+        }
+      ]
+    },
+    "IConnectionPoint": {
+      "uuid": "b196b286-bab4-101a-b69c-00aa00341d07",
+      "base": "IUnknown",
+      "header": "ocidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IConnectionPoint",
+          "name": "GetConnectionInterface",
+          "ret": "HRESULT",
+          "params": [
+            "IID *pIID"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IConnectionPoint",
+          "name": "GetConnectionPointContainer",
+          "ret": "HRESULT",
+          "params": [
+            "IConnectionPointContainer **ppCPC"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IConnectionPoint",
+          "name": "Advise",
+          "ret": "HRESULT",
+          "params": [
+            "IUnknown *pUnkSink",
+            "DWORD *pdwCookie"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IConnectionPoint",
+          "name": "Unadvise",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwCookie"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IConnectionPoint",
+          "name": "EnumConnections",
+          "ret": "HRESULT",
+          "params": [
+            "IEnumConnections **ppEnum"
+          ]
+        }
+      ]
+    },
+    "IConnectionPointContainer": {
+      "uuid": "b196b284-bab4-101a-b69c-00aa00341d07",
+      "base": "IUnknown",
+      "header": "ocidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IConnectionPointContainer",
+          "name": "EnumConnectionPoints",
+          "ret": "HRESULT",
+          "params": [
+            "IEnumConnectionPoints **ppEnum"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IConnectionPointContainer",
+          "name": "FindConnectionPoint",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "IConnectionPoint **ppCP"
+          ]
+        }
+      ]
+    },
+    "ICreateErrorInfo": {
+      "uuid": "22f03340-547d-101b-8e65-08002b2bd119",
+      "base": "IUnknown",
+      "header": "oaidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "ICreateErrorInfo",
+          "name": "SetGUID",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguid"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "ICreateErrorInfo",
+          "name": "SetSource",
+          "ret": "HRESULT",
+          "params": [
+            "LPOLESTR szSource"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "ICreateErrorInfo",
+          "name": "SetDescription",
+          "ret": "HRESULT",
+          "params": [
+            "LPOLESTR szDescription"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "ICreateErrorInfo",
+          "name": "SetHelpFile",
+          "ret": "HRESULT",
+          "params": [
+            "LPOLESTR szHelpFile"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "ICreateErrorInfo",
+          "name": "SetHelpContext",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwHelpContext"
+          ]
+        }
+      ]
+    },
+    "IDirectMusic": {
+      "uuid": "6536115a-7b2d-11d2-ba18-0000f875ac12",
+      "base": "IUnknown",
+      "header": "dmusicc.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusic",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusic",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusic",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectMusic",
+          "name": "EnumPort",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwIndex",
+            "DMUS_PORTCAPS *pPortCaps"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectMusic",
+          "name": "CreateMusicBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "DMUS_BUFFERDESC *pBufferDesc",
+            "IDirectMusicBuffer **ppBuffer",
+            "IUnknown *pUnkOuter"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectMusic",
+          "name": "CreatePort",
+          "ret": "HRESULT",
+          "params": [
+            "REFCLSID rclsidPort",
+            "DMUS_PORTPARAMS8 *pPortParams",
+            "IDirectMusicPort **ppPort",
+            "IUnknown *pUnkOuter"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectMusic",
+          "name": "EnumMasterClock",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwIndex",
+            "DMUS_CLOCKINFO8 *lpClockInfo"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectMusic",
+          "name": "GetMasterClock",
+          "ret": "HRESULT",
+          "params": [
+            "LPGUID pguidClock",
+            "IReferenceClock **ppReferenceClock"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectMusic",
+          "name": "SetMasterClock",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidClock"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectMusic",
+          "name": "Activate",
+          "ret": "HRESULT",
+          "params": [
+            "BOOL fEnable"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectMusic",
+          "name": "GetDefaultPort",
+          "ret": "HRESULT",
+          "params": [
+            "LPGUID pguidPort"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirectMusic",
+          "name": "SetDirectSound",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectSound *pDirectSound",
+            "HWND hWnd"
+          ]
+        }
+      ]
+    },
+    "IDirectMusicAudioPath": {
+      "uuid": "c87631f5-23be-4986-8836-05832fcc48f9",
+      "base": "IUnknown",
+      "header": "dmusici.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusicAudioPath",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusicAudioPath",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusicAudioPath",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectMusicAudioPath",
+          "name": "GetObjectInPath",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwPChannel",
+            "DWORD dwStage",
+            "DWORD dwBuffer",
+            "REFGUID guidObject",
+            "DWORD dwIndex",
+            "REFGUID iidInterface",
+            "void **ppObject"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectMusicAudioPath",
+          "name": "Activate",
+          "ret": "HRESULT",
+          "params": [
+            "BOOL fActivate"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectMusicAudioPath",
+          "name": "SetVolume",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lVolume",
+            "DWORD dwDuration"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectMusicAudioPath",
+          "name": "ConvertPChannel",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwPChannelIn",
+            "DWORD *pdwPChannelOut"
+          ]
+        }
+      ]
+    },
+    "IDirectMusicBand": {
+      "uuid": "d2ac28c0-b39b-11d1-8704-00600893b1bd",
+      "base": "IUnknown",
+      "header": "dmusici.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusicBand",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusicBand",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusicBand",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectMusicBand",
+          "name": "CreateSegment",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicSegment **ppSegment"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectMusicBand",
+          "name": "Download",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicPerformance *pPerformance"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectMusicBand",
+          "name": "Unload",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicPerformance *pPerformance"
+          ]
+        }
+      ]
+    },
+    "IDirectMusicBuffer": {
+      "uuid": "d2ac2878-b39b-11d1-8704-00600893b1bd",
+      "base": "IUnknown",
+      "header": "dmusicc.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusicBuffer",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusicBuffer",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusicBuffer",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectMusicBuffer",
+          "name": "Flush",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectMusicBuffer",
+          "name": "TotalTime",
+          "ret": "HRESULT",
+          "params": [
+            "LPREFERENCE_TIME prtTime"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectMusicBuffer",
+          "name": "PackStructured",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME rt",
+            "DWORD dwChannelGroup",
+            "DWORD dwChannelMessage"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectMusicBuffer",
+          "name": "PackUnstructured",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME rt",
+            "DWORD dwChannelGroup",
+            "DWORD cb",
+            "LPBYTE lpb"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectMusicBuffer",
+          "name": "ResetReadPtr",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectMusicBuffer",
+          "name": "GetNextEvent",
+          "ret": "HRESULT",
+          "params": [
+            "LPREFERENCE_TIME prt",
+            "LPDWORD pdwChannelGroup",
+            "LPDWORD pdwLength",
+            "LPBYTE *ppData"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectMusicBuffer",
+          "name": "GetRawBufferPtr",
+          "ret": "HRESULT",
+          "params": [
+            "LPBYTE *ppData"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectMusicBuffer",
+          "name": "GetStartTime",
+          "ret": "HRESULT",
+          "params": [
+            "LPREFERENCE_TIME prt"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirectMusicBuffer",
+          "name": "GetUsedBytes",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD pcb"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirectMusicBuffer",
+          "name": "GetMaxBytes",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD pcb"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IDirectMusicBuffer",
+          "name": "GetBufferFormat",
+          "ret": "HRESULT",
+          "params": [
+            "LPGUID pGuidFormat"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IDirectMusicBuffer",
+          "name": "SetStartTime",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME rt"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirectMusicBuffer",
+          "name": "SetUsedBytes",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD cb"
+          ]
+        }
+      ]
+    },
+    "IDirectMusicDownloadedInstrument": {
+      "uuid": "d2ac287e-b39b-11d1-8704-00600893b1bd",
+      "base": "IUnknown",
+      "header": "dmusicc.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusicDownloadedInstrument",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusicDownloadedInstrument",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusicDownloadedInstrument",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        }
+      ]
+    },
+    "IDirectMusicGetLoader": {
+      "uuid": "68a04844-d13d-11d1-afa6-00aa0024d8b6",
+      "base": "IUnknown",
+      "header": "dmusici.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusicGetLoader",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusicGetLoader",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusicGetLoader",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectMusicGetLoader",
+          "name": "GetLoader",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicLoader **ppLoader"
+          ]
+        }
+      ]
+    },
+    "IDirectMusicGraph": {
+      "uuid": "2befc277-5497-11d2-bccb-00a0c922e6eb",
+      "base": "IUnknown",
+      "header": "dmusici.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusicGraph",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusicGraph",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusicGraph",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectMusicGraph",
+          "name": "StampPMsg",
+          "ret": "HRESULT",
+          "params": [
+            "DMUS_PMSG *pPMSG"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectMusicGraph",
+          "name": "InsertTool",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicTool *pTool",
+            "DWORD *pdwPChannels",
+            "DWORD cPChannels",
+            "LONG lIndex"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectMusicGraph",
+          "name": "GetTool",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwIndex",
+            "IDirectMusicTool **ppTool"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectMusicGraph",
+          "name": "RemoveTool",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicTool *pTool"
+          ]
+        }
+      ]
+    },
+    "IDirectMusicInstrument": {
+      "uuid": "d2ac287d-b39b-11d1-8704-00600893b1bd",
+      "base": "IUnknown",
+      "header": "dmusicc.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusicInstrument",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusicInstrument",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusicInstrument",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectMusicInstrument",
+          "name": "GetPatch",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *pdwPatch"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectMusicInstrument",
+          "name": "SetPatch",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwPatch"
+          ]
+        }
+      ]
+    },
+    "IDirectMusicLoader": {
+      "uuid": "2ffaaca2-5dca-11d2-afa6-00aa0024d8b6",
+      "base": "IUnknown",
+      "header": "dmusici.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusicLoader",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusicLoader",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusicLoader",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectMusicLoader",
+          "name": "GetObject",
+          "ret": "HRESULT",
+          "params": [
+            "DMUS_OBJECTDESC *pDesc",
+            "REFIID riid",
+            "LPVOID *ppv"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectMusicLoader",
+          "name": "SetObject",
+          "ret": "HRESULT",
+          "params": [
+            "DMUS_OBJECTDESC *pDesc"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectMusicLoader",
+          "name": "SetSearchDirectory",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidClass",
+            "WCHAR *pwzPath",
+            "BOOL fClear"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectMusicLoader",
+          "name": "ScanDirectory",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidClass",
+            "WCHAR *pwzFileExtension",
+            "WCHAR *pwzScanFileName"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectMusicLoader",
+          "name": "CacheObject",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicObject *pObject"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectMusicLoader",
+          "name": "ReleaseObject",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicObject *pObject"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectMusicLoader",
+          "name": "ClearCache",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidClass"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectMusicLoader",
+          "name": "EnableCache",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidClass",
+            "BOOL fEnable"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirectMusicLoader",
+          "name": "EnumObject",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidClass",
+            "DWORD dwIndex",
+            "DMUS_OBJECTDESC *pDesc"
+          ]
+        }
+      ]
+    },
+    "IDirectMusicLoader8": {
+      "uuid": "19e7c08c-0a44-4e6a-a116-595a7cd5de8c",
+      "base": "IDirectMusicLoader",
+      "header": "dmusici.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusicLoader8",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusicLoader8",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusicLoader8",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectMusicLoader8",
+          "name": "GetObject",
+          "ret": "HRESULT",
+          "params": [
+            "DMUS_OBJECTDESC *pDesc",
+            "REFIID riid",
+            "LPVOID *ppv"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectMusicLoader8",
+          "name": "SetObject",
+          "ret": "HRESULT",
+          "params": [
+            "DMUS_OBJECTDESC *pDesc"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectMusicLoader8",
+          "name": "SetSearchDirectory",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidClass",
+            "WCHAR *pwzPath",
+            "BOOL fClear"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectMusicLoader8",
+          "name": "ScanDirectory",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidClass",
+            "WCHAR *pwzFileExtension",
+            "WCHAR *pwzScanFileName"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectMusicLoader8",
+          "name": "CacheObject",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicObject *pObject"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectMusicLoader8",
+          "name": "ReleaseObject",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicObject *pObject"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectMusicLoader8",
+          "name": "ClearCache",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidClass"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectMusicLoader8",
+          "name": "EnableCache",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidClass",
+            "BOOL fEnable"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirectMusicLoader8",
+          "name": "EnumObject",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidClass",
+            "DWORD dwIndex",
+            "DMUS_OBJECTDESC *pDesc"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirectMusicLoader8",
+          "name": "CollectGarbage",
+          "ret": "void",
+          "params": []
+        },
+        {
+          "slot": 13,
+          "owner": "IDirectMusicLoader8",
+          "name": "ReleaseObjectByUnknown",
+          "ret": "HRESULT",
+          "params": [
+            "IUnknown *pObject"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IDirectMusicLoader8",
+          "name": "LoadObjectFromFile",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidClassID",
+            "REFIID iidInterfaceID",
+            "WCHAR *pwzFilePath",
+            "void **ppObject"
+          ]
+        }
+      ]
+    },
+    "IDirectMusicObject": {
+      "uuid": "d2ac28b5-b39b-11d1-8704-00600893b1bd",
+      "base": "IUnknown",
+      "header": "dmusici.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusicObject",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusicObject",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusicObject",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectMusicObject",
+          "name": "GetDescriptor",
+          "ret": "HRESULT",
+          "params": [
+            "DMUS_OBJECTDESC *pDesc"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectMusicObject",
+          "name": "SetDescriptor",
+          "ret": "HRESULT",
+          "params": [
+            "DMUS_OBJECTDESC *pDesc"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectMusicObject",
+          "name": "ParseDescriptor",
+          "ret": "HRESULT",
+          "params": [
+            "IStream *pStream",
+            "DMUS_OBJECTDESC *pDesc"
+          ]
+        }
+      ]
+    },
+    "IDirectMusicPerformance": {
+      "uuid": "07d43d03-6523-11d2-871d-00600893b1bd",
+      "base": "IUnknown",
+      "header": "dmusici.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusicPerformance",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusicPerformance",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusicPerformance",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectMusicPerformance",
+          "name": "Init",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusic **ppDirectMusic",
+            "IDirectSound *pDirectSound",
+            "HWND hWnd"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectMusicPerformance",
+          "name": "PlaySegment",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicSegment *pSegment",
+            "DWORD dwFlags",
+            "__int64 i64StartTime",
+            "IDirectMusicSegmentState **ppSegmentState"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectMusicPerformance",
+          "name": "Stop",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicSegment *pSegment",
+            "IDirectMusicSegmentState *pSegmentState",
+            "MUSIC_TIME mtTime",
+            "DWORD dwFlags"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectMusicPerformance",
+          "name": "GetSegmentState",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicSegmentState **ppSegmentState",
+            "MUSIC_TIME mtTime"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectMusicPerformance",
+          "name": "SetPrepareTime",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwMilliSeconds"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectMusicPerformance",
+          "name": "GetPrepareTime",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *pdwMilliSeconds"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectMusicPerformance",
+          "name": "SetBumperLength",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwMilliSeconds"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectMusicPerformance",
+          "name": "GetBumperLength",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *pdwMilliSeconds"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirectMusicPerformance",
+          "name": "SendPMsg",
+          "ret": "HRESULT",
+          "params": [
+            "DMUS_PMSG *pPMSG"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirectMusicPerformance",
+          "name": "MusicToReferenceTime",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME mtTime",
+            "REFERENCE_TIME *prtTime"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IDirectMusicPerformance",
+          "name": "ReferenceToMusicTime",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME rtTime",
+            "MUSIC_TIME *pmtTime"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IDirectMusicPerformance",
+          "name": "IsPlaying",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicSegment *pSegment",
+            "IDirectMusicSegmentState *pSegState"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirectMusicPerformance",
+          "name": "GetTime",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME *prtNow",
+            "MUSIC_TIME *pmtNow"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IDirectMusicPerformance",
+          "name": "AllocPMsg",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG cb",
+            "DMUS_PMSG **ppPMSG"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IDirectMusicPerformance",
+          "name": "FreePMsg",
+          "ret": "HRESULT",
+          "params": [
+            "DMUS_PMSG *pPMSG"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IDirectMusicPerformance",
+          "name": "GetGraph",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicGraph **ppGraph"
+          ]
+        },
+        {
+          "slot": 19,
+          "owner": "IDirectMusicPerformance",
+          "name": "SetGraph",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicGraph *pGraph"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "IDirectMusicPerformance",
+          "name": "SetNotificationHandle",
+          "ret": "HRESULT",
+          "params": [
+            "HANDLE hNotification",
+            "REFERENCE_TIME rtMinimum"
+          ]
+        },
+        {
+          "slot": 21,
+          "owner": "IDirectMusicPerformance",
+          "name": "GetNotificationPMsg",
+          "ret": "HRESULT",
+          "params": [
+            "DMUS_NOTIFICATION_PMSG **ppNotificationPMsg"
+          ]
+        },
+        {
+          "slot": 22,
+          "owner": "IDirectMusicPerformance",
+          "name": "AddNotificationType",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidNotificationType"
+          ]
+        },
+        {
+          "slot": 23,
+          "owner": "IDirectMusicPerformance",
+          "name": "RemoveNotificationType",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidNotificationType"
+          ]
+        },
+        {
+          "slot": 24,
+          "owner": "IDirectMusicPerformance",
+          "name": "AddPort",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicPort *pPort"
+          ]
+        },
+        {
+          "slot": 25,
+          "owner": "IDirectMusicPerformance",
+          "name": "RemovePort",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicPort *pPort"
+          ]
+        },
+        {
+          "slot": 26,
+          "owner": "IDirectMusicPerformance",
+          "name": "AssignPChannelBlock",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwBlockNum",
+            "IDirectMusicPort *pPort",
+            "DWORD dwGroup"
+          ]
+        },
+        {
+          "slot": 27,
+          "owner": "IDirectMusicPerformance",
+          "name": "AssignPChannel",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwPChannel",
+            "IDirectMusicPort *pPort",
+            "DWORD dwGroup",
+            "DWORD dwMChannel"
+          ]
+        },
+        {
+          "slot": 28,
+          "owner": "IDirectMusicPerformance",
+          "name": "PChannelInfo",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwPChannel",
+            "IDirectMusicPort **ppPort",
+            "DWORD *pdwGroup",
+            "DWORD *pdwMChannel"
+          ]
+        },
+        {
+          "slot": 29,
+          "owner": "IDirectMusicPerformance",
+          "name": "DownloadInstrument",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicInstrument *pInst",
+            "DWORD dwPChannel",
+            "IDirectMusicDownloadedInstrument **ppDownInst",
+            "DMUS_NOTERANGE *pNoteRanges",
+            "DWORD dwNumNoteRanges",
+            "IDirectMusicPort **ppPort",
+            "DWORD *pdwGroup",
+            "DWORD *pdwMChannel"
+          ]
+        },
+        {
+          "slot": 30,
+          "owner": "IDirectMusicPerformance",
+          "name": "Invalidate",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME mtTime",
+            "DWORD dwFlags"
+          ]
+        },
+        {
+          "slot": 31,
+          "owner": "IDirectMusicPerformance",
+          "name": "GetParam",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidType",
+            "DWORD dwGroupBits",
+            "DWORD dwIndex",
+            "MUSIC_TIME mtTime",
+            "MUSIC_TIME *pmtNext",
+            "void *pParam"
+          ]
+        },
+        {
+          "slot": 32,
+          "owner": "IDirectMusicPerformance",
+          "name": "SetParam",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidType",
+            "DWORD dwGroupBits",
+            "DWORD dwIndex",
+            "MUSIC_TIME mtTime",
+            "void *pParam"
+          ]
+        },
+        {
+          "slot": 33,
+          "owner": "IDirectMusicPerformance",
+          "name": "GetGlobalParam",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidType",
+            "void *pParam",
+            "DWORD dwSize"
+          ]
+        },
+        {
+          "slot": 34,
+          "owner": "IDirectMusicPerformance",
+          "name": "SetGlobalParam",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidType",
+            "void *pParam",
+            "DWORD dwSize"
+          ]
+        },
+        {
+          "slot": 35,
+          "owner": "IDirectMusicPerformance",
+          "name": "GetLatencyTime",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME *prtTime"
+          ]
+        },
+        {
+          "slot": 36,
+          "owner": "IDirectMusicPerformance",
+          "name": "GetQueueTime",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME *prtTime"
+          ]
+        },
+        {
+          "slot": 37,
+          "owner": "IDirectMusicPerformance",
+          "name": "AdjustTime",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME rtAmount"
+          ]
+        },
+        {
+          "slot": 38,
+          "owner": "IDirectMusicPerformance",
+          "name": "CloseDown",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 39,
+          "owner": "IDirectMusicPerformance",
+          "name": "GetResolvedTime",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME rtTime",
+            "REFERENCE_TIME *prtResolved",
+            "DWORD dwTimeResolveFlags"
+          ]
+        },
+        {
+          "slot": 40,
+          "owner": "IDirectMusicPerformance",
+          "name": "MIDIToMusic",
+          "ret": "HRESULT",
+          "params": [
+            "BYTE bMIDIValue",
+            "DMUS_CHORD_KEY *pChord",
+            "BYTE bPlayMode",
+            "BYTE bChordLevel",
+            "WORD *pwMusicValue"
+          ]
+        },
+        {
+          "slot": 41,
+          "owner": "IDirectMusicPerformance",
+          "name": "MusicToMIDI",
+          "ret": "HRESULT",
+          "params": [
+            "WORD wMusicValue",
+            "DMUS_CHORD_KEY *pChord",
+            "BYTE bPlayMode",
+            "BYTE bChordLevel",
+            "BYTE *pbMIDIValue"
+          ]
+        },
+        {
+          "slot": 42,
+          "owner": "IDirectMusicPerformance",
+          "name": "TimeToRhythm",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME mtTime",
+            "DMUS_TIMESIGNATURE *pTimeSig",
+            "WORD *pwMeasure",
+            "BYTE *pbBeat",
+            "BYTE *pbGrid",
+            "short *pnOffset"
+          ]
+        },
+        {
+          "slot": 43,
+          "owner": "IDirectMusicPerformance",
+          "name": "RhythmToTime",
+          "ret": "HRESULT",
+          "params": [
+            "WORD wMeasure",
+            "BYTE bBeat",
+            "BYTE bGrid",
+            "short nOffset",
+            "DMUS_TIMESIGNATURE *pTimeSig",
+            "MUSIC_TIME *pmtTime"
+          ]
+        }
+      ]
+    },
+    "IDirectMusicPerformance8": {
+      "uuid": "679c4137-c62e-4147-b2b4-9d569acb254c",
+      "base": "IDirectMusicPerformance",
+      "header": "dmusici.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusicPerformance8",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusicPerformance8",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusicPerformance8",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectMusicPerformance8",
+          "name": "Init",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusic **ppDirectMusic",
+            "IDirectSound *pDirectSound",
+            "HWND hWnd"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectMusicPerformance8",
+          "name": "PlaySegment",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicSegment *pSegment",
+            "DWORD dwFlags",
+            "__int64 i64StartTime",
+            "IDirectMusicSegmentState **ppSegmentState"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectMusicPerformance8",
+          "name": "Stop",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicSegment *pSegment",
+            "IDirectMusicSegmentState *pSegmentState",
+            "MUSIC_TIME mtTime",
+            "DWORD dwFlags"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectMusicPerformance8",
+          "name": "GetSegmentState",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicSegmentState **ppSegmentState",
+            "MUSIC_TIME mtTime"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectMusicPerformance8",
+          "name": "SetPrepareTime",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwMilliSeconds"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectMusicPerformance8",
+          "name": "GetPrepareTime",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *pdwMilliSeconds"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectMusicPerformance8",
+          "name": "SetBumperLength",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwMilliSeconds"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectMusicPerformance8",
+          "name": "GetBumperLength",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *pdwMilliSeconds"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirectMusicPerformance8",
+          "name": "SendPMsg",
+          "ret": "HRESULT",
+          "params": [
+            "DMUS_PMSG *pPMSG"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirectMusicPerformance8",
+          "name": "MusicToReferenceTime",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME mtTime",
+            "REFERENCE_TIME *prtTime"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IDirectMusicPerformance8",
+          "name": "ReferenceToMusicTime",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME rtTime",
+            "MUSIC_TIME *pmtTime"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IDirectMusicPerformance8",
+          "name": "IsPlaying",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicSegment *pSegment",
+            "IDirectMusicSegmentState *pSegState"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirectMusicPerformance8",
+          "name": "GetTime",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME *prtNow",
+            "MUSIC_TIME *pmtNow"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IDirectMusicPerformance8",
+          "name": "AllocPMsg",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG cb",
+            "DMUS_PMSG **ppPMSG"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IDirectMusicPerformance8",
+          "name": "FreePMsg",
+          "ret": "HRESULT",
+          "params": [
+            "DMUS_PMSG *pPMSG"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IDirectMusicPerformance8",
+          "name": "GetGraph",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicGraph **ppGraph"
+          ]
+        },
+        {
+          "slot": 19,
+          "owner": "IDirectMusicPerformance8",
+          "name": "SetGraph",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicGraph *pGraph"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "IDirectMusicPerformance8",
+          "name": "SetNotificationHandle",
+          "ret": "HRESULT",
+          "params": [
+            "HANDLE hNotification",
+            "REFERENCE_TIME rtMinimum"
+          ]
+        },
+        {
+          "slot": 21,
+          "owner": "IDirectMusicPerformance8",
+          "name": "GetNotificationPMsg",
+          "ret": "HRESULT",
+          "params": [
+            "DMUS_NOTIFICATION_PMSG **ppNotificationPMsg"
+          ]
+        },
+        {
+          "slot": 22,
+          "owner": "IDirectMusicPerformance8",
+          "name": "AddNotificationType",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidNotificationType"
+          ]
+        },
+        {
+          "slot": 23,
+          "owner": "IDirectMusicPerformance8",
+          "name": "RemoveNotificationType",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidNotificationType"
+          ]
+        },
+        {
+          "slot": 24,
+          "owner": "IDirectMusicPerformance8",
+          "name": "AddPort",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicPort *pPort"
+          ]
+        },
+        {
+          "slot": 25,
+          "owner": "IDirectMusicPerformance8",
+          "name": "RemovePort",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicPort *pPort"
+          ]
+        },
+        {
+          "slot": 26,
+          "owner": "IDirectMusicPerformance8",
+          "name": "AssignPChannelBlock",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwBlockNum",
+            "IDirectMusicPort *pPort",
+            "DWORD dwGroup"
+          ]
+        },
+        {
+          "slot": 27,
+          "owner": "IDirectMusicPerformance8",
+          "name": "AssignPChannel",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwPChannel",
+            "IDirectMusicPort *pPort",
+            "DWORD dwGroup",
+            "DWORD dwMChannel"
+          ]
+        },
+        {
+          "slot": 28,
+          "owner": "IDirectMusicPerformance8",
+          "name": "PChannelInfo",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwPChannel",
+            "IDirectMusicPort **ppPort",
+            "DWORD *pdwGroup",
+            "DWORD *pdwMChannel"
+          ]
+        },
+        {
+          "slot": 29,
+          "owner": "IDirectMusicPerformance8",
+          "name": "DownloadInstrument",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicInstrument *pInst",
+            "DWORD dwPChannel",
+            "IDirectMusicDownloadedInstrument **ppDownInst",
+            "DMUS_NOTERANGE *pNoteRanges",
+            "DWORD dwNumNoteRanges",
+            "IDirectMusicPort **ppPort",
+            "DWORD *pdwGroup",
+            "DWORD *pdwMChannel"
+          ]
+        },
+        {
+          "slot": 30,
+          "owner": "IDirectMusicPerformance8",
+          "name": "Invalidate",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME mtTime",
+            "DWORD dwFlags"
+          ]
+        },
+        {
+          "slot": 31,
+          "owner": "IDirectMusicPerformance8",
+          "name": "GetParam",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidType",
+            "DWORD dwGroupBits",
+            "DWORD dwIndex",
+            "MUSIC_TIME mtTime",
+            "MUSIC_TIME *pmtNext",
+            "void *pParam"
+          ]
+        },
+        {
+          "slot": 32,
+          "owner": "IDirectMusicPerformance8",
+          "name": "SetParam",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidType",
+            "DWORD dwGroupBits",
+            "DWORD dwIndex",
+            "MUSIC_TIME mtTime",
+            "void *pParam"
+          ]
+        },
+        {
+          "slot": 33,
+          "owner": "IDirectMusicPerformance8",
+          "name": "GetGlobalParam",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidType",
+            "void *pParam",
+            "DWORD dwSize"
+          ]
+        },
+        {
+          "slot": 34,
+          "owner": "IDirectMusicPerformance8",
+          "name": "SetGlobalParam",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidType",
+            "void *pParam",
+            "DWORD dwSize"
+          ]
+        },
+        {
+          "slot": 35,
+          "owner": "IDirectMusicPerformance8",
+          "name": "GetLatencyTime",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME *prtTime"
+          ]
+        },
+        {
+          "slot": 36,
+          "owner": "IDirectMusicPerformance8",
+          "name": "GetQueueTime",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME *prtTime"
+          ]
+        },
+        {
+          "slot": 37,
+          "owner": "IDirectMusicPerformance8",
+          "name": "AdjustTime",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME rtAmount"
+          ]
+        },
+        {
+          "slot": 38,
+          "owner": "IDirectMusicPerformance8",
+          "name": "CloseDown",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 39,
+          "owner": "IDirectMusicPerformance8",
+          "name": "GetResolvedTime",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME rtTime",
+            "REFERENCE_TIME *prtResolved",
+            "DWORD dwTimeResolveFlags"
+          ]
+        },
+        {
+          "slot": 40,
+          "owner": "IDirectMusicPerformance8",
+          "name": "MIDIToMusic",
+          "ret": "HRESULT",
+          "params": [
+            "BYTE bMIDIValue",
+            "DMUS_CHORD_KEY *pChord",
+            "BYTE bPlayMode",
+            "BYTE bChordLevel",
+            "WORD *pwMusicValue"
+          ]
+        },
+        {
+          "slot": 41,
+          "owner": "IDirectMusicPerformance8",
+          "name": "MusicToMIDI",
+          "ret": "HRESULT",
+          "params": [
+            "WORD wMusicValue",
+            "DMUS_CHORD_KEY *pChord",
+            "BYTE bPlayMode",
+            "BYTE bChordLevel",
+            "BYTE *pbMIDIValue"
+          ]
+        },
+        {
+          "slot": 42,
+          "owner": "IDirectMusicPerformance8",
+          "name": "TimeToRhythm",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME mtTime",
+            "DMUS_TIMESIGNATURE *pTimeSig",
+            "WORD *pwMeasure",
+            "BYTE *pbBeat",
+            "BYTE *pbGrid",
+            "short *pnOffset"
+          ]
+        },
+        {
+          "slot": 43,
+          "owner": "IDirectMusicPerformance8",
+          "name": "RhythmToTime",
+          "ret": "HRESULT",
+          "params": [
+            "WORD wMeasure",
+            "BYTE bBeat",
+            "BYTE bGrid",
+            "short nOffset",
+            "DMUS_TIMESIGNATURE *pTimeSig",
+            "MUSIC_TIME *pmtTime"
+          ]
+        },
+        {
+          "slot": 44,
+          "owner": "IDirectMusicPerformance8",
+          "name": "InitAudio",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusic **ppDirectMusic",
+            "IDirectSound **ppDirectSound",
+            "HWND hWnd",
+            "DWORD dwDefaultPathType",
+            "DWORD dwPChannelCount",
+            "DWORD dwFlags",
+            "DMUS_AUDIOPARAMS *pParams"
+          ]
+        },
+        {
+          "slot": 45,
+          "owner": "IDirectMusicPerformance8",
+          "name": "PlaySegmentEx",
+          "ret": "HRESULT",
+          "params": [
+            "IUnknown *pSource",
+            "WCHAR *pwzSegmentName",
+            "IUnknown *pTransition",
+            "DWORD dwFlags",
+            "__int64 i64StartTime",
+            "IDirectMusicSegmentState **ppSegmentState",
+            "IUnknown *pFrom",
+            "IUnknown *pAudioPath"
+          ]
+        },
+        {
+          "slot": 46,
+          "owner": "IDirectMusicPerformance8",
+          "name": "StopEx",
+          "ret": "HRESULT",
+          "params": [
+            "IUnknown *pObjectToStop",
+            "__int64 i64StopTime",
+            "DWORD dwFlags"
+          ]
+        },
+        {
+          "slot": 47,
+          "owner": "IDirectMusicPerformance8",
+          "name": "ClonePMsg",
+          "ret": "HRESULT",
+          "params": [
+            "DMUS_PMSG *pSourcePMSG",
+            "DMUS_PMSG **ppCopyPMSG"
+          ]
+        },
+        {
+          "slot": 48,
+          "owner": "IDirectMusicPerformance8",
+          "name": "CreateAudioPath",
+          "ret": "HRESULT",
+          "params": [
+            "IUnknown *pSourceConfig",
+            "BOOL fActivate",
+            "IDirectMusicAudioPath **ppNewPath"
+          ]
+        },
+        {
+          "slot": 49,
+          "owner": "IDirectMusicPerformance8",
+          "name": "CreateStandardAudioPath",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwType",
+            "DWORD dwPChannelCount",
+            "BOOL fActivate",
+            "IDirectMusicAudioPath **ppNewPath"
+          ]
+        },
+        {
+          "slot": 50,
+          "owner": "IDirectMusicPerformance8",
+          "name": "SetDefaultAudioPath",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicAudioPath *pAudioPath"
+          ]
+        },
+        {
+          "slot": 51,
+          "owner": "IDirectMusicPerformance8",
+          "name": "GetDefaultAudioPath",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicAudioPath **ppAudioPath"
+          ]
+        },
+        {
+          "slot": 52,
+          "owner": "IDirectMusicPerformance8",
+          "name": "GetParamEx",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidType",
+            "DWORD dwTrackID",
+            "DWORD dwGroupBits",
+            "DWORD dwIndex",
+            "MUSIC_TIME mtTime",
+            "MUSIC_TIME *pmtNext",
+            "void *pParam"
+          ]
+        }
+      ]
+    },
+    "IDirectMusicPort": {
+      "uuid": "08f2d8c9-37c2-11d2-b9f9-0000f875ac12",
+      "base": "IUnknown",
+      "header": "dmusicc.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusicPort",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusicPort",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusicPort",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectMusicPort",
+          "name": "PlayBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicBuffer *pBuffer"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectMusicPort",
+          "name": "SetReadNotificationHandle",
+          "ret": "HRESULT",
+          "params": [
+            "HANDLE hEvent"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectMusicPort",
+          "name": "Read",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicBuffer *pBuffer"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectMusicPort",
+          "name": "DownloadInstrument",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicInstrument *pInstrument",
+            "IDirectMusicDownloadedInstrument **ppDownloadedInstrument",
+            "DMUS_NOTERANGE *pNoteRanges",
+            "DWORD dwNumNoteRanges"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectMusicPort",
+          "name": "UnloadInstrument",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicDownloadedInstrument *pDownloadedInstrument"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectMusicPort",
+          "name": "GetLatencyClock",
+          "ret": "HRESULT",
+          "params": [
+            "IReferenceClock **ppClock"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectMusicPort",
+          "name": "GetRunningStats",
+          "ret": "HRESULT",
+          "params": [
+            "DMUS_SYNTHSTATS *pStats"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectMusicPort",
+          "name": "Compact",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 11,
+          "owner": "IDirectMusicPort",
+          "name": "GetCaps",
+          "ret": "HRESULT",
+          "params": [
+            "DMUS_PORTCAPS *pPortCaps"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirectMusicPort",
+          "name": "DeviceIoControl",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwIoControlCode",
+            "LPVOID lpInBuffer",
+            "DWORD nInBufferSize",
+            "LPVOID lpOutBuffer",
+            "DWORD nOutBufferSize",
+            "LPDWORD lpBytesReturned",
+            "LPOVERLAPPED lpOverlapped"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IDirectMusicPort",
+          "name": "SetNumChannelGroups",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwChannelGroups"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IDirectMusicPort",
+          "name": "GetNumChannelGroups",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD pdwChannelGroups"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirectMusicPort",
+          "name": "Activate",
+          "ret": "HRESULT",
+          "params": [
+            "BOOL fActive"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IDirectMusicPort",
+          "name": "SetChannelPriority",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwChannelGroup",
+            "DWORD dwChannel",
+            "DWORD dwPriority"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IDirectMusicPort",
+          "name": "GetChannelPriority",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwChannelGroup",
+            "DWORD dwChannel",
+            "LPDWORD pdwPriority"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IDirectMusicPort",
+          "name": "SetDirectSound",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectSound *pDirectSound",
+            "IDirectSoundBuffer *pDirectSoundBuffer"
+          ]
+        },
+        {
+          "slot": 19,
+          "owner": "IDirectMusicPort",
+          "name": "GetFormat",
+          "ret": "HRESULT",
+          "params": [
+            "LPWAVEFORMATEX pWaveFormatEx",
+            "LPDWORD pdwWaveFormatExSize",
+            "LPDWORD pdwBufferSize"
+          ]
+        }
+      ]
+    },
+    "IDirectMusicSegment": {
+      "uuid": "f96029a2-4282-11d2-8717-00600893b1bd",
+      "base": "IUnknown",
+      "header": "dmusici.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusicSegment",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusicSegment",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusicSegment",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectMusicSegment",
+          "name": "GetLength",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME *pmtLength"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectMusicSegment",
+          "name": "SetLength",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME mtLength"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectMusicSegment",
+          "name": "GetRepeats",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *pdwRepeats"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectMusicSegment",
+          "name": "SetRepeats",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwRepeats"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectMusicSegment",
+          "name": "GetDefaultResolution",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *pdwResolution"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectMusicSegment",
+          "name": "SetDefaultResolution",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwResolution"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectMusicSegment",
+          "name": "GetTrack",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidType",
+            "DWORD dwGroupBits",
+            "DWORD dwIndex",
+            "IDirectMusicTrack **ppTrack"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectMusicSegment",
+          "name": "GetTrackGroup",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicTrack *pTrack",
+            "DWORD *pdwGroupBits"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirectMusicSegment",
+          "name": "InsertTrack",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicTrack *pTrack",
+            "DWORD dwGroupBits"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirectMusicSegment",
+          "name": "RemoveTrack",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicTrack *pTrack"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IDirectMusicSegment",
+          "name": "InitPlay",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicSegmentState **ppSegState",
+            "IDirectMusicPerformance *pPerformance",
+            "DWORD dwFlags"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IDirectMusicSegment",
+          "name": "GetGraph",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicGraph **ppGraph"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirectMusicSegment",
+          "name": "SetGraph",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicGraph *pGraph"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IDirectMusicSegment",
+          "name": "AddNotificationType",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidNotificationType"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IDirectMusicSegment",
+          "name": "RemoveNotificationType",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidNotificationType"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IDirectMusicSegment",
+          "name": "GetParam",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidType",
+            "DWORD dwGroupBits",
+            "DWORD dwIndex",
+            "MUSIC_TIME mtTime",
+            "MUSIC_TIME *pmtNext",
+            "void *pParam"
+          ]
+        },
+        {
+          "slot": 19,
+          "owner": "IDirectMusicSegment",
+          "name": "SetParam",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidType",
+            "DWORD dwGroupBits",
+            "DWORD dwIndex",
+            "MUSIC_TIME mtTime",
+            "void *pParam"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "IDirectMusicSegment",
+          "name": "Clone",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME mtStart",
+            "MUSIC_TIME mtEnd",
+            "IDirectMusicSegment **ppSegment"
+          ]
+        },
+        {
+          "slot": 21,
+          "owner": "IDirectMusicSegment",
+          "name": "SetStartPoint",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME mtStart"
+          ]
+        },
+        {
+          "slot": 22,
+          "owner": "IDirectMusicSegment",
+          "name": "GetStartPoint",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME *pmtStart"
+          ]
+        },
+        {
+          "slot": 23,
+          "owner": "IDirectMusicSegment",
+          "name": "SetLoopPoints",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME mtStart",
+            "MUSIC_TIME mtEnd"
+          ]
+        },
+        {
+          "slot": 24,
+          "owner": "IDirectMusicSegment",
+          "name": "GetLoopPoints",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME *pmtStart",
+            "MUSIC_TIME *pmtEnd"
+          ]
+        },
+        {
+          "slot": 25,
+          "owner": "IDirectMusicSegment",
+          "name": "SetPChannelsUsed",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwNumPChannels",
+            "DWORD *paPChannels"
+          ]
+        }
+      ]
+    },
+    "IDirectMusicSegment8": {
+      "uuid": "c6784488-41a3-418f-aa15-b35093ba42d4",
+      "base": "IDirectMusicSegment",
+      "header": "dmusici.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusicSegment8",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusicSegment8",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusicSegment8",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectMusicSegment8",
+          "name": "GetLength",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME *pmtLength"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectMusicSegment8",
+          "name": "SetLength",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME mtLength"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectMusicSegment8",
+          "name": "GetRepeats",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *pdwRepeats"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectMusicSegment8",
+          "name": "SetRepeats",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwRepeats"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectMusicSegment8",
+          "name": "GetDefaultResolution",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *pdwResolution"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectMusicSegment8",
+          "name": "SetDefaultResolution",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwResolution"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectMusicSegment8",
+          "name": "GetTrack",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidType",
+            "DWORD dwGroupBits",
+            "DWORD dwIndex",
+            "IDirectMusicTrack **ppTrack"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectMusicSegment8",
+          "name": "GetTrackGroup",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicTrack *pTrack",
+            "DWORD *pdwGroupBits"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirectMusicSegment8",
+          "name": "InsertTrack",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicTrack *pTrack",
+            "DWORD dwGroupBits"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirectMusicSegment8",
+          "name": "RemoveTrack",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicTrack *pTrack"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IDirectMusicSegment8",
+          "name": "InitPlay",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicSegmentState **ppSegState",
+            "IDirectMusicPerformance *pPerformance",
+            "DWORD dwFlags"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IDirectMusicSegment8",
+          "name": "GetGraph",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicGraph **ppGraph"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirectMusicSegment8",
+          "name": "SetGraph",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicGraph *pGraph"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IDirectMusicSegment8",
+          "name": "AddNotificationType",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidNotificationType"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IDirectMusicSegment8",
+          "name": "RemoveNotificationType",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidNotificationType"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IDirectMusicSegment8",
+          "name": "GetParam",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidType",
+            "DWORD dwGroupBits",
+            "DWORD dwIndex",
+            "MUSIC_TIME mtTime",
+            "MUSIC_TIME *pmtNext",
+            "void *pParam"
+          ]
+        },
+        {
+          "slot": 19,
+          "owner": "IDirectMusicSegment8",
+          "name": "SetParam",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidType",
+            "DWORD dwGroupBits",
+            "DWORD dwIndex",
+            "MUSIC_TIME mtTime",
+            "void *pParam"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "IDirectMusicSegment8",
+          "name": "Clone",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME mtStart",
+            "MUSIC_TIME mtEnd",
+            "IDirectMusicSegment **ppSegment"
+          ]
+        },
+        {
+          "slot": 21,
+          "owner": "IDirectMusicSegment8",
+          "name": "SetStartPoint",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME mtStart"
+          ]
+        },
+        {
+          "slot": 22,
+          "owner": "IDirectMusicSegment8",
+          "name": "GetStartPoint",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME *pmtStart"
+          ]
+        },
+        {
+          "slot": 23,
+          "owner": "IDirectMusicSegment8",
+          "name": "SetLoopPoints",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME mtStart",
+            "MUSIC_TIME mtEnd"
+          ]
+        },
+        {
+          "slot": 24,
+          "owner": "IDirectMusicSegment8",
+          "name": "GetLoopPoints",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME *pmtStart",
+            "MUSIC_TIME *pmtEnd"
+          ]
+        },
+        {
+          "slot": 25,
+          "owner": "IDirectMusicSegment8",
+          "name": "SetPChannelsUsed",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwNumPChannels",
+            "DWORD *paPChannels"
+          ]
+        },
+        {
+          "slot": 26,
+          "owner": "IDirectMusicSegment8",
+          "name": "SetTrackConfig",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidTrackClassID",
+            "DWORD dwGroupBits",
+            "DWORD dwIndex",
+            "DWORD dwFlagsOn",
+            "DWORD dwFlagsOff"
+          ]
+        },
+        {
+          "slot": 27,
+          "owner": "IDirectMusicSegment8",
+          "name": "GetAudioPathConfig",
+          "ret": "HRESULT",
+          "params": [
+            "IUnknown **ppAudioPathConfig"
+          ]
+        },
+        {
+          "slot": 28,
+          "owner": "IDirectMusicSegment8",
+          "name": "Compose",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME mtTime",
+            "IDirectMusicSegment *pFromSegment",
+            "IDirectMusicSegment *pToSegment",
+            "IDirectMusicSegment **ppComposedSegment"
+          ]
+        },
+        {
+          "slot": 29,
+          "owner": "IDirectMusicSegment8",
+          "name": "Download",
+          "ret": "HRESULT",
+          "params": [
+            "IUnknown *pAudioPath"
+          ]
+        },
+        {
+          "slot": 30,
+          "owner": "IDirectMusicSegment8",
+          "name": "Unload",
+          "ret": "HRESULT",
+          "params": [
+            "IUnknown *pAudioPath"
+          ]
+        }
+      ]
+    },
+    "IDirectMusicSegmentState": {
+      "uuid": "a3afdcc7-d3ee-11d1-bc8d-00a0c922e6eb",
+      "base": "IUnknown",
+      "header": "dmusici.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusicSegmentState",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusicSegmentState",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusicSegmentState",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectMusicSegmentState",
+          "name": "GetRepeats",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *pdwRepeats"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectMusicSegmentState",
+          "name": "GetSegment",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicSegment **ppSegment"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectMusicSegmentState",
+          "name": "GetStartTime",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME *pmtStart"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectMusicSegmentState",
+          "name": "GetSeek",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME *pmtSeek"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectMusicSegmentState",
+          "name": "GetStartPoint",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME *pmtStart"
+          ]
+        }
+      ]
+    },
+    "IDirectMusicTool": {
+      "uuid": "d2ac28ba-b39b-11d1-8704-00600893b1bd",
+      "base": "IUnknown",
+      "header": "dmplugin.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusicTool",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusicTool",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusicTool",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectMusicTool",
+          "name": "Init",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicGraph *pGraph"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectMusicTool",
+          "name": "GetMsgDeliveryType",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *pdwDeliveryType"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectMusicTool",
+          "name": "GetMediaTypeArraySize",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *pdwNumElements"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectMusicTool",
+          "name": "GetMediaTypes",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD **padwMediaTypes",
+            "DWORD dwNumElements"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectMusicTool",
+          "name": "ProcessPMsg",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicPerformance *pPerf",
+            "DMUS_PMSG *pPMSG"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectMusicTool",
+          "name": "Flush",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicPerformance *pPerf",
+            "DMUS_PMSG *pPMSG",
+            "REFERENCE_TIME rtTime"
+          ]
+        }
+      ]
+    },
+    "IDirectMusicTrack": {
+      "uuid": "f96029a1-4282-11d2-8717-00600893b1bd",
+      "base": "IUnknown",
+      "header": "dmplugin.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectMusicTrack",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectMusicTrack",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectMusicTrack",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectMusicTrack",
+          "name": "Init",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicSegment *pSegment"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectMusicTrack",
+          "name": "InitPlay",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectMusicSegmentState *pSegmentState",
+            "IDirectMusicPerformance *pPerformance",
+            "void **ppStateData",
+            "DWORD dwVirtualTrackID",
+            "DWORD dwFlags"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectMusicTrack",
+          "name": "EndPlay",
+          "ret": "HRESULT",
+          "params": [
+            "void *pStateData"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectMusicTrack",
+          "name": "Play",
+          "ret": "HRESULT",
+          "params": [
+            "void *pStateData",
+            "MUSIC_TIME mtStart",
+            "MUSIC_TIME mtEnd",
+            "MUSIC_TIME mtOffset",
+            "DWORD dwFlags",
+            "IDirectMusicPerformance *pPerf",
+            "IDirectMusicSegmentState *pSegSt",
+            "DWORD dwVirtualID"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectMusicTrack",
+          "name": "GetParam",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidType",
+            "MUSIC_TIME mtTime",
+            "MUSIC_TIME *pmtNext",
+            "void *pParam"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectMusicTrack",
+          "name": "SetParam",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidType",
+            "MUSIC_TIME mtTime",
+            "void *pParam"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectMusicTrack",
+          "name": "IsParamSupported",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidType"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectMusicTrack",
+          "name": "AddNotificationType",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidNotificationType"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirectMusicTrack",
+          "name": "RemoveNotificationType",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidNotificationType"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirectMusicTrack",
+          "name": "Clone",
+          "ret": "HRESULT",
+          "params": [
+            "MUSIC_TIME mtStart",
+            "MUSIC_TIME mtEnd",
+            "IDirectMusicTrack **ppTrack"
+          ]
+        }
+      ]
+    },
+    "IDirectSound": {
+      "uuid": "279afa83-4981-11ce-a521-0020af0be560",
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectSound",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectSound",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectSound",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSound",
+          "name": "CreateSoundBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "LPCDSBUFFERDESC lpcDSBufferDesc",
+            "LPLPDIRECTSOUNDBUFFER lplpDirectSoundBuffer",
+            "IUnknown *pUnkOuter"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSound",
+          "name": "GetCaps",
+          "ret": "HRESULT",
+          "params": [
+            "DSCAPS *lpDSCaps"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectSound",
+          "name": "DuplicateSoundBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectSoundBuffer *lpDsbOriginal",
+            "LPLPDIRECTSOUNDBUFFER lplpDsbDuplicate"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectSound",
+          "name": "SetCooperativeLevel",
+          "ret": "HRESULT",
+          "params": [
+            "HWND hwnd",
+            "DWORD dwLevel"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectSound",
+          "name": "Compact",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectSound",
+          "name": "GetSpeakerConfig",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD lpdwSpeakerConfig"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectSound",
+          "name": "SetSpeakerConfig",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwSpeakerConfig"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectSound",
+          "name": "Initialize",
+          "ret": "HRESULT",
+          "params": [
+            "LPCGUID lpcGuid"
+          ]
+        }
+      ]
+    },
+    "IDirectSoundBuffer": {
+      "uuid": "279afa85-4981-11ce-a521-0020af0be560",
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IDirectSoundBuffer",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IDirectSoundBuffer",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IDirectSoundBuffer",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSoundBuffer",
+          "name": "GetCaps",
+          "ret": "HRESULT",
+          "params": [
+            "DSBCAPS *lpDSBufferCaps"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSoundBuffer",
+          "name": "GetCurrentPosition",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD lpdwCurrentPlayCursor",
+            "LPDWORD lpdwCurrentWriteCursor"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectSoundBuffer",
+          "name": "GetFormat",
+          "ret": "HRESULT",
+          "params": [
+            "LPWAVEFORMATEX lpwfxFormat",
+            "DWORD dwSizeAllocated",
+            "LPDWORD lpdwSizeWritten"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectSoundBuffer",
+          "name": "GetVolume",
+          "ret": "HRESULT",
+          "params": [
+            "LPLONG lplVolume"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectSoundBuffer",
+          "name": "GetPan",
+          "ret": "HRESULT",
+          "params": [
+            "LPLONG lplpan"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectSoundBuffer",
+          "name": "GetFrequency",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD lpdwFrequency"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectSoundBuffer",
+          "name": "GetStatus",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD lpdwStatus"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectSoundBuffer",
+          "name": "Initialize",
+          "ret": "HRESULT",
+          "params": [
+            "IDirectSound *lpDirectSound",
+            "LPCDSBUFFERDESC lpcDSBufferDesc"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirectSoundBuffer",
+          "name": "Lock",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwOffset",
+            "DWORD dwBytes",
+            "LPVOID *ppvAudioPtr1",
+            "LPDWORD pdwAudioBytes1",
+            "LPVOID *ppvAudioPtr2",
+            "LPDWORD pdwAudioBytes2",
+            "DWORD dwFlags"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirectSoundBuffer",
+          "name": "Play",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwReserved1",
+            "DWORD dwReserved2",
+            "DWORD dwFlags"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IDirectSoundBuffer",
+          "name": "SetCurrentPosition",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwNewPosition"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IDirectSoundBuffer",
+          "name": "SetFormat",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWAVEFORMATEX lpcfxFormat"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirectSoundBuffer",
+          "name": "SetVolume",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lVolume"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IDirectSoundBuffer",
+          "name": "SetPan",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lPan"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IDirectSoundBuffer",
+          "name": "SetFrequency",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwFrequency"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IDirectSoundBuffer",
+          "name": "Stop",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 19,
+          "owner": "IDirectSoundBuffer",
+          "name": "Unlock",
+          "ret": "HRESULT",
+          "params": [
+            "LPVOID pvAudioPtr1",
+            "DWORD dwAudioBytes1",
+            "LPVOID pvAudioPtr2",
+            "DWORD dwAudioPtr2"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "IDirectSoundBuffer",
+          "name": "Restore",
+          "ret": "HRESULT",
+          "params": []
+        }
+      ]
+    },
+    "IDispatch": {
+      "uuid": "00020400-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "oaidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDispatch",
+          "name": "GetTypeInfoCount",
+          "ret": "HRESULT",
+          "params": [
+            "UINT *pctinfo"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDispatch",
+          "name": "GetTypeInfo",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iTInfo",
+            "LCID lcid",
+            "ITypeInfo **ppTInfo"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDispatch",
+          "name": "GetIDsOfNames",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "LPOLESTR *rgszNames",
+            "UINT cNames",
+            "LCID lcid",
+            "DISPID *rgDispId"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDispatch",
+          "name": "Invoke",
+          "ret": "HRESULT",
+          "params": [
+            "DISPID dispIdMember",
+            "REFIID riid",
+            "LCID lcid",
+            "WORD wFlags",
+            "DISPPARAMS *pDispParams",
+            "VARIANT *pVarResult",
+            "EXCEPINFO *pExcepInfo",
+            "UINT *puArgErr"
+          ]
+        }
+      ]
+    },
+    "IEnumConnectionPoints": {
+      "uuid": "b196b285-bab4-101a-b69c-00aa00341d07",
+      "base": "IUnknown",
+      "header": "ocidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IEnumConnectionPoints",
+          "name": "Next",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG cConnections",
+            "IConnectionPoint **ppCP",
+            "ULONG *pcFetched"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IEnumConnectionPoints",
+          "name": "Skip",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG cConnections"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IEnumConnectionPoints",
+          "name": "Reset",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 6,
+          "owner": "IEnumConnectionPoints",
+          "name": "Clone",
+          "ret": "HRESULT",
+          "params": [
+            "IEnumConnectionPoints **ppEnum"
+          ]
+        }
+      ]
+    },
+    "IEnumConnections": {
+      "uuid": "b196b287-bab4-101a-b69c-00aa00341d07",
+      "base": "IUnknown",
+      "header": "ocidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IEnumConnections",
+          "name": "Next",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG cConnections",
+            "CONNECTDATA *rgcd",
+            "ULONG *pcFetched"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IEnumConnections",
+          "name": "Skip",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG cConnections"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IEnumConnections",
+          "name": "Reset",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 6,
+          "owner": "IEnumConnections",
+          "name": "Clone",
+          "ret": "HRESULT",
+          "params": [
+            "IEnumConnections **ppEnum"
+          ]
+        }
+      ]
+    },
+    "IEnumMoniker": {
+      "uuid": "00000102-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IEnumMoniker",
+          "name": "Next",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG celt",
+            "IMoniker **rgelt",
+            "ULONG *pceltFetched"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IEnumMoniker",
+          "name": "Skip",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG celt"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IEnumMoniker",
+          "name": "Reset",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 6,
+          "owner": "IEnumMoniker",
+          "name": "Clone",
+          "ret": "HRESULT",
+          "params": [
+            "IEnumMoniker **ppenum"
+          ]
+        }
+      ]
+    },
+    "IEnumSTATSTG": {
+      "uuid": "0000000d-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IEnumSTATSTG",
+          "name": "Next",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG celt",
+            "STATSTG *rgelt",
+            "ULONG *pceltFetched"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IEnumSTATSTG",
+          "name": "Skip",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG celt"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IEnumSTATSTG",
+          "name": "Reset",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 6,
+          "owner": "IEnumSTATSTG",
+          "name": "Clone",
+          "ret": "HRESULT",
+          "params": [
+            "IEnumSTATSTG **ppenum"
+          ]
+        }
+      ]
+    },
+    "IEnumString": {
+      "uuid": "00000101-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IEnumString",
+          "name": "Next",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG celt",
+            "LPOLESTR *rgelt",
+            "ULONG *pceltFetched"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IEnumString",
+          "name": "Skip",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG celt"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IEnumString",
+          "name": "Reset",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 6,
+          "owner": "IEnumString",
+          "name": "Clone",
+          "ret": "HRESULT",
+          "params": [
+            "IEnumString **ppenum"
+          ]
+        }
+      ]
+    },
+    "IEnumUnknown": {
+      "uuid": "00000100-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IEnumUnknown",
+          "name": "Next",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG celt",
+            "IUnknown **rgelt",
+            "ULONG *pceltFetched"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IEnumUnknown",
+          "name": "Skip",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG celt"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IEnumUnknown",
+          "name": "Reset",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 6,
+          "owner": "IEnumUnknown",
+          "name": "Clone",
+          "ret": "HRESULT",
+          "params": [
+            "IEnumUnknown **ppenum"
+          ]
+        }
+      ]
+    },
+    "IErrorInfo": {
+      "uuid": "1cf2b120-547d-101b-8e65-08002b2bd119",
+      "base": "IUnknown",
+      "header": "oaidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IErrorInfo",
+          "name": "GetGUID",
+          "ret": "HRESULT",
+          "params": [
+            "GUID *pGUID"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IErrorInfo",
+          "name": "GetSource",
+          "ret": "HRESULT",
+          "params": [
+            "BSTR *pBstrSource"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IErrorInfo",
+          "name": "GetDescription",
+          "ret": "HRESULT",
+          "params": [
+            "BSTR *pBstrDescription"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IErrorInfo",
+          "name": "GetHelpFile",
+          "ret": "HRESULT",
+          "params": [
+            "BSTR *pBstrHelpFile"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IErrorInfo",
+          "name": "GetHelpContext",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *pdwHelpContext"
+          ]
+        }
+      ]
+    },
+    "IGlobalInterfaceTable": {
+      "uuid": "00000146-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IGlobalInterfaceTable",
+          "name": "RegisterInterfaceInGlobal",
+          "ret": "HRESULT",
+          "params": [
+            "IUnknown *pUnk",
+            "REFIID riid",
+            "DWORD *pdwCookie"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IGlobalInterfaceTable",
+          "name": "RevokeInterfaceFromGlobal",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwCookie"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IGlobalInterfaceTable",
+          "name": "GetInterfaceFromGlobal",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwCookie",
+            "REFIID riid",
+            "void **ppv"
+          ]
+        }
+      ]
+    },
+    "IInspectable": {
+      "uuid": "af86e2e0-b12d-4c6a-9c5a-d7aa65101e90",
+      "base": "IUnknown",
+      "header": "inspectable.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IInspectable",
+          "name": "GetIids",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG *iidCount",
+            "IID **iids"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IInspectable",
+          "name": "GetRuntimeClassName",
+          "ret": "HRESULT",
+          "params": [
+            "HSTRING *className"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IInspectable",
+          "name": "GetTrustLevel",
+          "ret": "HRESULT",
+          "params": [
+            "TrustLevel *trustLevel"
+          ]
+        }
+      ]
+    },
+    "ILockBytes": {
+      "uuid": "0000000a-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "ILockBytes",
+          "name": "ReadAt",
+          "ret": "HRESULT",
+          "params": [
+            "ULARGE_INTEGER ulOffset",
+            "void *pv",
+            "ULONG cb",
+            "ULONG *pcbRead"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "ILockBytes",
+          "name": "WriteAt",
+          "ret": "HRESULT",
+          "params": [
+            "ULARGE_INTEGER ulOffset",
+            "const void *pv",
+            "ULONG cb",
+            "ULONG *pcbWritten"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "ILockBytes",
+          "name": "Flush",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 6,
+          "owner": "ILockBytes",
+          "name": "SetSize",
+          "ret": "HRESULT",
+          "params": [
+            "ULARGE_INTEGER cb"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "ILockBytes",
+          "name": "LockRegion",
+          "ret": "HRESULT",
+          "params": [
+            "ULARGE_INTEGER libOffset",
+            "ULARGE_INTEGER cb",
+            "DWORD dwLockType"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "ILockBytes",
+          "name": "UnlockRegion",
+          "ret": "HRESULT",
+          "params": [
+            "ULARGE_INTEGER libOffset",
+            "ULARGE_INTEGER cb",
+            "DWORD dwLockType"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "ILockBytes",
+          "name": "Stat",
+          "ret": "HRESULT",
+          "params": [
+            "STATSTG *pstatstg",
+            "DWORD grfStatFlag"
+          ]
+        }
+      ]
+    },
+    "IMalloc": {
+      "uuid": "00000002-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IMalloc",
+          "name": "Alloc",
+          "ret": "LPVOID",
+          "params": [
+            "SIZE_T cb"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IMalloc",
+          "name": "Realloc",
+          "ret": "LPVOID",
+          "params": [
+            "LPVOID pv",
+            "SIZE_T cb"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IMalloc",
+          "name": "Free",
+          "ret": "void",
+          "params": [
+            "LPVOID pv"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IMalloc",
+          "name": "GetSize",
+          "ret": "SIZE_T",
+          "params": [
+            "LPVOID pv"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IMalloc",
+          "name": "DidAlloc",
+          "ret": "int",
+          "params": [
+            "LPVOID pv"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IMalloc",
+          "name": "HeapMinimize",
+          "ret": "void",
+          "params": []
+        }
+      ]
+    },
+    "IMarshal": {
+      "uuid": "00000003-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IMarshal",
+          "name": "GetUnmarshalClass",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void *pv",
+            "DWORD dwDestContext",
+            "void *pvDestContext",
+            "DWORD mshlflags",
+            "CLSID *pCid"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IMarshal",
+          "name": "GetMarshalSizeMax",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void *pv",
+            "DWORD dwDestContext",
+            "void *pvDestContext",
+            "DWORD mshlflags",
+            "DWORD *pSize"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IMarshal",
+          "name": "MarshalInterface",
+          "ret": "HRESULT",
+          "params": [
+            "IStream *pStm",
+            "REFIID riid",
+            "void *pv",
+            "DWORD dwDestContext",
+            "void *pvDestContext",
+            "DWORD mshlflags"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IMarshal",
+          "name": "UnmarshalInterface",
+          "ret": "HRESULT",
+          "params": [
+            "IStream *pStm",
+            "REFIID riid",
+            "void **ppv"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IMarshal",
+          "name": "ReleaseMarshalData",
+          "ret": "HRESULT",
+          "params": [
+            "IStream *pStm"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IMarshal",
+          "name": "DisconnectObject",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwReserved"
+          ]
+        }
+      ]
+    },
+    "IMoniker": {
+      "uuid": "0000000f-0000-0000-c000-000000000046",
+      "base": "IPersistStream",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IPersist",
+          "name": "GetClassID",
+          "ret": "HRESULT",
+          "params": [
+            "CLSID *pClassID"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IPersistStream",
+          "name": "IsDirty",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 5,
+          "owner": "IPersistStream",
+          "name": "Load",
+          "ret": "HRESULT",
+          "params": [
+            "IStream *pStm"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IPersistStream",
+          "name": "Save",
+          "ret": "HRESULT",
+          "params": [
+            "IStream *pStm",
+            "BOOL fClearDirty"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IPersistStream",
+          "name": "GetSizeMax",
+          "ret": "HRESULT",
+          "params": [
+            "ULARGE_INTEGER *pcbSize"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IMoniker",
+          "name": "BindToObject",
+          "ret": "HRESULT",
+          "params": [
+            "IBindCtx *pbc",
+            "IMoniker *pmkToLeft",
+            "REFIID riidResult",
+            "void **ppvResult"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IMoniker",
+          "name": "BindToStorage",
+          "ret": "HRESULT",
+          "params": [
+            "IBindCtx *pbc",
+            "IMoniker *pmkToLeft",
+            "REFIID riid",
+            "void **ppvObj"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IMoniker",
+          "name": "Reduce",
+          "ret": "HRESULT",
+          "params": [
+            "IBindCtx *pbc",
+            "DWORD dwReduceHowFar",
+            "IMoniker **ppmkToLeft",
+            "IMoniker **ppmkReduced"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IMoniker",
+          "name": "ComposeWith",
+          "ret": "HRESULT",
+          "params": [
+            "IMoniker *pmkRight",
+            "BOOL fOnlyIfNotGeneric",
+            "IMoniker **ppmkComposite"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IMoniker",
+          "name": "Enum",
+          "ret": "HRESULT",
+          "params": [
+            "BOOL fForward",
+            "IEnumMoniker **ppenumMoniker"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IMoniker",
+          "name": "IsEqual",
+          "ret": "HRESULT",
+          "params": [
+            "IMoniker *pmkOtherMoniker"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IMoniker",
+          "name": "Hash",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *pdwHash"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IMoniker",
+          "name": "IsRunning",
+          "ret": "HRESULT",
+          "params": [
+            "IBindCtx *pbc",
+            "IMoniker *pmkToLeft",
+            "IMoniker *pmkNewlyRunning"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IMoniker",
+          "name": "GetTimeOfLastChange",
+          "ret": "HRESULT",
+          "params": [
+            "IBindCtx *pbc",
+            "IMoniker *pmkToLeft",
+            "FILETIME *pFileTime"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IMoniker",
+          "name": "Inverse",
+          "ret": "HRESULT",
+          "params": [
+            "IMoniker **ppmk"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IMoniker",
+          "name": "CommonPrefixWith",
+          "ret": "HRESULT",
+          "params": [
+            "IMoniker *pmkOther",
+            "IMoniker **ppmkPrefix"
+          ]
+        },
+        {
+          "slot": 19,
+          "owner": "IMoniker",
+          "name": "RelativePathTo",
+          "ret": "HRESULT",
+          "params": [
+            "IMoniker *pmkOther",
+            "IMoniker **ppmkRelPath"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "IMoniker",
+          "name": "GetDisplayName",
+          "ret": "HRESULT",
+          "params": [
+            "IBindCtx *pbc",
+            "IMoniker *pmkToLeft",
+            "LPOLESTR *ppszDisplayName"
+          ]
+        },
+        {
+          "slot": 21,
+          "owner": "IMoniker",
+          "name": "ParseDisplayName",
+          "ret": "HRESULT",
+          "params": [
+            "IBindCtx *pbc",
+            "IMoniker *pmkToLeft",
+            "LPOLESTR pszDisplayName",
+            "ULONG *pchEaten",
+            "IMoniker **ppmkOut"
+          ]
+        },
+        {
+          "slot": 22,
+          "owner": "IMoniker",
+          "name": "IsSystemMoniker",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *pdwMksys"
+          ]
+        }
+      ]
+    },
+    "IMultiQI": {
+      "uuid": "00000020-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IMultiQI",
+          "name": "QueryMultipleInterfaces",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG cMQIs",
+            "MULTI_QI *pMQIs"
+          ]
+        }
+      ]
+    },
+    "IPersist": {
+      "uuid": "0000010c-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IPersist",
+          "name": "GetClassID",
+          "ret": "HRESULT",
+          "params": [
+            "CLSID *pClassID"
+          ]
+        }
+      ]
+    },
+    "IPersistFile": {
+      "uuid": "0000010b-0000-0000-c000-000000000046",
+      "base": "IPersist",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IPersist",
+          "name": "GetClassID",
+          "ret": "HRESULT",
+          "params": [
+            "CLSID *pClassID"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IPersistFile",
+          "name": "IsDirty",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 5,
+          "owner": "IPersistFile",
+          "name": "Load",
+          "ret": "HRESULT",
+          "params": [
+            "LPCOLESTR pszFileName",
+            "DWORD dwMode"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IPersistFile",
+          "name": "Save",
+          "ret": "HRESULT",
+          "params": [
+            "LPCOLESTR pszFileName",
+            "BOOL fRemember"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IPersistFile",
+          "name": "SaveCompleted",
+          "ret": "HRESULT",
+          "params": [
+            "LPCOLESTR pszFileName"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IPersistFile",
+          "name": "GetCurFile",
+          "ret": "HRESULT",
+          "params": [
+            "LPOLESTR *ppszFileName"
+          ]
+        }
+      ]
+    },
+    "IPersistStream": {
+      "uuid": "00000109-0000-0000-c000-000000000046",
+      "base": "IPersist",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IPersist",
+          "name": "GetClassID",
+          "ret": "HRESULT",
+          "params": [
+            "CLSID *pClassID"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IPersistStream",
+          "name": "IsDirty",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 5,
+          "owner": "IPersistStream",
+          "name": "Load",
+          "ret": "HRESULT",
+          "params": [
+            "IStream *pStm"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IPersistStream",
+          "name": "Save",
+          "ret": "HRESULT",
+          "params": [
+            "IStream *pStm",
+            "BOOL fClearDirty"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IPersistStream",
+          "name": "GetSizeMax",
+          "ret": "HRESULT",
+          "params": [
+            "ULARGE_INTEGER *pcbSize"
+          ]
+        }
+      ]
+    },
+    "IPersistStreamInit": {
+      "uuid": "7fd52380-4e07-101b-ae2d-08002b2ec713",
+      "base": "IPersist",
+      "header": "ocidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IPersist",
+          "name": "GetClassID",
+          "ret": "HRESULT",
+          "params": [
+            "CLSID *pClassID"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IPersistStreamInit",
+          "name": "IsDirty",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 5,
+          "owner": "IPersistStreamInit",
+          "name": "Load",
+          "ret": "HRESULT",
+          "params": [
+            "IStream *pStm"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IPersistStreamInit",
+          "name": "Save",
+          "ret": "HRESULT",
+          "params": [
+            "IStream *pStm",
+            "BOOL fClearDirty"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IPersistStreamInit",
+          "name": "GetSizeMax",
+          "ret": "HRESULT",
+          "params": [
+            "ULARGE_INTEGER *pcbSize"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IPersistStreamInit",
+          "name": "InitNew",
+          "ret": "HRESULT",
+          "params": []
+        }
+      ]
+    },
+    "IRecordInfo": {
+      "uuid": "0000002f-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "oaidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IRecordInfo",
+          "name": "RecordInit",
+          "ret": "HRESULT",
+          "params": [
+            "PVOID pvNew"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IRecordInfo",
+          "name": "RecordClear",
+          "ret": "HRESULT",
+          "params": [
+            "PVOID pvExisting"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IRecordInfo",
+          "name": "RecordCopy",
+          "ret": "HRESULT",
+          "params": [
+            "PVOID pvExisting",
+            "PVOID pvNew"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IRecordInfo",
+          "name": "GetGuid",
+          "ret": "HRESULT",
+          "params": [
+            "GUID *pguid"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IRecordInfo",
+          "name": "GetName",
+          "ret": "HRESULT",
+          "params": [
+            "BSTR *pbstrName"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IRecordInfo",
+          "name": "GetSize",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG *pcbSize"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IRecordInfo",
+          "name": "GetTypeInfo",
+          "ret": "HRESULT",
+          "params": [
+            "ITypeInfo **ppTypeInfo"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IRecordInfo",
+          "name": "GetField",
+          "ret": "HRESULT",
+          "params": [
+            "PVOID pvData",
+            "LPCOLESTR szFieldName",
+            "VARIANT *pvarField"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IRecordInfo",
+          "name": "GetFieldNoCopy",
+          "ret": "HRESULT",
+          "params": [
+            "PVOID pvData",
+            "LPCOLESTR szFieldName",
+            "VARIANT *pvarField",
+            "PVOID *ppvDataCArray"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IRecordInfo",
+          "name": "PutField",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG wFlags",
+            "PVOID pvData",
+            "LPCOLESTR szFieldName",
+            "VARIANT *pvarField"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IRecordInfo",
+          "name": "PutFieldNoCopy",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG wFlags",
+            "PVOID pvData",
+            "LPCOLESTR szFieldName",
+            "VARIANT *pvarField"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IRecordInfo",
+          "name": "GetFieldNames",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG *pcNames",
+            "BSTR *rgBstrNames"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IRecordInfo",
+          "name": "IsMatchingType",
+          "ret": "BOOL",
+          "params": [
+            "IRecordInfo *pRecordInfo"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IRecordInfo",
+          "name": "RecordCreate",
+          "ret": "PVOID",
+          "params": []
+        },
+        {
+          "slot": 17,
+          "owner": "IRecordInfo",
+          "name": "RecordCreateCopy",
+          "ret": "HRESULT",
+          "params": [
+            "PVOID pvSource",
+            "PVOID *ppvDest"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IRecordInfo",
+          "name": "RecordDestroy",
+          "ret": "HRESULT",
+          "params": [
+            "PVOID pvRecord"
+          ]
+        }
+      ]
+    },
+    "IReferenceClock": {
+      "uuid": "56a86897-0ad4-11ce-b03a-0020af0ba770",
+      "base": "IUnknown",
+      "header": "strmif.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IReferenceClock",
+          "name": "GetTime",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME *pTime"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IReferenceClock",
+          "name": "AdviseTime",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME baseTime",
+            "REFERENCE_TIME streamTime",
+            "HEVENT hEvent",
+            "DWORD_PTR *pdwAdviseCookie"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IReferenceClock",
+          "name": "AdvisePeriodic",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME startTime",
+            "REFERENCE_TIME periodTime",
+            "HSEMAPHORE hSemaphore",
+            "DWORD_PTR *pdwAdviseCookie"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IReferenceClock",
+          "name": "Unadvise",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD_PTR dwAdviseCookie"
+          ]
+        }
+      ]
+    },
+    "IRunningObjectTable": {
+      "uuid": "00000010-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IRunningObjectTable",
+          "name": "Register",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD grfFlags",
+            "IUnknown *punkObject",
+            "IMoniker *pmkObjectName",
+            "DWORD *pdwRegister"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IRunningObjectTable",
+          "name": "Revoke",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwRegister"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IRunningObjectTable",
+          "name": "IsRunning",
+          "ret": "HRESULT",
+          "params": [
+            "IMoniker *pmkObjectName"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IRunningObjectTable",
+          "name": "GetObject",
+          "ret": "HRESULT",
+          "params": [
+            "IMoniker *pmkObjectName",
+            "IUnknown **ppunkObject"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IRunningObjectTable",
+          "name": "NoteChangeTime",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwRegister",
+            "FILETIME *pfiletime"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IRunningObjectTable",
+          "name": "GetTimeOfLastChange",
+          "ret": "HRESULT",
+          "params": [
+            "IMoniker *pmkObjectName",
+            "FILETIME *pfiletime"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IRunningObjectTable",
+          "name": "EnumRunning",
+          "ret": "HRESULT",
+          "params": [
+            "IEnumMoniker **ppenumMoniker"
+          ]
+        }
+      ]
+    },
+    "ISequentialStream": {
+      "uuid": "0c733a30-2a1c-11ce-ade5-00aa0044773d",
+      "base": "IUnknown",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "ISequentialStream",
+          "name": "Read",
+          "ret": "HRESULT",
+          "params": [
+            "void *pv",
+            "ULONG cb",
+            "ULONG *pcbRead"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "ISequentialStream",
+          "name": "Write",
+          "ret": "HRESULT",
+          "params": [
+            "const void *pv",
+            "ULONG cb",
+            "ULONG *pcbWritten"
+          ]
+        }
+      ]
+    },
+    "IStorage": {
+      "uuid": "0000000b-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IStorage",
+          "name": "CreateStream",
+          "ret": "HRESULT",
+          "params": [
+            "LPCOLESTR pwcsName",
+            "DWORD grfMode",
+            "DWORD reserved1",
+            "DWORD reserved2",
+            "IStream **ppstm"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IStorage",
+          "name": "OpenStream",
+          "ret": "HRESULT",
+          "params": [
+            "LPCOLESTR pwcsName",
+            "void *reserved1",
+            "DWORD grfMode",
+            "DWORD reserved2",
+            "IStream **ppstm"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IStorage",
+          "name": "CreateStorage",
+          "ret": "HRESULT",
+          "params": [
+            "LPCOLESTR pwcsName",
+            "DWORD grfMode",
+            "DWORD dwStgFmt",
+            "DWORD reserved2",
+            "IStorage **ppstg"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IStorage",
+          "name": "OpenStorage",
+          "ret": "HRESULT",
+          "params": [
+            "LPCOLESTR pwcsName",
+            "IStorage *pstgPriority",
+            "DWORD grfMode",
+            "SNB snbExclude",
+            "DWORD reserved",
+            "IStorage **ppstg"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IStorage",
+          "name": "CopyTo",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD ciidExclude",
+            "const IID *rgiidExclude",
+            "SNB snbExclude",
+            "IStorage *pstgDest"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IStorage",
+          "name": "MoveElementTo",
+          "ret": "HRESULT",
+          "params": [
+            "LPCOLESTR pwcsName",
+            "IStorage *pstgDest",
+            "LPCOLESTR pwcsNewName",
+            "DWORD grfFlags"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IStorage",
+          "name": "Commit",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD grfCommitFlags"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IStorage",
+          "name": "Revert",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 11,
+          "owner": "IStorage",
+          "name": "EnumElements",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD reserved1",
+            "void *reserved2",
+            "DWORD reserved3",
+            "IEnumSTATSTG **ppenum"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IStorage",
+          "name": "DestroyElement",
+          "ret": "HRESULT",
+          "params": [
+            "LPCOLESTR pwcsName"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IStorage",
+          "name": "RenameElement",
+          "ret": "HRESULT",
+          "params": [
+            "LPCOLESTR pwcsOldName",
+            "LPCOLESTR pwcsNewName"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IStorage",
+          "name": "SetElementTimes",
+          "ret": "HRESULT",
+          "params": [
+            "LPCOLESTR pwcsName",
+            "const FILETIME *pctime",
+            "const FILETIME *patime",
+            "const FILETIME *pmtime"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IStorage",
+          "name": "SetClass",
+          "ret": "HRESULT",
+          "params": [
+            "REFCLSID clsid"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IStorage",
+          "name": "SetStateBits",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD grfStateBits",
+            "DWORD grfMask"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IStorage",
+          "name": "Stat",
+          "ret": "HRESULT",
+          "params": [
+            "STATSTG *pstatstg",
+            "DWORD grfStatFlag"
+          ]
+        }
+      ]
+    },
+    "IStream": {
+      "uuid": "0000000c-0000-0000-c000-000000000046",
+      "base": "ISequentialStream",
+      "header": "objidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "ISequentialStream",
+          "name": "Read",
+          "ret": "HRESULT",
+          "params": [
+            "void *pv",
+            "ULONG cb",
+            "ULONG *pcbRead"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "ISequentialStream",
+          "name": "Write",
+          "ret": "HRESULT",
+          "params": [
+            "const void *pv",
+            "ULONG cb",
+            "ULONG *pcbWritten"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IStream",
+          "name": "Seek",
+          "ret": "HRESULT",
+          "params": [
+            "LARGE_INTEGER dlibMove",
+            "DWORD dwOrigin",
+            "ULARGE_INTEGER *plibNewPosition"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IStream",
+          "name": "SetSize",
+          "ret": "HRESULT",
+          "params": [
+            "ULARGE_INTEGER libNewSize"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IStream",
+          "name": "CopyTo",
+          "ret": "HRESULT",
+          "params": [
+            "IStream *pstm",
+            "ULARGE_INTEGER cb",
+            "ULARGE_INTEGER *pcbRead",
+            "ULARGE_INTEGER *pcbWritten"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IStream",
+          "name": "Commit",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD grfCommitFlags"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IStream",
+          "name": "Revert",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 10,
+          "owner": "IStream",
+          "name": "LockRegion",
+          "ret": "HRESULT",
+          "params": [
+            "ULARGE_INTEGER libOffset",
+            "ULARGE_INTEGER cb",
+            "DWORD dwLockType"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IStream",
+          "name": "UnlockRegion",
+          "ret": "HRESULT",
+          "params": [
+            "ULARGE_INTEGER libOffset",
+            "ULARGE_INTEGER cb",
+            "DWORD dwLockType"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IStream",
+          "name": "Stat",
+          "ret": "HRESULT",
+          "params": [
+            "STATSTG *pstatstg",
+            "DWORD grfStatFlag"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IStream",
+          "name": "Clone",
+          "ret": "HRESULT",
+          "params": [
+            "IStream **ppstm"
+          ]
+        }
+      ]
+    },
+    "ISupportErrorInfo": {
+      "uuid": "df0b3d60-548f-101b-8e65-08002b2bd119",
+      "base": "IUnknown",
+      "header": "oaidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "ISupportErrorInfo",
+          "name": "InterfaceSupportsErrorInfo",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid"
+          ]
+        }
+      ]
+    },
+    "ITypeComp": {
+      "uuid": "00020403-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "oaidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "ITypeComp",
+          "name": "Bind",
+          "ret": "HRESULT",
+          "params": [
+            "LPOLESTR szName",
+            "ULONG lHashVal",
+            "WORD wFlags",
+            "ITypeInfo **ppTInfo",
+            "DESCKIND *pDescKind",
+            "BINDPTR *pBindPtr"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "ITypeComp",
+          "name": "BindType",
+          "ret": "HRESULT",
+          "params": [
+            "LPOLESTR szName",
+            "ULONG lHashVal",
+            "ITypeInfo **ppTInfo",
+            "ITypeComp **ppTComp"
+          ]
+        }
+      ]
+    },
+    "ITypeInfo": {
+      "uuid": "00020401-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "oaidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "ITypeInfo",
+          "name": "GetTypeAttr",
+          "ret": "HRESULT",
+          "params": [
+            "TYPEATTR **ppTypeAttr"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "ITypeInfo",
+          "name": "GetTypeComp",
+          "ret": "HRESULT",
+          "params": [
+            "ITypeComp **ppTComp"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "ITypeInfo",
+          "name": "GetFuncDesc",
+          "ret": "HRESULT",
+          "params": [
+            "UINT index",
+            "FUNCDESC **ppFuncDesc"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "ITypeInfo",
+          "name": "GetVarDesc",
+          "ret": "HRESULT",
+          "params": [
+            "UINT index",
+            "VARDESC **ppVarDesc"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "ITypeInfo",
+          "name": "GetNames",
+          "ret": "HRESULT",
+          "params": [
+            "MEMBERID memid",
+            "BSTR *rgBstrNames",
+            "UINT cMaxNames",
+            "UINT *pcNames"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "ITypeInfo",
+          "name": "GetRefTypeOfImplType",
+          "ret": "HRESULT",
+          "params": [
+            "UINT index",
+            "HREFTYPE *pRefType"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "ITypeInfo",
+          "name": "GetImplTypeFlags",
+          "ret": "HRESULT",
+          "params": [
+            "UINT index",
+            "INT *pImplTypeFlags"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "ITypeInfo",
+          "name": "GetIDsOfNames",
+          "ret": "HRESULT",
+          "params": [
+            "LPOLESTR *rgszNames",
+            "UINT cNames",
+            "MEMBERID *pMemId"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "ITypeInfo",
+          "name": "Invoke",
+          "ret": "HRESULT",
+          "params": [
+            "PVOID pvInstance",
+            "MEMBERID memid",
+            "WORD wFlags",
+            "DISPPARAMS *pDispParams",
+            "VARIANT *pVarResult",
+            "EXCEPINFO *pExcepInfo",
+            "UINT *puArgErr"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "ITypeInfo",
+          "name": "GetDocumentation",
+          "ret": "HRESULT",
+          "params": [
+            "MEMBERID memid",
+            "BSTR *pBstrName",
+            "BSTR *pBstrDocString",
+            "DWORD *pdwHelpContext",
+            "BSTR *pBstrHelpFile"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "ITypeInfo",
+          "name": "GetDllEntry",
+          "ret": "HRESULT",
+          "params": [
+            "MEMBERID memid",
+            "INVOKEKIND invKind",
+            "BSTR *pBstrDllName",
+            "BSTR *pBstrName",
+            "WORD *pwOrdinal"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "ITypeInfo",
+          "name": "GetRefTypeInfo",
+          "ret": "HRESULT",
+          "params": [
+            "HREFTYPE hRefType",
+            "ITypeInfo **ppTInfo"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "ITypeInfo",
+          "name": "AddressOfMember",
+          "ret": "HRESULT",
+          "params": [
+            "MEMBERID memid",
+            "INVOKEKIND invKind",
+            "PVOID *ppv"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "ITypeInfo",
+          "name": "CreateInstance",
+          "ret": "HRESULT",
+          "params": [
+            "IUnknown *pUnkOuter",
+            "REFIID riid",
+            "PVOID *ppvObj"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "ITypeInfo",
+          "name": "GetMops",
+          "ret": "HRESULT",
+          "params": [
+            "MEMBERID memid",
+            "BSTR *pBstrMops"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "ITypeInfo",
+          "name": "GetContainingTypeLib",
+          "ret": "HRESULT",
+          "params": [
+            "ITypeLib **ppTLib",
+            "UINT *pIndex"
+          ]
+        },
+        {
+          "slot": 19,
+          "owner": "ITypeInfo",
+          "name": "ReleaseTypeAttr",
+          "ret": "void",
+          "params": [
+            "TYPEATTR *pTypeAttr"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "ITypeInfo",
+          "name": "ReleaseFuncDesc",
+          "ret": "void",
+          "params": [
+            "FUNCDESC *pFuncDesc"
+          ]
+        },
+        {
+          "slot": 21,
+          "owner": "ITypeInfo",
+          "name": "ReleaseVarDesc",
+          "ret": "void",
+          "params": [
+            "VARDESC *pVarDesc"
+          ]
+        }
+      ]
+    },
+    "ITypeLib": {
+      "uuid": "00020402-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "oaidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "ITypeLib",
+          "name": "GetTypeInfoCount",
+          "ret": "UINT",
+          "params": []
+        },
+        {
+          "slot": 4,
+          "owner": "ITypeLib",
+          "name": "GetTypeInfo",
+          "ret": "HRESULT",
+          "params": [
+            "UINT index",
+            "ITypeInfo **ppTInfo"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "ITypeLib",
+          "name": "GetTypeInfoType",
+          "ret": "HRESULT",
+          "params": [
+            "UINT index",
+            "TYPEKIND *pTKind"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "ITypeLib",
+          "name": "GetTypeInfoOfGuid",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID guid",
+            "ITypeInfo **ppTinfo"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "ITypeLib",
+          "name": "GetLibAttr",
+          "ret": "HRESULT",
+          "params": [
+            "TLIBATTR **ppTLibAttr"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "ITypeLib",
+          "name": "GetTypeComp",
+          "ret": "HRESULT",
+          "params": [
+            "ITypeComp **ppTComp"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "ITypeLib",
+          "name": "GetDocumentation",
+          "ret": "HRESULT",
+          "params": [
+            "INT index",
+            "BSTR *pBstrName",
+            "BSTR *pBstrDocString",
+            "DWORD *pdwHelpContext",
+            "BSTR *pBstrHelpFile"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "ITypeLib",
+          "name": "IsName",
+          "ret": "HRESULT",
+          "params": [
+            "LPOLESTR szNameBuf",
+            "ULONG lHashVal",
+            "BOOL *pfName"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "ITypeLib",
+          "name": "FindName",
+          "ret": "HRESULT",
+          "params": [
+            "LPOLESTR szNameBuf",
+            "ULONG lHashVal",
+            "ITypeInfo **ppTInfo",
+            "MEMBERID *rgMemId",
+            "USHORT *pcFound"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "ITypeLib",
+          "name": "ReleaseTLibAttr",
+          "ret": "void",
+          "params": [
+            "TLIBATTR *pTLibAttr"
+          ]
+        }
+      ]
+    },
+    "IUnknown": {
+      "uuid": "00000000-0000-0000-c000-000000000046",
+      "base": null,
+      "header": "(builtin)",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        }
+      ]
+    }
+  }
+}

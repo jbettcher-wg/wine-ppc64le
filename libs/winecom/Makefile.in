@@ -1,0 +1,4 @@
+STATICLIB = libwinecom.a
+
+SOURCES = \
+	winecom.c

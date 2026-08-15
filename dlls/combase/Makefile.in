@@ -1,13 +1,14 @@
 EXTRADEFS = -DWINOLE32API=
 MODULE    = combase.dll
 IMPORTLIB = combase
-IMPORTS   = advapi32 ole32 user32 gdi32 uuid rpcrt4
+IMPORTS   = advapi32 ole32 user32 gdi32 uuid rpcrt4 winecom
 DELAYIMPORTS = oleaut32
 
 SOURCES = \
 	combase.thunks \
 	apartment.c \
 	combase.c \
+	syscom.c \
 	dcom.idl \
 	errorinfo.c \
 	hglobalstream.c \

@@ -7,3 +7,118 @@
 # per-symbol sentinel -- loadability first, surface closes from the data.
 DLL ole32.dll
 FROM-SPEC auto
+
+# --- system-COM interface roster + the flat-surface interception ---
+# (hangover-ppc64le/docs/system-com-design.md).  COM-JSON adds the
+# per-interface vtable stub arrays and __wine_com_thunk_info; the guest
+# gets proxies whose vtables are AMD64 trap stubs, dispatched by native
+# combase's __wine_com_dispatch.  Every flat export whose signature
+# carries an interface pointer is classified below; the build-time audit
+# (spec2thunk) FAILS if any is left to pass through silently.
+COM-JSON  ../../ppc64le/syscom/interfaces_syscom.json
+
+# vending wrappers: translate/wrap interface pointers at the boundary
+GUEST-IMPL   CoCreateInstance                 __wine_guest_CoCreateInstance
+GUEST-IMPL   CoGetClassObject                 __wine_guest_CoGetClassObject
+GUEST-IMPL   CreateStreamOnHGlobal            __wine_guest_CreateStreamOnHGlobal
+GUEST-IMPL   GetHGlobalFromStream             __wine_guest_GetHGlobalFromStream
+
+# refused loudly (E_NOTIMPL) until their wrapper/walker lands -- never
+# a pass-through that would hand the guest a native vtable
+GUEST-REFUSE BindMoniker
+GUEST-REFUSE CoAllowSetForegroundWindow
+GUEST-REFUSE CoCopyProxy
+GUEST-REFUSE CoCreateFreeThreadedMarshaler
+GUEST-REFUSE CoCreateInstanceEx
+GUEST-REFUSE CoCreateInstanceFromApp
+GUEST-REFUSE CoDisconnectObject
+GUEST-REFUSE CoGetCallContext
+GUEST-REFUSE CoGetInstanceFromFile
+GUEST-REFUSE CoGetInstanceFromIStorage
+GUEST-REFUSE CoGetInterfaceAndReleaseStream
+GUEST-REFUSE CoGetMalloc
+GUEST-REFUSE CoGetMarshalSizeMax
+GUEST-REFUSE CoGetObject
+GUEST-REFUSE CoGetObjectContext
+GUEST-REFUSE CoGetStandardMarshal
+GUEST-REFUSE CoIsHandlerConnected
+GUEST-REFUSE CoLockObjectExternal
+GUEST-REFUSE CoMarshalHresult
+GUEST-REFUSE CoMarshalInterThreadInterfaceInStream
+GUEST-REFUSE CoMarshalInterface
+GUEST-REFUSE CoQueryProxyBlanket
+GUEST-REFUSE CoRegisterClassObject
+GUEST-REFUSE CoReleaseMarshalData
+GUEST-REFUSE CoSetProxyBlanket
+GUEST-REFUSE CoSwitchCallContext
+GUEST-REFUSE CoUnmarshalHresult
+GUEST-REFUSE CoUnmarshalInterface
+GUEST-REFUSE CreateAntiMoniker
+GUEST-REFUSE CreateBindCtx
+GUEST-REFUSE CreateClassMoniker
+GUEST-REFUSE CreateDataCache
+GUEST-REFUSE CreateErrorInfo
+GUEST-REFUSE CreateFileMoniker
+GUEST-REFUSE CreateGenericComposite
+GUEST-REFUSE CreateILockBytesOnHGlobal
+GUEST-REFUSE CreateItemMoniker
+GUEST-REFUSE CreateObjrefMoniker
+GUEST-REFUSE CreatePointerMoniker
+GUEST-REFUSE DllGetClassObject
+GUEST-REFUSE FreePropVariantArray
+GUEST-REFUSE GetConvertStg
+GUEST-REFUSE GetErrorInfo
+GUEST-REFUSE GetHGlobalFromILockBytes
+GUEST-REFUSE GetRunningObjectTable
+GUEST-REFUSE IsValidInterface
+GUEST-REFUSE MkParseDisplayName
+GUEST-REFUSE MonikerCommonPrefixWith
+GUEST-REFUSE OleConvertIStorageToOLESTREAM
+GUEST-REFUSE OleConvertIStorageToOLESTREAMEx
+GUEST-REFUSE OleConvertOLESTREAMToIStorage
+GUEST-REFUSE OleCreate
+GUEST-REFUSE OleCreateDefaultHandler
+GUEST-REFUSE OleCreateEmbeddingHelper
+GUEST-REFUSE OleCreateFromData
+GUEST-REFUSE OleCreateFromDataEx
+GUEST-REFUSE OleCreateFromFile
+GUEST-REFUSE OleCreateFromFileEx
+GUEST-REFUSE OleCreateLink
+GUEST-REFUSE OleCreateLinkFromData
+GUEST-REFUSE OleCreateLinkToFile
+GUEST-REFUSE OleCreateStaticFromData
+GUEST-REFUSE OleDoAutoConvert
+GUEST-REFUSE OleDraw
+GUEST-REFUSE OleLoad
+GUEST-REFUSE OleLoadFromStream
+GUEST-REFUSE OleLockRunning
+GUEST-REFUSE OleNoteObjectVisible
+GUEST-REFUSE OleRun
+GUEST-REFUSE OleSave
+GUEST-REFUSE OleSaveToStream
+GUEST-REFUSE OleSetContainedObject
+GUEST-REFUSE PropVariantClear
+GUEST-REFUSE PropVariantCopy
+GUEST-REFUSE ReadClassStg
+GUEST-REFUSE ReadClassStm
+GUEST-REFUSE ReadFmtUserTypeStg
+GUEST-REFUSE RoGetAgileReference
+GUEST-REFUSE STGMEDIUM_UserFree
+GUEST-REFUSE STGMEDIUM_UserMarshal
+GUEST-REFUSE STGMEDIUM_UserSize
+GUEST-REFUSE STGMEDIUM_UserUnmarshal
+GUEST-REFUSE SetConvertStg
+GUEST-REFUSE SetErrorInfo
+GUEST-REFUSE StgCreateDocfile
+GUEST-REFUSE StgCreateDocfileOnILockBytes
+GUEST-REFUSE StgCreatePropSetStg
+GUEST-REFUSE StgCreatePropStg
+GUEST-REFUSE StgCreateStorageEx
+GUEST-REFUSE StgIsStorageILockBytes
+GUEST-REFUSE StgOpenPropStg
+GUEST-REFUSE StgOpenStorage
+GUEST-REFUSE StgOpenStorageEx
+GUEST-REFUSE StgOpenStorageOnILockBytes
+GUEST-REFUSE WriteClassStg
+GUEST-REFUSE WriteClassStm
+GUEST-REFUSE WriteFmtUserTypeStg

@@ -417,3 +417,7 @@
 @ stdcall -private DllGetClassObject(ptr ptr ptr)
 @ stdcall -private DllRegisterServer()
 @ stdcall -private DllUnregisterServer()
+
+# System COM: forwards to combase's single runtime instance.
+@ stdcall __wine_com_dispatch(long long ptr) combase.__wine_com_dispatch
+@ stdcall __wine_com_refuse() combase.__wine_com_refuse

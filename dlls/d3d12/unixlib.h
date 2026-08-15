@@ -72,11 +72,22 @@ struct d3d12_flat_params
     UINT   argc;
 };
 
+/* Create the unix-side presentation factory (unix_present.c): a host COM
+ * object shaped like IDXGIFactory2 whose CreateSwapChainForHwnd builds a
+ * vkd3d swapchain presenting through win32u's client-surface machinery
+ * (presentation-design.md §4).  Reached from the PE side's D3D12GetInterface
+ * intercept; everything after creation flows through unix_call. */
+struct d3d12_present_factory_params
+{
+    UINT64 factory;   /* out: host IDXGIFactory2-shaped interface pointer */
+};
+
 enum d3d12_unix_func
 {
     unix_init,
     unix_call,
     unix_flat,
+    unix_present_factory,
     unix_funcs_count
 };
 
