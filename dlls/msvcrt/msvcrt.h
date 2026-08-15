@@ -454,4 +454,39 @@ static inline char* astrdupw_utf8(const wchar_t *wstr)
     return str;
 }
 
+/* Exports this CRT implements but declares nowhere.
+ *
+ * Wine defines these in its .c files and lists them in the .spec, with no
+ * prototype in any header -- which is invisible to a native build (the
+ * definition IS the declaration) but not to anything that has to know their
+ * shape.  The guest thunk generator reads Wine's own headers as its signature
+ * oracle, so an export declared nowhere is refused, and a guest importing it
+ * binds to a sentinel that faults when called.  Microsoft's own msvcp140.dll,
+ * running here as an x86-64 guest, imports a dozen of them through the UCRT
+ * apisets and dies in its DllMain on the first one.
+ *
+ * Declaring them here is self-checking: the file that defines each one
+ * includes this header, so a prototype that disagrees with the definition is a
+ * compile error rather than a silently wrong thunk.
+ *
+ * The two callback types are spelled out rather than named because their
+ * typedefs are local to heap.c and exit.c; these are the same types.
+ */
+void        CDECL _lock_locales(void);
+void        CDECL _unlock_locales(void);
+int         CDECL ___lc_collate_cp_func(void);
+unsigned int * CDECL __p__commode(void);
+void        CDECL _invalid_parameter_noinfo(void);
+void        CDECL _invalid_parameter_noinfo_noreturn(void);
+void        DECLSPEC_NORETURN CDECL _wassert(const wchar_t*,const wchar_t*,unsigned int);
+int         CDECL _get_stream_buffer_pointers(FILE*,char***,char***,int**);
+__time64_t  CDECL _mkgmtime64(struct tm*);
+char *      CDECL _Getdays(void);
+char *      CDECL _Getmonths(void);
+wchar_t *   CDECL _W_Getdays(void);
+wchar_t *   CDECL _W_Getmonths(void);
+size_t      CDECL _Wcsftime(wchar_t*,size_t,const wchar_t*,const struct tm*,__lc_time_data*);
+int (CDECL *CDECL _set_new_handler(int (CDECL *)(size_t)))(size_t);
+void        CDECL _register_thread_local_exe_atexit_callback(void (__stdcall *)(void*,ULONG,void*));
+
 #endif /* __WINE_MSVCRT_H */

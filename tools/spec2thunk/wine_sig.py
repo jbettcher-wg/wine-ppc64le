@@ -254,6 +254,11 @@ PROBE_SRC = (
     "#include <ntsecapi.h>\n"         # advapi32: LsaOpenPolicy, LsaClose, LsaLookup*,
                                       # LsaQueryInformationPolicy, ...
     "#include <threadpoolapiset.h>\n" # kernel32/kernelbase: CallbackMayRunLong
+    "#include <winhttp.h>\n"          # winhttp: the whole WinHttp* surface, which
+                                      # PlayFabMultiplayerWin.dll imports
+    "#include <conio.h>\n"            # msvcrt/ucrtbase: _getch, _kbhit, _cputs
+    "#include <direct.h>\n"           # msvcrt/ucrtbase: _getcwd, _chdir, _mkdir
+    "#include <assert.h>\n"           # msvcrt/ucrtbase: _wassert
     "#include <signal.h>\n"           # msvcrt/ucrtbase: signal, raise
     "#include <shlobj.h>\n"           # shell32: SHGetKnownFolderPath, SHGetFolderPath*
     "#include <evntprov.h>\n"         # advapi32: EventRegister, EventWriteTransfer,
