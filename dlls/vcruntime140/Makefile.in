@@ -2,6 +2,7 @@ MODULE    = vcruntime140.dll
 IMPORTLIB = vcruntime140
 
 SOURCES = \
+	vcruntime140.thunks \
 	init_thread.c \
 	misc.c \
 	new.cpp \

@@ -9,6 +9,7 @@ VER_FILEDESCRIPTION_STR = "Wine HTTP Library"
 VER_PRODUCTVERSION      = 5,1,2600,2180
 
 SOURCES = \
+	winhttp.thunks \
 	cookie.c \
 	handle.c \
 	main.c \

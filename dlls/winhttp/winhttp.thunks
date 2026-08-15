@@ -1,0 +1,11 @@
+# AMD64 thunk export spec -- winhttp.dll.
+#
+# Added from the 2026-08-15 first-real-game triage: with the application's own
+# shipped DLLs now loadable (find_dll_file() searches the load path for the
+# guest's machine instead of refusing it outright), what stopped
+# quake2ex_steam.exe was Wine builtins with no guest thunk -- each reported as
+# c000007b, the loader correctly refusing to splice a native ppc64 module into
+# a guest call.  Nothing here is hand-written: the export list comes from this
+# module's own .spec.
+DLL winhttp.dll
+FROM-SPEC auto

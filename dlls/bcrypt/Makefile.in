@@ -7,4 +7,5 @@ VER_FILEDESCRIPTION_STR = "Wine Crypto Library"
 VER_PRODUCTVERSION      = 6,0,6000,16386
 
 SOURCES = \
+	bcrypt.thunks \
 	bcrypt_main.c

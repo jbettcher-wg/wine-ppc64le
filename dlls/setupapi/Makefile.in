@@ -5,6 +5,7 @@ IMPORTS   = cfgmgr32 uuid advapi32 rpcrt4 kernelbase
 DELAYIMPORTS = cabinet shell32 wintrust ole32 comdlg32 user32
 
 SOURCES = \
+	setupapi.thunks \
 	devinst.c \
 	dialog.c \
 	dirid.c \

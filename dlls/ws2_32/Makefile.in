@@ -8,6 +8,7 @@ UNIX_LIBS    = $(PTHREAD_LIBS)
 VER_PRODUCTVERSION = 5,1,2600,5512
 
 SOURCES = \
+	ws2_32.thunks \
 	async.c \
 	inaddr.c \
 	protocol.c \

@@ -5,4 +5,5 @@ IMPORTS   = kernelbase
 VER_PRODUCTVERSION = 5,1,2600,2180
 
 SOURCES = \
+	version.thunks \
 	version.c

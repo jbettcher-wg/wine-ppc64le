@@ -11,6 +11,7 @@ VER_FILEDESCRIPTION_STR = "Wine CryptoAPI Library"
 VER_PRODUCTVERSION      = 5,131,2600,1243
 
 SOURCES = \
+	crypt32.thunks \
 	base64.c \
 	cert.c \
 	chain.c \

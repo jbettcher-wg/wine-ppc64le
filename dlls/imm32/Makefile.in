@@ -6,5 +6,6 @@ DELAYIMPORTS = ole32
 VER_PRODUCTVERSION = 5,1,2600,2180
 
 SOURCES = \
+	imm32.thunks \
 	ime.c \
 	imm.c

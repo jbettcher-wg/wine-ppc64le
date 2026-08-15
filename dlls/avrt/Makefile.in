@@ -3,4 +3,5 @@ IMPORTLIB = avrt
 IMPORTS   = user32
 
 SOURCES = \
+	avrt.thunks \
 	main.c

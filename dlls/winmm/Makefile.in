@@ -5,6 +5,7 @@ IMPORTS   = uuid user32 advapi32 ole32 msacm32
 DELAYIMPORTS = dinput8
 
 SOURCES = \
+	winmm.thunks \
 	driver.c \
 	joystick.c \
 	lolvldrv.c \
