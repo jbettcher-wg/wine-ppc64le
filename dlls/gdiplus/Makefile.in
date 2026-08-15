@@ -6,6 +6,7 @@ DELAYIMPORTS = mlang windowscodecs
 VER_PRODUCTVERSION = 6,1,7601,17514
 
 SOURCES = \
+	gdiplus.thunks \
 	brush.c \
 	customlinecap.c \
 	font.c \

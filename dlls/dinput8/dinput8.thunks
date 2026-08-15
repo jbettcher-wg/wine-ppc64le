@@ -1,0 +1,13 @@
+# AMD64 thunk export spec -- dinput8.dll.
+#
+# From the 2026-08-15 second-game pass: DOOM's Vulkan build imports these and
+# every one reported c000007b -- the loader found the native ppc64 module and
+# correctly refused to splice it into a guest call, because no guest thunk
+# existed.  Same class of gap as the first game, same one-line fix, which is
+# the point: nothing here is per-title.
+#
+# vulkan-1 is the one that matters for that binary.  It renders through
+# vulkan-1 -> winevulkan -> RADV with no D3D anywhere in the path, so this is
+# the shortest route from a real game's draw calls to this machine's GPU.
+DLL dinput8.dll
+FROM-SPEC auto

@@ -10,6 +10,7 @@ VER_FILESUBTYPE         = VFT2_DRV_PRINTER
 VER_PRODUCTVERSION      = 5,1,2600,2180
 
 SOURCES = \
+	winspool.drv.thunks \
 	cups.c \
 	info.c \
 	winspool.drv.spec \

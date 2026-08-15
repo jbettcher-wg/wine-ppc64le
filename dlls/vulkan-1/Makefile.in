@@ -7,4 +7,5 @@ VER_FILEDESCRIPTION_STR = "Wine Vulkan Loader"
 VER_PRODUCTVERSION      = 1,0,0,0
 
 SOURCES = \
+	vulkan-1.thunks \
 	vulkan.c

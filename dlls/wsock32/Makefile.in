@@ -5,6 +5,7 @@ IMPORTS   = mswsock ws2_32 iphlpapi
 VER_PRODUCTVERSION = 4,0,0,0
 
 SOURCES = \
+	wsock32.thunks \
 	protocol.c \
 	service.c \
 	socket.c

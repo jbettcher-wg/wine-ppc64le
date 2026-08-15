@@ -3391,10 +3391,23 @@ static NTSTATUS find_builtin_without_file( const WCHAR *name, USHORT machine, UN
         len = new_name->Length;
         RtlAppendUnicodeToString( new_name, L"\\dlls\\" );
         RtlAppendUnicodeToString( new_name, name );
-        if ((ext = wcsrchr( name, '.' )) && !wcscmp( ext, L".dll" )) new_name->Length -= 4 * sizeof(WCHAR);
+        /* wcsICmp: an import table carries whatever case the linker wrote, and
+         * DOOM's says "IPHLPAPI.DLL".  A case-sensitive compare left the
+         * extension on and looked for dlls/IPHLPAPI.DLL/<arch>/IPHLPAPI.DLL,
+         * which fails as INVALID_IMAGE_FORMAT once the guest branch has
+         * refused the native module it did find. */
+        if ((ext = wcsrchr( name, '.' )) && !wcsicmp( ext, L".dll" )) new_name->Length -= 4 * sizeof(WCHAR);
         RtlAppendUnicodeToString( new_name, pe_subdir );
         RtlAppendUnicodeToString( new_name, L"\\" );
         RtlAppendUnicodeToString( new_name, name );
+        /* A module whose own name carries a non-.dll extension is still BUILT
+         * as <name>.dll -- winspool.drv becomes winspool.drv.dll -- because
+         * the build names its output after the source, extension and all.
+         * The import table asks for WINSPOOL.DRV, so append the .dll the
+         * build added.  (Case is not the problem here: the unix path lookup
+         * is case-insensitive, which is why IPHLPAPI.DLL resolves once the
+         * extension is stripped.) */
+        if (ext && wcsicmp( ext, L".dll" )) RtlAppendUnicodeToString( new_name, L".dll" );
         status = open_dll_file( new_name, pwm, mapping, image_info, id, machine );
         if (status != STATUS_DLL_NOT_FOUND) goto done;
 

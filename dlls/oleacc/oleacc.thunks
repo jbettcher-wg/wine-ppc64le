@@ -1,0 +1,8 @@
+# AMD64 thunk export spec -- oleacc.dll.
+#
+# 2026-08-15 second-game pass: DOOM's Vulkan build imports this and it had no
+# guest thunk, so the loader found the native ppc64 module and refused it
+# (c000007b), which is correct and unhelpful.  Generated from the module's own
+# .spec like every other one.
+DLL oleacc.dll
+FROM-SPEC auto
