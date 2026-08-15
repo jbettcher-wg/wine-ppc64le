@@ -1742,6 +1742,10 @@ static void call_tls_callbacks( HMODULE module, UINT reason )
     const IMAGE_TLS_DIRECTORY *dir;
     const PIMAGE_TLS_CALLBACK *callback;
     ULONG dirsize;
+#ifdef __powerpc64__
+    const IMAGE_NT_HEADERS *nt = RtlImageNtHeader( module );
+    USHORT machine = nt ? nt->FileHeader.Machine : 0;
+#endif
 
     dir = RtlImageDirectoryEntryToData( module, TRUE, IMAGE_DIRECTORY_ENTRY_TLS, &dirsize );
     if (!dir || !dir->AddressOfCallBacks) return;
@@ -1750,6 +1754,22 @@ static void call_tls_callbacks( HMODULE module, UINT reason )
     {
         TRACE_(relay)("\1Call TLS callback (proc=%p,module=%p,reason=%s,reserved=0)\n",
                       *callback, module, reason_names[reason] );
+#ifdef __powerpc64__
+        /* A guest image's TLS callbacks are guest code, the same shape as its
+         * entry point: dispatch them through the emulator, never through
+         * call_dll_entry_point, which would execute x86-64 bytes as ppc64. */
+        if (machine != current_machine)
+        {
+            if (machine == IMAGE_FILE_MACHINE_AMD64)
+                call_guest_tls_callback( (void *)*callback, module, reason );
+            else
+                WARN( "not calling TLS callback %p of machine %04x image %p natively\n",
+                      *callback, machine, module );
+            TRACE_(relay)("\1Ret  TLS callback (proc=%p,module=%p,reason=%s,reserved=0)\n",
+                          *callback, module, reason_names[reason] );
+            continue;
+        }
+#endif
         __TRY
         {
             call_dll_entry_point( (DLLENTRYPROC)*callback, module, reason, NULL );

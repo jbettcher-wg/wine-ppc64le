@@ -91,6 +91,9 @@ extern void get_resource_lcids( LANGID *user, LANGID *user_neutral, LANGID *syst
 
 /* module handling */
 extern NTSTATUS load_guest_dll( const WCHAR *name, USHORT machine, HMODULE *module );
+#ifdef __powerpc64__
+extern void call_guest_tls_callback( void *callback, void *module, UINT reason );
+#endif
 extern FARPROC RELAY_GetProcAddress( HMODULE module, const IMAGE_EXPORT_DIRECTORY *exports,
                                      DWORD exp_size, FARPROC proc, DWORD ordinal, const WCHAR *user );
 extern FARPROC SNOOP_GetProcAddress( HMODULE hmod, const IMAGE_EXPORT_DIRECTORY *exports, DWORD exp_size,

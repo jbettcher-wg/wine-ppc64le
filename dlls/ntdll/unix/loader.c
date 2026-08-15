@@ -1048,39 +1048,103 @@ static NTSTATUS emu_bridge_status;
  * pthread_once: every guest thread needs these pointers, and resolving them
  * again per call raced with threads already using them.
  */
+#define FEXBRIDGE_SONAME  "libfexbridge.so"
+#define FEXBRIDGE_MIN_ABI 2
+
 static void emu_load_bridge(void)
 {
     const char *name = getenv( "WINEFEXBRIDGE" );
-    void *so;
+    char path[1024];
+    const char *loaded = NULL;
+    UINT (*p_abi_version)(void);
+    Dl_info info;
+    void *so = NULL;
 
-    if (!name || !name[0]) name = "libfexbridge.so";
-    if (!(so = dlopen( name, RTLD_NOW | RTLD_LOCAL )))
+    if (name && name[0])
     {
-        ERR( "cannot load emulator bridge %s: %s\n", name, dlerror() );
-        emu_bridge_status = STATUS_DLL_NOT_FOUND;
+        /* An explicit override is obeyed or fails -- never silently replaced
+         * by a fallback, which would run a different bridge than the one the
+         * caller named. */
+        if (!(so = dlopen( name, RTLD_NOW | RTLD_LOCAL )))
+        {
+            ERR( "cannot load emulator bridge %s (WINEFEXBRIDGE): %s\n", name, dlerror() );
+            emu_bridge_status = STATUS_DLL_NOT_FOUND;
+            return;
+        }
+        loaded = name;
+    }
+    /* The build installs the bridge next to this unixlib (see
+     * fexbridge/build-fexbridge.sh in the port tree).  Resolve our own path
+     * first, exactly as the d3d12 unixlib does for vkd3d-proton: glibc
+     * expands $ORIGIN-style lookups from the load path rather than the real
+     * path, so a symlinked ntdll.so must be resolved before the dirname is
+     * reused.  A defaulted /tmp build artifact is what this replaces -- a
+     * stale bridge there was silently wrong instead of loudly missing. */
+    if (!so && dladdr( (void *)emu_load_bridge, &info ) && info.dli_fname)
+    {
+        const char *slash = strrchr( info.dli_fname, '/' );
+        if (slash && (size_t)(slash - info.dli_fname) + sizeof(FEXBRIDGE_SONAME) + 1 < sizeof(path))
+        {
+            char *real;
+            snprintf( path, sizeof(path), "%.*s/%s",
+                      (int)(slash - info.dli_fname), info.dli_fname, FEXBRIDGE_SONAME );
+            if ((real = realpath( path, NULL )))
+            {
+                if ((so = dlopen( real, RTLD_NOW | RTLD_LOCAL )))
+                {
+                    snprintf( path, sizeof(path), "%s", real );
+                    loaded = path;
+                }
+                else WARN( "cannot load %s: %s\n", real, dlerror() );
+                free( real );
+            }
+            else TRACE( "no %s beside ntdll.so, trying the linker path\n", FEXBRIDGE_SONAME );
+        }
+    }
+    if (!so)
+    {
+        if (!(so = dlopen( FEXBRIDGE_SONAME, RTLD_NOW | RTLD_LOCAL )))
+        {
+            ERR( "cannot load emulator bridge %s: %s -- build and install it with "
+                 "fexbridge/build-fexbridge.sh (WINEFEXBRIDGE overrides the search)\n",
+                 FEXBRIDGE_SONAME, dlerror() );
+            emu_bridge_status = STATUS_DLL_NOT_FOUND;
+            return;
+        }
+        loaded = FEXBRIDGE_SONAME;
+    }
+
+    /* Refuse a wrong-ABI bridge by name, not by symptom.  An ABI-1 bridge has
+     * no GS-base accessor, and under one of those every real guest dies at
+     * entry with c0000005 on its first TEB read through %gs.  That symptom
+     * must never again be how a stale file announces itself. */
+    p_abi_version = (UINT (*)(void))dlsym( so, "fexbridge_abi_version" );
+    if (!p_abi_version || p_abi_version() < FEXBRIDGE_MIN_ABI ||
+        !(p_fexbridge_set_gs_base = dlsym( so, "fexbridge_set_gs_base" )))
+    {
+        ERR( "emulator bridge %s has ABI %u, this ntdll needs >= %u (no GS base accessor "
+             "means every guest faults at entry) -- stale build?\n",
+             loaded, p_abi_version ? p_abi_version() : 0, FEXBRIDGE_MIN_ABI );
+        dlclose( so );
+        emu_bridge_status = STATUS_DLL_INIT_FAILED;
         return;
     }
     if (!(p_fexbridge_run_entry = dlsym( so, "fexbridge_run_entry" )))
     {
-        ERR( "%s has no fexbridge_run_entry: %s\n", name, dlerror() );
+        ERR( "%s has no fexbridge_run_entry: %s\n", loaded, dlerror() );
         dlclose( so );
         emu_bridge_status = STATUS_ENTRYPOINT_NOT_FOUND;
         return;
     }
-    /* Optional: an older bridge exports only the one-shot entry.  Without it
-     * the guest still runs, but any call into a thunk module traps with no
-     * handler and ends the run, so fail loudly rather than silently. */
+    /* Guaranteed present at ABI 2, resolved individually all the same. */
     p_fexbridge_set_trap_handler = dlsym( so, "fexbridge_set_trap_handler" );
-    /* ABI 2 additions.  All optional: an older bridge simply cannot give the
-     * guest a TEB or hand us its faults, and we say so rather than misbehaving. */
     p_fexbridge_process_init   = dlsym( so, "fexbridge_process_init" );
     p_fexbridge_thread_init    = dlsym( so, "fexbridge_thread_init" );
     p_fexbridge_thread_term    = dlsym( so, "fexbridge_thread_term" );
     p_fexbridge_current_thread = dlsym( so, "fexbridge_current_thread" );
-    p_fexbridge_set_gs_base    = dlsym( so, "fexbridge_set_gs_base" );
     p_fexbridge_fault_is_jit   = dlsym( so, "fexbridge_fault_is_jit" );
     p_fexbridge_fault_unwind   = dlsym( so, "fexbridge_fault_unwind" );
-    TRACE( "loaded emulator bridge %s\n", name );
+    TRACE( "loaded emulator bridge %s, ABI %u\n", loaded, p_abi_version() );
 }
 
 

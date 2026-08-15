@@ -1271,6 +1271,61 @@ static ULONG_PTR call_guest_function( void *entry, void *arg )
 
 
 /***********************************************************************
+ *           call_guest_tls_callback
+ *
+ * A PIMAGE_TLS_CALLBACK of a guest image, at process and thread attach and
+ * detach.  The same native->guest direction as the atexit handlers, with one
+ * wrinkle: a TLS callback takes three MS-x64 arguments and the run-entry
+ * primitive carries exactly one (RCX).  So the one argument is a parameter
+ * block, and a five-instruction guest thunk unpacks it and tail-jumps to the
+ * real callback -- the tail jump leaves RSP exactly as run_entry aligned it,
+ * so the callback returns straight into run_entry's own return path.
+ *
+ * The thunk is written once into anonymous executable memory.  It is only
+ * ever entered through call_guest_function, so it needs no classification by
+ * guest_module_from_address, and a freshly mapped page can have no stale
+ * translation to invalidate.  Callers hold the loader lock, which serializes
+ * the one-time setup.
+ */
+void call_guest_tls_callback( void *callback, void *module, UINT reason )
+{
+    static const BYTE thunk_code[] =
+    {
+        0x48, 0x8b, 0x01,        /* mov rax,[rcx]       callback */
+        0x48, 0x8b, 0x51, 0x10,  /* mov rdx,[rcx+0x10]  reason */
+        0x4c, 0x8b, 0x41, 0x18,  /* mov r8,[rcx+0x18]   reserved */
+        0x48, 0x8b, 0x49, 0x08,  /* mov rcx,[rcx+0x08]  module */
+        0xff, 0xe0,              /* jmp rax */
+    };
+    static void *thunk;
+    struct
+    {
+        void      *callback;   /* 0x00 */
+        void      *module;     /* 0x08 */
+        ULONGLONG  reason;     /* 0x10 */
+        void      *reserved;   /* 0x18 */
+    } params = { callback, module, reason, NULL };
+
+    if (!thunk)
+    {
+        void *mem = NULL;
+        SIZE_T size = sizeof(thunk_code);
+        NTSTATUS status = NtAllocateVirtualMemory( GetCurrentProcess(), &mem, 0, &size,
+                                                   MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE );
+        if (status)
+        {
+            ERR( "no memory for the guest TLS callback thunk, status %08x\n", (UINT)status );
+            return;
+        }
+        memcpy( mem, thunk_code, sizeof(thunk_code) );
+        thunk = mem;
+    }
+    TRACE( "callback %p module %p reason %u\n", callback, module, reason );
+    call_guest_function( thunk, &params );
+}
+
+
+/***********************************************************************
  *           guest atexit handlers
  *
  * A guest registering an atexit handler hands native code a guest function
