@@ -47,6 +47,10 @@
 #
 DLL ntdll.dll
 
+# Export list from ntdll.spec; the line below becomes an override.
+# See kernel32.thunks.
+FROM-SPEC auto
+
 # index 0: the one ntdll import of programs/winepath.exe
 # (guest-corpus/imports/programs/winepath.txt).
 #

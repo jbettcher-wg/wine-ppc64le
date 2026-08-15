@@ -50,6 +50,10 @@
 #
 DLL ucrtbase.dll
 
+# Export list from ucrtbase.spec; the lines below become overrides.
+# See kernel32.thunks.
+FROM-SPEC auto
+
 # indices 0..1: the __p_* accessors.  No arguments, and the return is a
 # pointer to the CRT's real variable, so the guest dereferences host memory
 # directly -- nothing to marshal.

@@ -9,6 +9,7 @@ VER_PRODUCTVERSION      = 10,0,19043,1466
 VER_OLESELFREGISTER     = 1
 
 SOURCES = \
+	oleaut32.thunks \
 	connpt.c \
 	dispatch.c \
 	hash.c \

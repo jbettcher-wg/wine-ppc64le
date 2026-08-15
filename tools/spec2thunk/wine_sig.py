@@ -190,6 +190,8 @@ PROBE_SRC = (
     "#include <appmodel.h>\n"         # AppPolicyGet*
     "#include <processsnapshot.h>\n"  # PssCaptureSnapshot, PssFreeSnapshot, ...
     "#include <winternl.h>\n"         # the NT surface kernel32 re-exports
+    "#include <patchapi.h>\n"         # the whole mspatcha surface
+    "#include <appcompatapi.h>\n"     # apphelp: ApphelpCheckShellObject, ...
 )
 
 # ---------------------------------------------------------------------------

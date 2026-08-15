@@ -12,6 +12,7 @@ SOURCES = \
 	debug.c \
 	file.c \
 	kernelbase.rc \
+	kernelbase.thunks \
 	loader.c \
 	locale.c \
 	main.c \

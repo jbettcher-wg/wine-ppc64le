@@ -57,12 +57,17 @@ marshals MS-x64 → ELFv2 and calls the real native ppc64 implementation. Nothin
 about the mechanism is specific to `kernel32`.
 
 Those modules are **ordinary build output**. `tools/spec2thunk` generates them
-from a `.thunks` list plus Wine's own headers — signatures come from clang
-parsing the real headers, never from the `.spec` file, which carries no return
-type and whose `ARG_LONG` is 32 bits. Anything unrepresentable is refused at
-generation time with the compiler's own reason rather than mis-marshalled. They
-are not staged into the prefix: like every other Wine builtin, they resolve from
-the build or install directory.
+from each module's **own `.spec`** (the `.thunks` file carries `FROM-SPEC` plus
+only the overrides a `.spec` cannot express: variadic v-variants, `.spec`-located
+names, exclusions) — signatures come from clang parsing Wine's real headers,
+never from the `.spec` file, which carries no return type and whose `ARG_LONG`
+is 32 bits. Anything unrepresentable is refused at generation time with the
+compiler's own reason rather than mis-marshalled; a guest import of a refused
+or absent export binds to a per-symbol `0xdead0000+n` sentinel so the fault's
+`si_addr` names the symbol that was missing. They are not staged into the
+prefix: like every other Wine builtin, they resolve from the build or install
+directory — and files copied into `sysx8664` are outranked by the builtin, so
+there is exactly one serving path.
 
 The proof it works end to end is Wine's own `winepath.exe`, built as an x86-64
 PE and run under the port:

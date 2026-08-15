@@ -90,6 +90,7 @@ extern void init_user_process_params(void);
 extern void get_resource_lcids( LANGID *user, LANGID *user_neutral, LANGID *system );
 
 /* module handling */
+extern NTSTATUS load_guest_dll( const WCHAR *name, USHORT machine, HMODULE *module );
 extern FARPROC RELAY_GetProcAddress( HMODULE module, const IMAGE_EXPORT_DIRECTORY *exports,
                                      DWORD exp_size, FARPROC proc, DWORD ordinal, const WCHAR *user );
 extern FARPROC SNOOP_GetProcAddress( HMODULE hmod, const IMAGE_EXPORT_DIRECTORY *exports, DWORD exp_size,

@@ -1124,13 +1124,16 @@ static BOOL handle_syscall_fault( struct thread_data *data, ucontext_t *context,
 
     if (!is_inside_syscall( data, SP_sig(context) )) return FALSE;
 
-    TRACE( "code=%x flags=%x addr=%p pc=%I64x\n",
-           rec->ExceptionCode, rec->ExceptionFlags, rec->ExceptionAddress, (ULONG64)NIP_sig(context) );
+    /* this half is compiled against glibc printf: %I64x there is a width-64
+     * %x that also truncates the value, so spell it %llx */
+    TRACE( "code=%x flags=%x addr=%p pc=%llx\n",
+           rec->ExceptionCode, rec->ExceptionFlags, rec->ExceptionAddress,
+           (unsigned long long)NIP_sig(context) );
     for (i = 0; i < rec->NumberParameters; i++)
-        TRACE( " info[%d]=%016I64x\n", i, (ULONG64)rec->ExceptionInformation[i] );
-    TRACE( " r1=%016I64x r2=%016I64x r3=%016I64x lr=%016I64x\n",
-           (ULONG64)GPR_sig(1, context), (ULONG64)GPR_sig(2, context),
-           (ULONG64)GPR_sig(3, context), (ULONG64)GPR_sig(PPC64_PT_LNK, context) );
+        TRACE( " info[%d]=%016llx\n", i, (unsigned long long)rec->ExceptionInformation[i] );
+    TRACE( " r1=%016llx r2=%016llx r3=%016llx lr=%016llx\n",
+           (unsigned long long)GPR_sig(1, context), (unsigned long long)GPR_sig(2, context),
+           (unsigned long long)GPR_sig(3, context), (unsigned long long)GPR_sig(PPC64_PT_LNK, context) );
 
     if (data->jmp_buf)
     {
@@ -1143,7 +1146,8 @@ static BOOL handle_syscall_fault( struct thread_data *data, ucontext_t *context,
     }
     else if ((frame = get_syscall_frame( data )))
     {
-        TRACE( "returning to user mode pc=%I64x ret=%x\n", frame->pc, rec->ExceptionCode );
+        TRACE( "returning to user mode pc=%llx ret=%x\n",
+               (unsigned long long)frame->pc, rec->ExceptionCode );
         GPR_sig(3, context)  = rec->ExceptionCode;
         GPR_sig(31, context) = (ULONG_PTR)frame;
         GPR_sig(12, context) = (ULONG_PTR)__wine_syscall_dispatcher_return;

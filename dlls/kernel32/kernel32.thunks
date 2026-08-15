@@ -58,6 +58,14 @@
 #
 DLL kernel32.dll
 
+# The export list is the module's own .spec: every export whose shape the
+# header oracle can prove gets a stub, and the lines below become OVERRIDES
+# (assertions, variadic= opt-ins, .spec locations) rather than the list
+# itself.  Hand-curating the list is what left the live surface at 36
+# exports while 344 corpus tests each needed ~40 more: no test ever reached
+# main() against it.
+FROM-SPEC auto
+
 GetCurrentProcessId       0x1234      0  int   processthreadsapi.h:254
 GetCurrentThreadId        0x00005678  0  int   processthreadsapi.h:256
 Sleep                     0x0000BEEF  1  void  winbase.h:2294

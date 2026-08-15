@@ -578,7 +578,20 @@ static ULONG_PTR allocate_stub( const char *dll, const char *name )
 }
 
 #else  /* __i386__ */
-static inline ULONG_PTR allocate_stub( const char *dll, const char *name ) { return 0xdeadbeef; }
+/* No stub code can be generated here: for a guest AMD64 image the stub would
+ * have to be AMD64 code, and for a native ppc64 caller nothing calls these in
+ * practice.  But ONE shared 0xdeadbeef made every missing-import fault look
+ * identical (a triage of 45 guest crashes produced 45 indistinguishable
+ * SIGSEGVs).  Hand out a distinct sentinel per binding instead: the fault's
+ * si_addr is then 0xdead0000+n, and the WARN at the bind site -- which prints
+ * the returned value next to the dll and symbol name -- is the index that
+ * names the symbol post mortem.  The page is never mapped either way. */
+static ULONG_PTR allocate_stub( const char *dll, const char *name )
+{
+    static LONG nb_sentinels;
+    ULONG n = (ULONG)InterlockedIncrement( &nb_sentinels );  /* 1-based */
+    return 0xdead0000 + (n & 0xffff);
+}
 #endif  /* __i386__ */
 
 /* call ldr notifications */
@@ -3656,6 +3669,40 @@ NTSTATUS WINAPI DECLSPEC_HOTPATCH LdrLoadDll(LPCWSTR search_path, DWORD *load_fl
     RtlLeaveCriticalSection( &loader_section );
     RtlFreeHeap( GetProcessHeap(), 0, dllname );
     if (path_name != search_path) RtlReleasePath( path_name );
+    return nts;
+}
+
+
+/******************************************************************
+ *		load_guest_dll
+ *
+ * LdrLoadDll pinned to a guest machine's namespace: the emulator's
+ * LoadLibrary overrides resolve here, exactly as a guest image's static
+ * imports do (load_dll with the importing module's machine), so the answer
+ * is that machine's builtin thunk module or nothing.  There is deliberately
+ * no native fallback -- see the machine_dir branch of find_dll_file.
+ * Bare names only: a guest namespace has no files, so a path means nothing.
+ */
+NTSTATUS load_guest_dll( const WCHAR *name, USHORT machine, HMODULE *module )
+{
+    WINE_MODREF *wm = NULL;
+    NTSTATUS nts;
+    WCHAR *dllname = append_dll_ext( name );
+
+    RtlEnterCriticalSection( &loader_section );
+    nts = load_dll( NULL, dllname ? dllname : name, 0, machine, &wm, FALSE );
+    if (nts == STATUS_SUCCESS)
+    {
+        nts = process_attach( wm->ldr.DdagNode, NULL );
+        if (nts != STATUS_SUCCESS)
+        {
+            LdrUnloadDll( wm->ldr.DllBase );
+            wm = NULL;
+        }
+    }
+    if (wm) *module = wm->ldr.DllBase;
+    RtlLeaveCriticalSection( &loader_section );
+    RtlFreeHeap( GetProcessHeap(), 0, dllname );
     return nts;
 }
 

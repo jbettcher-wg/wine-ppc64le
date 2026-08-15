@@ -1193,6 +1193,51 @@ static ULONG_PTR emu_GetProcAddress( const ULONG_PTR *a, void *native )
     return (ULONG_PTR)proc;
 }
 
+/* LoadLibrary answers in a namespace too: the guest wants a module whose
+ * exports IT can call, so resolve the name against the guest machine's own
+ * loader namespace (load_guest_dll -> the machine's builtin thunk modules),
+ * exactly as its static imports were resolved.  Passing through to native
+ * LoadLibrary hands back a native HMODULE, and the guest's next step is
+ * GetProcAddress on it -- whose override then rightly refuses, turning every
+ * dynamically-resolved API into a spurious "not available".  No guest module
+ * of that name means NULL, the documented outcome the caller already handles. */
+static ULONG_PTR load_guest_library( const WCHAR *name )
+{
+    HMODULE mod;
+
+    if (!name) return 0;
+    if (wcschr( name, '\\' ) || wcschr( name, '/' ))
+    {
+        FIXME( "path %s not resolvable in the guest namespace, refusing\n", debugstr_w(name) );
+        return 0;
+    }
+    if (load_guest_dll( name, IMAGE_FILE_MACHINE_AMD64, &mod ))
+    {
+        WARN( "no guest %s\n", debugstr_w(name) );
+        return 0;
+    }
+    return (ULONG_PTR)mod;
+}
+
+static ULONG_PTR emu_LoadLibraryW( const ULONG_PTR *a, void *native )
+{
+    return load_guest_library( (const WCHAR *)a[0] );
+}
+
+static ULONG_PTR emu_LoadLibraryA( const ULONG_PTR *a, void *native )
+{
+    UNICODE_STRING str;
+    ANSI_STRING ansi;
+    ULONG_PTR ret;
+
+    if (!a[0]) return 0;
+    RtlInitAnsiString( &ansi, (const char *)a[0] );
+    if (RtlAnsiStringToUnicodeString( &str, &ansi, TRUE )) return 0;
+    ret = load_guest_library( str.Buffer );
+    RtlFreeUnicodeString( &str );
+    return ret;
+}
+
 void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len );
 
 /***********************************************************************
@@ -1332,17 +1377,74 @@ static ULONG_PTR emu_crt_atexit( const ULONG_PTR *a, void *native )
     return 0;
 }
 
+/* msvcrt's older registration API, the same native->guest boundary as
+ * _crt_atexit -- apphelp_test printed its full 15-test summary and THEN
+ * segfaulted in native exit() calling the guest handler _onexit had
+ * registered.  Result convention differs: _onexit returns the function on
+ * success and NULL on failure, so this cannot share emu_crt_atexit's body. */
+static ULONG_PTR emu_onexit( const ULONG_PTR *a, void *native )
+{
+    void *fn = (void *)a[0];
+    ULONG_PTR magic;
+    BOOL is_guest;
+
+    if (!fn) return 0;
+
+    LdrLockLoaderLock( 0, NULL, &magic );
+    is_guest = guest_module_from_address( fn ) != NULL;
+    LdrUnlockLoaderLock( 0, magic );
+
+    if (!is_guest)
+    {
+        if (!native) return 0;
+        return ((ULONG_PTR (*)( void * ))native)( fn );
+    }
+    if (guest_atexit_count >= MAX_GUEST_ATEXIT)
+    {
+        ERR( "more than %u guest atexit handlers\n", MAX_GUEST_ATEXIT );
+        return 0;
+    }
+    if (!guest_atexit_count)
+    {
+        if (!native)
+        {
+            ERR( "no native _onexit to hang guest handlers off\n" );
+            return 0;
+        }
+        if (!((ULONG_PTR (*)( void (*)(void) ))native)( run_guest_atexit_handlers )) return 0;
+    }
+    guest_atexit_funcs[guest_atexit_count++] = fn;
+    TRACE( "queued guest onexit handler %p (%u total)\n", fn, guest_atexit_count );
+    return a[0];
+}
+
 
 static const struct thunk_override thunk_overrides[] =
 {
     { L"kernel32.dll", "GetProcAddress",    2, emu_GetProcAddress },
     { L"kernel32.dll", "GetModuleHandleW",  1, emu_GetModuleHandleW },
     { L"kernel32.dll", "GetModuleHandleA",  1, emu_GetModuleHandleA },
+    /* kernelbase exports the same sharp functions, and a modern CRT imports
+     * them from THERE: find.exe went GetModuleHandleW -> native handle ->
+     * GetProcAddress -> native ppc64 code address -> guest CALLed it.  An
+     * override keyed only to kernel32 silently passes those through, so
+     * every module that exports one of these needs its own row. */
+    { L"kernelbase.dll", "GetProcAddress",   2, emu_GetProcAddress },
+    { L"kernelbase.dll", "GetModuleHandleW", 1, emu_GetModuleHandleW },
+    { L"kernelbase.dll", "GetModuleHandleA", 1, emu_GetModuleHandleA },
+    { L"kernel32.dll",   "LoadLibraryA",     1, emu_LoadLibraryA },
+    { L"kernel32.dll",   "LoadLibraryW",     1, emu_LoadLibraryW },
+    { L"kernelbase.dll", "LoadLibraryA",     1, emu_LoadLibraryA },
+    { L"kernelbase.dll", "LoadLibraryW",     1, emu_LoadLibraryW },
     /* native->guest: the pointer is queued here and run by our own native
      * handler at exit; see run_guest_atexit_handlers */
     { L"ucrtbase.dll", "_crt_atexit",       1, emu_crt_atexit },
     { L"msvcrt.dll",   "_crt_atexit",       1, emu_crt_atexit },
+    { L"msvcrt.dll",   "atexit",            1, emu_crt_atexit },
+    { L"msvcrt.dll",   "_onexit",           1, emu_onexit },
+    { L"ucrtbase.dll", "_onexit",           1, emu_onexit },
     { L"kernel32.dll", "ExitThread",        1, emu_ExitThread },
+    { L"kernelbase.dll", "ExitThread",      1, emu_ExitThread },
 };
 
 /***********************************************************************

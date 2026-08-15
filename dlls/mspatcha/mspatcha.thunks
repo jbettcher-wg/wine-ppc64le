@@ -1,0 +1,9 @@
+# AMD64 thunk export spec -- mspatcha.dll.
+#
+# First DLL-under-test surface: mspatcha_test resolves every function it tests
+# through LoadLibraryA("mspatcha.dll") + GetProcAddress, so the guest namespace
+# must actually contain a mspatcha for those lookups to answer (the dispatcher
+# overrides resolve both calls against guest modules only).  All 16 exports are
+# integer/pointer-class and declared in include/patchapi.h.
+DLL mspatcha.dll
+FROM-SPEC auto

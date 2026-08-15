@@ -1,0 +1,8 @@
+# AMD64 thunk export spec -- apphelp.dll.
+#
+# apphelp_test resolves ApphelpCheckShellObject via LoadLibraryA +
+# GetProcAddress, both answered in the guest namespace by the dispatcher
+# overrides; its assertions are plain pointer/integer calls with no callbacks,
+# which is what makes it the first test expected to EXECUTE rather than skip.
+DLL apphelp.dll
+FROM-SPEC auto

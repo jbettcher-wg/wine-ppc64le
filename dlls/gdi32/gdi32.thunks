@@ -1,0 +1,9 @@
+# AMD64 thunk export spec -- gdi32.dll.
+#
+# Greedy-cover module from the 2026-08-14 triage worklist: with combase,
+# ole32, advapi32, oleaut32 and gdi32 present as guest thunk builtins, 101
+# more of the 344 corpus tests become loadable.  Exports the oracle refuses
+# (struct-by-value, float, no declaration) are absent and bind to a named
+# per-symbol sentinel -- loadability first, surface closes from the data.
+DLL gdi32.dll
+FROM-SPEC auto

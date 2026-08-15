@@ -1,11 +1,12 @@
-# Generalisation + refusal demonstration.  Two representable exports, three
-# that are not: a struct passed by value, a float argument, and varargs.
-# The unrepresentable three are REFUSED, not described.  Columns for a refused
-# export are never read (resolution refuses before the assertions are checked).
+# AMD64 thunk export spec -- user32.dll.
+#
+# Export list from user32.spec; the oracle refuses what it cannot prove
+# (struct-by-value like MonitorFromPoint, float arguments) and those exports
+# are simply absent -- a guest import of one binds to a per-symbol sentinel.
+# This file carries only the overrides the .spec cannot express.
 DLL user32.dll
+FROM-SPEC auto
 
-GetSystemMetrics   0x0000A001  1  int   winuser.h:4304
-MessageBoxW        0x0000A002  4  int   winuser.h:4461
-MonitorFromPoint   0x0000A003  2  int   winuser.h:4472
-AngleArc           0x0000A004  6  int   wingdi.h:3784
-wsprintfW          0x0000A005  2  int   winuser.h:0
+# True variadic: forwarded to its own v-variant with a synthesised va_list.
+wsprintfW          0x0000A005  2  int   winuser.h:4745  variadic=wvsprintfW
+wsprintfA          0x0000A006  2  int   winuser.h:4744  variadic=wvsprintfA

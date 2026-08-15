@@ -7,6 +7,7 @@ DELAYIMPORTS = oleaut32
 VER_OLESELFREGISTER = 1
 
 SOURCES = \
+	ole32.thunks \
 	antimoniker.c \
 	bindctx.c \
 	classmoniker.c \

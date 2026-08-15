@@ -180,6 +180,10 @@
 #
 DLL msvcrt.dll
 
+# Export list from msvcrt.spec; the lines below become overrides (this is
+# where the variadic= opt-ins live).  See kernel32.thunks.
+FROM-SPEC auto
+
 # ---------------------------------------------------------------------------
 # indices 0..17: the core, in descending corpus demand.  Every entry in this
 # file -- these eighteen and the two at 18..19 -- is clang-verified against

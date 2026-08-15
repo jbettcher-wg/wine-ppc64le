@@ -1,0 +1,15 @@
+# AMD64 thunk export spec -- kernelbase.dll.
+#
+# kernelbase matters because a modern CRT imports the loader surface from HERE,
+# not from kernel32: find.exe called kernelbase.GetModuleHandleW and then
+# kernelbase.GetProcAddress.  Those two are namespace-sharp and are answered by
+# the dispatcher's thunk_overrides (see dlls/ntdll/signal_ppc64.c), which must
+# carry a kernelbase row for every sharp export -- a plain pass-through hands
+# the guest a native ppc64 code address to CALL.
+#
+# Until this file existed kernelbase was the ONE module a staged file in
+# C:\windows\sysx8664 could serve, because no builtin outranked it.  Now the
+# builtin does, and there is exactly one way any thunk module reaches a guest:
+# built here, served from the build/install tree like every other builtin.
+DLL kernelbase.dll
+FROM-SPEC auto

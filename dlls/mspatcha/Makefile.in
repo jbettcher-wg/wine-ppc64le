@@ -8,5 +8,6 @@ VER_PRODUCTVERSION      = 6,1,7600,16385
 
 SOURCES = \
 	lzxd_dec.c \
+	mspatcha.thunks \
 	mspatcha_main.c \
 	pa19.c

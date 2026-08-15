@@ -7,6 +7,7 @@ DELAYIMPORTS = cryptsp rpcrt4 user32 userenv
 VER_PRODUCTVERSION = 10,0,10240,16384
 
 SOURCES = \
+	advapi32.thunks \
 	advapi.c \
 	cred.c \
 	crypt.c \
