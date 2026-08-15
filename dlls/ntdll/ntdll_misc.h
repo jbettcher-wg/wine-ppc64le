@@ -93,6 +93,7 @@ extern void get_resource_lcids( LANGID *user, LANGID *user_neutral, LANGID *syst
 extern NTSTATUS load_guest_dll( const WCHAR *name, USHORT machine, HMODULE *module );
 #ifdef __powerpc64__
 extern void call_guest_tls_callback( void *callback, void *module, UINT reason );
+extern WCHAR *get_apiset_target_name( const WCHAR *name );
 extern BOOL call_guest_dll_entry_point( void *entry, void *module, UINT reason, void *reserved );
 #endif
 extern FARPROC RELAY_GetProcAddress( HMODULE module, const IMAGE_EXPORT_DIRECTORY *exports,

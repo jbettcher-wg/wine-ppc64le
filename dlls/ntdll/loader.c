@@ -3295,6 +3295,39 @@ static NTSTATUS find_apiset_dll( const WCHAR *name, WCHAR **fullname )
 
 
 /***********************************************************************
+ *	get_apiset_target_name
+ *
+ * The MODULE NAME an apiset resolves to, without find_apiset_dll()'s
+ * system_dir prefix.  An apiset is a name, and that part is machine-neutral:
+ * api-ms-win-core-synch-l1-2-0 means kernelbase whoever is asking.  Only
+ * find_apiset_dll()'s answer is native, because it prepends the native system
+ * directory.
+ *
+ * Static imports already go through this via build_import_name(); a guest
+ * calling LoadLibraryExW() at runtime did not, and got NULL for every apiset
+ * it probed.  Quake II asks for api-ms-win-core-synch-l1-2-0 (the
+ * WaitOnAddress family) during startup.
+ *
+ * -> a heap block the caller frees, or NULL if the name is not an apiset.
+ */
+WCHAR *get_apiset_target_name( const WCHAR *name )
+{
+    WCHAR *full, *ret;
+    SIZE_T len;
+
+    if (find_apiset_dll( name, &full )) return NULL;
+    len = wcslen( full ) - wcslen( system_dir );
+    if ((ret = RtlAllocateHeap( GetProcessHeap(), 0, (len + 1) * sizeof(WCHAR) )))
+    {
+        memcpy( ret, full + wcslen( system_dir ), len * sizeof(WCHAR) );
+        ret[len] = 0;
+    }
+    RtlFreeHeap( GetProcessHeap(), 0, full );
+    return ret;
+}
+
+
+/***********************************************************************
  *	get_env_var
  */
 static NTSTATUS get_env_var( const WCHAR *name, SIZE_T extra, UNICODE_STRING *ret )

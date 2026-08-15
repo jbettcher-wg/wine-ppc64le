@@ -1252,8 +1252,22 @@ static ULONG_PTR emu_GetProcAddress( const ULONG_PTR *a, void *native )
 static ULONG_PTR load_guest_library( const WCHAR *name )
 {
     HMODULE mod;
+    WCHAR *apiset;
+    ULONG_PTR ret;
 
     if (!name) return 0;
+    /* An apiset is a name for another module, and the guest namespace has no
+     * module of that name -- so resolve it first, exactly as a static import
+     * does through build_import_name().  Without this every runtime probe for
+     * an api-ms-win-* set answered NULL, and a caller that treats NULL as
+     * "this platform lacks the feature" quietly configured itself wrong. */
+    if ((apiset = get_apiset_target_name( name )))
+    {
+        TRACE( "apiset %s -> %s\n", debugstr_w(name), debugstr_w(apiset) );
+        ret = load_guest_library( apiset );
+        RtlFreeHeap( GetProcessHeap(), 0, apiset );
+        return ret;
+    }
     if (wcschr( name, '\\' ) || wcschr( name, '/' ))
     {
         FIXME( "path %s not resolvable in the guest namespace, refusing\n", debugstr_w(name) );
@@ -1270,6 +1284,51 @@ static ULONG_PTR load_guest_library( const WCHAR *name )
 static ULONG_PTR emu_LoadLibraryW( const ULONG_PTR *a, void *native )
 {
     return load_guest_library( (const WCHAR *)a[0] );
+}
+
+/* The Ex forms need the same treatment, and missing them is not academic: a
+ * modern binary almost never calls plain LoadLibraryW.  Quake II went
+ * LoadLibraryExW -> native HMODULE -> GetProcAddress -> refused (correctly,
+ * it is not a guest module) -> NULL into its own function-pointer table ->
+ * a null-vtable call 5000 traps later, with nothing in between naming the
+ * cause.
+ *
+ * The flags are deliberately not forwarded, with one exception.  They select
+ * a SEARCH PATH, and the guest namespace is resolved by name rather than by
+ * path, so there is nothing for LOAD_LIBRARY_SEARCH_* to change.  A DATAFILE
+ * or IMAGE_RESOURCE load is different in kind: the caller wants a resource
+ * handle and will never call GetProcAddress on it, and a guest thunk module
+ * carries no resources -- so that one passes through to native. */
+#define LOAD_LIBRARY_DATAFILE_ANY 0x00000062u  /* AS_DATAFILE | AS_IMAGE_RESOURCE
+                                                  | AS_DATAFILE_EXCLUSIVE */
+
+static ULONG_PTR emu_LoadLibraryExW( const ULONG_PTR *a, void *native )
+{
+    if (a[2] & LOAD_LIBRARY_DATAFILE_ANY)
+    {
+        if (!native) return 0;
+        return ((ULONG_PTR (*)( ULONG_PTR, ULONG_PTR, ULONG_PTR ))native)( a[0], a[1], a[2] );
+    }
+    return load_guest_library( (const WCHAR *)a[0] );
+}
+
+static ULONG_PTR emu_LoadLibraryExA( const ULONG_PTR *a, void *native )
+{
+    UNICODE_STRING str;
+    ANSI_STRING ansi;
+    ULONG_PTR ret;
+
+    if (a[2] & LOAD_LIBRARY_DATAFILE_ANY)
+    {
+        if (!native) return 0;
+        return ((ULONG_PTR (*)( ULONG_PTR, ULONG_PTR, ULONG_PTR ))native)( a[0], a[1], a[2] );
+    }
+    if (!a[0]) return 0;
+    RtlInitAnsiString( &ansi, (const char *)a[0] );
+    if (RtlAnsiStringToUnicodeString( &str, &ansi, TRUE )) return 0;
+    ret = load_guest_library( str.Buffer );
+    RtlFreeUnicodeString( &str );
+    return ret;
 }
 
 static ULONG_PTR emu_LoadLibraryA( const ULONG_PTR *a, void *native )
@@ -2243,6 +2302,10 @@ static const struct thunk_override thunk_overrides[] =
     { L"kernel32.dll",   "LoadLibraryW",     1, emu_LoadLibraryW },
     { L"kernelbase.dll", "LoadLibraryA",     1, emu_LoadLibraryA },
     { L"kernelbase.dll", "LoadLibraryW",     1, emu_LoadLibraryW },
+    { L"kernel32.dll",   "LoadLibraryExA",   3, emu_LoadLibraryExA },
+    { L"kernel32.dll",   "LoadLibraryExW",   3, emu_LoadLibraryExW },
+    { L"kernelbase.dll", "LoadLibraryExA",   3, emu_LoadLibraryExA },
+    { L"kernelbase.dll", "LoadLibraryExW",   3, emu_LoadLibraryExW },
     /* native->guest: the pointer is queued here and run by our own native
      * handler at exit; see run_guest_atexit_handlers */
     { L"ucrtbase.dll", "_crt_atexit",       1, emu_crt_atexit },
