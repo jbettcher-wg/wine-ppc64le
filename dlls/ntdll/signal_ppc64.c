@@ -968,23 +968,70 @@ void __cdecl NTDLL_longjmp( _JUMP_BUFFER *buf, int retval )
 
 
 /***********************************************************************
+ *           guest_module_from_address
+ *
+ * The loaded AMD64 module containing an address, or NULL.  This is what
+ * "is this pointer guest code" means on this port: guest code lives in guest
+ * images, and native code never does.  Callers must hold the loader lock.
+ *
+ * It cannot see guest code outside any module -- a packer or JIT writing into
+ * anonymous guest memory -- so callers that must not guess treat "in no module
+ * at all" as a distinct case rather than as "native".
+ */
+static HMODULE guest_module_from_address( const void *addr )
+{
+    LIST_ENTRY *mark, *entry;
+
+    mark = &NtCurrentTeb()->Peb->LdrData->InMemoryOrderModuleList;
+    for (entry = mark->Flink; entry != mark; entry = entry->Flink)
+    {
+        LDR_DATA_TABLE_ENTRY *mod = CONTAINING_RECORD( entry, LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks );
+        const IMAGE_NT_HEADERS *nt = RtlImageNtHeader( mod->DllBase );
+        const char *base = (const char *)mod->DllBase;
+
+        if (!nt || nt->FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64) continue;
+        if ((const char *)addr >= base && (const char *)addr < base + nt->OptionalHeader.SizeOfImage)
+            return mod->DllBase;
+    }
+    return NULL;
+}
+
+/***********************************************************************
  *           thread_start_is_guest_code
  *
- * TRUE when the thread entry point lies inside an image the native CPU
- * cannot execute (an x86-64 main exe on this ppc64le port).  Deliberately
- * scoped to the main image: every other start routine Wine creates points
- * at native (translated-PE or builtin) code.  Guest-created threads whose
- * start routine lies elsewhere in guest memory are future work and will
- * fault exactly as before this check existed.
+ * Whether a thread start routine is guest code the native cpu cannot execute.
+ *
+ * Any loaded AMD64 module counts, not just the main image: a guest that calls
+ * CreateThread with a start routine in one of its own DLLs is the same case,
+ * and the main image is simply one such module -- so this is one rule rather
+ * than a special case plus a gap.
+ *
+ * A start routine in NO module is the case this cannot classify: guest code
+ * generated into anonymous memory looks exactly like a native pointer here.
+ * Guessing either way is wrong, so say so and refuse the thread -- a diagnosed
+ * failure rather than executing x86-64 bytes as ppc64, which is what happened
+ * before.  If that class ever matters the fix is registration-side wrapping of
+ * CreateThread, which composes with this rather than replacing it.
  */
-static BOOL thread_start_is_guest_code( const void *entry )
+static BOOL thread_start_is_guest_code( const void *entry, BOOL *unclassifiable )
 {
-    const char *base = (const char *)NtCurrentTeb()->Peb->ImageBaseAddress;
     const IMAGE_NT_HEADERS *nt = RtlImageNtHeader( NtCurrentTeb()->Peb->ImageBaseAddress );
+    ULONG_PTR magic;
+    BOOL ret;
 
-    if (!nt || nt->FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64) return FALSE;
-    return (const char *)entry >= base && (const char *)entry < base + nt->OptionalHeader.SizeOfImage;
+    *unclassifiable = FALSE;
+    LdrLockLoaderLock( 0, NULL, &magic );
+    ret = guest_module_from_address( entry ) != NULL;
+    if (!ret && nt && nt->FileHeader.Machine == IMAGE_FILE_MACHINE_AMD64 &&
+        !RtlPcToFileHeader( (void *)entry, (void **)&nt ))
+    {
+        /* guest process, but the entry belongs to no loaded image at all */
+        *unclassifiable = TRUE;
+    }
+    LdrUnlockLoaderLock( 0, magic );
+    return ret;
 }
+
 
 /***********************************************************************
  *           guest import thunks
@@ -1050,7 +1097,11 @@ struct thunk_info
  * An override takes the already-marshalled argument slots, so it sees exactly
  * what the guest passed.
  */
-typedef ULONG_PTR (*thunk_override_func)( const ULONG_PTR *a );
+/* An override receives the marshalled arguments and the native export it
+ * stands in for, so it can either replace the native call or wrap it.  NULL
+ * native means the name did not resolve natively -- an override that needs it
+ * must check. */
+typedef ULONG_PTR (*thunk_override_func)( const ULONG_PTR *a, void *native );
 
 struct thunk_override
 {
@@ -1067,6 +1118,8 @@ struct thunk_override
  * fall back to the native namespace: a guest asking for "kernel32" must get
  * its own kernel32 or nothing.
  */
+
+
 static HMODULE find_guest_module( const WCHAR *name )
 {
     WCHAR buf[64];
@@ -1094,14 +1147,14 @@ static HMODULE find_guest_module( const WCHAR *name )
     return NULL;
 }
 
-static ULONG_PTR emu_GetModuleHandleW( const ULONG_PTR *a )
+static ULONG_PTR emu_GetModuleHandleW( const ULONG_PTR *a, void *native )
 {
     /* NULL means "the main image", which is the guest exe either way */
     if (!a[0]) return (ULONG_PTR)NtCurrentTeb()->Peb->ImageBaseAddress;
     return (ULONG_PTR)find_guest_module( (const WCHAR *)a[0] );
 }
 
-static ULONG_PTR emu_GetModuleHandleA( const ULONG_PTR *a )
+static ULONG_PTR emu_GetModuleHandleA( const ULONG_PTR *a, void *native )
 {
     UNICODE_STRING str;
     ANSI_STRING ansi;
@@ -1115,7 +1168,7 @@ static ULONG_PTR emu_GetModuleHandleA( const ULONG_PTR *a )
     return ret;
 }
 
-static ULONG_PTR emu_GetProcAddress( const ULONG_PTR *a )
+static ULONG_PTR emu_GetProcAddress( const ULONG_PTR *a, void *native )
 {
     const IMAGE_NT_HEADERS *nt = RtlImageNtHeader( (HMODULE)a[0] );
     ANSI_STRING name;
@@ -1140,11 +1193,156 @@ static ULONG_PTR emu_GetProcAddress( const ULONG_PTR *a )
     return (ULONG_PTR)proc;
 }
 
+void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len );
+
+/***********************************************************************
+ *           call_guest_function
+ *
+ * Run a guest procedure on this thread and return its RAX.
+ *
+ * Deliberately the SAME primitive the main image and guest threads use rather
+ * than a second way into the bridge: unix_emu_run_entry adopts a bridge handle
+ * for whatever thread calls it and sets that thread's GS base, so a native
+ * worker thread invoking a guest callback needs no thread-specific code here.
+ *
+ * On a thread already inside guest code this nests, which the bridge supports
+ * provided the caller does not disturb the outer guest register file.  It does
+ * not: the outer state lives in the trap CONTEXT, which the bridge writes back
+ * when the trap returns TRAP_CONTINUE.  The nested run gets its own guest
+ * stack from run_entry, so the outer guest frame is untouched too.
+ */
+static ULONG_PTR call_guest_function( void *entry, void *arg )
+{
+    struct emu_run_entry_params params = { entry, arg, 0, emu_trap_dispatch };
+    NTSTATUS status = WINE_UNIX_CALL( unix_emu_run_entry, &params );
+
+    if (status)
+    {
+        ERR( "guest callback %p failed, status %08x\n", entry, (UINT)status );
+        return 0;
+    }
+    return (ULONG_PTR)params.retval;
+}
+
+
+/***********************************************************************
+ *           guest atexit handlers
+ *
+ * A guest registering an atexit handler hands native code a guest function
+ * pointer, and native exit() then calls it -- executing x86-64 bytes as ppc64.
+ * That is the whole native->guest direction in one API, and it is exactly what
+ * made winepath print its answer correctly and then die in do_global_dtors.
+ *
+ * The interception is at REGISTRATION, not at the call.  A native caller
+ * holding a function pointer cannot be taught to classify it, but the thunk
+ * that receives the pointer knows precisely what it is.  Address-range
+ * classification exists (guest_module_from_address) and is used as a check,
+ * not as the mechanism, because it cannot see guest code that never lived in
+ * a loaded image.
+ *
+ * atexit handlers carry no identity -- every one is void(*)(void) -- so one
+ * native handler walking a list serves them all and no per-callback
+ * trampoline has to be generated.  An API whose callbacks must be told apart
+ * (a window procedure, a comparator) needs a trampoline pool instead; that is
+ * the generalisation this case happens not to need.
+ */
+#define MAX_GUEST_ATEXIT 64
+
+static void *guest_atexit_funcs[MAX_GUEST_ATEXIT];
+static UINT  guest_atexit_count;
+
+static void run_guest_atexit_handlers(void)
+{
+    /* LIFO, as atexit specifies */
+    while (guest_atexit_count)
+    {
+        void *fn = guest_atexit_funcs[--guest_atexit_count];
+        TRACE( "running guest atexit handler %p\n", fn );
+        call_guest_function( fn, NULL );
+    }
+}
+
+/***********************************************************************
+ *           emu_ExitThread
+ *
+ * A guest thread calling ExitThread must not reach native ExitThread from
+ * inside the trap dispatch: that ends in pthread_exit with a live
+ * fexbridge_run and FEX JIT frames below it on the kernel stack, and the
+ * forced unwind has to cross frames whose CFI quality is unknown.  That is the
+ * empty-FDE hazard class, whose failure mode is a spinning core rather than a
+ * crash.
+ *
+ * So unwind by protocol instead: record the request, and return a status that
+ * makes emu_trap_dispatch end the run through the mechanism that already
+ * exists for it (NtCallbackReturn -> nonzero -> FEXBRIDGE_TRAP_EXIT).  The
+ * thread is an ordinary native Wine thread again before any native teardown
+ * runs, which is the load-bearing ordering.
+ */
+static __thread BOOL guest_exit_requested;
+static __thread ULONG guest_exit_code;
+
+static ULONG_PTR emu_ExitThread( const ULONG_PTR *a, void *native )
+{
+    guest_exit_requested = TRUE;
+    guest_exit_code = (ULONG)a[0];
+    TRACE( "guest requested ExitThread(%u); ending the run\n", guest_exit_code );
+    return 0;
+}
+
+
+static ULONG_PTR emu_crt_atexit( const ULONG_PTR *a, void *native )
+{
+    void *fn = (void *)a[0];
+    ULONG_PTR magic;
+    BOOL is_guest;
+
+    if (!fn) return 0;
+
+    LdrLockLoaderLock( 0, NULL, &magic );
+    is_guest = guest_module_from_address( fn ) != NULL;
+    LdrUnlockLoaderLock( 0, magic );
+
+    /* A native pointer here would mean something other than the guest CRT
+     * registered it; pass those straight through rather than queueing them. */
+    if (!is_guest)
+    {
+        if (!native) return -1;
+        return ((int (*)( void * ))native)( fn );
+    }
+    if (guest_atexit_count >= MAX_GUEST_ATEXIT)
+    {
+        ERR( "more than %u guest atexit handlers\n", MAX_GUEST_ATEXIT );
+        return -1;
+    }
+    /* Register the single native handler on the first guest registration, so
+     * native exit() reaches the guest ones through the normal path.  They all
+     * run at this point in the native order rather than interleaved with
+     * native handlers -- correct for a guest whose handlers are its own. */
+    if (!guest_atexit_count)
+    {
+        if (!native)
+        {
+            ERR( "no native _crt_atexit to hang guest handlers off\n" );
+            return -1;
+        }
+        ((int (*)( void (*)(void) ))native)( run_guest_atexit_handlers );
+    }
+    guest_atexit_funcs[guest_atexit_count++] = fn;
+    TRACE( "queued guest atexit handler %p (%u total)\n", fn, guest_atexit_count );
+    return 0;
+}
+
+
 static const struct thunk_override thunk_overrides[] =
 {
     { L"kernel32.dll", "GetProcAddress",    2, emu_GetProcAddress },
     { L"kernel32.dll", "GetModuleHandleW",  1, emu_GetModuleHandleW },
     { L"kernel32.dll", "GetModuleHandleA",  1, emu_GetModuleHandleA },
+    /* native->guest: the pointer is queued here and run by our own native
+     * handler at exit; see run_guest_atexit_handlers */
+    { L"ucrtbase.dll", "_crt_atexit",       1, emu_crt_atexit },
+    { L"msvcrt.dll",   "_crt_atexit",       1, emu_crt_atexit },
+    { L"kernel32.dll", "ExitThread",        1, emu_ExitThread },
 };
 
 /***********************************************************************
@@ -1156,6 +1354,15 @@ static const struct thunk_override thunk_overrides[] =
 static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_override_func *override )
 {
     LIST_ENTRY *mark, *entry;
+    void *ret = NULL;
+    ULONG_PTR magic;
+
+    /* The loader lock, not a private one: this walk calls LdrLoadDll below when
+     * a guest module's native counterpart is not loaded yet, and that takes the
+     * loader lock itself.  Anything else here deadlocks.  Without it, a trap
+     * resolving while another guest thread is inside LoadLibrary reads a list
+     * that is being spliced. */
+    LdrLockLoaderLock( 0, NULL, &magic );
 
     mark = &NtCurrentTeb()->Peb->LdrData->InMemoryOrderModuleList;
     for (entry = mark->Flink; entry != mark; entry = entry->Flink)
@@ -1178,23 +1385,23 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
         {
             ERR( "%s is a guest module but exports no __wine_thunk_info\n",
                  debugstr_w(mod->BaseDllName.Buffer) );
-            return NULL;
+            goto done;
         }
         if (info->version != THUNK_INFO_VERSION || !info->stride)
         {
             ERR( "%s has thunk info version %u, expected %u\n",
                  debugstr_w(mod->BaseDllName.Buffer), info->version, THUNK_INFO_VERSION );
-            return NULL;
+            goto done;
         }
 
         /* The stub rescues the guest's first argument before trapping, so the
          * trap is at a fixed offset inside the stub rather than at its start;
          * the module publishes that offset.  Requiring an exact hit keeps a
          * stray trap from anywhere else in the image out of the dispatch. */
-        if (rip < base + info->stubs_rva + info->trap_off) return NULL;
+        if (rip < base + info->stubs_rva + info->trap_off) goto done;
         idx = (rip - (base + info->stubs_rva + info->trap_off)) / info->stride;
-        if (idx >= info->count) return NULL;
-        if (base + info->stubs_rva + info->trap_off + (ULONG_PTR)idx * info->stride != rip) return NULL;
+        if (idx >= info->count) goto done;
+        if (base + info->stubs_rva + info->trap_off + (ULONG_PTR)idx * info->stride != rip) goto done;
 
         names = (const UINT *)(base + info->names_rva);
         sigs  = (const UINT *)(base + info->sigs_rva);
@@ -1206,11 +1413,33 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
         {
             ERR( "%s stub %u has unusable signature %08x\n",
                  debugstr_w(mod->BaseDllName.Buffer), idx, sig );
-            return NULL;
+            goto done;
         }
 
         *sig_out = sig;
 
+        /* The native namespace: same base name, resolved for our own machine.
+         * Nothing native necessarily references it -- a guest process may be
+         * the only reason the module is wanted at all -- so load it if it is
+         * not already present rather than treating that as a failure. */
+        if (LdrGetDllHandle( NULL, 0, &mod->BaseDllName, &native ) &&
+            LdrLoadDll( NULL, 0, &mod->BaseDllName, &native ))
+        {
+            WARN( "no native %s; only an override can serve this\n",
+                  debugstr_w(mod->BaseDllName.Buffer) );
+            native = NULL;
+        }
+        RtlInitAnsiString( &func_name, (char *)(base + impl_names[idx]) );
+        if (LdrGetProcedureAddress( native, &func_name, 0, &proc ))
+        {
+            WARN( "native %s has no %s; only an override can serve it\n",
+                  debugstr_w(mod->BaseDllName.Buffer), func_name.Buffer );
+            proc = NULL;
+        }
+
+        TRACE( "%s.%s -> %s %p (%u%s args)\n", debugstr_w(mod->BaseDllName.Buffer),
+               (char *)(base + names[idx]), (char *)(base + impl_names[idx]), proc,
+               THUNK_SIG_ARGC(sig), (sig & THUNK_SIG_VARIADIC) ? "+va" : "" );
         /* An export whose answer only means something in one machine's
          * namespace is answered here rather than forwarded; see above. */
         for (i = 0; i < ARRAY_SIZE(thunk_overrides); i++)
@@ -1222,37 +1451,20 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
                 ERR( "%s.%s override expects %u args, thunk says %u\n",
                      debugstr_w(mod->BaseDllName.Buffer), thunk_overrides[i].name,
                      thunk_overrides[i].argc, THUNK_SIG_ARGC(sig) );
-                return NULL;
+                goto done;
             }
             TRACE( "%s.%s -> override (%u args)\n", debugstr_w(mod->BaseDllName.Buffer),
                    thunk_overrides[i].name, thunk_overrides[i].argc );
             *override = thunk_overrides[i].func;
-            return NULL;
+            break;
         }
 
-        /* The native namespace: same base name, resolved for our own machine.
-         * Nothing native necessarily references it -- a guest process may be
-         * the only reason the module is wanted at all -- so load it if it is
-         * not already present rather than treating that as a failure. */
-        if (LdrGetDllHandle( NULL, 0, &mod->BaseDllName, &native ) &&
-            LdrLoadDll( NULL, 0, &mod->BaseDllName, &native ))
-        {
-            ERR( "no native %s to implement guest imports\n", debugstr_w(mod->BaseDllName.Buffer) );
-            return NULL;
-        }
-        RtlInitAnsiString( &func_name, (char *)(base + impl_names[idx]) );
-        if (LdrGetProcedureAddress( native, &func_name, 0, &proc ))
-        {
-            ERR( "native %s has no %s\n", debugstr_w(mod->BaseDllName.Buffer), func_name.Buffer );
-            return NULL;
-        }
-
-        TRACE( "%s.%s -> %s %p (%u%s args)\n", debugstr_w(mod->BaseDllName.Buffer),
-               (char *)(base + names[idx]), (char *)(base + impl_names[idx]), proc,
-               THUNK_SIG_ARGC(sig), (sig & THUNK_SIG_VARIADIC) ? "+va" : "" );
-        return proc;
+        ret = proc;
+        goto done;
     }
-    return NULL;
+done:
+    LdrUnlockLoaderLock( 0, magic );
+    return ret;
 }
 
 /***********************************************************************
@@ -1379,7 +1591,7 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
             a[argc] = (ULONG_PTR)marshal_thunk_va_list( ctx, argc );
             argc++;
         }
-        ret = override ? override( a ) : call_native_thunk( proc, a );
+        ret = override ? override( a, proc ) : call_native_thunk( proc, a );
 
         /* return to the guest's caller: the trap fired with Rip still on the
          * trap opcode and Rsp still pointing at the return address its CALL
@@ -1389,6 +1601,9 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
         ctx->Rax = ret;
     }
 
+    /* Ending the run is how a guest ExitThread unwinds; see emu_ExitThread. */
+    if (guest_exit_requested) status = STATUS_THREAD_IS_TERMINATING;
+
     status = NtCallbackReturn( NULL, 0, status );
     RtlRaiseStatus( status );
 }
@@ -1397,15 +1612,39 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
 /***********************************************************************
  *           RtlUserThreadStart (NTDLL.@)
  */
+/* the thread that ran the main image; see RtlUserThreadStart */
+static HANDLE emu_first_guest_thread;
+
 void WINAPI RtlUserThreadStart( PRTL_THREAD_START_ROUTINE entry, void *arg )
 {
     __TRY
     {
-        if (thread_start_is_guest_code( entry ))
+        BOOL unclassifiable;
+
+        if (thread_start_is_guest_code( entry, &unclassifiable ) || unclassifiable)
         {
             struct emu_run_entry_params params = { (void *)entry, arg, 0, emu_trap_dispatch };
+            NTSTATUS status;
 
-            NTSTATUS status = WINE_UNIX_CALL( unix_emu_run_entry, &params );
+            /* The first thread to run guest code is the one that ran the main
+             * image: a guest cannot create a thread before its own entry point
+             * executes, so this is unambiguous and needs no lock. */
+            if (!emu_first_guest_thread) emu_first_guest_thread = NtCurrentTeb()->ClientId.UniqueThread;
+
+            if (unclassifiable)
+            {
+                ERR( "thread start %p is in no loaded image; refusing to run it either way\n", entry );
+                RtlExitUserThread( STATUS_INVALID_IMAGE_FORMAT );
+            }
+            status = WINE_UNIX_CALL( unix_emu_run_entry, &params );
+
+            /* A guest ExitThread ended the run deliberately; that is not a
+             * failure and must be checked before the error path below. */
+            if (guest_exit_requested)
+            {
+                TRACE( "guest thread exited with %u\n", guest_exit_code );
+                RtlExitUserThread( guest_exit_code );
+            }
 
             /* not wine_dbgstr_longlong(): on this port PE-side code is built by
              * the native ELF compiler, so its `unsigned long` is 64 bits and the
@@ -1416,7 +1655,12 @@ void WINAPI RtlUserThreadStart( PRTL_THREAD_START_ROUTINE entry, void *arg )
             if (status)
             {
                 ERR( "failed to emulate AMD64 entry point %p, status %08x\n", entry, (UINT)status );
-                NtTerminateProcess( GetCurrentProcess(), status );
+                /* Killing the process is right only for the initial thread,
+                 * where nothing else can be running.  A guest worker thread
+                 * that fails to start must take down itself, not everything. */
+                if (NtCurrentTeb()->ClientId.UniqueThread == emu_first_guest_thread)
+                    NtTerminateProcess( GetCurrentProcess(), status );
+                RtlExitUserThread( status );
             }
             RtlExitUserThread( (ULONG)params.retval );
         }

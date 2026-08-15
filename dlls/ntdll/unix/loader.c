@@ -1024,6 +1024,12 @@ static NTSTATUS unwind_builtin_dll( void *args )
  */
 static void (*p_emu_trap_dispatcher)( ULONG id, void *args, ULONG len );
 
+static int  (*p_fexbridge_run_entry)( void *entry, void *arg,
+                                     ULONGLONG *rax, /* same width as the
+                                     bridge's unsigned long long on LP64 */
+                                     char *err, unsigned int errlen );
+static void (*p_fexbridge_set_trap_handler)( int (*cb)( void *thread, void *ctx, void *user ),
+                                             void *user );
 static int  (*p_fexbridge_process_init)(void);
 static int  (*p_fexbridge_thread_init)( void **thread_out );
 static void (*p_fexbridge_thread_term)( void *thread );
@@ -1032,10 +1038,64 @@ static int  (*p_fexbridge_set_gs_base)( void *thread, ULONGLONG base );
 static int  (*p_fexbridge_fault_is_jit)( const void *host_ucontext );
 static int  (*p_fexbridge_fault_unwind)( void *host_ucontext );
 
+static pthread_once_t emu_bridge_once = PTHREAD_ONCE_INIT;
+static NTSTATUS emu_bridge_status;
+
+/***********************************************************************
+ *           emu_load_bridge
+ *
+ * Load the emulator bridge and resolve its ABI.  Runs once per process under
+ * pthread_once: every guest thread needs these pointers, and resolving them
+ * again per call raced with threads already using them.
+ */
+static void emu_load_bridge(void)
+{
+    const char *name = getenv( "WINEFEXBRIDGE" );
+    void *so;
+
+    if (!name || !name[0]) name = "libfexbridge.so";
+    if (!(so = dlopen( name, RTLD_NOW | RTLD_LOCAL )))
+    {
+        ERR( "cannot load emulator bridge %s: %s\n", name, dlerror() );
+        emu_bridge_status = STATUS_DLL_NOT_FOUND;
+        return;
+    }
+    if (!(p_fexbridge_run_entry = dlsym( so, "fexbridge_run_entry" )))
+    {
+        ERR( "%s has no fexbridge_run_entry: %s\n", name, dlerror() );
+        dlclose( so );
+        emu_bridge_status = STATUS_ENTRYPOINT_NOT_FOUND;
+        return;
+    }
+    /* Optional: an older bridge exports only the one-shot entry.  Without it
+     * the guest still runs, but any call into a thunk module traps with no
+     * handler and ends the run, so fail loudly rather than silently. */
+    p_fexbridge_set_trap_handler = dlsym( so, "fexbridge_set_trap_handler" );
+    /* ABI 2 additions.  All optional: an older bridge simply cannot give the
+     * guest a TEB or hand us its faults, and we say so rather than misbehaving. */
+    p_fexbridge_process_init   = dlsym( so, "fexbridge_process_init" );
+    p_fexbridge_thread_init    = dlsym( so, "fexbridge_thread_init" );
+    p_fexbridge_thread_term    = dlsym( so, "fexbridge_thread_term" );
+    p_fexbridge_current_thread = dlsym( so, "fexbridge_current_thread" );
+    p_fexbridge_set_gs_base    = dlsym( so, "fexbridge_set_gs_base" );
+    p_fexbridge_fault_is_jit   = dlsym( so, "fexbridge_fault_is_jit" );
+    p_fexbridge_fault_unwind   = dlsym( so, "fexbridge_fault_unwind" );
+    TRACE( "loaded emulator bridge %s\n", name );
+}
+
+
+/* set when the PE dispatcher ended the run because the guest called
+ * ExitThread, so that a deliberate exit is not reported as an emulator
+ * failure.  Per thread: it describes this thread's run, nothing else. */
+static __thread BOOL emu_thread_exit_requested;
+
 static int emu_trap_thunk( void *thread, void *ctx, void *user )
 {
+    NTSTATUS status = call_emu_trap_dispatcher( p_emu_trap_dispatcher, ctx );
+
+    if (status == STATUS_THREAD_IS_TERMINATING) emu_thread_exit_requested = TRUE;
     /* FEXBRIDGE_TRAP_CONTINUE / _EXIT */
-    return call_emu_trap_dispatcher( p_emu_trap_dispatcher, ctx ) ? 1 : 0;
+    return status ? 1 : 0;
 }
 
 
@@ -1077,52 +1137,24 @@ BOOL emu_handle_fault( void *sigcontext )
  */
 static NTSTATUS unixcall_emu_run_entry( void *args )
 {
-    static int (*p_fexbridge_run_entry)( void *entry, void *arg,
-                                         ULONGLONG *rax, /* same width as the
-                                         bridge's unsigned long long on LP64 */
-                                         char *err, unsigned int errlen );
-    static void (*p_fexbridge_set_trap_handler)( int (*cb)( void *thread, void *ctx, void *user ),
-                                                 void *user );
     struct emu_run_entry_params *params = args;
+    static TEB *emu_initial_teb;
+    static int no_gs_threads = -1;
+
     void *thread = NULL;
     BOOL own_thread = FALSE;
     char err[256] = "";
     int ret;
 
-    if (!p_fexbridge_run_entry)
-    {
-        const char *name = getenv( "WINEFEXBRIDGE" );
-        void *so;
+    pthread_once( &emu_bridge_once, emu_load_bridge );
+    if (emu_bridge_status) return emu_bridge_status;
 
-        if (!name || !name[0]) name = "libfexbridge.so";
-        if (!(so = dlopen( name, RTLD_NOW | RTLD_LOCAL )))
-        {
-            ERR( "cannot load emulator bridge %s: %s\n", name, dlerror() );
-            return STATUS_DLL_NOT_FOUND;
-        }
-        if (!(p_fexbridge_run_entry = dlsym( so, "fexbridge_run_entry" )))
-        {
-            ERR( "%s has no fexbridge_run_entry: %s\n", name, dlerror() );
-            dlclose( so );
-            return STATUS_ENTRYPOINT_NOT_FOUND;
-        }
-        /* Optional: an older bridge exports only the one-shot entry.  Without
-         * it the guest still runs, but any call into a thunk module traps with
-         * no handler and ends the run, so fail loudly rather than silently. */
-        p_fexbridge_set_trap_handler = dlsym( so, "fexbridge_set_trap_handler" );
-        /* ABI 2 additions.  All optional: an older bridge simply cannot give
-         * the guest a TEB or hand us its faults, and we say so rather than
-         * misbehaving. */
-        p_fexbridge_process_init   = dlsym( so, "fexbridge_process_init" );
-        p_fexbridge_thread_init    = dlsym( so, "fexbridge_thread_init" );
-        p_fexbridge_thread_term    = dlsym( so, "fexbridge_thread_term" );
-        p_fexbridge_current_thread = dlsym( so, "fexbridge_current_thread" );
-        p_fexbridge_set_gs_base    = dlsym( so, "fexbridge_set_gs_base" );
-        p_fexbridge_fault_is_jit   = dlsym( so, "fexbridge_fault_is_jit" );
-        p_fexbridge_fault_unwind   = dlsym( so, "fexbridge_fault_unwind" );
-        TRACE( "loaded emulator bridge %s\n", name );
-    }
-
+    /* The dispatcher and the bridge's trap handler are process-global and were
+     * being rewritten on every call.  With one guest thread that was merely
+     * redundant; with two it repoints a handler another thread may be trapping
+     * through right now.  There is one PE ntdll per process, so the value is
+     * the same every time -- freeze it, and treat a different one as a bug
+     * rather than silently swapping it under a running thread. */
     if (params->trap_dispatcher)
     {
         if (!p_fexbridge_set_trap_handler)
@@ -1130,8 +1162,17 @@ static NTSTATUS unixcall_emu_run_entry( void *args )
             ERR( "emulator bridge has no fexbridge_set_trap_handler, guest imports cannot work\n" );
             return STATUS_ENTRYPOINT_NOT_FOUND;
         }
-        p_emu_trap_dispatcher = params->trap_dispatcher;
-        p_fexbridge_set_trap_handler( emu_trap_thunk, NULL );
+        if (!p_emu_trap_dispatcher)
+        {
+            p_emu_trap_dispatcher = params->trap_dispatcher;
+            p_fexbridge_set_trap_handler( emu_trap_thunk, NULL );
+        }
+        else if (p_emu_trap_dispatcher != params->trap_dispatcher)
+        {
+            ERR( "trap dispatcher changed from %p to %p; refusing to repoint it\n",
+                 p_emu_trap_dispatcher, params->trap_dispatcher );
+            return STATUS_INVALID_PARAMETER;
+        }
     }
 
     /* Give the guest a TEB.  Every real x86-64 Windows image reaches it
@@ -1153,7 +1194,26 @@ static NTSTATUS unixcall_emu_run_entry( void *args )
         if (p_fexbridge_process_init()) WARN( "emulator process init failed\n" );
         if (p_fexbridge_current_thread) thread = p_fexbridge_current_thread();
         if (!thread && !p_fexbridge_thread_init( &thread )) own_thread = TRUE;
-        if (thread) p_fexbridge_set_gs_base( thread, (ULONG_PTR)NtCurrentTeb() );
+
+        /* The GS base is per guest thread and is NOT inherited, so every thread
+         * that runs guest code must set its own or it reads another thread's
+         * TEB -- a bug that looks like it works.  WINEEMUNOGSTHREADS=1 skips it
+         * on every thread but the first, which is exactly that bug, so the test
+         * that asserts distinct TEBs has something to go red against.  Same
+         * shape as WINEEMUKERNELSTACK in unix/signal_ppc64.c. */
+        if (!emu_initial_teb) emu_initial_teb = NtCurrentTeb();
+        if (no_gs_threads == -1)
+        {
+            const char *str = getenv( "WINEEMUNOGSTHREADS" );
+            no_gs_threads = (str && *str == '1');
+        }
+        if (thread)
+        {
+            if (no_gs_threads && NtCurrentTeb() != emu_initial_teb)
+                ERR( "WINEEMUNOGSTHREADS: deliberately leaving GS unset on this thread\n" );
+            else
+                p_fexbridge_set_gs_base( thread, (ULONG_PTR)NtCurrentTeb() );
+        }
         else WARN( "no guest thread, GS will be unset\n" );
     }
     else WARN( "emulator bridge cannot set a guest GS base; TEB access will fault\n" );
@@ -1161,6 +1221,17 @@ static NTSTATUS unixcall_emu_run_entry( void *args )
     ret = p_fexbridge_run_entry( params->entry, params->arg, &params->retval,
                                  err, sizeof(err) );
     if (own_thread && p_fexbridge_thread_term) p_fexbridge_thread_term( thread );
+
+    /* A guest ExitThread ends the run on purpose.  Check it before the error
+     * path: the bridge reports the same "run exited" either way, and only we
+     * know it was asked for.  The bridge handle is already gone above, so the
+     * thread is an ordinary native one before any teardown runs. */
+    if (emu_thread_exit_requested)
+    {
+        emu_thread_exit_requested = FALSE;
+        params->exit_requested = TRUE;
+        return STATUS_SUCCESS;
+    }
     if (ret)
     {
         ERR( "emulator bridge failed (%d): %s\n", ret, err );

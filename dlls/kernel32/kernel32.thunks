@@ -163,3 +163,13 @@ lstrcmpiW                 0x00000B07  2  int   winbase.h:2387
 # kernel32.spec lines (1737/1738) only corroborate the arity.
 wine_get_unix_file_name   0x00000B08  1  int   winbase.h:2507
 wine_get_dos_file_name    0x00000B09  1  int   winbase.h:2508
+
+# Guest threads.  lpStartAddress is passed through UNWRAPPED on purpose: the
+# thread-start funnel (RtlUserThreadStart -> thread_start_is_guest_code) owns
+# thread starts, and wrapping it here too would be the double interception the
+# threads design forbids.
+CreateThread              0x0000C7D0  6  int   processthreadsapi.h:162
+GetExitCodeThread         0x0000E71C  2  int   processthreadsapi.h:172
+# Ends the run by protocol rather than letting native ExitThread reach
+# pthread_exit with a live fexbridge_run below it; see emu_ExitThread.
+ExitThread                0x0000E717  1  void  processthreadsapi.h:165

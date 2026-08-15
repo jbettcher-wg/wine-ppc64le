@@ -87,6 +87,14 @@ struct emu_run_entry_params
      * STATUS_SUCCESS resumes the guest, anything else ends the run.  See
      * emu_trap_dispatch() in dlls/ntdll/signal_ppc64.c. */
     void     (*trap_dispatcher)( ULONG id, void *args, ULONG len );
+    /* out: the guest called ExitThread rather than returning.  The run is
+     * ended from inside the trap dispatch (see emu_ExitThread) instead of
+     * letting native ExitThread reach pthread_exit with a live fexbridge_run
+     * and JIT frames of unknown CFI quality below it on the kernel stack --
+     * the forced unwind across those is the empty-FDE hazard class, which
+     * fails as an invisible spinning core rather than a crash. */
+    BOOL       exit_requested;
+    ULONG      exit_code;
 };
 
 enum ntdll_unix_funcs
