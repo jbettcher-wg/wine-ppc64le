@@ -55,20 +55,96 @@ varargs.  Nothing special is needed in this file for that: va_list already
 classifies as pointer class with sizeof == 8, so the stage-2 probe accepts
 it on its own.  This note exists so nobody later "fixes" it back.
 
+---------------------------------------------------------------------------
+TRUE `...` VARIADICS ARE SUPPORTED, BY FORWARDING TO THE CALLEE'S OWN
+v-VARIANT.  OPT-IN ONLY.  READ THIS BEFORE "FIXING" IT BACK.
+---------------------------------------------------------------------------
+The obvious objection is correct as far as it goes: a FIXED-ARITY stub cannot
+forward `...`, because it cannot know how many arguments the guest pushed.
+The trick is that it does not have to.  It never calls the variadic function
+at all.  It calls that function's OWN v-variant --
+
+    printf     -> vprintf          (1 fixed arg  -> 2 args)
+    _snprintf  -> _vsnprintf       (3 fixed args -> 4 args)
+
+-- handing it a va_list that the HOST synthesises from the guest's argument
+frame.  The v-variant is an ordinary non-variadic function of nfixed+1
+arguments, which this file has always been able to describe.
+
+That works only because of a measured property of THIS abi pair, and would
+not transfer to another one:
+
+  * MS-x64 homes RCX/RDX/R8/R9 into the caller's 32-byte shadow space, so
+    from the first vararg onward the guest's arguments are a flat run of
+    8-byte slots, and a `char *` pointing at the first of them IS an MS-x64
+    va_list.
+  * ppc64le ELFv2 va_list is likewise a plain pointer into a flat 8-byte-slot
+    parameter save area -- no register-save-area half to reconstruct, unlike
+    SysV x86-64, where this would be impossible without rebuilding a
+    __va_list_tag.
+
+Measured end to end on the AC922: a guest-built MS-x64 va_list was consumed
+correctly by native ppc64 `_vsnprintf`, `"%d-%s-%d"` -> `"4242-AB-77"`.
+
+The sibling project (wine-spec-thunk, gen_spec_thunk.py) refuses va_list
+outright.  That refusal was written for a different boundary; it is not an
+ABI fact about this one.  Do not copy it back here.
+
+The opt-in is deliberate and belongs to the SPEC, not to this file: a
+variadic export is only described when its .thunks line names the v-variant
+explicitly (`variadic=vprintf`), and the caller then passes
+allow_variadic=True.  A variadic FunctionDecl with no such opt-in is still
+refused exactly as it always was, because nothing has told us what to call
+instead.  Nothing here derives the v-variant name by string munging -- the
+spec supplies it and the oracle is used to CONFIRM it (nargs(impl) must be
+nfixed+1); see resolve_signatures() in spec2thunk.
+
 Still genuinely unsupported, still refused:
   * a `long double` vararg -- 128-bit on ppc64, 64-bit on MS-x64, so the
     slot widths differ and the walk desynchronises.
   * a struct passed BY VALUE as a vararg -- MS-x64 passes a pointer for
     anything over 8 bytes, ppc64le passes it inline.
-  * true `...` varargs on the thunk itself.  We can forward a va_list we
-    were handed, but we cannot synthesise one from an unknown argument
-    count, so a variadic FunctionDecl is refused (see signature()).
+  * a variadic with ZERO fixed arguments -- there is no anchor to start the
+    walk from, and no such thing exists in a C runtime's surface anyway.
   * float/vector/struct-by-value in the NAMED parameters, and any return
     wider than 64 bits.
+
+---------------------------------------------------------------------------
+BATCHING.  ONE clang PER MODULE, NOT ONE PER SYMBOL.  MUST NOT CHANGE ANSWERS.
+---------------------------------------------------------------------------
+Both stages used to run once per export, which is fine for a hand-written list
+of 150 names and hopeless for a whole .spec (kernel32 has 1342 non-stub
+exports).  Measured on the AC922: one `-ast-dump-filter=<name>` dump is 0.58 s,
+one FULL unfiltered dump of the same probe is 1.49 s and contains every one of
+the 6284 visible FunctionDecls.  So the filtered dump is not a cheaper query,
+it is the same work done 1342 times.
+
+  stage 1 is now dumped ONCE, unfiltered, and indexed by name.  A filtered
+  dump and an unfiltered one traverse the same list -- clang's ASTPrinter walks
+  the translation unit's own decls either way, and the filter only decides
+  which of them get printed -- so the FunctionDecl nodes are the same nodes.
+  _decl_from_node() is the single reader of a node and is shared by both paths,
+  so an indexed answer cannot drift from a filtered one.
+
+  stage 2 is COMPILED ONCE for the whole module, as one translation unit made
+  of per-export chunks that share nothing but the headers.  This is a fast path
+  for the ACCEPT case only: if the batch compiles clean, every chunk in it
+  compiled clean, and each export is memoised accepted.  If it does not, every
+  export whose own lines a diagnostic points at -- and, if a diagnostic cannot
+  be attributed at all, every export in the batch -- falls back to its OWN
+  single-symbol probe, so a REFUSAL is still produced by exactly the code and
+  the exact source text that produced it before, and carries the same message.
+  That is why the per-symbol probe is kept rather than deleted: it is the
+  authority on refusals, and refusals are the minority.
+
+Verified answer-for-answer: regenerating kernel32, msvcrt, ntdll, ucrtbase and
+user32 with batching on and off produces byte-identical DLLs.  set batch=False
+(or SPEC2THUNK_NO_BATCH=1) to re-run that comparison.
 """
 
 import json
 import os
+import re
 import subprocess
 import tempfile
 
@@ -87,6 +163,15 @@ INTEGER_CLASSES = (1,   # integer_type_class
 # own; adding them only widens what clang can see, it does not relax a single
 # check.  They are listed explicitly rather than globbed so that what the
 # oracle reads stays reviewable.
+#
+# The second group below is Win32 headers that windows.h does NOT pull in --
+# it stops at winbase/wingdi/winuser/winnls/wincon/winver/winreg/winnetwk and
+# the OLE set (see include/windows.h).  Wine's own kernel32 sources include
+# them by name, so the declarations exist and only the PROBE could not see
+# them.  MEASURED on a whole-kernel32.spec run: 39 exports came back "no
+# declaration found in Wine headers" purely because of this, out of 179 -- a
+# tooling gap being reported as an ABI fact, which is the one thing this file
+# must never do.  Each line below says which exports it is there for.
 PROBE_SRC = (
     "#include <stdarg.h>\n"
     "#include <windows.h>\n"
@@ -97,6 +182,14 @@ PROBE_SRC = (
     "#include <process.h>\n"
     "#include <io.h>\n"               # corecrt_io.h: _setmode
     "#include <corecrt_startup.h>\n"  # _set_app_type, _configure_wide_argv, ...
+    "#include <fileapi.h>\n"          # CreateFile2, Find{First,Next}FileNameW,
+                                      # GetTempPath2A/W
+    "#include <tlhelp32.h>\n"         # CreateToolhelp32Snapshot, Module32*,
+                                      # Process32*, Thread32*, Heap32*
+    "#include <werapi.h>\n"           # WerRegisterFile, WerSetFlags, ...
+    "#include <appmodel.h>\n"         # AppPolicyGet*
+    "#include <processsnapshot.h>\n"  # PssCaptureSnapshot, PssFreeSnapshot, ...
+    "#include <winternl.h>\n"         # the NT surface kernel32 re-exports
 )
 
 # ---------------------------------------------------------------------------
@@ -157,18 +250,80 @@ SUGAR_SPELLING = {
 NULLABILITY = ('_Nonnull', '_Nullable', '_Null_unspecified', '_Nullable_result')
 
 
+# ---------------------------------------------------------------------------
+# clang PRINTS A CALLING CONVENTION WHERE IT CANNOT BE WRITTEN.
+# ---------------------------------------------------------------------------
+# A function-POINTER parameter comes back with the pointee's convention printed
+# after the declarator, which is not a position C accepts:
+#
+#     qsort -> params[3] = 'int (*)(const void *, const void *)
+#                           __attribute__((cdecl))'
+#
+# Splicing that into the stage-2 probe is
+#     error: use of undeclared identifier '__cdecl__'
+# (Wine's headers #define cdecl, so the attribute name macro-expands and stops
+# being an attribute at all).  That is a printing artefact exactly like the
+# `__size_t` sugar and the doubled nullability specifiers above, and it was
+# refusing qsort, bsearch, qsort_s and atexit from every CRT module -- four
+# exports a real guest binary imports.
+#
+# DROPPING IT IS ABI-INERT AND BACKSTOPPED, TWICE OVER.  A function pointer is
+# one 8-byte pointer in one integer register whatever the pointee's convention
+# is, so the descriptor cannot change.  And the reconstruction is still
+# ASSIGNED the real function: if the convention actually mattered the two
+# pointer types would be incompatible and the probe would fail with clang's own
+# "incompatible pointer types" -- a refusal, not a wrong answer.  Only the
+# convention attributes are dropped; every other attribute keeps failing
+# exactly as it does today.
+CONV_ATTR = re.compile(
+    r'\s*__attribute__\(\(\s*(?:__)?'
+    r'(?:cdecl|stdcall|fastcall|thiscall|vectorcall|regcall|ms_abi|sysv_abi)'
+    r'(?:__)?\s*\)\)')
+
+
+# ---------------------------------------------------------------------------
+# "POINTER TO <T>" IS NOT "<T> *" WHEN <T> IS AN ABSTRACT DECLARATOR.
+# ---------------------------------------------------------------------------
+# The stage-2 probe needs an expression of each parameter's type and builds one
+# as `*(<T> *)0`.  Appending ` *` is correct for `const char *` and for `DWORD`
+# and wrong for every declarator with inner parentheses -- a function pointer:
+#
+#     int (*)(const void *, const void *) *      <- error: expected ')'
+#
+# The pointer has to go INSIDE the declarator: `int (**)(const void *, const
+# void *)`.  This is the second half of what was refusing qsort, bsearch,
+# qsort_s and atexit; fixing only the printed calling convention just moved the
+# error from "undeclared identifier '__cdecl__'" to "expected ')'".
+#
+# Inserting one `*` in the innermost declarator is the C spelling of "pointer
+# to that type" -- it is not a relaxation, and `sizeof` still uses the type
+# UNCHANGED.  The outermost `(*` is the first one in the string, because the
+# return type is printed before it, so a parameter that is itself a pointer to
+# a function taking a function pointer still gets the outer declarator.
+_PTR_DECL = re.compile(r'\(\s*\*')
+
+
+def _ptr_to(spelling):
+    """-> a valid spelling of "pointer to <spelling>"."""
+    m = _PTR_DECL.search(spelling)
+    if m:
+        return spelling[:m.end()] + '*' + spelling[m.end():]
+    return spelling + ' *'
+
+
 def _respell(spelling):
     """Make a clang type spelling valid source again.
 
-    Two transformations, both provably ABI-inert -- see the SUGAR_SPELLING and
-    NULLABILITY notes above:
+    Three transformations, all provably ABI-inert -- see the SUGAR_SPELLING,
+    NULLABILITY and CONV_ATTR notes above:
       * clang's unspellable canonical-sugar names -> the source typedef
       * clang's nullability specifiers -> dropped
+      * a calling convention printed after a declarator -> dropped
     """
-    import re
     s = re.sub(r'\b(%s)\b' % '|'.join(SUGAR_SPELLING),
                lambda m: SUGAR_SPELLING[m.group(1)], spelling)
     s = re.sub(r'\s*\b(?:%s)\b' % '|'.join(NULLABILITY), '', s)
+    s = CONV_ATTR.sub('', s)
     return s.strip()
 
 
@@ -176,6 +331,58 @@ class Refused(Exception):
     def __init__(self, reason):
         Exception.__init__(self, reason)
         self.reason = reason
+
+
+def _split_top(text, sep=','):
+    """Split on `sep` at parenthesis/bracket depth 0 only."""
+    out, depth, cur = [], 0, ''
+    for ch in text:
+        if ch in '([':
+            depth += 1
+        elif ch in ')]':
+            depth -= 1
+        if ch == sep and depth == 0:
+            out.append(cur.strip())
+            cur = ''
+        else:
+            cur += ch
+    out.append(cur.strip())
+    return out
+
+
+def _toplevel_params(functype):
+    """-> list of top-level parameter spellings of a clang function type.
+
+    `functype` is a whole function type as clang prints it, e.g.
+    'int (char *, size_t, const char *, ...)'.  Returns the contents of the
+    OUTERMOST parameter list, split at depth 0.
+
+    Naive substring tests on the printed type get this wrong: a parameter that
+    is itself a pointer to a variadic function -- 'int (int (*)(char *, ...))'
+    -- contains ', ...)' while the function itself is NOT variadic.  Mistaking
+    that for a variadic would be a silent arity error, so the parameter list is
+    parsed rather than pattern-matched.
+    """
+    depth, start = 0, None
+    for i, ch in enumerate(functype):
+        if ch == '(':
+            if depth == 0 and start is None:
+                start = i + 1
+            depth += 1
+        elif ch == ')':
+            depth -= 1
+            if depth == 0 and start is not None:
+                return _split_top(functype[start:i])
+    raise Refused('cannot find a parameter list in %r' % functype)
+
+
+def _is_variadic(functype):
+    """True iff the OUTERMOST parameter list ends in a literal '...'."""
+    try:
+        params = _toplevel_params(functype)
+    except Refused:
+        return False
+    return bool(params) and params[-1] == '...'
 
 
 # ---------------------------------------------------------------------------
@@ -224,7 +431,8 @@ def crt_defines_for_dll(dll):
 
 class WineHeaders:
     def __init__(self, include_dir, generated_dir=None, clang='clang',
-                 target='x86_64-windows-gnu', workdir=None, defines=()):
+                 target='x86_64-windows-gnu', workdir=None, defines=(),
+                 batch=None):
         self.include_dir = os.path.abspath(os.path.expanduser(include_dir))
         self.generated_dir = (os.path.abspath(os.path.expanduser(generated_dir))
                               if generated_dir else None)
@@ -237,6 +445,18 @@ class WineHeaders:
         with open(self._probe, 'w') as f:
             f.write(PROBE_SRC)
         self._cache = {}
+        # name -> [decl, ...] for the WHOLE header surface, built on first use.
+        # None until then; see _build_index() and the BATCHING banner above.
+        self._index = None
+        # (name, ret, params, variadic) -> (returncode, stderr) for a stage-2
+        # probe already decided, whether one at a time or inside a batch.
+        self._probe_memo = {}
+        if batch is None:
+            batch = os.environ.get('SPEC2THUNK_NO_BATCH', '') in ('', '0')
+        self.batch = bool(batch)
+        # Counters, so a caller can SAY what it did rather than assume it.
+        self.stats = dict(ast_dumps=0, probe_compiles=0, batched_probes=0,
+                          fallback_probes=0, indexed_decls=0)
 
     # ---------------------------------------------------------------- clang
 
@@ -273,48 +493,142 @@ class WineHeaders:
             out.append(obj)
         return out
 
+    @staticmethod
+    def _decl_from_node(obj, name):
+        """-> the one decl dict we keep for a FunctionDecl node, or None.
+
+        THE SINGLE READER OF A CLANG AST NODE.  Both the per-symbol filtered
+        dump and the whole-translation-unit index go through this, so an
+        indexed answer cannot drift from a filtered one -- there is only one
+        piece of code that turns a node into an answer.
+        """
+        if obj.get('kind') != 'FunctionDecl' or obj.get('name') != name:
+            return None
+        # Skip clang's own implicit builtin declaration (wcsncmp, memcpy,
+        # exit, ...).  It shadows Wine's header declaration and prints its
+        # types with clang-internal names that are not spellable in source
+        # -- `__size_t` -- so reconstructing from it produces an
+        # implicit-int error that looks like a refusal but is not one.
+        # We want what Wine's header says, so take only explicit decls.
+        if obj.get('isImplicit'):
+            return None
+        ty = obj.get('type', {})
+        qt = ty.get('qualType', '')
+        # One level of desugaring strips a MacroQualifiedType, which clang
+        # prints as the bare macro name: HeapAlloc's type comes back as
+        # "__WINE_MALLOC LPVOID (HANDLE, DWORD, SIZE_T)", and splicing
+        # that macro in front of a function-pointer declarator is an
+        # ignored-attribute error.  desugaredQualType is the same type
+        # without the macro sugar: "LPVOID (HANDLE, DWORD, SIZE_T)".
+        rt = ty.get('desugaredQualType') or qt
+        params = [c.get('type', {}).get('qualType')
+                  for c in obj.get('inner', []) if c.get('kind') == 'ParmVarDecl']
+        loc = obj.get('loc', {})
+        # A macro-expanded declarator reports its spelling location; the
+        # expansion location is the one a human can go and read.
+        file_ = loc.get('file')
+        line = loc.get('line')
+        if file_ is None:
+            beg = obj.get('range', {}).get('begin', {})
+            exp = beg.get('expansionLoc', beg)
+            file_, line = exp.get('file'), exp.get('line')
+        return dict(file=file_, line=line, qualtype=qt, rettype=rt,
+                    params=params, variadic=_is_variadic(rt))
+
+    # -----------------------------------------------------------------------
+    # clang's JSON AST DUMP OMITS A LOCATION'S `file` WHEN IT HAS NOT CHANGED.
+    # -----------------------------------------------------------------------
+    # JSONNodeDumper::writeBareSourceLocation prints `file` only when the
+    # buffer name differs from the previously printed location's, and `line`
+    # only when the line number differs.  Per-symbol `-ast-dump-filter` runs
+    # hid this: the FIRST location a run prints always carries its file, and a
+    # filtered run prints almost nothing else.  In ONE unfiltered dump only 17
+    # of 5868 FunctionDecls carry a `file` at all, and the other 5851 came back
+    # as "<unknown>:None" -- which spec2thunk correctly rejected as a
+    # spec/header disagreement rather than emitting a wrong citation.
+    #
+    # `includedFrom` is NOT the answer: it names the file doing the #include,
+    # not the file the declaration is in.
+    #
+    # The state is reconstructed by replaying the omission rule in the order
+    # clang emitted the locations.  json.loads preserves object key order, and
+    # a pre-order walk of the parsed tree in key order therefore visits every
+    # location in exactly its serialisation order -- which IS clang's emission
+    # order.  The walk is generic (any object carrying an `offset` is a bare
+    # location) so it cannot be desynchronised by a location attached to some
+    # node kind this file does not know about.
+    @staticmethod
+    def _fill_omitted_locations(tu):
+        """Restore the `file` (and `line`) clang left out.  In place."""
+        cur_file, cur_line = None, None
+        stack = [tu]
+        while stack:
+            o = stack.pop()
+            if type(o) is dict:
+                if 'offset' in o:               # a bare source location
+                    f = o.get('file')
+                    if f is not None:
+                        # file printed => line printed too, always.
+                        cur_file, cur_line = f, o.get('line', cur_line)
+                    elif 'line' in o:
+                        o['file'], cur_line = cur_file, o['line']
+                    else:
+                        o['file'], o['line'] = cur_file, cur_line
+                stack.extend(reversed(list(o.values())))
+            elif type(o) is list:
+                stack.extend(reversed(o))
+
+    def _build_index(self):
+        """Dump the WHOLE probe's AST once and index every FunctionDecl by name.
+
+        82 MB of JSON and 5868 FunctionDecls for Wine's windows.h + CRT closure,
+        in 1.4 s -- against 0.58 s for ONE `-ast-dump-filter` query.  See the
+        BATCHING banner at the top of this file.
+
+        In C every function declaration is a direct child of the translation
+        unit, which is exactly the list `-ast-dump-filter` walks, so this sees
+        the same nodes the filtered dump would have printed one at a time.
+        """
+        cmd = self._base() + ['-Xclang', '-ast-dump=json', self._probe]
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        self.stats['ast_dumps'] += 1
+        if not r.stdout.strip():
+            raise SystemExit('FATAL: clang produced no AST for the probe:\n%s'
+                             % r.stderr[:4000])
+        try:
+            tu = json.loads(r.stdout)
+        except ValueError as e:
+            raise SystemExit('FATAL: cannot parse clang\'s AST dump (%s)' % e)
+        self._fill_omitted_locations(tu)
+        idx = {}
+        for obj in tu.get('inner', ()):
+            if obj.get('kind') != 'FunctionDecl':
+                continue
+            n = obj.get('name')
+            if n:
+                idx.setdefault(n, []).append(obj)
+        self._index = idx
+        self.stats['indexed_decls'] = sum(len(v) for v in idx.values())
+
     def _ast(self, name):
         if name in self._cache:
             return self._cache[name]
-        cmd = self._base() + ['-Xclang', '-ast-dump=json',
-                              '-Xclang', '-ast-dump-filter=' + name, self._probe]
-        r = subprocess.run(cmd, capture_output=True, text=True)
+        if self.batch:
+            if self._index is None:
+                self._build_index()
+            nodes = self._index.get(name, ())
+        else:
+            cmd = self._base() + ['-Xclang', '-ast-dump=json',
+                                  '-Xclang', '-ast-dump-filter=' + name,
+                                  self._probe]
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            self.stats['ast_dumps'] += 1
+            nodes = self._split_json(r.stdout)
         decls = []
-        for obj in self._split_json(r.stdout):
-            if obj.get('kind') != 'FunctionDecl' or obj.get('name') != name:
-                continue
-            # Skip clang's own implicit builtin declaration (wcsncmp, memcpy,
-            # exit, ...).  It shadows Wine's header declaration and prints its
-            # types with clang-internal names that are not spellable in source
-            # -- `__size_t` -- so reconstructing from it produces an
-            # implicit-int error that looks like a refusal but is not one.
-            # We want what Wine's header says, so take only explicit decls.
-            if obj.get('isImplicit'):
-                continue
-            ty = obj.get('type', {})
-            qt = ty.get('qualType', '')
-            # One level of desugaring strips a MacroQualifiedType, which clang
-            # prints as the bare macro name: HeapAlloc's type comes back as
-            # "__WINE_MALLOC LPVOID (HANDLE, DWORD, SIZE_T)", and splicing
-            # that macro in front of a function-pointer declarator is an
-            # ignored-attribute error.  desugaredQualType is the same type
-            # without the macro sugar: "LPVOID (HANDLE, DWORD, SIZE_T)".
-            rt = ty.get('desugaredQualType') or qt
-            params = [c.get('type', {}).get('qualType')
-                      for c in obj.get('inner', []) if c.get('kind') == 'ParmVarDecl']
-            loc = obj.get('loc', {})
-            # A macro-expanded declarator reports its spelling location; the
-            # expansion location is the one a human can go and read.
-            file_ = loc.get('file')
-            line = loc.get('line')
-            if file_ is None:
-                beg = obj.get('range', {}).get('begin', {})
-                exp = beg.get('expansionLoc', beg)
-                file_, line = exp.get('file'), exp.get('line')
-            decls.append(dict(file=file_, line=line, qualtype=qt, rettype=rt,
-                              params=params,
-                              variadic=qt.rstrip().endswith('...)')
-                              or ', ...)' in qt))
+        for obj in nodes:
+            d = self._decl_from_node(obj, name)
+            if d is not None:
+                decls.append(d)
         self._cache[name] = decls
         return decls
 
@@ -333,26 +647,43 @@ class WineHeaders:
 
     # ---------------------------------------- stage 2: compiler-checked probe
 
-    def _probe_source(self, name, ret, params):
-        L = [PROBE_SRC]
-        arglist = ', '.join(params) if params else 'void'
-        # If this reconstruction is not the real prototype, this is a hard error.
-        L.append('static %s (*wt_reconstructed)(%s) = &%s;\n' % (ret, arglist, name))
-        L.append('void wt_use(void) { (void)wt_reconstructed; }\n')
+    def _probe_chunk(self, name, ret, params, variadic=False, tag=''):
+        """The lines that test ONE export.  Self-contained: it declares only
+        its own `wt_r<tag>` / `wt_use<tag>`, mentions no other export, and
+        needs nothing but the headers, which is what makes concatenating a
+        module's worth of them into one translation unit sound.
 
-        def intcheck(tag, spelling):
-            ors = ' || '.join('__builtin_classify_type(*(%s *)0) == %d'
-                              % (spelling, c) for c in INTEGER_CLASSES)
+        tag='' reproduces the single-symbol probe byte for byte, so a refusal
+        message is the one this tool has always printed.
+        """
+        L = []
+        # The ellipsis is part of the TYPE, so it has to be reconstructed too:
+        # assigning &printf to `int (*)(const char *)` is a hard error, which
+        # is exactly the property that makes this check worth anything.
+        plist = list(params) + (['...'] if variadic else [])
+        arglist = ', '.join(plist) if plist else 'void'
+        # If this reconstruction is not the real prototype, this is a hard error.
+        L.append('static %s (*wt_reconstructed%s)(%s) = &%s;\n'
+                 % (ret, tag, arglist, name))
+        L.append('void wt_use%s(void) { (void)wt_reconstructed%s; }\n' % (tag, tag))
+
+        def intcheck(what, spelling):
+            ors = ' || '.join('__builtin_classify_type(*(%s)0) == %d'
+                              % (_ptr_to(spelling), c) for c in INTEGER_CLASSES)
             L.append('_Static_assert(%s, "%s: %s is not integer/pointer class");\n'
-                     % (ors, name, tag))
+                     % (ors, name, what))
             L.append('_Static_assert(sizeof(%s) <= 8, "%s: %s is wider than 64 bits");\n'
-                     % (spelling, name, tag))
+                     % (spelling, name, what))
 
         for i, p in enumerate(params):
             intcheck('argument %d (%s)' % (i, p), p)
         if ret.strip() != 'void':
             intcheck('return value (%s)' % ret, ret)
-        return ''.join(L)
+        return L
+
+    def _probe_source(self, name, ret, params, variadic=False):
+        return PROBE_SRC + ''.join(
+            self._probe_chunk(name, ret, params, variadic))
 
     def _compile_probe(self, name, src):
         p = os.path.join(self.workdir, 'wt_check_%s.c' % name)
@@ -360,7 +691,105 @@ class WineHeaders:
             f.write(src)
         r = subprocess.run(self._base() + ['-Werror', p],
                            capture_output=True, text=True)
+        self.stats['probe_compiles'] += 1
         return r.returncode, r.stderr
+
+    # A clang diagnostic header line: "<file>:<line>:<col>: error: <text>".
+    _DIAG_RE = re.compile(r'^(?P<file>[^\s:][^:]*):(?P<line>\d+):\d+:\s*'
+                          r'(?P<kind>error|fatal error|warning|note):', re.M)
+
+    def _probe_verdict(self, name, ret, params, variadic):
+        """-> (returncode, stderr) for one export's stage-2 probe.
+
+        Answers from the batch memo when the batch already proved this exact
+        (name, ret, params, variadic) compiles clean; otherwise runs the
+        single-symbol probe that has always produced the refusal message.
+        """
+        key = (name, ret, tuple(params), bool(variadic))
+        hit = self._probe_memo.get(key)
+        if hit is not None:
+            return hit
+        self.stats['fallback_probes'] += 1
+        rc, err = self._compile_probe(
+            name, self._probe_source(name, ret, params, variadic))
+        self._probe_memo[key] = (rc, err)
+        return rc, err
+
+    def prefetch(self, requests):
+        """Decide the stage-2 probe for a whole module in ONE compile.
+
+        `requests` is an iterable of (export_name, allow_variadic).  Anything
+        stage 1 already refuses is skipped silently -- signature() will raise
+        the identical Refused when it is asked for real.
+
+        ACCEPTS IN BULK, REFUSES ONE AT A TIME.  A clean batch memoises every
+        chunk in it as accepted.  A dirty one memoises only the chunks no
+        diagnostic points at, and leaves the implicated ones unmemoised so
+        _probe_verdict() falls back to the single-symbol probe and produces the
+        same message it always did.  If a diagnostic cannot be attributed to a
+        chunk at all -- an error in a header, or a line outside every chunk --
+        NOTHING is memoised and the whole batch falls back.  The batch can
+        therefore only ever save work, never decide a refusal.
+        """
+        if not self.batch:
+            return
+        items, seen = [], set()
+        for name, allow_variadic in requests:
+            try:
+                d, ret, params = self._shape(name, allow_variadic)
+            except Refused:
+                continue
+            key = (name, ret, tuple(params), bool(d['variadic']))
+            if key in self._probe_memo or key in seen:
+                continue
+            seen.add(key)
+            items.append((key, name, ret, params, d['variadic']))
+        if not items:
+            return
+
+        lines = [PROBE_SRC]
+        nl = PROBE_SRC.count('\n')          # lines consumed so far
+        spans = []                          # (first_line, last_line, key)
+        for i, (key, name, ret, params, variadic) in enumerate(items):
+            chunk = self._probe_chunk(name, ret, params, variadic, tag='_%d' % i)
+            first = nl + 1
+            lines += chunk
+            nl += sum(c.count('\n') for c in chunk)
+            spans.append((first, nl, key))
+
+        path = os.path.join(self.workdir, 'wt_batch.c')
+        with open(path, 'w') as f:
+            f.write(''.join(lines))
+        r = subprocess.run(
+            self._base() + ['-Werror', '-ferror-limit=0', path],
+            capture_output=True, text=True)
+        self.stats['probe_compiles'] += 1
+        self.stats['batched_probes'] += len(items)
+
+        if r.returncode == 0:
+            for _f, _l, key in spans:
+                self._probe_memo[key] = (0, '')
+            return
+
+        # Attribute every error to the chunk whose lines it points at.
+        bad = set()
+        for m in self._DIAG_RE.finditer(r.stderr):
+            if m.group('kind') == 'note':
+                continue                     # notes hang off an error we saw
+            if os.path.abspath(m.group('file')) != os.path.abspath(path):
+                if m.group('kind') != 'warning':
+                    return                   # error outside our file: fall back
+                continue
+            ln = int(m.group('line'))
+            for first, last, key in spans:
+                if first <= ln <= last:
+                    bad.add(key)
+                    break
+            else:
+                return                       # unattributable: fall back
+        for _f, _l, key in spans:
+            if key not in bad:
+                self._probe_memo[key] = (0, '')
 
     @staticmethod
     def _first_reason(stderr):
@@ -376,12 +805,14 @@ class WineHeaders:
 
     # ------------------------------------------------------------------ API
 
-    def signature(self, name):
-        """-> dict(nargs, returns_void, header, line, ret, params).
+    def _shape(self, name, allow_variadic=False):
+        """Stage 1 and every purely structural check, with no compiler run.
 
-        Raises Refused with a human reason for anything not representable as
-        "N integer/pointer arguments, one <=64-bit integer/pointer or void
-        return".  Never guesses.
+        -> (decl, ret_spelling, param_spellings), or raises Refused.  Split out
+        of signature() so prefetch() can work out what the stage-2 probe would
+        say WITHOUT deciding anything: the order and the wording of the checks
+        below are unchanged, so a name refused here is refused identically
+        whether it arrives through signature() or prefetch().
         """
         decls = self._ast(name)
         if not decls:
@@ -392,7 +823,7 @@ class WineHeaders:
             raise Refused('conflicting declarations: %s'
                           % '; '.join(sorted(s[0] for s in shapes)))
         d = decls[0]
-        if d['variadic']:
+        if d['variadic'] and not allow_variadic:
             raise Refused('varargs (%s)' % d['qualtype'])
         if any(p is None for p in d['params']):
             raise Refused('unreadable parameter type in %s' % d['qualtype'])
@@ -402,14 +833,43 @@ class WineHeaders:
         if len(params) > 16:
             raise Refused('%d arguments, descriptor field holds at most 16'
                           % len(params))
+        if d['variadic'] and not params:
+            raise Refused('variadic with no fixed argument: nothing for the '
+                          'host to anchor the va_list walk on (%s)'
+                          % d['qualtype'])
+        if d['variadic'] and len(params) + 1 > 16:
+            # The host calls the v-variant, which takes one argument MORE than
+            # the fixed count -- the va_list -- and its marshaller tops out at
+            # 16 (THUNK_MAX_ARGS in dlls/ntdll/signal_ppc64.c).  Emitting this
+            # would produce a descriptor the dispatcher then rejects at runtime.
+            raise Refused('%d fixed arguments + va_list exceeds the 16 the '
+                          'host marshaller passes' % len(params))
+        return d, ret, params
 
-        rc, err = self._compile_probe(name, self._probe_source(name, ret, params))
+    def signature(self, name, allow_variadic=False):
+        """-> dict(nargs, returns_void, variadic, header, line, ret, params).
+
+        Raises Refused with a human reason for anything not representable as
+        "N integer/pointer arguments, one <=64-bit integer/pointer or void
+        return".  Never guesses.
+
+        allow_variadic=True additionally permits a true `...` declaration, and
+        then `nargs` is the number of FIXED arguments -- i.e. where the
+        variadic part begins.  It is OPT-IN because describing a variadic is
+        only sound when the caller also has a v-variant to forward to; see the
+        long note at the top of this file.  Left False (the default) a
+        variadic is refused exactly as it always was.
+        """
+        d, ret, params = self._shape(name, allow_variadic)
+
+        rc, err = self._probe_verdict(name, ret, params, d['variadic'])
         if rc != 0:
             raise Refused(self._first_reason(err))
 
         hdr = d['file'] or '<unknown>'
         return dict(nargs=len(params),
                     returns_void=(ret.strip() == 'void'),
+                    variadic=d['variadic'],
                     header=os.path.basename(hdr),
                     header_path=hdr,
                     line=d['line'],
@@ -494,6 +954,17 @@ class WineSpecs:
             raise Refused('%s:%d is architecture-conditional (-arch=), so the '
                           'line cited may not be the one that applies'
                           % (specname, lineno))
+        # `@ varargs printf(str)` lists only the FIXED arguments, exactly like
+        # `@ cdecl` lists all of them, so counting tokens silently produced a
+        # fixed-arity descriptor for a variadic.  A variadic needs its
+        # v-variant cross-checked with the header oracle (nargs(impl) ==
+        # nfixed+1) and a .spec has no return type to check it against, so this
+        # path cannot serve one at all.  Cite the header instead.
+        if 'varargs' in head.split():
+            raise Refused('%s:%d is `@ varargs`; a variadic must be cited to a '
+                          'header and carry variadic=<v-variant> in the thunk '
+                          'spec, the .spec arity fallback cannot describe one'
+                          % (specname, lineno))
         args = arglist.split()
         for a in args:
             if a in self.BAD_ARGS:
@@ -506,6 +977,7 @@ class WineSpecs:
                           % len(args))
         return dict(nargs=len(args),
                     returns_void=asserted_returns_void,
+                    variadic=False,          # refused above; never reached
                     return_verified=False,
                     header=specname,
                     header_path=path,
@@ -516,11 +988,26 @@ class WineSpecs:
                              % (name, ' '.join(args), specname, lineno))
 
 
+DESC_VOID = 0x100        # bit 8
+DESC_VARIADIC = 0x200    # bit 9
+DESC_RESERVED = 0xfffffc00   # bits 10..31, MUST be zero
+
+
 def descriptor(sig):
-    """Pack a signature into the uint32 that sigs_rva[i] holds."""
+    """Pack a signature into the uint32 that sigs_rva[i] holds.
+
+    bits 0..7  argument count.  For a variadic this is the number of FIXED
+               arguments, i.e. where the variadic part begins.
+    bit  8     returns void
+    bit  9     variadic -- the host must synthesise a va_list from the guest
+               frame past argument nargs-1 and call impl_names_rva[i] instead.
+    bits 10..31 reserved, must be zero.
+    """
     if not (0 <= sig['nargs'] <= 16):
         raise Refused('nargs out of range')
-    return (sig['nargs'] & 0xff) | (0x100 if sig['returns_void'] else 0)
+    return ((sig['nargs'] & 0xff)
+            | (DESC_VOID if sig['returns_void'] else 0)
+            | (DESC_VARIADIC if sig.get('variadic') else 0))
 
 
 # This is a build tool living at <wine-root>/tools/spec2thunk/, so the source
@@ -553,20 +1040,38 @@ if __name__ == '__main__':
     # `wine_sig.py --dll=msvcrt.dll vprintf ...` puts the CRT headers in that
     # module's own mode, the same way spec2thunk does from the DLL line of
     # a .thunks file.  Without it you get the default (UCRT) view.
-    defines = []
-    while argv and argv[0].startswith('--dll='):
-        defines = crt_defines_for_dll(argv.pop(0).split('=', 1)[1])
+    # `--variadic` turns on the opt-in for the names that follow, the same way
+    # a `variadic=<impl>` column does in a .thunks file.  Without it a variadic
+    # is refused, which is the default everywhere.
+    defines, allow_variadic = [], False
+    while argv and argv[0].startswith('--'):
+        a = argv.pop(0)
+        if a.startswith('--dll='):
+            defines = crt_defines_for_dll(a.split('=', 1)[1])
+        elif a == '--variadic':
+            allow_variadic = True
+        else:
+            sys.exit('usage: wine_sig.py [--dll=<name>.dll] [--variadic] '
+                     '<export> ...')
     if defines:
         print('# CRT mode: %s' % ' '.join(defines))
-    w = WineHeaders(DEFAULT_INCLUDE, DEFAULT_GENERATED,
-                    workdir='/tmp/imports-work/build/sigprobe',
+    # find_generated_include() -- the widl-generated headers are BUILD output.
+    # This used to name a DEFAULT_GENERATED that does not exist anywhere in
+    # this file, so running the module directly died with a NameError before
+    # it printed anything.
+    generated = find_generated_include()
+    if not generated:
+        sys.exit('cannot find the widl-generated headers (wtypes.h); run from '
+                 'the top of the build directory')
+    w = WineHeaders(DEFAULT_INCLUDE, generated,
+                    workdir=tempfile.mkdtemp(prefix='winesig-cli-'),
                     defines=defines)
     w.sanity()
     for n in argv:
         try:
-            s = w.signature(n)
-            print('%-26s nargs=%d void=%d desc=0x%03x  %s:%s  %s'
-                  % (n, s['nargs'], s['returns_void'], descriptor(s),
-                     s['header'], s['line'], s['qualtype']))
+            s = w.signature(n, allow_variadic=allow_variadic)
+            print('%-26s nargs=%d void=%d variadic=%d desc=0x%03x  %s:%s  %s'
+                  % (n, s['nargs'], s['returns_void'], s['variadic'],
+                     descriptor(s), s['header'], s['line'], s['qualtype']))
         except Refused as e:
             print('%-26s REFUSED: %s' % (n, e.reason))

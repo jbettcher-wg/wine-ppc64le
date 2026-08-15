@@ -8,7 +8,7 @@ tabulated address.  A host-side dispatcher maps a trapping RIP back to an
 export index using the exported __wine_thunk_info structure:
 
     struct {
-        uint32_t version;    /* = 3 */
+        uint32_t version;    /* = 4 */
         uint32_t count;
         uint32_t stubs_rva;
         uint32_t stride;     /* = 16 */
@@ -16,7 +16,14 @@ export index using the exported __wine_thunk_info structure:
         uint32_t sigs_rva;   /* count x uint32 signature descriptor        */
         uint32_t trap_off;   /* byte offset of the trapping instruction
                                 within a stub: 3 for trap, 0 for direct    */
+        uint32_t impl_names_rva; /* count x uint32 RVA -> the name to resolve
+                                in the NATIVE module.  The same string as
+                                names_rva[i] except for a variadic, where it
+                                is the v-variant -- see below.             */
     };
+
+Version 4 appended impl_names_rva; the first seven fields keep their v3
+offsets, so a v3 reader that stops after trap_off still reads the same bytes.
 
 A trapping RIP is stubs_rva + index*stride + trap_off -- NOT a clean multiple
 of the stride -- so the dispatcher can both recover the index and confirm the
@@ -38,26 +45,47 @@ which puts the host-visible argument registers at:
                                    shadow space)
 
 Signature descriptor bits:
-    0..7   number of integer/pointer arguments (0..16)
-    8      set if the function returns void
-    9..31  reserved, always 0
+    0..7    number of integer/pointer arguments (0..16).  For a VARIADIC this
+            is the number of FIXED arguments, i.e. where the `...` begins.
+    8       set if the function returns void
+    9       VARIADIC -- see below
+    10..31  reserved, always 0
 
 SIGNATURES COME FROM WINE'S HEADERS, NOT FROM THE SPEC FILE.  The spec file's
 nargs / return-kind / header:line columns are ASSERTIONS: they are checked
 against what clang reads out of Wine's real headers (see wine_sig.py) and any
 mismatch is a hard failure.  A function whose shape is not representable --
-float or vector arguments, struct by value, varargs, a return wider than 64
-bits, or no declaration at all -- is REFUSED and listed, never described with
-a plausible-looking descriptor.
+float or vector arguments, struct by value, a return wider than 64 bits, or no
+declaration at all -- is REFUSED and listed, never described with a
+plausible-looking descriptor.
 
 A va_list ARGUMENT IS NOT REFUSED on this ABI pair -- it is one pointer-sized
 slot on both sides, measured, not assumed.  See the long note in wine_sig.py
 before changing that back.
 
+TRUE `...` VARIADICS ARE SUPPORTED, VIA THE CALLEE'S OWN v-VARIANT.  A
+fixed-arity stub cannot forward `...` -- it cannot know the argument count.
+It does not have to: it never calls the variadic function at all.  The host
+calls that function's v-variant (printf -> vprintf, _snprintf -> _vsnprintf),
+handing it a va_list synthesised from the guest's argument frame starting at
+slot nfixed.  That is sound only because ppc64le ELFv2 va_list is a plain
+pointer into a flat 8-byte-slot parameter save area, structurally identical to
+MS-x64's -- measured end to end on the AC922, a guest-built MS-x64 va_list
+consumed correctly by native ppc64 _vsnprintf ("%d-%s-%d" -> "4242-AB-77").
+The sibling project ~/Development/powerpc64le-ports/wine-spec-thunk refuses
+va_list outright; that refusal is about a different boundary and must not be
+copied back here.  impl_names_rva[i] is what carries the v-variant name to the
+host, and the generator REFUSES rather than guesses: the .thunks line must
+name the v-variant, clang must agree the export really is variadic, and the
+oracle must confirm nargs(v-variant) == nfixed + 1.  Nothing is derived by
+string munging the export name.
+
 Spec file format (see kernel32.thunks):
     DLL   kernel32.dll
     <ExportName>  <imm32>  <nargs>  <int|void>  <header.h>:<line>
-Export order in the file IS the stub index order.
+    <ExportName>  <imm32>  <nfixed> <int|void>  <header.h>:<line>  variadic=<impl>
+Export order in the file IS the stub index order.  The optional sixth token is
+the ONLY way to describe a variadic; five tokens keep their exact old meaning.
 
 The location column may name a Wine `.spec` file instead of a header, for the
 handful of exports Wine implements in C and exports from a .spec but declares
@@ -84,13 +112,49 @@ From the top of the build directory that is enough.  From anywhere else add
 oracle needs are build output, not source, and the tool says so rather than
 letting clang fail confusingly.
 
-THE EXPORT LIST IS SOURCE FOR NOW AND SHOULD NOT STAY THAT WAY.  A .thunks file
-says which exports to emit, plus an assertion about each signature that the
-oracle re-derives and checks.  But the list itself already exists: it is the
-module's own .spec file, which nobody maintains by hand.  The end state is for
-this tool to read <name>.spec directly and for the .thunks files to disappear.
-Nothing in the format or the build rule depends on them being hand-written --
-the rule is keyed on the module, not on the file.
+THE EXPORT LIST COMES FROM THE MODULE'S OWN WINE .spec.  A .thunks file used to
+BE the list, plus an assertion about each signature.  But the list already
+exists and nobody maintains it twice: winebuild turns <mod>.spec into the
+module's real export table, so it IS, by construction, the set of names a guest
+could import.
+
+    spec2thunk --from-spec dlls/kernel32/kernel32.spec --body=trap --out ...
+
+`@ stub` lines are skipped -- there is no implementation to call -- as are
+entries this machine does not export at all (-arch=/-i386), -noname entries
+(exported by ordinal, so there is no name to bind) and -register entries (which
+take a CONTEXT, not an argument list).  Each of those is reported as a SKIP with
+its reason, separately from the refusals, because they are not the same thing.
+
+THE .spec SUPPLIES ONLY *WHICH NAMES EXIST*.  Every signature still comes from
+clang reading Wine's real headers: a .spec has no return type at all and its
+`long` is 32 bits.  What it does state exactly is the ARITY and the argument
+CLASSES, and that is used as an independent CROSS-CHECK -- an export whose .spec
+arity disagrees with its header declaration is refused and listed, never emitted
+on one source's word.  (That check found two real Wine bugs the first time it
+ran: kernel32.spec's RtlUnwindEx was one argument short of ntdll's, and
+kernel32/kernelbase spelled VerSetConditionMask's ULONGLONG as two `long`s,
+which is right on i386 and wrong on win64.  Both fixed.)
+
+A .thunks FILE IS NOW UNNECESSARY, NOT FORBIDDEN.  A module with nothing to say
+needs no file at all.  A module with a few things to say keeps a small one:
+
+    DLL       kernel32.dll
+    FROM-SPEC auto                  # or a path; `auto` = <mod>.spec beside it
+    EXCLUDE   SomeExport            # drop one name
+    DelayLoadFailureHook 0xD1A0 2 int kernel32.spec:366   # an OVERRIDE
+
+With a FROM-SPEC line the export LINES become overrides for the handful of names
+the .spec cannot describe -- a `variadic=<v-variant>` opt-in, a .spec location
+for something Wine declares in no header, a deliberate arity/return assertion --
+and everything else comes from the .spec.  Without one, the file means exactly
+what it always meant, which is why the five hand-written modules still build
+byte-for-byte identically.
+
+REFUSALS ARE NORMAL AT THIS SCALE AND ARE NOT ERRORS.  A whole kernel32.spec
+emits about 87% of its eligible exports; the rest are refused, biggest reason
+first, with `--report FILE` giving the per-export detail as TSV.  --strict still
+turns any refusal into a failure for a module that expects none.
 
 """
 
@@ -98,15 +162,17 @@ import argparse
 import os
 import shutil
 import tempfile
+import re
 import struct
 import subprocess
 import sys
+import time
 
 import wine_sig
 from wine_sig import Refused
 
 STRIDE = 16
-INFO_VERSION = 3
+INFO_VERSION = 4
 # Byte offset of the trapping instruction inside a stub, per body mode.
 TRAP_OFF = {'direct': 0, 'trap': 3}
 BUILTIN_SIG = b"Wine builtin DLL\x00"   # 17 bytes, must sit at file offset 0x40
@@ -119,7 +185,23 @@ IMAGE_BASE = 0x180000000
 # --------------------------------------------------------------------------
 
 def parse_spec(path):
+    """Read a .thunks file -> (dll, exports, from_spec, excludes).
+
+    TWO ROLES, AND THE FILE SAYS WHICH.  Without a FROM-SPEC line the export
+    lines ARE the list, exactly as they always were.  With one, the list comes
+    from the module's own Wine .spec and the export lines become OVERRIDES for
+    the handful of names that need something the .spec cannot say -- a
+    `variadic=<v-variant>` opt-in, a .spec location for a name Wine declares in
+    no header, or a deliberate arity/return assertion.  EXCLUDE drops a name.
+
+    So a .thunks file becomes UNNECESSARY rather than forbidden: a module with
+    nothing to override needs no file at all (--from-spec on the command line),
+    one with a few needs only those lines, and the five hand-written ones keep
+    working untouched.
+    """
     dll = None
+    from_spec = None
+    excludes = []
     exports = []          # (name, imm32, nargs, returns_void, header, line)
     with open(path) as f:
         for lineno, raw in enumerate(f, 1):
@@ -132,11 +214,49 @@ def parse_spec(path):
                     sys.exit("%s:%d: DLL needs exactly one argument" % (path, lineno))
                 dll = parts[1]
                 continue
-            if len(parts) != 5:
+            if parts[0].upper() == 'FROM-SPEC':
+                if len(parts) != 2:
+                    sys.exit("%s:%d: FROM-SPEC needs exactly one argument: the "
+                             "module's .spec, or 'auto' to look for "
+                             "<name>.spec beside this file" % (path, lineno))
+                if from_spec is not None:
+                    sys.exit("%s:%d: a second FROM-SPEC line" % (path, lineno))
+                from_spec = parts[1]
+                continue
+            if parts[0].upper() == 'EXCLUDE':
+                if len(parts) != 2:
+                    sys.exit("%s:%d: EXCLUDE needs exactly one export name"
+                             % (path, lineno))
+                excludes.append(parts[1])
+                continue
+            if len(parts) not in (5, 6):
                 sys.exit("%s:%d: expected "
-                         "'<Name> <imm32> <nargs> <int|void> <header.h>:<line>'"
-                         % (path, lineno))
-            name, imm, nargs, retkind, loc = parts
+                         "'<Name> <imm32> <nargs> <int|void> <header.h>:<line>"
+                         "[ variadic=<impl>]'" % (path, lineno))
+            name, imm, nargs, retkind, loc = parts[:5]
+            # Sixth token, optional: variadic=<name to resolve natively>.
+            # Five tokens means exactly what it always meant.
+            variadic_impl = None
+            if len(parts) == 6:
+                tok = parts[5]
+                if not tok.startswith('variadic='):
+                    sys.exit("%s:%d: unknown 6th token %r; the only one "
+                             "defined is 'variadic=<impl>'" % (path, lineno, tok))
+                variadic_impl = tok[len('variadic='):]
+                if not variadic_impl:
+                    sys.exit("%s:%d: variadic= needs the name of the "
+                             "v-variant to call, e.g. variadic=vprintf"
+                             % (path, lineno))
+                if variadic_impl == name:
+                    sys.exit("%s:%d: variadic=%s names the variadic export "
+                             "itself; it must name that function's v-variant"
+                             % (path, lineno, variadic_impl))
+                if loc.endswith('.spec') or '.spec:' in loc:
+                    sys.exit("%s:%d: variadic= requires a header location; a "
+                             "Wine .spec carries no return type and its "
+                             "`@ varargs` line lists only the fixed arguments, "
+                             "so the v-variant cross-check is impossible"
+                             % (path, lineno))
             try:
                 imm = int(imm, 0)
                 nargs = int(nargs, 0)
@@ -155,17 +275,216 @@ def parse_spec(path):
                 sys.exit("%s:%d: bad line number in %r" % (path, lineno, loc))
             exports.append(dict(name=name, imm=imm, nargs=nargs,
                                 returns_void=(retkind == 'void'),
-                                header=hdr, line=ln))
+                                header=hdr, line=ln,
+                                variadic_impl=variadic_impl,
+                                asserted=True,
+                                specline=lineno))
     if dll is None:
         sys.exit("%s: no 'DLL <name>' line" % path)
-    if not exports:
+    if not exports and from_spec is None:
         sys.exit("%s: no exports" % path)
     names = [e['name'] for e in exports]
     if len(set(names)) != len(names):
         sys.exit("%s: duplicate export names" % path)
     if '__wine_thunk_info' in names:
         sys.exit("%s: __wine_thunk_info is reserved" % path)
-    return dll, exports
+    return dll, exports, from_spec, excludes
+
+
+# --------------------------------------------------------------------------
+# THE EXPORT LIST, DERIVED FROM THE MODULE'S OWN WINE .spec
+# --------------------------------------------------------------------------
+# The .spec is the list nobody maintains twice: it is what winebuild turns into
+# the module's real export table, so it is by construction the set of names a
+# guest could import.  It supplies ONLY WHICH NAMES EXIST.  Every signature
+# still comes from clang reading Wine's real headers -- a .spec has no return
+# type at all and its `long` is 32 bits, so it cannot describe a thunk (see the
+# banner at the top of wine_sig.py).
+#
+# What the .spec DOES state exactly is the arity and the CLASS of each
+# argument, and that is used here as an independent CROSS-CHECK of what clang
+# read, not as a source: an export whose .spec arity disagrees with its header
+# declaration is refused and listed, never emitted on one source's word.
+# --------------------------------------------------------------------------
+
+# tools/tools.h get_cpu_from_name(), which matches by PREFIX: the table entry
+# has to be a prefix of the spelling in the file, so "x86_64" matches and a
+# bare "x86" matches nothing.
+_CPU_NAMES = (('i386', 'i386'), ('i486', 'i386'), ('i586', 'i386'),
+              ('i686', 'i386'), ('i786', 'i386'), ('x86_64', 'x86_64'),
+              ('amd64', 'x86_64'), ('aarch64', 'arm64'), ('arm64ec', 'arm64ec'),
+              ('arm64', 'arm64'), ('arm', 'arm'), ('ppc64', 'powerpc64'),
+              ('powerpc64', 'powerpc64'))
+# tools/winebuild/build.h FLAG_CPU_WIN32 / FLAG_CPU_WIN64.
+_CPU_WIN32 = frozenset(('i386', 'arm'))
+_CPU_WIN64 = frozenset(('x86_64', 'arm64', 'arm64ec', 'powerpc64'))
+_CPU_ALL = _CPU_WIN32 | _CPU_WIN64
+# The machine the generated thunk PE is for.  Not configurable: the whole file
+# is an AMD64 PE by construction (IMAGE_FILE_MACHINE_AMD64, MS-x64 stubs).
+GUEST_CPU = 'x86_64'
+
+# .spec entry types that are a callable function with an argument list.
+_SPEC_FUNC_TYPES = frozenset(('stdcall', 'cdecl', 'varargs', 'thiscall',
+                              'fastcall'))
+
+
+def _cpu_from_name(tok):
+    for prefix, cpu in _CPU_NAMES:
+        if tok.startswith(prefix):
+            return cpu
+    return None
+
+
+def _spec_cpus(flags):
+    """-> set of CPUs an entry is exported for, or None for "all of them".
+
+    Reimplements tools/winebuild/parser.c parse_spec_flags()'s -arch= handling
+    and its `-i386` backwards-compatibility alias, including the `!cpu`
+    negation and the "x86-64 implies arm64ec" rule.
+    """
+    cpus, mask = set(), set()
+    for f in flags:
+        if f == 'i386':                        # backwards compatibility
+            cpus.add('i386')
+        elif f.startswith('arch='):
+            for tok in f[len('arch='):].split(','):
+                if tok == 'win32':
+                    cpus |= _CPU_WIN32
+                elif tok == 'win64':
+                    cpus |= _CPU_WIN64
+                else:
+                    neg = tok.startswith('!')
+                    cpu = _cpu_from_name(tok[1:] if neg else tok)
+                    if cpu is None:
+                        raise SystemExit("unknown architecture %r in -%s"
+                                         % (tok, f))
+                    (mask if neg else cpus).add(cpu)
+    if 'x86_64' in cpus:
+        cpus.add('arm64ec')
+    if 'x86_64' in mask:
+        mask.add('arm64ec')
+    if mask:
+        cpus |= _CPU_ALL - mask
+    return cpus or None
+
+
+def parse_wine_spec(path):
+    """Read a Wine .spec -> (ordered entries, skipped-with-reason).
+
+    An entry is dict(name, spec_args, spec_type, flags, specline).  `spec_args`
+    is the argument-type list exactly as the .spec spells it, kept for the
+    arity/class cross-check; it is never the source of a signature.
+
+    Everything the guest cannot bind to a named AMD64 export is skipped here
+    rather than refused later, with the reason, so the two are not confused in
+    the report: a `@ stub` has no implementation to call at all, and an
+    -arch-restricted entry is simply not in this machine's export table.
+    """
+    entries, skipped = [], []
+    with open(path, errors='replace') as f:
+        for lineno, raw in enumerate(f, 1):
+            line = raw.split('#', 1)[0].strip()
+            if not line:
+                continue
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            ordinal, kind, rest = parts[0], parts[1], parts[2:]
+            if ordinal != '@' and not ordinal.isdigit():
+                continue                       # not an export line at all
+            flags = []
+            while rest and rest[0].startswith('-'):
+                flags.append(rest.pop(0)[1:])
+            if kind == 'stub':
+                name = rest[0].split('(')[0] if rest else '?'
+                skipped.append((name, lineno, 'stub -- Wine has no '
+                                'implementation to call'))
+                continue
+            if kind not in _SPEC_FUNC_TYPES:
+                # extern/variable/equate: data, not a callable entry point.
+                if rest:
+                    skipped.append((rest[0].split('(')[0], lineno,
+                                    '`@ %s` is not a callable entry point' % kind))
+                continue
+            if not rest:
+                continue
+            decl = ' '.join(rest)
+            name, _, tail = decl.partition('(')
+            name = name.strip()
+            args = tail.rpartition(')')[0].split() if '(' in decl else []
+            cpus = _spec_cpus(flags)
+            if cpus is not None and GUEST_CPU not in cpus:
+                skipped.append((name, lineno,
+                                'not exported for %s (-%s)'
+                                % (GUEST_CPU,
+                                   ' -'.join(f for f in flags
+                                             if f == 'i386' or f.startswith('arch=')))))
+                continue
+            if name == '@':
+                # `86 stdcall -i386 -private @(ptr) krnl386...`: exported by
+                # ordinal under no name at all.
+                skipped.append((name, lineno, '-noname: exported by ordinal '
+                                'only, so there is no name to bind'))
+                continue
+            if not name.replace('_', 'a').replace('.', 'a').isalnum():
+                skipped.append((name, lineno, 'name is not a plain C identifier'))
+                continue
+            if 'noname' in flags:
+                # winebuild puts no name in the export table for these; a guest
+                # can only reach them by ordinal, which a thunk PE built from
+                # names cannot serve.
+                skipped.append((name, lineno, '-noname: exported by ordinal '
+                                'only, so there is no name to bind'))
+                continue
+            if 'register' in flags:
+                skipped.append((name, lineno, '-register: the entry point takes '
+                                'a CONTEXT, not an argument list'))
+                continue
+            entries.append(dict(name=name, spec_args=args, spec_type=kind,
+                                flags=flags, specline=lineno))
+    if not entries:
+        sys.exit('%s: no usable export lines' % path)
+    return entries, skipped
+
+
+def exports_from_wine_spec(path, overrides=None, excludes=(), start_imm=0):
+    """-> (export entries in .spec order, skipped, dropped-by-EXCLUDE).
+
+    `overrides` maps an export name to a parsed .thunks line, which then
+    supplies the assertion columns (and `variadic=`) for that one export
+    exactly as it does in --spec mode.  Anything not overridden carries
+    asserted=False and is checked against the .spec's own arity instead.
+    """
+    overrides = overrides or {}
+    entries, skipped = parse_wine_spec(path)
+    excluded = set(excludes)
+    out, dropped = [], []
+    for e in entries:
+        if e['name'] in excluded:
+            dropped.append(e['name'])
+            continue
+        ov = overrides.get(e['name'])
+        if ov:
+            e = dict(ov, spec_args=e['spec_args'], spec_type=e['spec_type'],
+                     specline=e['specline'], asserted=True)
+        else:
+            # No hand-written assertion to check: the header oracle is the only
+            # source, cross-checked against this line's own arity.  imm is only
+            # read by --body=direct, where it just has to be distinct per stub.
+            e = dict(e, imm=start_imm + len(out), nargs=None,
+                     returns_void=None, header=None, line=None,
+                     variadic_impl=None, asserted=False)
+        e['imm'] = e.get('imm', start_imm + len(out))
+        out.append(e)
+    unknown = sorted(set(overrides) - {e['name'] for e in entries})
+    if unknown:
+        skipped_names = {n: why for n, _l, why in skipped}
+        sys.exit('%s: %d override(s) name an export this .spec does not offer:\n  '
+                 % (path, len(unknown))
+                 + '\n  '.join('%-30s %s' % (n, skipped_names.get(
+                     n, 'no such line in the .spec at all'))
+                     for n in unknown))
+    return out, skipped, dropped
 
 
 # --------------------------------------------------------------------------
@@ -180,43 +499,199 @@ def resolve_signatures(exports, headers, specs=None):
     takes the last-resort arity oracle (wine_sig.WineSpecs) -- read the class
     docstring, in particular that its <int|void> column is an UNCHECKED human
     assertion.  Those entries are collected and reported separately.
+
+    AN ENTRY WITH asserted=False CAME FROM A WINE .spec, NOT FROM A HAND-WRITTEN
+    LINE, so there is no nargs / int|void / header:line claim to police.  The
+    .spec's OWN argument list is used as the cross-check instead: a disagreement
+    between it and the header declaration is a REFUSAL of that one export, not a
+    fatal error for the module.  A hand-written line is a promise somebody made
+    and a broken one is a bug; a whole-.spec run legitimately meets exports Wine
+    describes inconsistently, and killing the build over each is useless.
     """
+    # ONE clang run for the whole module's stage-2 probes instead of one per
+    # export.  This decides nothing on its own -- see WineHeaders.prefetch():
+    # a clean batch memoises acceptances, anything a diagnostic touches still
+    # takes its own single-symbol probe and its own message.  Ask for the
+    # v-variants too, since every variadic makes a second signature() call.
+    headers.prefetch(
+        [(e['name'], e.get('variadic_impl') is not None)
+         for e in exports if not (e['header'] or '').endswith('.spec')]
+        + [(e['variadic_impl'], False)
+           for e in exports if e.get('variadic_impl')])
+
     accepted, refused, mismatches = [], [], []
     for e in exports:
+        want_variadic = e.get('variadic_impl') is not None
+        # A .spec states the CLASS of each argument exactly, and that is one
+        # thing it is authoritative about.  Refuse on it before spending a
+        # header lookup, so the reason names the .spec that said so.
+        bad = [a for a in (e.get('spec_args') or [])
+               if a in wine_sig.WineSpecs.BAD_ARGS]
+        if bad and not e.get('asserted', True):
+            refused.append((e['name'], '%s (%s:%d)'
+                            % (wine_sig.WineSpecs.BAD_ARGS[bad[0]],
+                               os.path.basename(e.get('spec_path', '.spec')),
+                               e['specline'])))
+            continue
         try:
-            if e['header'].endswith('.spec'):
+            if (e['header'] or '').endswith('.spec'):
                 if specs is None:
                     raise Refused('.spec location cited but no source tree given')
                 sig = specs.signature(e['name'], e['header'], e['line'],
                                       e['returns_void'])
             else:
-                sig = headers.signature(e['name'])
+                sig = headers.signature(e['name'],
+                                        allow_variadic=want_variadic)
         except Refused as ex:
             refused.append((e['name'], ex.reason))
             continue
-        # The spec's numbers are claims. Wine's headers are the fact.
-        if sig['nargs'] != e['nargs']:
-            mismatches.append("%s: spec says %d args, %s:%s says %d  [%s]"
-                              % (e['name'], e['nargs'], sig['header'],
-                                 sig['line'], sig['nargs'], sig['qualtype']))
-        if sig['returns_void'] != e['returns_void']:
-            mismatches.append("%s: spec says returns %s, %s:%s says %s  [%s]"
-                              % (e['name'], 'void' if e['returns_void'] else 'int',
-                                 sig['header'], sig['line'],
-                                 'void' if sig['returns_void'] else 'int',
-                                 sig['qualtype']))
-        if (sig['header'] != e['header']) or (sig['line'] != e['line']):
-            mismatches.append("%s: spec cites %s:%d, clang found it at %s:%s"
-                              % (e['name'], e['header'], e['line'],
-                                 sig['header'], sig['line']))
+        # ------------------------------------------------------------------
+        # variadic= is an ASSERTION like every other column, and it is checked
+        # in BOTH directions.  A variadic with no variadic= never gets here at
+        # all -- allow_variadic stayed False and wine_sig refused it -- so the
+        # only direction left to police is a variadic= on something that is not
+        # in fact variadic, which would make the host synthesise a va_list out
+        # of whatever happened to follow the last real argument.
+        # ------------------------------------------------------------------
+        if want_variadic and not sig.get('variadic'):
+            mismatches.append(
+                "%s: spec says variadic=%s, but %s:%s declares it NON-variadic"
+                "  [%s]" % (e['name'], e['variadic_impl'], sig['header'],
+                            sig['line'], sig['qualtype']))
+        elif want_variadic:
+            # Confirm the v-variant the SPEC named -- never derive it by string
+            # munging the export name.  va_list is one ordinary pointer
+            # parameter to the oracle, so the v-variant must have exactly one
+            # argument more than the variadic has fixed arguments.
+            try:
+                impl = headers.signature(e['variadic_impl'])
+            except Refused as ex:
+                mismatches.append("%s: variadic=%s does not resolve: %s"
+                                  % (e['name'], e['variadic_impl'], ex.reason))
+            else:
+                if impl['nargs'] != sig['nargs'] + 1:
+                    mismatches.append(
+                        "%s: variadic=%s pairing is wrong -- %d fixed args + "
+                        "va_list needs %d, but the v-variant takes %d\n"
+                        "      %-14s %s  (%s:%s)\n"
+                        "      %-14s %s  (%s:%s)"
+                        % (e['name'], e['variadic_impl'], sig['nargs'],
+                           sig['nargs'] + 1, impl['nargs'],
+                           e['name'], sig['qualtype'], sig['header'], sig['line'],
+                           e['variadic_impl'], impl['qualtype'],
+                           impl['header'], impl['line']))
+                elif impl['returns_void'] != sig['returns_void']:
+                    mismatches.append(
+                        "%s: variadic=%s returns %s but %s returns %s; the "
+                        "host returns the v-variant's value as the export's"
+                        % (e['name'], e['variadic_impl'],
+                           'void' if impl['returns_void'] else 'a value',
+                           e['name'],
+                           'void' if sig['returns_void'] else 'a value'))
+                e['impl_sig'] = impl
+        if e.get('asserted', True):
+            # The spec's numbers are claims. Wine's headers are the fact.
+            if sig['nargs'] != e['nargs']:
+                mismatches.append("%s: spec says %d args, %s:%s says %d  [%s]"
+                                  % (e['name'], e['nargs'], sig['header'],
+                                     sig['line'], sig['nargs'], sig['qualtype']))
+            if sig['returns_void'] != e['returns_void']:
+                mismatches.append("%s: spec says returns %s, %s:%s says %s  [%s]"
+                                  % (e['name'],
+                                     'void' if e['returns_void'] else 'int',
+                                     sig['header'], sig['line'],
+                                     'void' if sig['returns_void'] else 'int',
+                                     sig['qualtype']))
+            if (sig['header'] != e['header']) or (sig['line'] != e['line']):
+                mismatches.append("%s: spec cites %s:%d, clang found it at %s:%s"
+                                  % (e['name'], e['header'], e['line'],
+                                     sig['header'], sig['line']))
+        elif e.get('spec_args') is not None:
+            # Derived from a Wine .spec: cross-check clang against the .spec's
+            # own argument list.  Two independent readings of the same module
+            # have to agree about how many arguments it takes before we publish
+            # a descriptor that tells the host how many to marshal.
+            if sig['nargs'] != len(e['spec_args']):
+                refused.append(
+                    (e['name'],
+                     "arity disagreement: %s:%d says %d arg(s) (%s), %s:%s says "
+                     "%d  [%s]"
+                     % (os.path.basename(e.get('spec_path', '.spec')),
+                        e['specline'], len(e['spec_args']),
+                        ' '.join(e['spec_args']) or 'none',
+                        sig['header'], sig['line'], sig['nargs'],
+                        sig['qualtype'])))
+                continue
         e = dict(e)
         e['sig'] = sig
         e['desc'] = wine_sig.descriptor(sig)
+        # What the host resolves in the NATIVE module.  Identical to the export
+        # name for everything except a variadic, which forwards to the
+        # v-variant the spec named.
+        e['impl'] = e.get('variadic_impl') or e['name']
         accepted.append(e)
     if mismatches:
         sys.exit("FATAL: spec disagrees with Wine's headers:\n  "
                  + "\n  ".join(mismatches))
     return accepted, refused
+
+
+# --------------------------------------------------------------------------
+# grouping refusals for the report
+# --------------------------------------------------------------------------
+# A whole .spec refuses hundreds of exports and the useful question is not
+# "which ones" -- that is what --report is for -- but "how many, and for what".
+# These turn one refusal's message, which names the offending type or export,
+# into the CLASS of reason, so the histogram counts causes and not spellings.
+# Nothing here decides anything: the refusal has already happened, with the
+# compiler's own words, and that text is what goes in the report file.
+
+_REFUSAL_CLASSES = (
+    (r'^no declaration found in Wine headers$',
+     'no declaration in any Wine header'),
+    (r'is not integer/pointer class',
+     'argument or return is not integer/pointer class '
+     '(struct by value, float, vector)'),
+    (r'is wider than 64 bits',
+     'argument or return is wider than 64 bits'),
+    (r'^varargs ',                       'variadic with no variadic=<v-variant>'),
+    (r'^conflicting declarations',       'Wine declares it more than one way'),
+    (r'^arity disagreement',             '.spec and header disagree on the argument count'),
+    (r'^incompatible pointer types|^initialization of|initializing .* with an '
+     r'expression of (incompatible )?type',
+     'header prototype does not match the export (reconstruction rejected)'),
+    (r'\bdouble argument\b|\bfloat argument\b',
+     '.spec declares a float/double argument'),
+    (r'\bint128 argument\b',             '.spec declares an int128 argument'),
+    (r'descriptor field holds at most 16|host marshaller passes',
+     'more arguments than the descriptor or the host marshaller can carry'),
+    (r'variadic with no fixed argument', 'variadic with no fixed argument'),
+    (r'^unknown \.spec argument type',   'unknown .spec argument type'),
+)
+
+_SKIP_CLASSES = (
+    (r'^stub ',                  '`@ stub` -- Wine has no implementation'),
+    (r'^not exported for ',      'not exported for this machine (-arch=/-i386)'),
+    (r'^-noname',                '-noname: no name in the export table'),
+    (r'^-register',              '-register: takes a CONTEXT, not arguments'),
+    (r'is not a callable entry point', 'data export, not a function'),
+    (r'not a plain C identifier', 'name is not a plain C identifier'),
+)
+
+
+def _classify(text, table, fallback):
+    for pat, label in table:
+        if re.search(pat, text):
+            return label
+    return fallback
+
+
+def refusal_class(why):
+    return _classify(why, _REFUSAL_CLASSES, 'other (see --report)')
+
+
+def skip_class(why):
+    return _classify(why, _SKIP_CLASSES, 'other')
 
 
 # --------------------------------------------------------------------------
@@ -268,23 +743,42 @@ def emit_asm(dll, exports, mode):
     a('\t.long\twine_thunk_namev@IMGREL\t# names_rva')
     a('\t.long\twine_thunk_sigv@IMGREL\t# sigs_rva')
     a('\t.long\t%d\t\t\t# trap_off' % TRAP_OFF[mode])
+    a('\t.long\twine_thunk_implv@IMGREL\t# impl_names_rva  (version 4)')
     a('')
     a('\t.balign\t4')
     a('wine_thunk_namev:')
     for i in range(len(exports)):
         a('\t.long\twine_thunk_name_%d@IMGREL' % i)
     a('')
+    a('\t# The name the host resolves in the NATIVE module.  Identical to')
+    a('\t# names_rva[i] -- the same string, deliberately not a copy -- except')
+    a('\t# for a variadic, which forwards to its own v-variant.')
+    a('\t.balign\t4')
+    a('wine_thunk_implv:')
+    for i, e in enumerate(exports):
+        if e['impl'] == e['name']:
+            a('\t.long\twine_thunk_name_%d@IMGREL' % i)
+        else:
+            a('\t.long\twine_thunk_impl_%d@IMGREL\t# %s -> %s'
+              % (i, e['name'], e['impl']))
+    a('')
     a('\t.balign\t4')
     a('wine_thunk_sigv:')
     for i, e in enumerate(exports):
         s = e['sig']
-        a('\t.long\t0x%08X\t# %d %-24s %d arg%s, returns %s  (%s:%s)'
-          % (e['desc'], i, e['name'], s['nargs'], '' if s['nargs'] == 1 else 's',
-             'void' if s['returns_void'] else s['ret'], s['header'], s['line']))
+        a('\t.long\t0x%08X\t# %d %-24s %d %sarg%s, returns %s  (%s:%s)%s'
+          % (e['desc'], i, e['name'], s['nargs'],
+             'fixed ' if s.get('variadic') else '',
+             '' if s['nargs'] == 1 else 's',
+             'void' if s['returns_void'] else s['ret'], s['header'], s['line'],
+             (' VARIADIC -> %s' % e['impl']) if s.get('variadic') else ''))
     a('')
     for i, e in enumerate(exports):
         a('wine_thunk_name_%d:' % i)
         a('\t.asciz\t"%s"' % e['name'])
+        if e['impl'] != e['name']:
+            a('wine_thunk_impl_%d:' % i)
+            a('\t.asciz\t"%s"' % e['impl'])
     a('')
     a('\t# One absolute 64-bit pointer so the linker is forced to emit a')
     a('\t# base relocation directory; Wine relocates this image.')
@@ -338,7 +832,22 @@ def run(cmd, verbose):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--spec', required=True)
+    ap.add_argument('--spec', help='a .thunks file.  Without a FROM-SPEC line '
+                                   'its export lines ARE the list; with one '
+                                   'they are overrides for a list taken from '
+                                   "the module's own Wine .spec")
+    ap.add_argument('--from-spec', metavar='<mod>.spec',
+                    help="derive the export list from the module's own Wine "
+                         '.spec.  Signatures still come from clang reading '
+                         "Wine's headers -- a .spec has no return type and its "
+                         '`long` is 32 bits.  May be combined with --spec, in '
+                         'which case the .thunks lines are overrides.')
+    ap.add_argument('--dll-name', metavar='<name>.dll',
+                    help='name for the generated DLL.  Defaults to the DLL line '
+                         'of the .thunks file, or to the .spec basename')
+    ap.add_argument('--report', metavar='FILE',
+                    help='write the machine-readable per-export outcome '
+                         '(name, verdict, reason) here, one TSV row each')
     ap.add_argument('--body', choices=('direct', 'trap'), required=True)
     # No default output location: a build tool writes where it is told.  The
     # old defaults pointed into one developer's /tmp and were pure scaffolding.
@@ -377,7 +886,56 @@ def main():
     ap.add_argument('-v', '--verbose', action='store_true')
     args = ap.parse_args()
 
-    dll, spec_exports = parse_spec(args.spec)
+    if not args.spec and not args.from_spec:
+        ap.error('one of --spec <mod>.thunks or --from-spec <mod>.spec is '
+                 'required')
+
+    # ---------------- where the export list comes from
+    dll, spec_exports, from_spec, excludes = None, [], None, []
+    if args.spec:
+        dll, spec_exports, from_spec, excludes = parse_spec(args.spec)
+    if args.from_spec:
+        from_spec = args.from_spec
+    elif from_spec == 'auto':
+        # `FROM-SPEC auto` = the .spec sitting beside this .thunks file, which
+        # is where Wine keeps it.  Named rather than guessed at, so a module
+        # that keeps it elsewhere can just say where.
+        from_spec = os.path.join(os.path.dirname(os.path.abspath(args.spec)),
+                                 os.path.splitext(os.path.basename(dll or
+                                                                   args.spec))[0]
+                                 + '.spec')
+    elif from_spec and args.spec:
+        # A relative FROM-SPEC is relative to the .thunks file that names it.
+        if not os.path.isabs(from_spec):
+            from_spec = os.path.join(os.path.dirname(os.path.abspath(args.spec)),
+                                     from_spec)
+
+    wine_spec_skipped, wine_spec_dropped = [], []
+    if from_spec:
+        if not os.path.isfile(from_spec):
+            ap.error('no such Wine .spec: %s' % from_spec)
+        overrides = {e['name']: e for e in spec_exports}
+        spec_exports, wine_spec_skipped, wine_spec_dropped = \
+            exports_from_wine_spec(from_spec, overrides, excludes)
+        for e in spec_exports:
+            e.setdefault('spec_path', from_spec)
+        if not dll:
+            dll = os.path.splitext(os.path.basename(from_spec))[0] + '.dll'
+    elif excludes:
+        keep = set(excludes)
+        wine_spec_dropped = [e['name'] for e in spec_exports if e['name'] in keep]
+        spec_exports = [e for e in spec_exports if e['name'] not in keep]
+    if args.dll_name:
+        dll = args.dll_name
+    if not spec_exports:
+        sys.exit('no exports to emit')
+    names = [e['name'] for e in spec_exports]
+    if len(set(names)) != len(names):
+        dup = sorted({n for n in names if names.count(n) > 1})
+        sys.exit('duplicate export names: %s' % ', '.join(dup))
+    if '__wine_thunk_info' in names:
+        sys.exit('__wine_thunk_info is reserved')
+
     stem = os.path.splitext(os.path.basename(dll))[0]
     tmp_builddir = None
     if not args.builddir:
@@ -405,7 +963,9 @@ def main():
                                    defines=crt_defines)
     headers.sanity()
     specs = wine_sig.WineSpecs(args.wine_source)
+    t0 = time.time()
     exports, refused = resolve_signatures(spec_exports, headers, specs)
+    resolve_secs = time.time() - t0
 
     unverified = [e for e in exports if e['sig'].get('return_verified') is False]
     if unverified:
@@ -418,15 +978,68 @@ def main():
                                            e['sig']['header'], e['sig']['line']))
         print()
 
+    if wine_spec_dropped:
+        print("EXCLUDED BY THE .thunks FILE (%d): %s"
+              % (len(wine_spec_dropped), ', '.join(sorted(wine_spec_dropped))))
+        print()
+
     if refused:
         print("REFUSED EXPORTS (not emitted -- shape is not representable):")
-        for name, why in refused:
-            print("  %-28s %s" % (name, why))
+        # Short lists stay verbatim, exactly as they always printed.  A whole
+        # .spec produces hundreds, where a wall of lines hides the answer: what
+        # the ceiling on this approach actually is.  So group by reason, biggest
+        # first, and show examples -- the full per-export list goes to --report.
+        if len(refused) <= 40:
+            for name, why in refused:
+                print("  %-28s %s" % (name, why))
+        else:
+            hist = {}
+            for name, why in refused:
+                hist.setdefault(refusal_class(why), []).append((name, why))
+            for cls, rows in sorted(hist.items(), key=lambda kv: -len(kv[1])):
+                print("  %5d  %.1f%%  %s"
+                      % (len(rows), 100.0 * len(rows) / len(spec_exports), cls))
+                for name, why in rows[:2]:
+                    print("           e.g. %-26s %s" % (name, why[:150]))
         print()
         if args.strict:
             sys.exit("FATAL: --strict and %d export(s) refused" % len(refused))
     if not exports:
         sys.exit("FATAL: every export was refused; nothing to emit")
+
+    if wine_spec_skipped or from_spec:
+        print("EXPORT LIST  from %s" % (from_spec or args.spec))
+        if wine_spec_skipped:
+            hist = {}
+            for _n, _l, why in wine_spec_skipped:
+                hist.setdefault(skip_class(why), 0)
+                hist[skip_class(why)] += 1
+            print("  %5d  not eligible for an AMD64 thunk at all:"
+                  % len(wine_spec_skipped))
+            for cls, n in sorted(hist.items(), key=lambda kv: -kv[1]):
+                print("         %5d  %s" % (n, cls))
+        print("  %5d  eligible export(s) considered" % len(spec_exports))
+        print("  %5d  emitted        (%.1f%% of eligible)"
+              % (len(exports), 100.0 * len(exports) / len(spec_exports)))
+        print("  %5d  refused        (%.1f%% of eligible)"
+              % (len(refused), 100.0 * len(refused) / len(spec_exports)))
+        print()
+
+    if args.report:
+        with open(args.report, 'w') as f:
+            f.write('name\tverdict\tdetail\n')
+            for n, l, why in wine_spec_skipped:
+                f.write('%s\tskipped\t%s\n' % (n, why))
+            for n in wine_spec_dropped:
+                f.write('%s\texcluded\tEXCLUDE line in %s\n' % (n, args.spec))
+            for e in exports:
+                s = e['sig']
+                f.write('%s\temitted\t%d args, %s, %s:%s\n'
+                        % (e['name'], s['nargs'],
+                           'void' if s['returns_void'] else 'value',
+                           s['header'], s['line']))
+            for n, why in refused:
+                f.write('%s\trefused\t%s\n' % (n, why.replace('\t', ' ')))
 
     if not args.out and not args.outdir:
         ap.error('one of --out or --outdir is required')
@@ -437,9 +1050,11 @@ def main():
     spath = os.path.join(args.builddir, tag + '.s')
     opath = os.path.join(args.builddir, tag + '.o')
     dpath = os.path.join(args.builddir, tag + '.def')
-    lpath = args.implib or os.path.join(args.outdir or os.path.dirname(outpath),
-                                       stem + '.import.lib')
-    os.makedirs(os.path.dirname(lpath), exist_ok=True)
+    # Opt-in: "make" only wants the DLL, and an unrequested .import.lib beside
+    # it is build-tree litter that nothing cleans.  Guest probes that link
+    # against a thunk module ask for one explicitly.
+    lpath = args.implib
+    if lpath: os.makedirs(os.path.dirname(os.path.abspath(lpath)), exist_ok=True)
 
     with open(spath, 'w') as f:
         f.write(emit_asm(dll, exports, args.body))
@@ -450,7 +1065,8 @@ def main():
         args.verbose)
     run([args.linker, '/dll', '/machine:x64', '/nodefaultlib', '/noentry',
          '/opt:noref', '/base:0x%x' % IMAGE_BASE, '/def:' + dpath,
-         '/implib:' + lpath, '/out:' + outpath, opath],
+         ('/implib:' + lpath) if lpath else '/noimplib',
+         '/out:' + outpath, opath],
         args.verbose)
 
     e_lfanew = stamp_builtin_signature(outpath)
@@ -464,16 +1080,52 @@ def main():
     print("e_lfanew     : 0x%x (signature stamped at 0x%02x..0x%02x)"
           % (e_lfanew, SIG_OFF, SIG_OFF + len(BUILTIN_SIG) - 1))
     print("trap_off     : %d" % TRAP_OFF[args.body])
-    print("import lib   : %s" % lpath)
+    print("import lib   : %s" % (lpath or "(none; pass --implib if you need one)"))
+    st = headers.stats
+    print("oracle       : %d clang run(s) for %d export(s) in %.1fs "
+          "(%d AST dump%s indexing %d decls, %d probe compile%s: "
+          "%d batched, %d one at a time)"
+          % (st['ast_dumps'] + st['probe_compiles'], len(spec_exports),
+             resolve_secs, st['ast_dumps'], '' if st['ast_dumps'] == 1 else 's',
+             st['indexed_decls'], st['probe_compiles'],
+             '' if st['probe_compiles'] == 1 else 's',
+             st['batched_probes'], st['fallback_probes']))
     if tmp_builddir and not args.verbose:
         shutil.rmtree(tmp_builddir, ignore_errors=True)
 
-    print("idx  export                     imm32       desc    args ret   from")
+    variadics = [e for e in exports if e['sig'].get('variadic')]
+    if variadics:
+        print()
+        print("VARIADIC EXPORTS -- the host synthesises a va_list from the "
+              "guest frame at")
+        print("slot <fixed> and calls the impl below instead.  Both signatures "
+              "clang-verified:")
+        for e in variadics:
+            s, im = e['sig'], e['impl_sig']
+            print("  %-20s %d fixed  %s:%s  %s"
+                  % (e['name'], s['nargs'], s['header'], s['line'], s['qualtype']))
+            print("  %-20s -> impl  %s:%s  %s"
+                  % ('', im['header'], im['line'], im['qualtype']))
+        print()
+
+    # A hand-written list is short enough to read; a whole .spec is 1300 rows of
+    # scrollback that nobody reads and that buries the summary above it.  The
+    # per-export detail is what --report exists for.
+    if len(exports) > 250 and not args.verbose:
+        print()
+        print("(%d exports emitted; per-export table suppressed -- pass -v, or "
+              "--report FILE)" % len(exports))
+        return
+
+    print("idx  export                     imm32       desc    args ret   "
+          "impl                       from")
     for i, e in enumerate(exports):
         s = e['sig']
-        print("%3d  %-26s 0x%08X  0x%05X %4d %-5s %s:%s"
+        print("%3d  %-26s 0x%08X  0x%05X %4d %-5s %-26s %s:%s"
               % (i, e['name'], e['imm'], e['desc'], s['nargs'],
-                 'void' if s['returns_void'] else 'int', s['header'], s['line']))
+                 'void' if s['returns_void'] else 'int',
+                 e['impl'] + (' (V)' if s.get('variadic') else ''),
+                 s['header'], s['line']))
 
 
 if __name__ == '__main__':

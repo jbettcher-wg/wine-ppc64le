@@ -1008,18 +1008,23 @@ static BOOL thread_start_is_guest_code( const void *entry )
 /* Published by a thunk module through its __wine_thunk_info export. */
 struct thunk_info
 {
-    UINT version;      /* 3 */
-    UINT count;        /* number of stubs */
-    UINT stubs_rva;    /* stub i is at stubs_rva + i * stride */
+    UINT version;         /* 4 */
+    UINT count;           /* number of stubs */
+    UINT stubs_rva;       /* stub i is at stubs_rva + i * stride */
     UINT stride;
-    UINT names_rva;    /* count RVAs of NUL-terminated ASCII export names */
-    UINT sigs_rva;     /* count descriptors, see below */
-    UINT trap_off;     /* offset of the trapping instruction within a stub */
+    UINT names_rva;       /* count RVAs of NUL-terminated ASCII export names */
+    UINT sigs_rva;        /* count descriptors, see below */
+    UINT trap_off;        /* offset of the trapping instruction within a stub */
+    UINT impl_names_rva;  /* count RVAs of the name to resolve natively: the
+                             same string as names_rva except for a variadic,
+                             where it names the callee's v-variant */
 };
 
-#define THUNK_INFO_VERSION   3
-#define THUNK_SIG_ARGC(sig)  ((sig) & 0xff)   /* integer/pointer arguments */
-#define THUNK_SIG_RESERVED   0xfffffe00u      /* must be zero; bit 8 = void return */
+#define THUNK_INFO_VERSION   4
+#define THUNK_SIG_ARGC(sig)  ((sig) & 0xff)   /* for a variadic, the FIXED count */
+#define THUNK_SIG_VOID       0x100u           /* returns void */
+#define THUNK_SIG_VARIADIC   0x200u           /* synthesise a va_list, see below */
+#define THUNK_SIG_RESERVED   0xfffffc00u      /* must be zero */
 
 #define THUNK_MAX_ARGS 16
 
@@ -1148,7 +1153,7 @@ static const struct thunk_override thunk_overrides[] =
  * Resolve a trapping guest address to the native function it stands for, or
  * to the override that stands in for it.
  */
-static void *find_guest_thunk_target( ULONG_PTR rip, UINT *argc, thunk_override_func *override )
+static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_override_func *override )
 {
     LIST_ENTRY *mark, *entry;
 
@@ -1160,7 +1165,7 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *argc, thunk_override_
         ULONG_PTR base = (ULONG_PTR)mod->DllBase;
         ANSI_STRING func_name;
         struct thunk_info *info;
-        const UINT *names, *sigs;
+        const UINT *names, *sigs, *impl_names;
         HMODULE native;
         void *proc;
         UINT idx, sig, i;
@@ -1193,15 +1198,18 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *argc, thunk_override_
 
         names = (const UINT *)(base + info->names_rva);
         sigs  = (const UINT *)(base + info->sigs_rva);
+        impl_names = (const UINT *)(base + info->impl_names_rva);
         sig = sigs[idx];
-        if ((sig & THUNK_SIG_RESERVED) || THUNK_SIG_ARGC(sig) > THUNK_MAX_ARGS)
+        /* a variadic needs one slot beyond its fixed arguments for the va_list */
+        if ((sig & THUNK_SIG_RESERVED) ||
+            THUNK_SIG_ARGC(sig) + ((sig & THUNK_SIG_VARIADIC) ? 1u : 0u) > THUNK_MAX_ARGS)
         {
             ERR( "%s stub %u has unusable signature %08x\n",
                  debugstr_w(mod->BaseDllName.Buffer), idx, sig );
             return NULL;
         }
 
-        *argc = THUNK_SIG_ARGC(sig);
+        *sig_out = sig;
 
         /* An export whose answer only means something in one machine's
          * namespace is answered here rather than forwarded; see above. */
@@ -1232,15 +1240,16 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *argc, thunk_override_
             ERR( "no native %s to implement guest imports\n", debugstr_w(mod->BaseDllName.Buffer) );
             return NULL;
         }
-        RtlInitAnsiString( &func_name, (char *)(base + names[idx]) );
+        RtlInitAnsiString( &func_name, (char *)(base + impl_names[idx]) );
         if (LdrGetProcedureAddress( native, &func_name, 0, &proc ))
         {
             ERR( "native %s has no %s\n", debugstr_w(mod->BaseDllName.Buffer), func_name.Buffer );
             return NULL;
         }
 
-        TRACE( "%s.%s -> %p (%u args)\n", debugstr_w(mod->BaseDllName.Buffer),
-               (char *)(base + names[idx]), proc, THUNK_SIG_ARGC(sig) );
+        TRACE( "%s.%s -> %s %p (%u%s args)\n", debugstr_w(mod->BaseDllName.Buffer),
+               (char *)(base + names[idx]), (char *)(base + impl_names[idx]), proc,
+               THUNK_SIG_ARGC(sig), (sig & THUNK_SIG_VARIADIC) ? "+va" : "" );
         return proc;
     }
     return NULL;
@@ -1282,6 +1291,38 @@ static void marshal_thunk_args( const AMD64_CONTEXT *ctx, UINT argc, ULONG_PTR *
     }
 }
 
+/***********************************************************************
+ *           marshal_thunk_va_list
+ *
+ * A true ellipsis export cannot be forwarded by a fixed-arity stub, which has
+ * no way to know how many arguments there are.  It does not have to be: it is
+ * forwarded to the callee own v-variant instead, with a va_list built here.
+ * That is possible only because ppc64le ELFv2 va_list is a plain pointer into
+ * a flat run of 8-byte argument slots, structurally identical to MS-x64 --
+ * measured, not assumed.  (The sibling wine-spec-thunk project refuses va_list
+ * outright; it is solving a different ABI pair, so do not copy that rule here.)
+ *
+ * MS-x64 requires every caller to reserve 32 bytes of shadow space above the
+ * return address, and that is exactly where a variadic callee spills its four
+ * register arguments to make the argument list contiguous.  Do the same spill
+ * here and the shadow slots, plus the caller stack arguments which already sit
+ * immediately above them at Rsp+0x28, form one contiguous save area.  The
+ * va_list is then the address of the slot after the last fixed argument.
+ *
+ * Argument 0 comes from R10 rather than RCX for the usual reason: the trap
+ * opcode is SYSCALL, which destroys RCX.
+ */
+static ULONG_PTR *marshal_thunk_va_list( const AMD64_CONTEXT *ctx, UINT nfixed )
+{
+    ULONG_PTR *home = (ULONG_PTR *)(ULONG_PTR)(ctx->Rsp + 8);
+
+    home[0] = ctx->R10;
+    home[1] = ctx->Rdx;
+    home[2] = ctx->R8;
+    home[3] = ctx->R9;
+    return home + nfixed;
+}
+
 static ULONG_PTR call_native_thunk( void *proc, const ULONG_PTR *a )
 {
     return ((ULONG_PTR (*)( ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR,
@@ -1313,11 +1354,12 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
     thunk_override_func override = NULL;
     NTSTATUS status = STATUS_SUCCESS;
     ULONG_PTR a[THUNK_MAX_ARGS] = { 0 };
-    UINT argc = 0;
+    UINT sig = 0, argc;
     ULONG_PTR ret;
     void *proc;
 
-    proc = find_guest_thunk_target( ctx->Rip, &argc, &override );
+    proc = find_guest_thunk_target( ctx->Rip, &sig, &override );
+    argc = THUNK_SIG_ARGC(sig);
     if (!proc && !override)
     {
         ERR( "unhandled guest trap at %p\n", (void *)(ULONG_PTR)ctx->Rip );
@@ -1331,6 +1373,12 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
                &argc, NtCurrentTeb()->Tib.StackLimit, NtCurrentTeb()->Tib.StackBase );
 
         marshal_thunk_args( ctx, argc, a );
+        if (sig & THUNK_SIG_VARIADIC)
+        {
+            /* the v-variant takes the fixed arguments plus one va_list */
+            a[argc] = (ULONG_PTR)marshal_thunk_va_list( ctx, argc );
+            argc++;
+        }
         ret = override ? override( a ) : call_native_thunk( proc, a );
 
         /* return to the guest's caller: the trap fired with Rip still on the
