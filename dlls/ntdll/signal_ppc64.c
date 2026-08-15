@@ -1071,7 +1071,23 @@ struct thunk_info
 #define THUNK_SIG_ARGC(sig)  ((sig) & 0xff)   /* for a variadic, the FIXED count */
 #define THUNK_SIG_VOID       0x100u           /* returns void */
 #define THUNK_SIG_VARIADIC   0x200u           /* synthesise a va_list, see below */
-#define THUNK_SIG_RESERVED   0xfffffc00u      /* must be zero */
+#define THUNK_SIG_RESERVED   0x0000fc00u      /* must be zero */
+/* Bit 16+i set: argument i is a 32-bit slot, measured by the generator's
+ * clang oracle from the parameter's type on the guest target (NOT from the
+ * .spec argument class, whose `long` names plenty of HANDLEs).  An MS-x64
+ * caller stores such an argument with a 32-bit store, leaving whatever was on
+ * the stack in the slot's upper half -- and PE-side code on this port is
+ * LP64, so a native ULONG parameter reads all 64 bits of it.  Measured:
+ * mspatcha's ApplyPatchToFileByBuffers received a poisoned buffer size,
+ * concluded the caller's buffer was big enough, and the LZXD decoder ran off
+ * the end of a guest stack buffer into the stack's top guard.  Zero-extension
+ * matches what the x86-64 register file already does to the four register
+ * arguments (writing a 32-bit register clears the upper half), so narrow
+ * stack slots simply become consistent with narrow register slots.  The mask
+ * carries no signedness, so a negative 32-bit value still reaches an LP64
+ * `long` parameter zero- rather than sign-extended -- a known limitation of
+ * the LP64 PE side, not of this mask. */
+#define THUNK_SIG_NARROW(sig) (((sig) >> 16) & 0xffffu)
 
 #define THUNK_MAX_ARGS 16
 
@@ -1108,7 +1124,11 @@ struct thunk_override
     const WCHAR         *module;
     const char          *name;
     UINT                 argc;
-    thunk_override_func  func;
+    thunk_override_func  func;     /* replaces the native call; NULL means the
+                                      row only rewrites arguments */
+    UINT                 cb_mask;  /* bit i set: argument i is a guest callback,
+                                      swapped for a trampoline at registration
+                                      (see wrap_guest_callback) */
 };
 
 /***********************************************************************
@@ -1271,40 +1291,48 @@ static ULONG_PTR call_guest_function( void *entry, void *arg )
 
 
 /***********************************************************************
- *           call_guest_tls_callback
+ *           call_guest_function_args
  *
- * A PIMAGE_TLS_CALLBACK of a guest image, at process and thread attach and
- * detach.  The same native->guest direction as the atexit handlers, with one
- * wrinkle: a TLS callback takes three MS-x64 arguments and the run-entry
- * primitive carries exactly one (RCX).  So the one argument is a parameter
- * block, and a five-instruction guest thunk unpacks it and tail-jumps to the
- * real callback -- the tail jump leaves RSP exactly as run_entry aligned it,
- * so the callback returns straight into run_entry's own return path.
+ * Run a guest procedure with up to four integer arguments and return its RAX.
+ *
+ * The run-entry primitive carries exactly one argument (RCX), so the one
+ * argument is a parameter block, and a six-instruction guest thunk unpacks it
+ * and tail-jumps to the real target -- the tail jump leaves RSP exactly as
+ * run_entry aligned it, MS-x64 shadow space included, so the target returns
+ * straight into run_entry's own return path with its RAX intact.
+ *
+ * Four arguments always travel, whatever the target's real arity: an MS-x64
+ * callee ignores argument registers beyond its own parameters, so a
+ * two-argument comparator called with garbage in R8/R9 cannot observe it.
+ * That keeps the block layout fixed and spares every caller from carrying an
+ * arity.  A callback with stack arguments (five or more) would need a thunk
+ * that builds a frame; nothing in the corpus has one, and this is where it
+ * would go.
  *
  * The thunk is written once into anonymous executable memory.  It is only
  * ever entered through call_guest_function, so it needs no classification by
  * guest_module_from_address, and a freshly mapped page can have no stale
- * translation to invalidate.  Callers hold the loader lock, which serializes
- * the one-time setup.
+ * translation to invalidate.  Publication is a compare-exchange: concurrent
+ * first callers race benignly, the loser frees its copy.
  */
-void call_guest_tls_callback( void *callback, void *module, UINT reason )
+static ULONG_PTR call_guest_function_args( void *fn, ULONG_PTR a0, ULONG_PTR a1,
+                                           ULONG_PTR a2, ULONG_PTR a3 )
 {
     static const BYTE thunk_code[] =
     {
-        0x48, 0x8b, 0x01,        /* mov rax,[rcx]       callback */
-        0x48, 0x8b, 0x51, 0x10,  /* mov rdx,[rcx+0x10]  reason */
-        0x4c, 0x8b, 0x41, 0x18,  /* mov r8,[rcx+0x18]   reserved */
-        0x48, 0x8b, 0x49, 0x08,  /* mov rcx,[rcx+0x08]  module */
+        0x48, 0x8b, 0x01,        /* mov rax,[rcx]       target */
+        0x48, 0x8b, 0x51, 0x10,  /* mov rdx,[rcx+0x10]  a1 */
+        0x4c, 0x8b, 0x41, 0x18,  /* mov r8,[rcx+0x18]   a2 */
+        0x4c, 0x8b, 0x49, 0x20,  /* mov r9,[rcx+0x20]   a3 */
+        0x48, 0x8b, 0x49, 0x08,  /* mov rcx,[rcx+0x08]  a0 */
         0xff, 0xe0,              /* jmp rax */
     };
     static void *thunk;
     struct
     {
-        void      *callback;   /* 0x00 */
-        void      *module;     /* 0x08 */
-        ULONGLONG  reason;     /* 0x10 */
-        void      *reserved;   /* 0x18 */
-    } params = { callback, module, reason, NULL };
+        void      *fn;    /* 0x00 */
+        ULONG_PTR  a[4];  /* 0x08 0x10 0x18 0x20 */
+    } params = { fn, { a0, a1, a2, a3 } };
 
     if (!thunk)
     {
@@ -1314,14 +1342,31 @@ void call_guest_tls_callback( void *callback, void *module, UINT reason )
                                                    MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE );
         if (status)
         {
-            ERR( "no memory for the guest TLS callback thunk, status %08x\n", (UINT)status );
-            return;
+            ERR( "no memory for the guest argument thunk, status %08x\n", (UINT)status );
+            return 0;
         }
         memcpy( mem, thunk_code, sizeof(thunk_code) );
-        thunk = mem;
+        if (InterlockedCompareExchangePointer( &thunk, mem, NULL ))
+        {
+            SIZE_T free_size = 0;
+            NtFreeVirtualMemory( GetCurrentProcess(), &mem, &free_size, MEM_RELEASE );
+        }
     }
+    return call_guest_function( thunk, &params );
+}
+
+
+/***********************************************************************
+ *           call_guest_tls_callback
+ *
+ * A PIMAGE_TLS_CALLBACK of a guest image, at process and thread attach and
+ * detach: (module, reason, reserved), MS-x64, through the generic argument
+ * thunk.  The same native->guest direction as the atexit handlers.
+ */
+void call_guest_tls_callback( void *callback, void *module, UINT reason )
+{
     TRACE( "callback %p module %p reason %u\n", callback, module, reason );
-    call_guest_function( thunk, &params );
+    call_guest_function_args( callback, (ULONG_PTR)module, reason, 0, 0 );
 }
 
 
@@ -1474,6 +1519,195 @@ static ULONG_PTR emu_onexit( const ULONG_PTR *a, void *native )
 }
 
 
+/***********************************************************************
+ *           guest callback trampolines
+ *
+ * The generalisation the atexit handlers dodged: an API whose callbacks must
+ * be told apart -- a progress callback, a comparator, an exception filter --
+ * hands native code a guest function pointer that native code then CALLS,
+ * with arguments.  The interception is at REGISTRATION, exactly as for
+ * atexit: the thunk that receives the pointer knows precisely what it is,
+ * where the native caller holding it later cannot be taught to classify it.
+ * Registration swaps the guest pointer for a native trampoline; native code
+ * calls the trampoline like any function pointer, and the trampoline funnels
+ * into the shared run-entry primitive -- which adopts whatever thread the
+ * caller happens to be on, so a native worker thread invoking a guest
+ * callback needs no thread-specific code here either.
+ *
+ * Trampolines come allocate_stub()-style from a pool OUTSIDE any AMD64 image
+ * range, so the widened thread_start_is_guest_code classifies one as native
+ * (guest-threads.md composition rule 2).  One trampoline per distinct guest
+ * target, found by lookup, so re-registration is idempotent and a callback
+ * invoked a million times costs one slot; slots live for the process, like
+ * allocate_stub's.  Each is twelve instructions:
+ *
+ *      r7  = guest target                (the fifth ELFv2 argument)
+ *      r12 = guest_callback_dispatch     (entered by its global entry)
+ *      mtctr r12 / bctr
+ *
+ * r3-r6 pass through untouched, so the dispatcher receives the native
+ * caller's first four integer arguments plus the guest target, and four
+ * arguments always travel (see call_guest_function_args).
+ *
+ * The return value is the guest's RAX with the low 32 bits sign-extended:
+ * every callback the corpus registers returns int/BOOL/LONG, an x86-64
+ * callee writing EAX zeroes the upper half, and a native caller may rely on
+ * the ELFv2 rule that the callee extended its 32-bit result -- a comparator
+ * returning -1 must not arrive as 0xffffffff.  A callback class returning a
+ * genuine 64-bit value (an LRESULT window procedure) needs a per-slot flag
+ * here on the day the corpus demands one.
+ *
+ * WINEEMUNOCBWRAP=1 is the negative control, same shape as
+ * WINEEMUNOGSTHREADS: registration hands the raw guest pointer to native
+ * code, which is exactly the bug this pool exists to fix, so anything this
+ * mechanism carries MUST go red under it.
+ */
+struct guest_callback_stub
+{
+    UINT  code[12];      /* r7 = guest_fn; r12 = dispatch; mtctr; bctr */
+    void *guest_fn;      /* identity: one stub per target, and post-mortem */
+    void *pad;           /* one cache line per slot */
+};
+
+#define MAX_GUEST_CALLBACKS 1024   /* a 64KB pool */
+
+static struct guest_callback_stub *guest_cb_pool;
+static UINT guest_cb_count;
+
+static ULONG_PTR guest_callback_dispatch( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
+                                          ULONG_PTR a3, void *fn )
+{
+    ULONG_PTR ret;
+
+    TRACE( "calling guest callback %p (%p,%p,%p,%p)\n", fn,
+           (void *)a0, (void *)a1, (void *)a2, (void *)a3 );
+    ret = call_guest_function_args( fn, a0, a1, a2, a3 );
+    /* A guest ExitThread inside the callback ended the nested run: RAX is
+     * meaningless, and every enclosing trap return keeps unwinding
+     * (guest-threads.md composition rule 3).  Hand back a value that stops
+     * the native caller doing more work; 0 is "stop" for every callback kind
+     * the corpus registers. */
+    if (guest_exit_requested) return 0;
+    TRACE( "guest callback %p returned %p\n", fn, (void *)ret );
+    return (ULONG_PTR)(LONG_PTR)(LONG)ret;
+}
+
+/* emit `reg = val' as the classic five-instruction absolute load */
+static UINT *emit_load_imm64( UINT *p, UINT reg, ULONG_PTR val )
+{
+    *p++ = 0x3C000000 | (reg << 21) | ((val >> 48) & 0xffff);               /* lis  */
+    *p++ = 0x60000000 | (reg << 21) | (reg << 16) | ((val >> 32) & 0xffff); /* ori  */
+    *p++ = 0x780007C6 | (reg << 21) | (reg << 16);                          /* sldi 32 */
+    *p++ = 0x64000000 | (reg << 21) | (reg << 16) | ((val >> 16) & 0xffff); /* oris */
+    *p++ = 0x60000000 | (reg << 21) | (reg << 16) | (val & 0xffff);         /* ori  */
+    return p;
+}
+
+/* a "1" in the process environment; PE-side, so no getenv here */
+static BOOL emu_env_flag( const WCHAR *name )
+{
+    UNICODE_STRING nameW, value;
+    WCHAR buf[4];
+
+    value.Buffer = buf;
+    value.MaximumLength = sizeof(buf);
+    value.Length = 0;
+    RtlInitUnicodeString( &nameW, name );
+    return !RtlQueryEnvironmentVariable_U( NULL, &nameW, &value ) &&
+           value.Length && buf[0] == '1';
+}
+
+static void *wrap_guest_callback( void *fn )
+{
+    static int nowrap = -1;
+    struct guest_callback_stub *stub;
+    ULONG_PTR magic;
+    void *ret = fn;
+    UINT *p, i;
+
+    if (!fn) return fn;
+
+    if (nowrap == -1) nowrap = emu_env_flag( L"WINEEMUNOCBWRAP" );
+    if (nowrap)
+    {
+        ERR( "WINEEMUNOCBWRAP: handing raw guest callback %p to native code\n", fn );
+        return fn;
+    }
+
+    LdrLockLoaderLock( 0, NULL, &magic );
+
+    /* Idempotence: a pointer that is already one of our trampolines comes
+     * back unchanged.  That happens legitimately -- SetUnhandledExceptionFilter
+     * returns the previous filter, which may be a trampoline the guest is now
+     * restoring -- and wrapping a trampoline would run its ppc64 bytes as
+     * x86-64. */
+    if (guest_cb_pool && fn >= (void *)guest_cb_pool &&
+        fn < (void *)(guest_cb_pool + guest_cb_count)) goto done;
+
+    /* Classification is a CHECK here, never the mechanism: the thunk knows
+     * its argument is a callback, which no address range can tell it. */
+    if (!guest_module_from_address( fn ))
+    {
+        void *image;
+        if (RtlPcToFileHeader( fn, &image ))
+        {
+            /* native code is native-callable exactly as it is */
+            WARN( "callback %p is native code, not wrapping\n", fn );
+            goto done;
+        }
+        /* in no image at all: guest code generated outside any module -- the
+         * registration site knows better than the address does */
+        TRACE( "callback %p lies in no image, wrapping as guest code\n", fn );
+    }
+
+    for (i = 0; i < guest_cb_count; i++)
+        if (guest_cb_pool[i].guest_fn == fn) { ret = &guest_cb_pool[i]; goto done; }
+
+    if (!guest_cb_pool)
+    {
+        void *mem = NULL;
+        SIZE_T size = MAX_GUEST_CALLBACKS * sizeof(struct guest_callback_stub);
+        NTSTATUS status = NtAllocateVirtualMemory( GetCurrentProcess(), &mem, 0, &size,
+                                                   MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE );
+        if (status)
+        {
+            ERR( "no memory for guest callback trampolines, status %08x\n", (UINT)status );
+            goto done;   /* raw pointer: a diagnosed crash, not a dropped callback */
+        }
+        guest_cb_pool = mem;
+    }
+    if (guest_cb_count >= MAX_GUEST_CALLBACKS)
+    {
+        ERR( "more than %u guest callbacks; %p goes to native code raw\n",
+             MAX_GUEST_CALLBACKS, fn );
+        goto done;
+    }
+
+    stub = &guest_cb_pool[guest_cb_count];
+    p = stub->code;
+    p = emit_load_imm64( p, 7, (ULONG_PTR)fn );
+    p = emit_load_imm64( p, 12, (ULONG_PTR)guest_callback_dispatch );
+    *p++ = 0x7D8903A6;   /* mtctr r12 */
+    *p++ = 0x4E800420;   /* bctr */
+    stub->guest_fn = fn;
+    NtFlushInstructionCache( GetCurrentProcess(), stub, sizeof(*stub) );
+    guest_cb_count++;    /* publish only after the code is flushed */
+    TRACE( "guest callback %p -> trampoline %p (%u total)\n", fn, stub, guest_cb_count );
+    ret = stub;
+done:
+    LdrUnlockLoaderLock( 0, magic );
+    return ret;
+}
+
+/* swap the arguments a thunk_override row declares as callbacks */
+static void wrap_thunk_callback_args( ULONG_PTR *a, UINT argc, UINT mask )
+{
+    UINT i;
+    for (i = 0; i < argc; i++)
+        if (mask & (1u << i)) a[i] = (ULONG_PTR)wrap_guest_callback( (void *)a[i] );
+}
+
+
 static const struct thunk_override thunk_overrides[] =
 {
     { L"kernel32.dll", "GetProcAddress",    2, emu_GetProcAddress },
@@ -1500,6 +1734,28 @@ static const struct thunk_override thunk_overrides[] =
     { L"ucrtbase.dll", "_onexit",           1, emu_onexit },
     { L"kernel32.dll", "ExitThread",        1, emu_ExitThread },
     { L"kernelbase.dll", "ExitThread",      1, emu_ExitThread },
+    /* native->guest WITH identity: these thunks receive a guest function
+     * pointer that native code later calls with arguments, so registration
+     * swaps it for a trampoline from the pool above.  Rows are driven by what
+     * the corpus actually registers, not by API taxonomy.  NOTE composition
+     * rule 1 (guest-threads.md #3): CreateThread's start routine must NOT
+     * appear here -- thread starts are intercepted at invocation, in
+     * RtlUserThreadStart. */
+    { L"mspatcha.dll", "ApplyPatchToFileExA",          6, NULL, 1u << 4 },
+    { L"mspatcha.dll", "ApplyPatchToFileExW",          6, NULL, 1u << 4 },
+    { L"mspatcha.dll", "ApplyPatchToFileByHandlesEx",  6, NULL, 1u << 4 },
+    { L"mspatcha.dll", "ApplyPatchToFileByBuffers",   11, NULL, 1u << 9 },
+    /* every winetest registers a top-level exception filter; SEH dispatch
+     * calling a guest filter natively was an illegal-instruction storm ending
+     * in a stack overflow, which buried the REAL failure under it */
+    { L"kernel32.dll",   "SetUnhandledExceptionFilter", 1, NULL, 1u << 0 },
+    { L"kernelbase.dll", "SetUnhandledExceptionFilter", 1, NULL, 1u << 0 },
+    /* comparators: the signed-return case -- a cmp returning -1 must not
+     * reach native qsort as 0xffffffff */
+    { L"msvcrt.dll",   "qsort",   4, NULL, 1u << 3 },
+    { L"ucrtbase.dll", "qsort",   4, NULL, 1u << 3 },
+    { L"msvcrt.dll",   "bsearch", 5, NULL, 1u << 4 },
+    { L"ucrtbase.dll", "bsearch", 5, NULL, 1u << 4 },
 };
 
 /***********************************************************************
@@ -1630,7 +1886,7 @@ static BOOL find_guest_com_target( LDR_DATA_TABLE_ENTRY *mod, ULONG_PTR rip,
  * fills *com and returns NULL.
  */
 static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_override_func *override,
-                                      struct com_thunk_hit *com )
+                                      struct com_thunk_hit *com, UINT *cb_mask )
 {
     LIST_ENTRY *mark, *entry;
     void *ret = NULL;
@@ -1734,9 +1990,12 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
                      thunk_overrides[i].argc, THUNK_SIG_ARGC(sig) );
                 goto done;
             }
-            TRACE( "%s.%s -> override (%u args)\n", debugstr_w(mod->BaseDllName.Buffer),
-                   thunk_overrides[i].name, thunk_overrides[i].argc );
+            TRACE( "%s.%s -> override %p cb_mask %#x (%u args)\n",
+                   debugstr_w(mod->BaseDllName.Buffer), thunk_overrides[i].name,
+                   thunk_overrides[i].func, thunk_overrides[i].cb_mask,
+                   thunk_overrides[i].argc );
             *override = thunk_overrides[i].func;
+            *cb_mask  = thunk_overrides[i].cb_mask;
             break;
         }
 
@@ -1769,7 +2028,7 @@ done:
  * not touch it.  Both RCX and R11 are volatile under MS-x64, so the guest
  * cannot observe the damage after the call returns.
  */
-static void marshal_thunk_args( const AMD64_CONTEXT *ctx, UINT argc, ULONG_PTR *a )
+static void marshal_thunk_args( const AMD64_CONTEXT *ctx, UINT argc, UINT narrow, ULONG_PTR *a )
 {
     UINT i;
 
@@ -1785,6 +2044,9 @@ static void marshal_thunk_args( const AMD64_CONTEXT *ctx, UINT argc, ULONG_PTR *
          * the 32 bytes of shadow space MS-x64 reserves for the register ones */
         default: a[i] = *(ULONG_PTR *)(ULONG_PTR)(ctx->Rsp + 8 + i * 8); break;
         }
+        /* a 32-bit argument's slot carries stack garbage above bit 31, and
+         * LP64-built native code reads all 64 bits; see THUNK_SIG_NARROW */
+        if (narrow & (1u << i)) a[i] = (UINT)a[i];
     }
 }
 
@@ -1852,11 +2114,11 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
     struct com_thunk_hit com = { 0 };
     NTSTATUS status = STATUS_SUCCESS;
     ULONG_PTR a[THUNK_MAX_ARGS] = { 0 };
-    UINT sig = 0, argc;
+    UINT sig = 0, argc, cb_mask = 0;
     ULONG_PTR ret;
     void *proc;
 
-    proc = find_guest_thunk_target( ctx->Rip, &sig, &override, &com );
+    proc = find_guest_thunk_target( ctx->Rip, &sig, &override, &com, &cb_mask );
     argc = THUNK_SIG_ARGC(sig);
     if (com.dispatch)
     {
@@ -1888,7 +2150,11 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
                (void *)(ULONG_PTR)ctx->R8, (void *)(ULONG_PTR)ctx->R9, (void *)(ULONG_PTR)ctx->Rsp,
                &argc, NtCurrentTeb()->Tib.StackLimit, NtCurrentTeb()->Tib.StackBase );
 
-        marshal_thunk_args( ctx, argc, a );
+        marshal_thunk_args( ctx, argc, THUNK_SIG_NARROW(sig), a );
+        /* registration-side interception of guest callbacks: swap each
+         * declared callback argument for a native trampoline BEFORE the
+         * native callee ever sees the pointer */
+        if (cb_mask) wrap_thunk_callback_args( a, argc, cb_mask );
         if (sig & THUNK_SIG_VARIADIC)
         {
             /* the v-variant takes the fixed arguments plus one va_list */

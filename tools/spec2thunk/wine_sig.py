@@ -860,6 +860,55 @@ class WineHeaders:
                           'host marshaller passes' % len(params))
         return d, ret, params
 
+    def widths(self, requests):
+        """-> {key: [sizeof(param), ...]} for each (key, params) request.
+
+        Measured by the SAME clang, target and headers that verified the
+        signatures: one translation unit of `char wt_asz_<n>_<i>[sizeof(T)];`
+        globals, compiled to LLVM IR, whose `[N x i8]` array lengths ARE the
+        sizes on the guest target.  No parsing of type spellings, no table of
+        typedef widths to maintain, and a request whose types will not compile
+        simply drops out.  Returns {} on any failure: the caller treats a
+        missing answer as "publish no width information", never as a guess.
+
+        This exists because argument WIDTH decides how the host reads a guest
+        argument slot -- an MS-x64 caller stores a 32-bit argument with a
+        32-bit store and leaves stack garbage in the slot's upper half, which
+        this port's LP64-built native code will read -- and because the one
+        other place widths could come from, the .spec argument classes, is
+        documented in WineSpecs below as unable to state width (`long` there
+        names plenty of HANDLEs).
+        """
+        items = [(k, list(ps)) for k, ps in requests if ps]
+        if not items:
+            return {}
+        lines = [self.probe_src]
+        for n, (k, params) in enumerate(items):
+            for i, ptype in enumerate(params):
+                lines.append('char wt_asz_%d_%d[sizeof(%s)];\n' % (n, i, ptype))
+        path = os.path.join(self.workdir, 'wt_widths.c')
+        with open(path, 'w') as f:
+            f.write(''.join(lines))
+        out = os.path.join(self.workdir, 'wt_widths.ll')
+        cmd = [c for c in self._base() if c != '-fsyntax-only']
+        r = subprocess.run(cmd + ['-S', '-emit-llvm', '-o', out, path],
+                           capture_output=True, text=True)
+        self.stats['probe_compiles'] += 1
+        if r.returncode != 0:
+            return {}
+        found = {}
+        with open(out) as f:
+            for m in re.finditer(r'@wt_asz_(\d+)_(\d+)\s*=[^\[]*\[(\d+) x i8\]',
+                                 f.read()):
+                found[(int(m.group(1)), int(m.group(2)))] = int(m.group(3))
+        result = {}
+        for n, (k, params) in enumerate(items):
+            sizes = [found.get((n, i)) for i in range(len(params))]
+            if None in sizes:
+                continue
+            result[k] = sizes
+        return result
+
     def signature(self, name, allow_variadic=False):
         """-> dict(nargs, returns_void, variadic, header, line, ret, params).
 
@@ -1004,6 +1053,13 @@ class WineSpecs:
 
 DESC_VOID = 0x100        # bit 8
 DESC_VARIADIC = 0x200    # bit 9
+DESC_NARROW_SHIFT = 16   # bits 16..31: bit 16+i set means argument i is a
+                         # 32-bit slot (spec class `long`/`word`); the host
+                         # must take only the low 32 bits of the guest's
+                         # argument slot, because an MS-x64 caller stores a
+                         # 32-bit value with a 32-bit store and leaves stack
+                         # garbage in the slot's upper half -- which this
+                         # port's LP64-built native code WILL read.
 DESC_RESERVED = 0xfffffc00   # bits 10..31, MUST be zero
 
 
@@ -1015,13 +1071,20 @@ def descriptor(sig):
     bit  8     returns void
     bit  9     variadic -- the host must synthesise a va_list from the guest
                frame past argument nargs-1 and call impl_names_rva[i] instead.
-    bits 10..31 reserved, must be zero.
+    bits 10..15 reserved, must be zero.
+    bits 16..31 narrow-argument mask: bit 16+i set means argument i is a
+               32-bit slot and the host must zero-extend its low 32 bits.
+               For a variadic the mask covers the FIXED arguments only.
     """
     if not (0 <= sig['nargs'] <= 16):
         raise Refused('nargs out of range')
+    mask = sig.get('narrow_mask', 0)
+    if mask & ~0xffff or (sig['nargs'] < 16 and mask >> sig['nargs']):
+        raise Refused('narrow mask names arguments beyond nargs')
     return ((sig['nargs'] & 0xff)
             | (DESC_VOID if sig['returns_void'] else 0)
-            | (DESC_VARIADIC if sig.get('variadic') else 0))
+            | (DESC_VARIADIC if sig.get('variadic') else 0)
+            | (mask << DESC_NARROW_SHIFT))
 
 
 # This is a build tool living at <wine-root>/tools/spec2thunk/, so the source

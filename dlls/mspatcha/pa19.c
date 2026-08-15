@@ -695,6 +695,8 @@ DWORD apply_patch_to_file_by_buffers(const BYTE *patch_file_view, const ULONG pa
 
     buf_size = old_file_size + ph.patched_size;
     decode_buf = new_file_buf;
+    TRACE("new_file_buf %p size %u, buf_size %u\n",
+          new_file_buf, (unsigned)new_file_buf_size, (unsigned)buf_size);
     if (new_file_buf == NULL || new_file_buf_size < buf_size)
     {
         /* decode_buf must have room for both files, so allocate a new buffer if
@@ -706,6 +708,7 @@ DWORD apply_patch_to_file_by_buffers(const BYTE *patch_file_view, const ULONG pa
             goto free_patch_header;
         }
     }
+    TRACE("decode_buf %p\n", decode_buf);
 
     if (old_file_view != NULL)
         memcpy(decode_buf, old_file_view, file_info->input_size);

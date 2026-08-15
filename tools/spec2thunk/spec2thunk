@@ -881,6 +881,35 @@ def resolve_signatures(exports, headers, specs=None):
     if mismatches:
         sys.exit("FATAL: spec disagrees with Wine's headers:\n  "
                  + "\n  ".join(mismatches))
+
+    # ------------------------------------------------------------------
+    # Argument WIDTHS, from the same headers that supplied the signatures.
+    # An MS-x64 caller stores a 32-bit argument with a 32-bit store and
+    # leaves whatever was on the stack in the slot's upper half; PE-side
+    # code on this port is LP64, so a native ULONG parameter reads all 64
+    # bits of it.  Measured: mspatcha's ApplyPatchToFileByBuffers received
+    # a stack-garbage-poisoned buffer size, concluded the caller's buffer
+    # was big enough, and the LZXD decoder ran off the end of a guest stack
+    # buffer.  So each parameter whose guest-side type is at most 4 bytes
+    # gets a bit in the descriptor's narrow-argument mask and the host
+    # zero-extends it.  NOT derived from the .spec argument classes: a Wine
+    # .spec says `long` for plenty of HANDLEs (HeapAlloc's very first
+    # argument), and truncating one of those corrupts every call -- the
+    # WineSpecs docstring warns that width is exactly what a .spec cannot
+    # state.  Entries the header oracle did not verify (the .spec-cited
+    # last-resort path) publish no mask, which is the old behaviour.
+    widths = headers.widths(
+        [(i, e['sig'].get('params')) for i, e in enumerate(accepted)])
+    for i, e in enumerate(accepted):
+        sizes = widths.get(i)
+        if not sizes or len(sizes) != e['sig']['nargs']:
+            continue
+        mask = sum(1 << j for j, sz in enumerate(sizes) if sz <= 4)
+        if mask:
+            sig = dict(e['sig'])
+            sig['narrow_mask'] = mask
+            e['sig'] = sig
+            e['desc'] = wine_sig.descriptor(sig)
     return accepted, refused
 
 

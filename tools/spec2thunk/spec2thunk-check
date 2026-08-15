@@ -39,7 +39,8 @@ INFO_VERSION = 4
 INFO_FIELDS = 8                 # version..impl_names_rva
 DESC_VOID = 0x100               # bit 8
 DESC_VARIADIC = 0x200           # bit 9
-DESC_RESERVED = 0xfffffc00      # bits 10..31, must be zero
+DESC_RESERVED = 0x0000fc00      # bits 10..15, must be zero
+DESC_NARROW_SHIFT = 16         # bits 16..31: argument i is a 32-bit slot
 # Byte offset of the trapping instruction inside a stub, per body mode.
 # trap mode prefixes `mov r10, rcx` (49 89 ca) because x86-64 SYSCALL
 # architecturally overwrites RCX -- which is MS-x64 argument 0 -- with RIP+2.
@@ -1077,8 +1078,17 @@ def main():
                     'at 11e below)' % len(descs))
         bad = ['%s=0x%08x' % (walked[i] if i < len(walked) else i, d)
                for i, d in enumerate(descs) if d & DESC_RESERVED]
-        r.check(not bad, '11a descriptor reserved bits 10..31 are zero',
+        r.check(not bad, '11a descriptor reserved bits 10..15 are zero',
                 '; '.join(bad) if bad else 'all %d clean' % count)
+        # The narrow-argument mask can only name arguments that exist: a bit
+        # at or beyond nargs means the generator and this reader disagree
+        # about the descriptor layout, which is exactly what a structural
+        # check is for.
+        bad = ['%s=0x%08x' % (walked[i] if i < len(walked) else i, d)
+               for i, d in enumerate(descs)
+               if (d & 0xff) < 16 and (d >> DESC_NARROW_SHIFT) >> (d & 0xff)]
+        r.check(not bad, '11a2 narrow-argument mask names only existing args',
+                '; '.join(bad) if bad else 'all %d in range' % count)
         # A variadic costs one slot MORE than its fixed count -- the va_list the
         # host synthesises -- and dlls/ntdll/signal_ppc64.c rejects a stub whose
         # total exceeds THUNK_MAX_ARGS, so the same bound has to hold here or
@@ -1164,10 +1174,16 @@ def main():
             nfixed = nargs - 1 if variadic else nargs
             want = ((nfixed & 0xff) | (DESC_VOID if void else 0)
                     | (DESC_VARIADIC if variadic else 0))
-            if i < len(descs) and descs[i] != want:
+            # Compare only the bits a regex re-derivation CAN re-derive:
+            # argc, void and variadic (bits 0..9).  The narrow-argument mask
+            # (bits 16..31) comes from clang measuring sizeof on the guest
+            # target, which no header regex reproduces honestly; its
+            # structural validity is 11a2 and its ground truth is the
+            # generator's own oracle.
+            if i < len(descs) and (descs[i] & 0x3ff) != want:
                 mism.append('%s: image 0x%03x, headers say 0x%03x '
                             '(%d %sargs, ret %s%s)'
-                            % (n, descs[i], want, nfixed,
+                            % (n, descs[i] & 0x3ff, want, nfixed,
                                'fixed ' if variadic else '',
                                'void' if void else 'non-void',
                                ', VARIADIC' if variadic else ''))
