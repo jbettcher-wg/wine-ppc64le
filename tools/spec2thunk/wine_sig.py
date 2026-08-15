@@ -201,6 +201,19 @@ PROBE_SRC = (
     "#include <perflib.h>\n"          # advapi32: PerfStartProvider*, PerfStopProvider, ...
     "#include <ntsecapi.h>\n"         # advapi32: LsaOpenPolicy, LsaClose, LsaLookup*,
                                       # LsaQueryInformationPolicy, ...
+    # The 2026-08-15 first-real-game set.  Each of these modules refused 100% of
+    # its exports as "no declaration found in Wine headers" -- the tooling gap
+    # this list exists to close, not an ABI fact about the module.
+    "#include <avrt.h>\n"             # avrt: AvSetMmThreadCharacteristics*,
+                                      # AvRevertMmThreadCharacteristics, ...
+    "#include <setupapi.h>\n"         # setupapi: the SetupDi* and SetupQueue* surface
+    "#include <cfgmgr32.h>\n"         # setupapi: the CM_* / CMP_* half, which
+                                      # setupapi.h does not declare
+    "#include <d3dcompiler.h>\n"      # d3dcompiler_47: D3DCompile*, D3DReflect, ...
+    "#include <dxgi1_6.h>\n"          # dxgi: CreateDXGIFactory{,1,2}; 1_6 pulls the
+                                      # whole 1_0..1_6 chain
+    "#include <d3d11_4.h>\n"          # d3d11: D3D11CreateDevice{,AndSwapChain}
+    "#include <ddk/d3dkmthk.h>\n"     # d3d11 re-exports the D3DKMT* thunks
 )
 
 # ---------------------------------------------------------------------------

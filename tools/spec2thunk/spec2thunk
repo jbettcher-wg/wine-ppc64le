@@ -789,6 +789,57 @@ def com_flat_bearing(sig, iface_tokens):
     return hits
 
 
+def apply_guest_impl(exports, extra, native_spec_path):
+    """GUEST-IMPL on a module with no COM-JSON.
+
+    The COM audit's job is completeness -- proving no interface-bearing export
+    slipped through unclassified -- and that question does not exist here.  The
+    checks that DO still apply are the ones that catch a directive which cannot
+    work, and they are the same three:
+
+      * the named export must be one this module actually emits (an
+        oracle-refused export is already absent and binds to a sentinel, so a
+        redirect on it would silently do nothing);
+      * the native symbol must be exported by the native namesake's .spec, or
+        the guest faults at first call instead of reaching the wrapper;
+      * it cannot be combined with variadic=, which needs impl_names_rva for
+        its own v-variant forwarding.
+    """
+    by_name = {e['name']: e for e in exports}
+    errs = []
+
+    for n, impl in sorted(extra['guest_impl'].items()):
+        e = by_name.get(n)
+        if e is None:
+            errs.append('GUEST-IMPL names %s, which this module does not emit '
+                        '(oracle-refused exports are already absent and bind '
+                        'to named sentinels)' % n)
+            continue
+        if e['sig'].get('variadic'):
+            errs.append('GUEST-IMPL %s: cannot combine with variadic=' % n)
+
+    with open(native_spec_path) as f:
+        spec_text = f.read()
+    for sym in sorted(set(extra['guest_impl'].values())):
+        if not re.search(r'\b%s\b' % re.escape(sym), spec_text):
+            errs.append('%s is not exported by %s; the guest would fault at '
+                        'first call instead of reaching the wrapper'
+                        % (sym, os.path.basename(native_spec_path)))
+
+    if errs:
+        sys.exit('FATAL: GUEST-IMPL is not sound:\n  ' + '\n  '.join(errs))
+
+    for e in exports:
+        if e['name'] in extra['guest_impl']:
+            e['impl'] = extra['guest_impl'][e['name']]
+
+    print('GUEST-IMPL  %d export(s) redirected: %s'
+          % (len(extra['guest_impl']),
+             ', '.join('%s -> %s' % kv
+                       for kv in sorted(extra['guest_impl'].items()))))
+    print()
+
+
 def audit_guest_com_flat(exports, com_json_path, extra, native_spec_path):
     """Classify-or-die, then apply the GUEST-IMPL/GUEST-REFUSE redirects.
     Mutates exports' impl names in place."""
@@ -1205,7 +1256,13 @@ def emit_asm(dll, exports, mode, com_ifaces=None):
     a('wine_thunk_info:')
     a('\t.long\t%d\t\t\t# version' % INFO_VERSION)
     a('\t.long\t%d\t\t\t# count' % len(exports))
-    a('\t.long\twine_thunk_stub_0@IMGREL\t# stubs_rva')
+    # With no exports the .thunk section is empty, /opt:noref discards it, and
+    # any IMGREL into it is a relocation against a discarded section.  count is
+    # 0 there, so nothing indexes the array and 0 is the honest RVA.
+    if exports:
+        a('\t.long\twine_thunk_stub_0@IMGREL\t# stubs_rva')
+    else:
+        a('\t.long\t0\t\t\t# stubs_rva  (no exports emitted)')
     a('\t.long\t%d\t\t\t# stride' % STRIDE)
     a('\t.long\twine_thunk_namev@IMGREL\t# names_rva')
     a('\t.long\twine_thunk_sigv@IMGREL\t# sigs_rva')
@@ -1516,18 +1573,41 @@ def main():
         if args.strict:
             sys.exit("FATAL: --strict and %d export(s) refused" % len(refused))
     if not exports:
-        sys.exit("FATAL: every export was refused; nothing to emit")
+        # An all-refused module is still worth emitting.  Refused exports are
+        # absent from the thunk DLL and ntdll binds each to its own named
+        # sentinel, so the module's value is that it EXISTS: the guest's import
+        # of it resolves, the process reaches its entry point, and only a call
+        # to a refused export faults -- with the symbol's name on it.  Refusing
+        # to emit turns that into c000007b at load time, which stops the whole
+        # process for exports it was never going to call.  msvcp140 and
+        # vcruntime140_1 are the honest cases: their exports are C++ mangled
+        # names (?...@@) and __CxxFrameHandler4, which no Wine header declares
+        # and none ever will, so "every export refused" is their steady state
+        # rather than a tooling gap to be fixed later.
+        print("WARNING: every export was refused; emitting a module with no "
+              "exports.  It will load and every import of it binds to a "
+              "sentinel; a call to any of them faults by name.")
 
     # ---------------- the flat-surface audit (COM-JSON + FROM-SPEC modules)
-    have_guest_directives = (extra['guest_impl'] or extra['guest_refuse']
-                             or extra['guest_pass'])
+    # GUEST-REFUSE and GUEST-PASS are CLASSIFICATIONS: the audit below reads
+    # them to prove every interface-bearing flat export is accounted for, so
+    # they are meaningless without a COM-JSON module to audit against.
+    #
+    # GUEST-IMPL is not a classification.  It only says "resolve this guest
+    # export to that native name", riding the same impl_names_rva plumbing as
+    # variadic= -- ntdll learns nothing and no audit consumes it.  It is
+    # equally sound on a plain FROM-SPEC module, which is what msvcrt and
+    # ucrtbase need for _initterm: the redirect has nothing to do with COM.
+    have_guest_directives = extra['guest_refuse'] or extra['guest_pass']
     if have_guest_directives and not (com_ifaces and from_spec):
-        sys.exit('GUEST-IMPL/GUEST-REFUSE/GUEST-PASS need a FROM-SPEC module '
+        sys.exit('GUEST-REFUSE/GUEST-PASS need a FROM-SPEC module '
                  'with COM-JSON: the audit that makes them sound only runs '
                  'there')
     if com_ifaces and from_spec:
         audit_guest_com_flat(exports, spec_relative(extra['com_json']),
                              extra, from_spec)
+    elif extra['guest_impl']:
+        apply_guest_impl(exports, extra, from_spec or args.spec)
 
     if wine_spec_skipped or from_spec:
         print("EXPORT LIST  from %s" % (from_spec or args.spec))
