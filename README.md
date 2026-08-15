@@ -28,9 +28,11 @@ Honest, and in progress.
 | Windows-side modules | **built as real PEs**, machine `0x01f3`, via `tools/elf2pe` |
 | PE-side `ntdll.dll` | stays an ELF builtin — see below |
 | `wineboot -u` | **works** — full prefix, services registered, and the prefix runs programs |
-| Wine's own test suite | `version:info`, `version:install`, `advapi32:lsa` pass |
-| Running an x86-64 PE | **works** — a real Windows program runs and prints correct output |
+| Wine's own test suite | runs **as x86-64 guests** — `mspatcha` 2145/0, `apphelp` 15/0, `advapi32:registry` 6367 executed |
+| Running an x86-64 PE | **works** — real Windows programs run to completion |
 | Guest imports → native code | **works**, generated at build time by `tools/spec2thunk` |
+| Guest threads, callbacks, TLS, SEH | **work** — see below |
+| D3D12 → native vkd3d-proton | **works**, including **pixels on screen** |
 
 `ntdll` cannot be a PE and never will be: its TEB lives in an initial-exec
 `__thread`, and a PE image has nowhere to put a static TLS block. It is built as
@@ -84,12 +86,32 @@ only works because handles are translated into the caller's own namespace, so a
 guest asking for a proc address gets the stub in *its* module rather than a
 native ppc64 address it would crash on.
 
-**Known gaps.** Calls in the other direction — native code invoking a guest
-callback — are unhandled, which is why `winepath` prints correctly and then
-crashes in an `atexit` destructor. Guest-created threads still run native.
-True variadics (`printf`) need a marker in the descriptor before they can
-forward. And the emulator bridge cannot yet be `dlopen`ed without a
-`GLIBC_TUNABLES` static-TLS workaround.
+Calls in the **other** direction work too. Native code invoking guest code —
+`atexit` destructors, thread start routines, TLS callbacks, and callbacks like
+a `qsort` comparator or a progress callback — is intercepted at *registration*
+rather than at invocation, because a native caller holding a function pointer
+cannot classify it but the thunk that received it knows exactly what it is.
+Callbacks needing distinct identities get a trampoline from a pool allocated
+outside any guest image, so nothing mistakes a trampoline for guest code.
+
+Guest **exceptions** dispatch: a fault inside guest code is caught by Wine's own
+handler, reconstructed as an `EXCEPTION_RECORD` carrying the guest RIP, and
+dispatched to the guest's vectored and TEB-chain handlers, with an unhandled one
+re-raised natively. That is what took `advapi32_test:registry` from dying at its
+first guest fault to executing 6367 tests.
+
+**Graphics.** A guest D3D12 program reaches native vkd3d-proton and the GPU, and
+**presents to the screen** — verified texel-exact by reading the window back on
+a live session. Presentation goes through Wine's own win32u client-surface
+layer, the one `winevulkan` uses, so both the X11 and Wayland drivers are served
+by construction and vkd3d-proton needs no changes at all. vkd3d is built by this
+tree's `make`.
+
+**Known gaps.** System COM is not finished: `CoCreateInstance` still hands a
+guest a native vtable, so ole32-dependent tests reach `main` and stop there.
+Table-based `.pdata` exception dispatch is not implemented (no corpus binary
+needs it yet, but real-world binaries will). D3D11 on this path, swapchain
+resize and fullscreen, and the Wayland driver leg are all unbuilt.
 
 ## The interesting part: r2 across unwound frames
 
