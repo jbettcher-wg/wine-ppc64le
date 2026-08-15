@@ -1276,13 +1276,24 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len );
  * when the trap returns TRAP_CONTINUE.  The nested run gets its own guest
  * stack from run_entry, so the outer guest frame is untouched too.
  */
+static void raise_pending_guest_exception(void);
+void WINAPI emu_exception_dispatch( ULONG id, void *args, ULONG len );
+
 static ULONG_PTR call_guest_function( void *entry, void *arg )
 {
     struct emu_run_entry_params params = { entry, arg, 0, emu_trap_dispatch };
-    NTSTATUS status = WINE_UNIX_CALL( unix_emu_run_entry, &params );
+    NTSTATUS status;
+
+    params.exception_dispatcher = emu_exception_dispatch;
+    status = WINE_UNIX_CALL( unix_emu_run_entry, &params );
 
     if (status)
     {
+        /* a guest exception the nested run could not consume propagates
+         * natively from here -- the callback's native caller and the
+         * unhandled machinery above it get their shot with their own
+         * machine's context.  Does not return when one was pending. */
+        raise_pending_guest_exception();
         ERR( "guest callback %p failed, status %08x\n", entry, (UINT)status );
         return 0;
     }
@@ -1367,6 +1378,321 @@ void call_guest_tls_callback( void *callback, void *module, UINT reason )
 {
     TRACE( "callback %p module %p reason %u\n", callback, module, reason );
     call_guest_function_args( callback, (ULONG_PTR)module, reason, 0, 0 );
+}
+
+
+/***********************************************************************
+ *           guest SEH dispatch (docs/guest-seh.md)
+ *
+ * Two register files exist per guest thread and never merge: a guest
+ * exception is dispatched against the guest's AMD64_CONTEXT, a native one
+ * against the native CONTEXT, and the two machines cross only as an
+ * NTSTATUS.  The EXCEPTION_RECORD is the one object that crosses by value:
+ * its layout is identical between MS-x64 and LP64 ELFv2, which these
+ * asserts pin rather than trust.
+ */
+C_ASSERT( sizeof(EXCEPTION_RECORD) == 152 );
+C_ASSERT( offsetof(EXCEPTION_RECORD, ExceptionRecord) == 8 );
+C_ASSERT( offsetof(EXCEPTION_RECORD, ExceptionAddress) == 16 );
+C_ASSERT( offsetof(EXCEPTION_RECORD, NumberParameters) == 24 );
+C_ASSERT( offsetof(EXCEPTION_RECORD, ExceptionInformation) == 32 );
+
+/* what a guest handler compiled against winnt.h expects EXCEPTION_POINTERS
+ * to be: two pointers, the CONTEXT one being its own machine's */
+struct guest_exception_pointers
+{
+    EXCEPTION_RECORD *ExceptionRecord;
+    AMD64_CONTEXT    *ContextRecord;
+};
+C_ASSERT( sizeof(struct guest_exception_pointers) == 16 );
+
+/* A guest exception went unhandled at guest level; the record waits here for
+ * the run's PE caller (RtlUserThreadStart divert / call_guest_function) to
+ * re-raise it NATIVELY, so the existing machinery -- vectored handlers, the
+ * RtlUserThreadStart __EXCEPT, the unhandled-exception filter (behind which
+ * a guest filter sits as a trampoline already), NtTerminateProcess -- turns
+ * it into a correctly-coded, reported death instead of "emulator bridge
+ * failed (1)".  Per thread, consumed exactly once. */
+static __thread BOOL guest_exc_pending;
+static __thread EXCEPTION_RECORD guest_exc_rec;
+
+/* the trap CONTEXT the innermost emu_trap_dispatch on this thread is
+ * serving: what a raise-style override (emu_RaiseException) dispatches
+ * against.  Saved/restored around each dispatch, so nesting works. */
+static __thread AMD64_CONTEXT *emu_current_trap_ctx;
+
+/* Guest vectored handlers, recorded at REGISTRATION through the thunk
+ * overrides below -- the atexit pattern: a pointer handed through a guest
+ * thunk is guest-callable by construction and needs no classification at
+ * call time.  Native vectored handlers are deliberately NOT offered guest
+ * exceptions in v1 (they would read an AMD64 CONTEXT through a native
+ * CONTEXT pointer); TRACE'd when that decision is taken.  Order matters:
+ * FIRST handlers prepend, others append, as RtlAddVectoredExceptionHandler
+ * defines. */
+#define MAX_GUEST_VEH 32
+static void *guest_veh[MAX_GUEST_VEH];
+static UINT  guest_veh_count;
+
+static BOOL is_valid_guest_frame( ULONG_PTR frame, void *stack_base, void *stack_limit )
+{
+    if (frame & (sizeof(void *) - 1)) return FALSE;
+    if ((void *)frame >= NtCurrentTeb()->Tib.StackLimit &&
+        (void *)frame <= NtCurrentTeb()->Tib.StackBase) return TRUE;
+    return stack_limit && (void *)frame > stack_limit && (void *)frame <= stack_base;
+}
+
+/***********************************************************************
+ *           dispatch_guest_exception
+ *
+ * Guest-level dispatch: guest vectored handlers, then the shared TEB chain
+ * -- the guest pushes its __TRY frames through gs:[0x30] onto the very list
+ * native dispatch walks.  Every handler is invoked as guest code through
+ * the nested-run primitive; the first native frame stops the walk, because
+ * native frames get their shot from the native dispatch after the run ends,
+ * with their own machine's context.
+ *
+ * STATUS_SUCCESS means a handler said continue-execution and the (possibly
+ * edited) guest CONTEXT should be resumed; anything else is the unhandled
+ * protocol.
+ */
+static NTSTATUS dispatch_guest_exception( EXCEPTION_RECORD *rec, AMD64_CONTEXT *ctx,
+                                          void *stack_base, void *stack_limit )
+{
+    EXCEPTION_REGISTRATION_RECORD *frame;
+    UINT i;
+
+    TRACE( "code=%x flags=%x addr=%p rip=%p rsp=%p params=%u\n",
+           (UINT)rec->ExceptionCode, (UINT)rec->ExceptionFlags, rec->ExceptionAddress,
+           (void *)(ULONG_PTR)ctx->Rip, (void *)(ULONG_PTR)ctx->Rsp, (UINT)rec->NumberParameters );
+    for (i = 0; i < rec->NumberParameters; i++)
+        TRACE( " info[%u]=%p\n", i, (void *)rec->ExceptionInformation[i] );
+
+    for (i = 0; i < guest_veh_count; i++)
+    {
+        struct guest_exception_pointers ptrs = { rec, ctx };
+        void *handler = guest_veh[i];
+        LONG res;
+
+        TRACE( "calling guest vectored handler %p\n", handler );
+        res = (LONG)(DWORD)call_guest_function_args( handler, (ULONG_PTR)&ptrs, 0, 0, 0 );
+        TRACE( "guest vectored handler %p returned %x\n", handler, (UINT)res );
+        if (res == EXCEPTION_CONTINUE_EXECUTION) return STATUS_SUCCESS;
+    }
+
+    for (frame = NtCurrentTeb()->Tib.ExceptionList;
+         frame != (EXCEPTION_REGISTRATION_RECORD *)~(ULONG_PTR)0;
+         frame = frame->Prev)
+    {
+        DWORD res;
+
+        if (!is_valid_guest_frame( (ULONG_PTR)frame, stack_base, stack_limit ))
+        {
+            ERR( "invalid frame %p (win32 %p-%p, guest %p-%p)\n", frame,
+                 NtCurrentTeb()->Tib.StackLimit, NtCurrentTeb()->Tib.StackBase,
+                 stack_limit, stack_base );
+            rec->ExceptionFlags |= EXCEPTION_STACK_INVALID;
+            break;
+        }
+        if (!guest_module_from_address( frame->Handler ))
+        {
+            void *image;
+            if (RtlPcToFileHeader( frame->Handler, &image ))
+            {
+                /* first native frame: stop the guest-level walk */
+                TRACE( "frame %p handler %p is native code, stopping the guest walk\n",
+                       frame, frame->Handler );
+                break;
+            }
+            /* the thread-start rule, verbatim: refuse loudly, never guess */
+            ERR( "frame %p handler %p is in no image at all, refusing\n", frame, frame->Handler );
+            break;
+        }
+        TRACE( "calling guest TEB handler %p (rec=%p frame=%p ctx=%p)\n",
+               frame->Handler, rec, frame, ctx );
+        res = (DWORD)call_guest_function_args( (void *)frame->Handler, (ULONG_PTR)rec,
+                                               (ULONG_PTR)frame, (ULONG_PTR)ctx, 0 );
+        TRACE( "guest TEB handler %p returned %u\n", frame->Handler, res );
+        switch (res)
+        {
+        case ExceptionContinueExecution:
+            if (rec->ExceptionFlags & EXCEPTION_NONCONTINUABLE) return STATUS_NONCONTINUABLE_EXCEPTION;
+            return STATUS_SUCCESS;
+        case ExceptionContinueSearch:
+            break;
+        default:
+            /* a guest handler that CATCHES never returns -- it unwinds via
+             * RtlUnwind (tripwired below, S4) -- so any other disposition
+             * here is a protocol we do not speak yet */
+            ERR( "guest handler %p returned disposition %u; refusing\n", frame->Handler, (UINT)res );
+            return STATUS_INVALID_DISPOSITION;
+        }
+    }
+    return STATUS_UNHANDLED_EXCEPTION;
+}
+
+/***********************************************************************
+ *           emu_exception_dispatch
+ *
+ * PE-side entry for a guest fault, entered from the unix run loop through
+ * call_emu_trap_dispatcher exactly like emu_trap_dispatch: same callback
+ * stack layout, same syscall-frame push, same NtCallbackReturn return, same
+ * FDE story.  args holds one pointer to a struct emu_exception_params.
+ */
+void WINAPI emu_exception_dispatch( ULONG id, void *args, ULONG len )
+{
+    struct emu_exception_params *exc = *(struct emu_exception_params **)args;
+    NTSTATUS status = dispatch_guest_exception( exc->rec, exc->ctx,
+                                                exc->stack_base, exc->stack_limit );
+
+    if (status != STATUS_SUCCESS)
+    {
+        guest_exc_rec = *exc->rec;
+        guest_exc_pending = TRUE;
+        status = STATUS_EMU_GUEST_EXCEPTION;
+    }
+    status = NtCallbackReturn( NULL, 0, status );
+    RtlRaiseStatus( status );
+}
+
+/***********************************************************************
+ *           raise_pending_guest_exception
+ *
+ * The unhandled half of the protocol, at the run's PE caller: pick up the
+ * record a guest-level dispatch could not consume and re-raise it natively.
+ * Does not return when a record was pending.
+ */
+static void raise_pending_guest_exception(void)
+{
+    EXCEPTION_RECORD rec;
+
+    if (!guest_exc_pending) return;
+    rec = guest_exc_rec;
+    guest_exc_pending = FALSE;
+    ERR( "guest exception %08x at %p unhandled at guest level; re-raising natively\n",
+         (UINT)rec.ExceptionCode, rec.ExceptionAddress );
+    RtlRaiseException( &rec );
+}
+
+/* registration-side interception, the atexit pattern (D3r) */
+static ULONG_PTR emu_AddVectoredExceptionHandler( const ULONG_PTR *a, void *native )
+{
+    BOOL first = a[0] != 0;
+    void *handler = (void *)a[1];
+    ULONG_PTR magic;
+    void *ret = NULL;
+
+    LdrLockLoaderLock( 0, NULL, &magic );
+    if (!handler) { /* nothing */ }
+    else if (guest_veh_count >= MAX_GUEST_VEH)
+        ERR( "more than %u guest vectored handlers; %p not registered\n", MAX_GUEST_VEH, handler );
+    else
+    {
+        if (first)
+        {
+            memmove( guest_veh + 1, guest_veh, guest_veh_count * sizeof(*guest_veh) );
+            guest_veh[0] = handler;
+        }
+        else guest_veh[guest_veh_count] = handler;
+        guest_veh_count++;
+        ret = handler;   /* the pseudo-handle: the guest pointer itself */
+        TRACE( "guest vectored handler %p registered (%s, %u total)\n",
+               handler, first ? "first" : "last", guest_veh_count );
+    }
+    LdrUnlockLoaderLock( 0, magic );
+    return (ULONG_PTR)ret;
+}
+
+static ULONG_PTR emu_RemoveVectoredExceptionHandler( const ULONG_PTR *a, void *native )
+{
+    void *handler = (void *)a[0];
+    ULONG_PTR magic, ret = 0;
+    UINT i;
+
+    LdrLockLoaderLock( 0, NULL, &magic );
+    for (i = 0; i < guest_veh_count; i++)
+    {
+        if (guest_veh[i] != handler) continue;
+        memmove( guest_veh + i, guest_veh + i + 1,
+                 (guest_veh_count - i - 1) * sizeof(*guest_veh) );
+        guest_veh_count--;
+        ret = 1;
+        TRACE( "guest vectored handler %p removed (%u left)\n", handler, guest_veh_count );
+        break;
+    }
+    LdrUnlockLoaderLock( 0, magic );
+    return ret;
+}
+
+/* Guest RaiseException: the state to dispatch against and the handlers to
+ * run are the guest's, so this replaces the old pass-through to the native
+ * implementation -- whose native unwind off the switched stack terminated
+ * measurably (a_unwind) but could never find a guest handler.  The same
+ * prompt-termination observable is preserved by the unhandled protocol. */
+static NTSTATUS dispatch_guest_raise( EXCEPTION_RECORD *rec, AMD64_CONTEXT *ctx )
+{
+    struct emu_guest_stack_params stack = { 0 };
+    NTSTATUS status;
+
+    WINE_UNIX_CALL( unix_emu_guest_stack, &stack );
+    status = dispatch_guest_exception( rec, ctx, stack.base, stack.limit );
+    if (status == STATUS_SUCCESS) return STATUS_SUCCESS;   /* continue after the call */
+    guest_exc_rec = *rec;
+    guest_exc_pending = TRUE;   /* emu_trap_dispatch ends the run on this */
+    return status;
+}
+
+static ULONG_PTR emu_RaiseException( const ULONG_PTR *a, void *native )
+{
+    AMD64_CONTEXT *ctx = emu_current_trap_ctx;
+    const ULONG_PTR *info = (const ULONG_PTR *)a[3];
+    EXCEPTION_RECORD rec = { 0 };
+    UINT i;
+
+    rec.ExceptionCode  = (DWORD)a[0];
+    rec.ExceptionFlags = (DWORD)a[1] & EXCEPTION_NONCONTINUABLE;
+    if (info)
+    {
+        rec.NumberParameters = min( (DWORD)a[2], EXCEPTION_MAXIMUM_PARAMETERS );
+        for (i = 0; i < rec.NumberParameters; i++) rec.ExceptionInformation[i] = info[i];
+    }
+    if (!ctx)
+    {
+        ERR( "no trap context for guest RaiseException(%08x)\n", (UINT)rec.ExceptionCode );
+        return 0;
+    }
+    /* the address of the raise is the return address its CALL pushed */
+    rec.ExceptionAddress = (void *)*(ULONG_PTR *)(ULONG_PTR)ctx->Rsp;
+    dispatch_guest_raise( &rec, ctx );
+    return 0;
+}
+
+static ULONG_PTR emu_RtlRaiseException( const ULONG_PTR *a, void *native )
+{
+    AMD64_CONTEXT *ctx = emu_current_trap_ctx;
+    EXCEPTION_RECORD rec;
+
+    if (!a[0] || !ctx)
+    {
+        ERR( "no record (%p) or trap context for guest RtlRaiseException\n", (void *)a[0] );
+        return 0;
+    }
+    rec = *(const EXCEPTION_RECORD *)a[0];   /* layout-identical; asserted above */
+    rec.ExceptionAddress = (void *)*(ULONG_PTR *)(ULONG_PTR)ctx->Rsp;
+    dispatch_guest_raise( &rec, ctx );
+    return 0;
+}
+
+/* S4 tripwire: a guest handler that CATCHES unwinds through RtlUnwind, whose
+ * cross-machine per-level protocol does not exist yet.  Letting the native
+ * implementation run against a guest target frame would orphan the nested
+ * run's native frames -- a slow corruption that presents much later -- so
+ * this fails loudly and immediately instead. */
+static ULONG_PTR emu_RtlUnwind( const ULONG_PTR *a, void *native )
+{
+    ERR( "guest RtlUnwind(frame=%p, target=%p): cross-machine unwind (guest-seh S4) "
+         "is not built; terminating\n", (void *)a[0], (void *)a[1] );
+    RtlRaiseStatus( STATUS_NOT_IMPLEMENTED );
+    return 0;   /* unreachable */
 }
 
 
@@ -1750,6 +2076,27 @@ static const struct thunk_override thunk_overrides[] =
      * in a stack overflow, which buried the REAL failure under it */
     { L"kernel32.dll",   "SetUnhandledExceptionFilter", 1, NULL, 1u << 0 },
     { L"kernelbase.dll", "SetUnhandledExceptionFilter", 1, NULL, 1u << 0 },
+    /* guest SEH (docs/guest-seh.md S3): vectored handlers are recorded at
+     * registration for GUEST-level dispatch -- not wrapped and handed to the
+     * native table, where a guest exception would run them twice and a
+     * native one would hand them a native CONTEXT */
+    { L"ntdll.dll",      "RtlAddVectoredExceptionHandler",    2, emu_AddVectoredExceptionHandler },
+    { L"ntdll.dll",      "AddVectoredExceptionHandler",       2, emu_AddVectoredExceptionHandler },
+    { L"kernel32.dll",   "AddVectoredExceptionHandler",       2, emu_AddVectoredExceptionHandler },
+    { L"kernelbase.dll", "AddVectoredExceptionHandler",       2, emu_AddVectoredExceptionHandler },
+    { L"ntdll.dll",      "RtlRemoveVectoredExceptionHandler", 1, emu_RemoveVectoredExceptionHandler },
+    { L"ntdll.dll",      "RemoveVectoredExceptionHandler",    1, emu_RemoveVectoredExceptionHandler },
+    { L"kernel32.dll",   "RemoveVectoredExceptionHandler",    1, emu_RemoveVectoredExceptionHandler },
+    { L"kernelbase.dll", "RemoveVectoredExceptionHandler",    1, emu_RemoveVectoredExceptionHandler },
+    /* a guest raise is dispatched against the guest state (S3/5.3); the old
+     * pass-through unwound native frames still live under the emulator and
+     * could never find a guest handler */
+    { L"kernel32.dll",   "RaiseException",    4, emu_RaiseException },
+    { L"kernelbase.dll", "RaiseException",    4, emu_RaiseException },
+    { L"ntdll.dll",      "RtlRaiseException", 1, emu_RtlRaiseException },
+    /* S4 tripwire: a guest catch unwinds through here; fail loudly, never leak */
+    { L"ntdll.dll",      "RtlUnwind",         4, emu_RtlUnwind },
+    { L"ntdll.dll",      "RtlUnwindEx",       6, emu_RtlUnwind },
     /* comparators: the signed-return case -- a cmp returning -1 must not
      * reach native qsort as 0xffffffff */
     { L"msvcrt.dll",   "qsort",   4, NULL, 1u << 3 },
@@ -2110,6 +2457,7 @@ static ULONG_PTR call_native_thunk( void *proc, const ULONG_PTR *a )
 void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
 {
     AMD64_CONTEXT *ctx = *(AMD64_CONTEXT **)args;
+    AMD64_CONTEXT *prev_trap_ctx = emu_current_trap_ctx;
     thunk_override_func override = NULL;
     struct com_thunk_hit com = { 0 };
     NTSTATUS status = STATUS_SUCCESS;
@@ -2117,6 +2465,11 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
     UINT sig = 0, argc, cb_mask = 0;
     ULONG_PTR ret;
     void *proc;
+
+    /* raise-style overrides dispatch against this trap's guest state; saved
+     * and restored so a nested dispatch (guest handler makes a thunk call)
+     * leaves the outer one intact */
+    emu_current_trap_ctx = ctx;
 
     proc = find_guest_thunk_target( ctx->Rip, &sig, &override, &com, &cb_mask );
     argc = THUNK_SIG_ARGC(sig);
@@ -2171,8 +2524,13 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
         ctx->Rax = ret;
     }
 
+    emu_current_trap_ctx = prev_trap_ctx;
+
     /* Ending the run is how a guest ExitThread unwinds; see emu_ExitThread. */
     if (guest_exit_requested) status = STATUS_THREAD_IS_TERMINATING;
+    /* ...and how an unhandled guest raise surfaces (dispatch_guest_raise);
+     * the record itself waits in guest_exc_rec for the run's PE caller. */
+    else if (guest_exc_pending && !status) status = STATUS_EMU_GUEST_EXCEPTION;
 
     status = NtCallbackReturn( NULL, 0, status );
     RtlRaiseStatus( status );
@@ -2196,6 +2554,8 @@ void WINAPI RtlUserThreadStart( PRTL_THREAD_START_ROUTINE entry, void *arg )
             struct emu_run_entry_params params = { (void *)entry, arg, 0, emu_trap_dispatch };
             NTSTATUS status;
 
+            params.exception_dispatcher = emu_exception_dispatch;
+
             /* The first thread to run guest code is the one that ran the main
              * image: a guest cannot create a thread before its own entry point
              * executes, so this is unambiguous and needs no lock. */
@@ -2215,6 +2575,14 @@ void WINAPI RtlUserThreadStart( PRTL_THREAD_START_ROUTINE entry, void *arg )
                 TRACE( "guest thread exited with %u\n", guest_exit_code );
                 RtlExitUserThread( guest_exit_code );
             }
+
+            /* A guest exception no guest-level handler consumed: re-raise it
+             * natively inside this __TRY, so the vectored handlers, the
+             * unhandled-exception filter (a guest filter sits behind it as a
+             * trampoline already) and the __EXCEPT below produce a
+             * correctly-coded, reported death -- the guest Rip is in the
+             * record.  Does not return when one was pending. */
+            raise_pending_guest_exception();
 
             /* not wine_dbgstr_longlong(): on this port PE-side code is built by
              * the native ELF compiler, so its `unsigned long` is 64 bits and the

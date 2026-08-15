@@ -227,6 +227,91 @@ def clean_ret(spelling):
     return ' '.join(keep).replace(' *', '*')
 
 
+def dll_is_ucrt(dll):
+    """Does <dll>'s own CRT mode define _UCRT?
+
+    Mirrors the generator's crt_defines_for_dll (wine_sig.py), which mirrors
+    tools/makedep.c:get_crt_define(): ucrt* gets -D_UCRT; msvcr%u gets
+    -D_MSVCR_VER=<N> ("msvcrt" parses as 0); everything else gets nothing --
+    and include/msvcrt/corecrt.h:48 then defaults _MSVCR_VER to 140, which
+    :52 turns into _UCRT.  So only msvcrt itself and msvcr<N<140> are
+    non-UCRT.  The checker needs the same verdict INDEPENDENTLY because
+    Wine's CRT headers declare a few names with different shapes per mode
+    (wcstok: 3 args under _UCRT, 2 without), and a mode-blind scan reads
+    that as a self-inconsistent header (a false 11d).
+    """
+    stem = os.path.splitext(os.path.basename(dll or ''))[0].lower()
+    if stem.startswith('ucrt'):
+        return True
+    m = re.fullmatch(r'msvcr(\d*|t)', stem)
+    if m:
+        ver = m.group(1)
+        return ver not in ('', 't') and int(ver) >= 140
+    return True
+
+
+# #if/#ifdef/#elif spellings of the _UCRT test this masker understands.
+# Anything else is an UNKNOWN condition and stays transparent (both branches
+# scanned), which is exactly the pre-masking behaviour.
+_UCRT_TEST = re.compile(r'^(?P<neg>!\s*)?defined\s*[\s(]\s*_UCRT\s*\)?$')
+
+
+def _ucrt_cond(kw, rest, ucrt):
+    """-> True/False when the directive tests exactly _UCRT, else None."""
+    rest = rest.strip()
+    if kw == 'ifdef':
+        return ucrt if rest == '_UCRT' else None
+    if kw == 'ifndef':
+        return (not ucrt) if rest == '_UCRT' else None
+    m = _UCRT_TEST.match(rest)          # kw is 'if' or 'elif'
+    if not m:
+        return None
+    return (not ucrt) if m.group('neg') else ucrt
+
+
+def mask_ucrt(text, ucrt):
+    """Blank the #if[def] _UCRT branches the module's CRT mode excludes,
+    preserving line numbers.
+
+    The scan is otherwise preprocessor-blind, and for one symbol that is not
+    good enough: corecrt_wstring.h declares wcstok with 3 arguments under
+    `#ifdef _UCRT` and 2 arguments under the matching #else, so a blind scan
+    of a real header reports a conflict that no actual compile ever sees.
+    Only conditions that test exactly _UCRT are evaluated; every other
+    condition (including #elif arms whose OWN test is a definite _UCRT no)
+    is handled conservatively -- when in doubt, the region stays visible,
+    which is the old behaviour.
+    """
+    out = []
+    # per open #if: [visible_now, taken] with taken True (a branch definitely
+    # ran), False (definitely none yet), None (unknowable from here)
+    stack = []
+    for line in text.split('\n'):
+        m = re.match(r'\s*#\s*(if|ifdef|ifndef|elif|else|endif)\b(.*)', line)
+        if m:
+            kw, rest = m.group(1), m.group(2)
+            if kw in ('if', 'ifdef', 'ifndef'):
+                c = _ucrt_cond(kw, rest, ucrt)
+                stack.append([c is not False, c])
+            elif kw == 'elif' and stack:
+                c = _ucrt_cond('elif', rest, ucrt)
+                taken = stack[-1][1]
+                stack[-1][0] = (taken is not True) and (c is not False)
+                if taken is False:
+                    stack[-1][1] = c
+                elif taken is None and c is True:
+                    stack[-1][1] = None   # taken earlier?  unknowable
+            elif kw == 'else' and stack:
+                stack[-1][0] = stack[-1][1] is not True
+                stack[-1][1] = True
+            elif kw == 'endif' and stack:
+                stack.pop()
+            out.append('')                # directives carry no declarations
+            continue
+        out.append(line if all(fr[0] for fr in stack) else '')
+    return '\n'.join(out)
+
+
 class HeaderScan:
     """Regex scan of Wine's header TEXT. Deliberately not the generator's method."""
 
@@ -234,11 +319,14 @@ class HeaderScan:
     # NOT a full walk: include/ddk and include/wine are private/driver headers
     # that redeclare Win32 names with different shapes, and pulling them in
     # would manufacture bogus 11d conflicts.  msvcrt/ is where the CRT lives
-    # and is the only one a ucrtbase spec needs.
-    SUBDIRS = ('msvcrt',)
+    # and is the only one a ucrtbase spec needs -- including msvcrt/sys/,
+    # where the _stat/_fstat/_wstat family is declared (sys/stat.h); leaving
+    # sys/ out made 11c report the whole family as undeclared.
+    SUBDIRS = ('msvcrt', 'msvcrt/sys')
 
-    def __init__(self, include_dir):
+    def __init__(self, include_dir, ucrt=True):
         self.dir = os.path.abspath(os.path.expanduser(include_dir))
+        self.ucrt = ucrt
         # paths relative to self.dir, so "msvcrt/corecrt_startup.h"
         files = [f for f in os.listdir(self.dir) if f.endswith('.h')]
         for sub in self.SUBDIRS:
@@ -284,7 +372,8 @@ class HeaderScan:
                 continue
             if not any(n in raw for n in want):
                 continue
-            for m in self.ALIAS_RE.finditer(strip_comments(raw)):
+            for m in self.ALIAS_RE.finditer(mask_ucrt(strip_comments(raw),
+                                                      self.ucrt)):
                 alias, real = m.group('alias'), m.group('real')
                 if real in want and alias != real and alias not in want:
                     out[alias] = real
@@ -294,9 +383,28 @@ class HeaderScan:
         """-> {name: [ {file,line,nargs,ret,void,variadic}, ... ]}"""
         alias = self._aliases(names)
         tokens = list(names) + sorted(alias)
+        namealt = '|'.join(re.escape(n) for n in tokens)
         pat = re.compile(
             r'(?P<ret>[A-Za-z_][A-Za-z_0-9 \t\*\(\)]*?)\s*' + CONV +
-            r'\s+(?P<name>' + '|'.join(re.escape(n) for n in tokens) + r')\s*\(')
+            r'\s+(?P<name>' + namealt + r')\s*\(')
+        # The CRT headers' second declaration mechanism: a static inline
+        # forwarder with NO calling-convention token at all --
+        #     static inline time_t time(time_t *t) { return _time64(t); }
+        # (include/msvcrt/time.h).  The pattern above requires a convention
+        # token, so every such name (time, ctime, strtoll, the sys/stat.h
+        # fstat/stat wrappers) read as "no declaration in Wine headers": a
+        # scanner blind spot, the same class as the missing CDECL spelling
+        # documented at CONV.  The optional convention keeps declarations
+        # spelled `static inline ... __cdecl strtoull(...)` from yielding a
+        # second, differently-spelled return type; position-dedup below
+        # keeps them from counting twice at all.
+        ipat = re.compile(
+            r'\bstatic\s+(?:__)?(?:inline|FORCEINLINE)\s+'
+            r'(?P<ret>[A-Za-z_][A-Za-z_0-9 \t\*]*?)\s*(?:' + CONV + r'\s+)?'
+            # the ret separator can be empty (`char* ctime`), so without this
+            # boundary the name group could match a mere SUFFIX of a longer
+            # identifier -- `exit` inside `onexit`, `printf` inside `swprintf`
+            r'(?<![A-Za-z_0-9])(?P<name>' + namealt + r')\s*\(')
         found = {n: [] for n in names}
         for relpath in self.files:
             fn = os.path.basename(relpath)   # spec files cite the basename
@@ -308,8 +416,12 @@ class HeaderScan:
                 continue
             if not any(n in raw for n in tokens):
                 continue
-            text = strip_comments(raw)
-            for m in pat.finditer(text):
+            text = mask_ucrt(strip_comments(raw), self.ucrt)
+            seen = set()
+            for m in list(pat.finditer(text)) + list(ipat.finditer(text)):
+                if m.start('name') in seen:
+                    continue
+                seen.add(m.start('name'))
                 depth, j = 1, m.end()
                 while j < len(text) and depth:
                     if text[j] == '(':
@@ -503,6 +615,12 @@ def parse_spec(path):
                 continue
             if parts[0].upper() == 'EXCLUDE':
                 excludes.append(parts[1])
+                continue
+            # Flat-surface interception directives (spec2thunk §4.3): the
+            # checker does not police them (spec2thunk's own build-time audit
+            # does), but it must not read them as export lines.
+            if parts[0].upper() in ('GUEST-IMPL', 'GUEST-REFUSE', 'GUEST-PASS'):
+                extra.setdefault('guest_directives', []).append(tuple(parts))
                 continue
             if len(parts) not in (5, 6):
                 raise SystemExit('%s: malformed export line: %s' % (path, line))
@@ -706,8 +824,20 @@ def check_com_section(r, pe, exp, com_json_path, flat_count, flat_stubs_rva):
             else '%d stubs verified' % checked)
 
 
-def expect_stub(mode, imm):
-    if mode == 'direct':
+# Register-contract exports carry a raw guest body instead of a trap stub;
+# independent copy of the generator's RAW_BODY_EXPORTS (spec2thunk), so a
+# divergence between the two shows up as a check-7 byte mismatch here.
+# These names are also exempt from the header checks (11c): there is no C
+# declaration to find and no call to marshal.
+RAW_BODY_EXPORTS = {
+    '__chkstk': b'\xc3',            # ret -- rax must survive, see spec2thunk
+}
+
+
+def expect_stub(mode, imm, name=None):
+    if name in RAW_BODY_EXPORTS:
+        body = RAW_BODY_EXPORTS[name]
+    elif mode == 'direct':
         body = b'\xb8' + struct.pack('<I', imm) + b'\xc3'
     else:
         body = b'\x49\x89\xca' + TRAP_INSN          # mov r10,rcx ; syscall
@@ -1015,7 +1145,7 @@ def main():
         except Fail as e:
             bad.append('%s: %s' % (n, e))
             continue
-        w = expect_stub(args.body, immmap[n])
+        w = expect_stub(args.body, immmap[n], n)
         if g != w:
             bad.append('%s@0x%x: got %s want %s' % (n, rva, g.hex(), w.hex()))
     r.check(not bad, '7  every stub body matches --body=%s exactly' % args.body,
@@ -1031,8 +1161,15 @@ def main():
             '12a trap_off == %d for --body=%s' % (want_off, args.body),
             str(trap_off))
     if args.body == 'trap':
+        # Register-contract exports (RAW_BODY_EXPORTS) carry a raw guest body,
+        # not a trap stub, so they are exempt from the syscall-site checks and
+        # verified separately: their slot must hold EXACTLY their raw body.
+        raw_idx = {i for i, n in enumerate(spec_names[:count])
+                   if n in RAW_BODY_EXPORTS}
         bad = []
         for i in range(count):
+            if i in raw_idx:
+                continue
             rva = stubs_rva + i * STRIDE + trap_off
             try:
                 g = pe.read(rva, len(TRAP_INSN))
@@ -1045,9 +1182,11 @@ def main():
         r.check(not bad,
                 '12b published trap site really holds SYSCALL (0f 05)',
                 '; '.join(bad) if bad else
-                '%d sites at stubs_rva+i*16+%d' % (count, trap_off))
+                '%d sites at stubs_rva+i*16+%d' % (count - len(raw_idx), trap_off))
         bad = []
         for i in range(count):
+            if i in raw_idx:
+                continue
             try:
                 g = pe.read(stubs_rva + i * STRIDE, 3)
             except Fail as e:
@@ -1057,7 +1196,24 @@ def main():
                 bad.append('stub %d: %s not 4989ca' % (i, g.hex()))
         r.check(not bad,
                 '12c every trap stub starts with mov r10,rcx (49 89 ca)',
-                '; '.join(bad) if bad else 'arg0 rescued in all %d stubs' % count)
+                '; '.join(bad) if bad else
+                'arg0 rescued in all %d stubs' % (count - len(raw_idx)))
+        bad = []
+        for i in sorted(raw_idx):
+            n = spec_names[i]
+            want = RAW_BODY_EXPORTS[n] + b'\xcc' * (STRIDE - len(RAW_BODY_EXPORTS[n]))
+            try:
+                g = pe.read(stubs_rva + i * STRIDE, STRIDE)
+            except Fail as e:
+                bad.append('%s: %s' % (n, e)); continue
+            if g != want:
+                bad.append('%s@stub %d: %s not %s' % (n, i, g.hex(), want.hex()))
+        if raw_idx:
+            r.check(not bad,
+                    '12b2 register-contract stubs hold their raw guest body',
+                    '; '.join(bad) if bad else
+                    '%d raw-body stub(s): %s' % (len(raw_idx),
+                        ', '.join(sorted(spec_names[i] for i in raw_idx))))
         # nothing before the trap site may itself trap or return
         r.check(TRAP_INSN not in pe.read(stubs_rva, trap_off),
                 '12d no earlier SYSCALL before the published trap site')
@@ -1119,15 +1275,19 @@ def main():
         # .thunks names (vkd3d-proton's generated headers), not in Wine's.
         # Scan those too and merge; the wine-include scan stays exactly as it
         # was for every module that names none.
-        scans = [HeaderScan(spec_relative(d)) for d in extra['include_dirs']]
-        scans.append(HeaderScan(args.wine_include))
+        ucrt = dll_is_ucrt(spec_dll)
+        scans = [HeaderScan(spec_relative(d), ucrt=ucrt)
+                 for d in extra['include_dirs']]
+        scans.append(HeaderScan(args.wine_include, ucrt=ucrt))
         hits = {n: [] for n in want_names}
         for scan in scans:
             for n, hs in scan.find(want_names).items():
                 hits[n] += hs
-        r.note('header scan', '; '.join('%d headers in %s'
-                                        % (len(s.files), s.dir) for s in scans))
-        nodecl = [n for n in spec_names if n not in by_spec and not hits[n]]
+        r.note('header scan', '%s mode; ' % ('_UCRT' if ucrt else 'non-UCRT')
+               + '; '.join('%d headers in %s'
+                           % (len(s.files), s.dir) for s in scans))
+        nodecl = [n for n in spec_names
+                  if n not in by_spec and n not in RAW_BODY_EXPORTS and not hits[n]]
         r.check(not nodecl, '11c every export has a declaration in Wine headers',
                 'not found: %s' % nodecl if nodecl else
                 '%d found (%d cited to a .spec instead)'

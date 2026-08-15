@@ -117,6 +117,14 @@ struct thread_data
     void        *jmp_buf;           /* setjmp buffer for exception handling */
     void        *start;             /* thread entry point */
     void        *param;             /* thread entry point parameter */
+    /* ppc64le emulator: the EXCEPTION_RECORD the signal handler built for a
+     * guest fault, stashed immediately before fexbridge_fault_unwind longjmps
+     * the fault away (which is why nothing else survives it).  Consumed by
+     * the RUN_FAULT arm of unixcall_emu_run_entry; the valid flag is cleared
+     * at the top of every run so a stale native record can never be replayed
+     * as a guest exception.  See docs/guest-seh.md section 5.2. */
+    EXCEPTION_RECORD emu_fault_rec; /* guest fault record (guest SEH S2) */
+    BOOL         emu_fault_rec_valid;
     struct list  entry;             /* entry in TEB list */
     char         debug_info[0x800]; /* debug_info structure */
     char         signal_stack[];    /* signal stack */
@@ -425,7 +433,7 @@ extern NTSTATUS call_user_exception_dispatcher( struct thread_data *data, EXCEPT
 extern void call_raise_user_exception_dispatcher( struct thread_data *data );
 #ifdef __powerpc64__
 extern NTSTATUS call_emu_trap_dispatcher( void *func, void *ctx );
-extern BOOL emu_handle_fault( void *sigcontext );
+extern BOOL emu_handle_fault( void *sigcontext, EXCEPTION_RECORD *rec );
 #endif
 
 #define IMAGE_DLLCHARACTERISTICS_PREFER_NATIVE 0x0010 /* Wine extension */

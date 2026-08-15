@@ -95,6 +95,46 @@ struct emu_run_entry_params
      * fails as an invisible spinning core rather than a crash. */
     BOOL       exit_requested;
     ULONG      exit_code;
+    /* PE-side entry for a guest exception (fault or raise), entered exactly
+     * like trap_dispatcher; args holds one pointer to a
+     * struct emu_exception_params.  Returning STATUS_SUCCESS resumes the
+     * guest with the (possibly handler-edited) CONTEXT; anything else ends
+     * the run with STATUS_EMU_GUEST_EXCEPTION, the record having been
+     * surfaced PE-side by the dispatcher itself (see emu_exception_dispatch
+     * in dlls/ntdll/signal_ppc64.c).  NULL restores the old behaviour: a
+     * guest fault fails the run with no dispatch of any kind. */
+    void     (*exception_dispatcher)( ULONG id, void *args, ULONG len );
+};
+
+/* What emu_exception_dispatch receives: the guest state to dispatch against
+ * and the record built where the fault was taken.  Two register files exist
+ * per guest thread and never merge; a guest exception is dispatched against
+ * the guest's AMD64_CONTEXT only, and the native CONTEXT plays no role (see
+ * docs/guest-seh.md section 4).  The pointers live in the unix-side run
+ * loop's frame, one nesting level per active run (U5 there). */
+struct emu_exception_params
+{
+    AMD64_CONTEXT    *ctx;         /* guest state; edits are honoured on resume */
+    EXCEPTION_RECORD *rec;         /* ExceptionAddress already rewritten to ctx->Rip */
+    void             *stack_base;  /* guest stack of the faulting run ... */
+    void             *stack_limit; /* ... for TEB-frame validity (grows down) */
+};
+
+/* Run status: the guest raised or faulted, no guest-level handler consumed
+ * it, and the record is waiting PE-side (see guest_exc_pending in
+ * signal_ppc64.c).  The run's PE caller re-raises it natively so the
+ * existing unhandled-exception machinery produces a correctly-coded death.
+ * Customer-defined NTSTATUS ('EMU'), impossible to collide with a real one. */
+#define STATUS_EMU_GUEST_EXCEPTION ((NTSTATUS)0xE0454D55)
+
+/* The innermost active run's guest stack bounds on the calling thread (zero
+ * when no run is active): what a raise-path guest dispatch validates TEB
+ * frames against, the fault path receiving the same bounds directly in its
+ * emu_exception_params. */
+struct emu_guest_stack_params
+{
+    void *base;    /* highest address; the stack grows down */
+    void *limit;   /* lowest address */
 };
 
 enum ntdll_unix_funcs
@@ -108,6 +148,7 @@ enum ntdll_unix_funcs
     unix_wine_spawnvp,
     unix_system_time_precise,
     unix_emu_run_entry,
+    unix_emu_guest_stack,
 };
 
 extern unixlib_handle_t __wine_unixlib_handle;

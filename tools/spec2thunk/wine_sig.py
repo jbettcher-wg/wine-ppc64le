@@ -192,6 +192,15 @@ PROBE_SRC = (
     "#include <winternl.h>\n"         # the NT surface kernel32 re-exports
     "#include <patchapi.h>\n"         # the whole mspatcha surface
     "#include <appcompatapi.h>\n"     # apphelp: ApphelpCheckShellObject, ...
+    "#include <aclapi.h>\n"           # advapi32: SetEntriesInAcl*, BuildSecurityDescriptor*,
+                                      # {Get,Set}{Named,}SecurityInfo*, GetExplicitEntriesFromAcl*
+    "#include <sddl.h>\n"             # advapi32: ConvertSid<->StringSid*,
+                                      # Convert{,String}SecurityDescriptor*
+    "#include <wmistr.h>\n"           # WNODE_HEADER etc., required BEFORE evntrace.h
+    "#include <evntrace.h>\n"         # advapi32: StartTrace*, ControlTrace*, EnableTrace*
+    "#include <perflib.h>\n"          # advapi32: PerfStartProvider*, PerfStopProvider, ...
+    "#include <ntsecapi.h>\n"         # advapi32: LsaOpenPolicy, LsaClose, LsaLookup*,
+                                      # LsaQueryInformationPolicy, ...
 )
 
 # ---------------------------------------------------------------------------

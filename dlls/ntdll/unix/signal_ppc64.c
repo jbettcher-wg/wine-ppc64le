@@ -1497,8 +1497,10 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     /* Must precede handle_syscall_fault: the emulator's JIT is unix code on
      * the kernel stack, so a guest fault is indistinguishable from a fault
      * inside a syscall and would be swallowed into a bare status code with
-     * the guest state thrown away.  Does not return when it takes the fault. */
-    if (emu_handle_fault( context )) return;
+     * the guest state thrown away.  Does not return when it takes the fault;
+     * the record built above is stashed inside so the run loop can dispatch
+     * it (guest-seh S2). */
+    if (emu_handle_fault( context, &rec )) return;
 
     if (handle_syscall_fault( data, context, &rec )) return;
     if (faultdump_enabled()) faultdump( signal, siginfo, context );
@@ -1535,6 +1537,13 @@ static void trap_handler( int signal, siginfo_t *siginfo, void *sigcontext )
         rec.NumberParameters = 1;
         break;
     }
+
+    /* A guest int3 is a SIGTRAP inside JIT code; route it to the guest run
+     * loop like any other guest exception (U4 of docs/guest-seh.md).  The
+     * native Iar adjustment above is irrelevant to that path -- the guest
+     * resume address is the guest Rip the bridge reconstructs. */
+    if (emu_handle_fault( context, &rec )) return;
+
     setup_raise_exception( data, context, &rec, &ctx );
 }
 
@@ -1583,6 +1592,13 @@ static void fpe_handler( int signal, siginfo_t *siginfo, void *sigcontext )
         rec.ExceptionCode = EXCEPTION_FLT_INVALID_OPERATION;
         break;
     }
+
+    /* A guest integer divide-by-zero is a SIGFPE inside JIT code.  Without
+     * this consult it dispatched against the nonsense native context (U4 of
+     * docs/guest-seh.md); with it, the record goes to the guest run loop
+     * like any other guest fault.  Does not return when it claims the fault. */
+    if (emu_handle_fault( context, &rec )) return;
+
     setup_raise_exception( data, context, &rec, &ctx );
 }
 

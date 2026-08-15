@@ -224,7 +224,8 @@ def parse_spec(path):
     excludes = []
     exports = []          # (name, imm32, nargs, returns_void, header, line)
     extra = dict(from_def=None, com_json=None, probe_includes=[],
-                 include_dirs=[])
+                 include_dirs=[], guest_impl={}, guest_refuse={},
+                 guest_pass={})
     with open(path) as f:
         for lineno, raw in enumerate(f, 1):
             line = raw.split('#', 1)[0].strip()
@@ -244,6 +245,48 @@ def parse_spec(path):
                 if extra[key] is not None:
                     sys.exit("%s:%d: a second %s line" % (path, lineno, parts[0]))
                 extra[key] = parts[1]
+                continue
+            # ---------------------------------------------------------------
+            # Flat-surface interception directives (system-com-design.md
+            # §4.3).  On a COM-JSON module, every flat export whose signature
+            # carries interface pointers must be classified by exactly one of
+            # these three, and the audit below FAILS THE BUILD otherwise:
+            #
+            #   GUEST-IMPL   <Export> <NativeName>  resolve the guest export
+            #       to <NativeName> in the native namesake -- a wrapper that
+            #       translates interface pointers at the classified positions.
+            #       Rides the same impl_names_rva plumbing as variadic=;
+            #       ntdll learns nothing.
+            #   GUEST-REFUSE <Export> [reason]      resolve it to the shared native
+            #       stub __wine_com_refuse, which answers E_NOTIMPL loudly --
+            #       never a pass-through.  (The trapping export's name is in
+            #       the dispatcher TRACE, so one shared stub suffices; the
+            #       reason column documents WHY at the .thunks site.)
+            #   GUEST-PASS   <Export> <reason>      an EXPLICIT audited
+            #       pass-through: the export's interface-bearing type is
+            #       provably inert on this path (VariantInit writes VT_EMPTY
+            #       and reads nothing).  The reason is mandatory.
+            # ---------------------------------------------------------------
+            if parts[0].upper() == 'GUEST-IMPL':
+                if len(parts) != 3:
+                    sys.exit("%s:%d: GUEST-IMPL needs <Export> <NativeName>"
+                             % (path, lineno))
+                if parts[1] in extra['guest_impl']:
+                    sys.exit("%s:%d: duplicate GUEST-IMPL for %s"
+                             % (path, lineno, parts[1]))
+                extra['guest_impl'][parts[1]] = parts[2]
+                continue
+            if parts[0].upper() in ('GUEST-REFUSE', 'GUEST-PASS'):
+                key = 'guest_refuse' if parts[0].upper() == 'GUEST-REFUSE' \
+                    else 'guest_pass'
+                if len(parts) < 2 or (key == 'guest_pass' and len(parts) < 3):
+                    sys.exit("%s:%d: %s needs <Export>%s"
+                             % (path, lineno, parts[0].upper(),
+                                ' <reason>' if key == 'guest_pass' else ''))
+                if parts[1] in extra[key]:
+                    sys.exit("%s:%d: duplicate %s for %s"
+                             % (path, lineno, parts[0].upper(), parts[1]))
+                extra[key][parts[1]] = ' '.join(parts[2:])
                 continue
             if parts[0].upper() == 'PROBE-INCLUDE':
                 if len(parts) != 2:
@@ -702,6 +745,123 @@ def load_com_interfaces(path):
     return out
 
 
+# --------------------------------------------------------------------------
+# THE FLAT-SURFACE AUDIT (system-com-design.md §4.3), for FROM-SPEC modules
+# with COM-JSON: no interface-bearing flat export may pass through silently.
+#
+# A flat pass-through writes whatever the native export wrote -- including a
+# native interface pointer -- straight into guest-visible memory, and the
+# guest's first vtable call through it executes ppc64 bytes as x86-64.  So
+# every emitted export whose clang-verified signature carries an
+# interface-pointer-bearing type (directly, via a pointer typedef the roster
+# JSON names, via a known carrier struct, or as a void**/LPVOID* out slot)
+# must be classified by exactly one GUEST-IMPL / GUEST-REFUSE / GUEST-PASS
+# directive, and the build FAILS on an unclassified one.  Stale directives
+# (naming an unemitted export, or one whose signature is not bearing) fail
+# too: a dead entry is indistinguishable from a live one.
+#
+# The wrapper/refusal symbols must exist: each GUEST-IMPL target and each
+# __wine_guest_refuse_<name> is required to appear in the native namesake's
+# .spec, so a missing wrapper is a build failure here rather than a guest
+# fault at first call.
+# --------------------------------------------------------------------------
+
+_COM_CARRIER_STRUCTS = frozenset((
+    'MULTI_QI', 'STGMEDIUM', 'uSTGMEDIUM', 'VARIANT', 'VARIANTARG',
+    'PROPVARIANT', 'SAFEARRAY', 'LPVARIANT', 'LPPROPVARIANT', 'LPSAFEARRAY'))
+
+
+def com_flat_bearing(sig, iface_tokens):
+    """Which of this signature's positions carry interface pointers."""
+    hits = []
+    for i, p in enumerate(sig.get('params') or []):
+        toks = set(re.findall(r'\w+', p or ''))
+        if toks & iface_tokens:
+            hits.append('%d:%s' % (i, p))
+        elif toks & _COM_CARRIER_STRUCTS:
+            hits.append('%d:%s' % (i, p))
+        elif re.search(r'void\s*\*\s*\*', p or '') or \
+                re.search(r'\bLPVOID\s*\*', p or ''):
+            hits.append('%d:%s' % (i, p))
+    r = sig.get('ret') or ''
+    if set(re.findall(r'\w+', r)) & (iface_tokens | _COM_CARRIER_STRUCTS):
+        hits.append('ret:%s' % r)
+    return hits
+
+
+def audit_guest_com_flat(exports, com_json_path, extra, native_spec_path):
+    """Classify-or-die, then apply the GUEST-IMPL/GUEST-REFUSE redirects.
+    Mutates exports' impl names in place."""
+    import json
+    with open(com_json_path) as f:
+        d = json.load(f)
+    iface_tokens = set(d['interfaces']) | set(d.get('iface_ptr_aliases', {}))
+
+    classified = {}
+    for tab, kind in ((extra['guest_impl'], 'GUEST-IMPL'),
+                      (extra['guest_refuse'], 'GUEST-REFUSE'),
+                      (extra['guest_pass'], 'GUEST-PASS')):
+        for n in tab:
+            if n in classified:
+                sys.exit('AUDIT: %s is classified twice (%s and %s)'
+                         % (n, classified[n], kind))
+            classified[n] = kind
+
+    by_name = {e['name']: e for e in exports}
+    errs, unclassified = [], []
+    for n, kind in sorted(classified.items()):
+        if n not in by_name:
+            errs.append('%s names %s, which this module does not emit '
+                        '(oracle-refused exports are already absent and '
+                        'bind to named sentinels)' % (kind, n))
+    for e in exports:
+        hits = com_flat_bearing(e['sig'], iface_tokens)
+        kind = classified.get(e['name'])
+        if hits and not kind:
+            unclassified.append((e['name'], hits))
+        elif kind and not hits:
+            errs.append('%s %s: clang sees no interface-bearing type in its '
+                        'signature; stale directive' % (kind, e['name']))
+        if kind == 'GUEST-IMPL' and e['sig'].get('variadic'):
+            errs.append('GUEST-IMPL %s: cannot combine with variadic='
+                        % e['name'])
+
+    if unclassified:
+        lines = ['  %-36s %s' % (n, '; '.join(h)) for n, h in unclassified]
+        errs.append('%d interface-bearing flat export(s) with no '
+                    'GUEST-IMPL/GUEST-REFUSE/GUEST-PASS classification:\n%s'
+                    % (len(unclassified), '\n'.join(lines)))
+
+    # the wrapper symbols must exist in the native namesake's .spec
+    with open(native_spec_path) as f:
+        spec_text = f.read()
+    need = sorted(set(extra['guest_impl'].values())
+                  | ({'__wine_com_refuse'} if extra['guest_refuse'] else set()))
+    for sym in need:
+        if not re.search(r'\b%s\b' % re.escape(sym), spec_text):
+            errs.append('%s is not exported by %s; the guest would fault at '
+                        'first call instead of reaching the wrapper'
+                        % (sym, os.path.basename(native_spec_path)))
+
+    if errs:
+        sys.exit('FATAL: the COM flat-surface audit failed:\n  '
+                 + '\n  '.join(errs))
+
+    for e in exports:
+        if e['name'] in extra['guest_impl']:
+            e['impl'] = extra['guest_impl'][e['name']]
+        elif e['name'] in extra['guest_refuse']:
+            e['impl'] = '__wine_com_refuse'
+
+    n_bearing = sum(1 for e in exports
+                    if com_flat_bearing(e['sig'], iface_tokens))
+    print('COM FLAT AUDIT  %d interface-bearing export(s): %d wrapped, %d '
+          'refused, %d audited pass-throughs; %d clean pass-throughs'
+          % (n_bearing, len(extra['guest_impl']), len(extra['guest_refuse']),
+             len(extra['guest_pass']), len(exports) - n_bearing))
+    print()
+
+
 def emit_com_asm(a, com_ifaces):
     """Append the COM stub arrays (to .thunk) and info tables (to .rdata).
     Called with the flat sections already emitted; `a` is the line sink."""
@@ -769,6 +929,19 @@ def resolve_signatures(exports, headers, specs=None):
 
     accepted, refused, mismatches = [], [], []
     for e in exports:
+        # Register-contract exports carry their own guest body and never meet
+        # the oracle: there is no C declaration to find and no call to
+        # marshal.  See RAW_BODY_EXPORTS.
+        if e['name'] in RAW_BODY_EXPORTS:
+            e = dict(e)
+            e['sig'] = dict(nargs=0, returns_void=True, variadic=False,
+                            header=e.get('header'), line=e.get('line'),
+                            qualtype='raw guest body')
+            e['desc'] = wine_sig.descriptor(e['sig'])
+            e['impl'] = e['name']
+            e['raw_body'] = RAW_BODY_EXPORTS[e['name']]
+            accepted.append(e)
+            continue
         want_variadic = e.get('variadic_impl') is not None
         # A .spec states the CLASS of each argument exactly, and that is one
         # thing it is authoritative about.  Refuse on it before spending a
@@ -975,9 +1148,26 @@ def skip_class(why):
 # stub bodies
 # --------------------------------------------------------------------------
 
-def stub_bytes(mode, imm):
+# Exports with a REGISTER contract no trap thunk can carry.  __chkstk's
+# MS-x64 contract is rax = frame size in, all argument registers preserved;
+# the generic trap stub writes the dispatch result into rax, so a trap
+# round-trip would hand the caller's `sub rsp, rax` a garbage frame size and
+# corrupt every large-frame function.  Wine's own x86-64 __chkstk is a bare
+# `ret` (Windows-side stacks are committed up front, and this port's guest
+# stacks likewise -- virtual_alloc_thread_stack), so the correct thunk IS
+# that ret, emitted as GUEST code in the stub slot: the call never leaves
+# the emulator.  91 of 345 corpus test binaries import it (2026-08-15).
+# spec2thunk-check carries the same table for its byte-for-byte stub check.
+RAW_BODY_EXPORTS = {
+    '__chkstk': b'\xc3',            # ret
+}
+
+
+def stub_bytes(mode, imm, raw_body=None):
     """Exactly STRIDE bytes of x86-64 for one stub slot."""
-    if mode == 'direct':
+    if raw_body is not None:
+        body = raw_body                                       # RAW_BODY_EXPORTS
+    elif mode == 'direct':
         body = b'\xb8' + struct.pack('<I', imm) + b'\xc3'     # mov eax,imm32; ret
     elif mode == 'trap':
         # mov r10, rcx  -- SYSCALL clobbers RCX, which is MS-x64 arg0.
@@ -1003,7 +1193,7 @@ def emit_asm(dll, exports, mode, com_ifaces=None):
     a('\t.balign\t%d' % STRIDE)
     a('wine_thunk_stubs:')
     for i, e in enumerate(exports):
-        b = stub_bytes(mode, e['imm'])
+        b = stub_bytes(mode, e['imm'], e.get('raw_body'))
         a('\t.globl\twine_thunk_stub_%d' % i)
         a('wine_thunk_stub_%d:\t\t# %s' % (i, e['name']))
         a('\t.byte\t' + ','.join('0x%02X' % c for c in b))
@@ -1327,6 +1517,17 @@ def main():
             sys.exit("FATAL: --strict and %d export(s) refused" % len(refused))
     if not exports:
         sys.exit("FATAL: every export was refused; nothing to emit")
+
+    # ---------------- the flat-surface audit (COM-JSON + FROM-SPEC modules)
+    have_guest_directives = (extra['guest_impl'] or extra['guest_refuse']
+                             or extra['guest_pass'])
+    if have_guest_directives and not (com_ifaces and from_spec):
+        sys.exit('GUEST-IMPL/GUEST-REFUSE/GUEST-PASS need a FROM-SPEC module '
+                 'with COM-JSON: the audit that makes them sound only runs '
+                 'there')
+    if com_ifaces and from_spec:
+        audit_guest_com_flat(exports, spec_relative(extra['com_json']),
+                             extra, from_spec)
 
     if wine_spec_skipped or from_spec:
         print("EXPORT LIST  from %s" % (from_spec or args.spec))

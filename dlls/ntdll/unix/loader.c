@@ -1037,6 +1037,17 @@ static void *(*p_fexbridge_current_thread)(void);
 static int  (*p_fexbridge_set_gs_base)( void *thread, ULONGLONG base );
 static int  (*p_fexbridge_fault_is_jit)( const void *host_ucontext );
 static int  (*p_fexbridge_fault_unwind)( void *host_ucontext );
+static int  (*p_fexbridge_run)( void *thread, void *ctx );
+static void (*p_fexbridge_invalidate_code_range)( ULONGLONG start, ULONGLONG length );
+
+/* fexbridge_run results and CONTEXT flags, mirrored from fexbridge.h (the
+ * header is not vendored into the tree; the values are ABI). */
+#define EMU_RUN_EXITED  0
+#define EMU_RUN_HLT     1
+#define EMU_RUN_FAULT   2
+#define EMU_CTX_AMD64   0x00100000u
+#define EMU_CTX_CONTROL (EMU_CTX_AMD64 | 0x1u)
+#define EMU_CTX_INTEGER (EMU_CTX_AMD64 | 0x2u)
 
 static pthread_once_t emu_bridge_once = PTHREAD_ONCE_INIT;
 static NTSTATUS emu_bridge_status;
@@ -1144,6 +1155,8 @@ static void emu_load_bridge(void)
     p_fexbridge_current_thread = dlsym( so, "fexbridge_current_thread" );
     p_fexbridge_fault_is_jit   = dlsym( so, "fexbridge_fault_is_jit" );
     p_fexbridge_fault_unwind   = dlsym( so, "fexbridge_fault_unwind" );
+    p_fexbridge_run            = dlsym( so, "fexbridge_run" );
+    p_fexbridge_invalidate_code_range = dlsym( so, "fexbridge_invalidate_code_range" );
     TRACE( "loaded emulator bridge %s, ABI %u\n", loaded, p_abi_version() );
 }
 
@@ -1153,11 +1166,27 @@ static void emu_load_bridge(void)
  * failure.  Per thread: it describes this thread's run, nothing else. */
 static __thread BOOL emu_thread_exit_requested;
 
+/* set when the PE dispatcher ended the run because a guest exception went
+ * unhandled at guest level (RaiseException with no consuming handler); the
+ * record itself waits PE-side.  Same per-thread protocol as the exit flag. */
+static __thread BOOL emu_thread_exc_pending;
+
+/* WINEEMUNOFAULTSTASH=1: skip the fault-record stash, the S2 negative
+ * control -- the dispatched record must visibly degrade to code-only,
+ * proving the stash is load-bearing.  Read once outside signal context. */
+static int emu_no_fault_stash = -1;
+
+/* the innermost run's guest stack bounds on this thread (base > limit, the
+ * stack grows down); guest TEB frames are validated against these */
+static __thread void *emu_guest_stack_base;
+static __thread void *emu_guest_stack_limit;
+
 static int emu_trap_thunk( void *thread, void *ctx, void *user )
 {
     NTSTATUS status = call_emu_trap_dispatcher( p_emu_trap_dispatcher, ctx );
 
     if (status == STATUS_THREAD_IS_TERMINATING) emu_thread_exit_requested = TRUE;
+    else if (status == STATUS_EMU_GUEST_EXCEPTION) emu_thread_exc_pending = TRUE;
     /* FEXBRIDGE_TRAP_CONTINUE / _EXIT */
     return status ? 1 : 0;
 }
@@ -1180,11 +1209,196 @@ static int emu_trap_thunk( void *thread, void *ctx, void *user )
  * return when it succeeds.  Called from a signal handler: it touches only
  * function pointers resolved once at bridge load.
  */
-BOOL emu_handle_fault( void *sigcontext )
+BOOL emu_handle_fault( void *sigcontext, EXCEPTION_RECORD *rec )
 {
+    struct thread_data *data = get_thread_data();
+
     if (!p_fexbridge_fault_is_jit || !p_fexbridge_fault_unwind) return FALSE;
     if (!p_fexbridge_fault_is_jit( sigcontext )) return FALSE;
+
+    /* Stash the record: fexbridge_fault_unwind longjmps the fault away, so
+     * this copy is the only thing that survives into the RUN_FAULT arm of
+     * the run loop.  A write, not a reorder -- fault legibility unchanged.
+     * (A guest jump to unfetchable memory never gets here at all: the bridge
+     * turns it into RUN_FAULT internally without any host signal, and the
+     * loop synthesizes the execute-fault record for it.) */
+    if (rec && data && emu_no_fault_stash != 1)
+    {
+        data->emu_fault_rec = *rec;
+        data->emu_fault_rec_valid = TRUE;
+    }
+
     return p_fexbridge_fault_unwind( sigcontext ) != 0;
+}
+
+
+/***********************************************************************
+ *           emu_alloc_hlt_page
+ *
+ * One page of x86-64 HLT instructions, preloaded as the return address of
+ * every guest entry frame: the guest returning normally executes HLT and
+ * fexbridge_run comes back with RUN_HLT and the result in RAX.  One page per
+ * process, published to the emulator once.
+ */
+static void *emu_hlt_page;
+static pthread_once_t emu_hlt_once = PTHREAD_ONCE_INIT;
+
+static void emu_alloc_hlt_page(void)
+{
+    void *mem = NULL;
+    SIZE_T size = page_size;
+
+    if (NtAllocateVirtualMemory( NtCurrentProcess(), &mem, 0, &size,
+                                 MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE ))
+    {
+        ERR( "cannot allocate the guest HLT page\n" );
+        return;
+    }
+    memset( mem, 0xf4 /* hlt */, size );
+    if (p_fexbridge_invalidate_code_range)
+        p_fexbridge_invalidate_code_range( (ULONG_PTR)mem, size );
+    emu_hlt_page = mem;
+}
+
+
+/***********************************************************************
+ *           emu_run_loop
+ *
+ * The Wine-owned replacement for the bridge's one-shot fexbridge_run_entry:
+ * same initial frame contract (fexbridge.h:276), but the guest stack is
+ * allocated through Wine's own virtual memory (real guard page, visible to
+ * NtQueryVirtualMemory, bounds known for guest TEB-frame validity) and the
+ * run is driven in a loop -- which is the structural point: RUN_FAULT no
+ * longer destroys the run, so a guest exception survives long enough to be
+ * dispatched (docs/guest-seh.md section 5.1/5.2).
+ */
+static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread )
+{
+    static const SIZE_T guest_stack_size = 0x800000;  /* 8 MiB, as the one-shot */
+
+    struct thread_data *data = get_thread_data();
+    AMD64_CONTEXT ctx = { 0 };
+    EXCEPTION_RECORD rec;
+    INITIAL_TEB stack;
+    NTSTATUS status;
+    void *prev_base, *prev_limit, *stack_addr;
+    SIZE_T free_size = 0;
+    ULONG_PTR rsp;
+    int r;
+
+    pthread_once( &emu_hlt_once, emu_alloc_hlt_page );
+    if (!emu_hlt_page) return STATUS_NO_MEMORY;
+
+    if ((status = virtual_alloc_thread_stack( &stack, 0, 0, guest_stack_size, 0x100000, TRUE )))
+    {
+        ERR( "cannot allocate a guest stack, status %08x\n", (UINT)status );
+        return status;
+    }
+
+    /* MS-x64 entry frame, exactly the one-shot's documented shape: the
+     * caller reserved 32 bytes of shadow space and CALL pushed a return
+     * address -- the HLT page -- so RSP % 16 == 8 at entry, RCX carries the
+     * one argument. */
+    rsp = ((ULONG_PTR)stack.StackBase & ~(ULONG_PTR)15) - 0x28;
+    *(ULONG_PTR *)rsp = (ULONG_PTR)emu_hlt_page;
+
+    ctx.ContextFlags = EMU_CTX_CONTROL | EMU_CTX_INTEGER;
+    ctx.Rip    = (ULONG_PTR)params->entry;
+    ctx.Rsp    = rsp;
+    ctx.Rcx    = (ULONG_PTR)params->arg;
+    ctx.EFlags = 0x202;
+
+    /* nested runs (guest callbacks under a trap) stack these */
+    prev_base  = emu_guest_stack_base;
+    prev_limit = emu_guest_stack_limit;
+    emu_guest_stack_base  = stack.StackBase;
+    emu_guest_stack_limit = stack.DeallocationStack;
+
+    for (;;)
+    {
+        /* only a stash written during THIS run may be consumed below; a
+         * record left by some earlier native fault must never be replayed
+         * as a guest exception */
+        if (data) data->emu_fault_rec_valid = FALSE;
+
+        r = p_fexbridge_run( thread, &ctx );
+
+        if (r == EMU_RUN_HLT)
+        {
+            params->retval = ctx.Rax;
+            status = STATUS_SUCCESS;
+            break;
+        }
+        if (r == EMU_RUN_EXITED)
+        {
+            /* the trap dispatcher ended the run: deliberate exit, pending
+             * guest exception, or a dispatch failure -- in that order */
+            if (emu_thread_exit_requested) { status = STATUS_SUCCESS; break; }
+            if (emu_thread_exc_pending)
+            {
+                emu_thread_exc_pending = FALSE;
+                status = STATUS_EMU_GUEST_EXCEPTION;
+                break;
+            }
+            ERR( "guest trap at rip=%p ended the run with no consuming handler\n",
+                 (void *)(ULONG_PTR)ctx.Rip );
+            status = STATUS_UNSUCCESSFUL;
+            break;
+        }
+        if (r == EMU_RUN_FAULT)
+        {
+            struct emu_exception_params exc;
+
+            if (data && data->emu_fault_rec_valid)
+            {
+                rec = data->emu_fault_rec;
+                data->emu_fault_rec_valid = FALSE;
+            }
+            else
+            {
+                /* No stash: either the bridge classified a jump to
+                 * unfetchable memory (no host signal fires for those, and
+                 * execute-at-Rip is exactly the right record), or the stash
+                 * was skipped (WINEEMUNOFAULTSTASH) -- in which case this
+                 * synthesis is visibly WRONG for a data fault, which is what
+                 * makes the control falsifiable. */
+                memset( &rec, 0, sizeof(rec) );
+                rec.ExceptionCode = EXCEPTION_ACCESS_VIOLATION;
+                rec.NumberParameters = 2;
+                rec.ExceptionInformation[0] = EXCEPTION_EXECUTE_FAULT;
+                rec.ExceptionInformation[1] = (ULONG_PTR)ctx.Rip;
+            }
+            /* the host NIP in the record points into JIT code and means
+             * nothing to any handler; the guest Rip is the address */
+            rec.ExceptionAddress = (void *)(ULONG_PTR)ctx.Rip;
+
+            if (!params->exception_dispatcher)
+            {
+                ERR( "guest fault at rip=%p with no exception dispatcher\n",
+                     (void *)(ULONG_PTR)ctx.Rip );
+                status = STATUS_UNSUCCESSFUL;
+                break;
+            }
+            exc.ctx = &ctx;
+            exc.rec = &rec;
+            exc.stack_base  = emu_guest_stack_base;
+            exc.stack_limit = emu_guest_stack_limit;
+            status = call_emu_trap_dispatcher( params->exception_dispatcher, &exc );
+            if (status == STATUS_SUCCESS) continue;   /* handled: resume the edited CONTEXT */
+            if (status != STATUS_EMU_GUEST_EXCEPTION)
+                ERR( "guest exception dispatch failed, status %08x\n", (UINT)status );
+            break;
+        }
+        ERR( "emulator run error %d at rip=%p\n", r, (void *)(ULONG_PTR)ctx.Rip );
+        status = STATUS_UNSUCCESSFUL;
+        break;
+    }
+
+    emu_guest_stack_base  = prev_base;
+    emu_guest_stack_limit = prev_limit;
+    stack_addr = stack.DeallocationStack;
+    NtFreeVirtualMemory( NtCurrentProcess(), &stack_addr, &free_size, MEM_RELEASE );
+    return status;
 }
 
 
@@ -1204,10 +1418,12 @@ static NTSTATUS unixcall_emu_run_entry( void *args )
     struct emu_run_entry_params *params = args;
     static TEB *emu_initial_teb;
     static int no_gs_threads = -1;
+    static int use_oneshot = -1;
 
     void *thread = NULL;
     BOOL own_thread = FALSE;
     char err[256] = "";
+    NTSTATUS status;
     int ret;
 
     pthread_once( &emu_bridge_once, emu_load_bridge );
@@ -1282,8 +1498,39 @@ static NTSTATUS unixcall_emu_run_entry( void *args )
     }
     else WARN( "emulator bridge cannot set a guest GS base; TEB access will fault\n" );
 
-    ret = p_fexbridge_run_entry( params->entry, params->arg, &params->retval,
-                                 err, sizeof(err) );
+    /* WINEEMUONESHOT=1 keeps the bridge's one-shot entry callable: the A/B
+     * lever for the run loop, and the negative control for everything the
+     * Wine-owned guest stack provides (RUN_FAULT survival, bookkeeping
+     * visibility, guard semantics).  Same shape as WINEEMUKERNELSTACK. */
+    if (use_oneshot == -1)
+    {
+        const char *str = getenv( "WINEEMUONESHOT" );
+        use_oneshot = (str && *str == '1');
+        if (use_oneshot) ERR( "WINEEMUONESHOT: using the bridge one-shot entry, guest faults are fatal\n" );
+        if (!p_fexbridge_run && !use_oneshot)
+        {
+            ERR( "emulator bridge has no fexbridge_run; falling back to the one-shot entry\n" );
+            use_oneshot = 1;
+        }
+    }
+    if (emu_no_fault_stash == -1)
+    {
+        const char *str = getenv( "WINEEMUNOFAULTSTASH" );
+        emu_no_fault_stash = (str && *str == '1');
+        if (emu_no_fault_stash) ERR( "WINEEMUNOFAULTSTASH: guest fault records will be code-only\n" );
+    }
+
+    if (!use_oneshot && thread)
+    {
+        ret = 0;
+        status = emu_run_loop( params, thread );
+    }
+    else
+    {
+        ret = p_fexbridge_run_entry( params->entry, params->arg, &params->retval,
+                                     err, sizeof(err) );
+        status = ret ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
+    }
     if (own_thread && p_fexbridge_thread_term) p_fexbridge_thread_term( thread );
 
     /* A guest ExitThread ends the run on purpose.  Check it before the error
@@ -1296,11 +1543,25 @@ static NTSTATUS unixcall_emu_run_entry( void *args )
         params->exit_requested = TRUE;
         return STATUS_SUCCESS;
     }
-    if (ret)
-    {
-        ERR( "emulator bridge failed (%d): %s\n", ret, err );
-        return STATUS_UNSUCCESSFUL;
-    }
+    if (ret) ERR( "emulator bridge failed (%d): %s\n", ret, err );
+    return status;
+}
+
+
+/***********************************************************************
+ *           unixcall_emu_guest_stack
+ *
+ * The innermost active run's guest stack bounds on this thread; zeros when
+ * no run is active.  For the raise-path guest exception dispatch, which is
+ * entered from a trap rather than from the run loop and so has no
+ * emu_exception_params in hand.
+ */
+static NTSTATUS unixcall_emu_guest_stack( void *args )
+{
+    struct emu_guest_stack_params *params = args;
+
+    params->base  = emu_guest_stack_base;
+    params->limit = emu_guest_stack_limit;
     return STATUS_SUCCESS;
 }
 
@@ -1316,6 +1577,7 @@ static const unixlib_entry_t unix_call_funcs[] =
     unixcall_wine_spawnvp,
     system_time_precise,
     unixcall_emu_run_entry,
+    unixcall_emu_guest_stack,
 };
 
 
@@ -1337,6 +1599,7 @@ const unixlib_entry_t unix_call_wow64_funcs[] =
     wow64_wine_spawnvp,
     system_time_precise,
     wow64_emu_run_entry,
+    wow64_emu_run_entry,   /* unix_emu_guest_stack: same not-supported answer */
 };
 
 #endif  /* _WIN64 */
