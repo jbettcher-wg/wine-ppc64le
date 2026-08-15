@@ -1766,6 +1766,8 @@
 @ stdcall __wine_unix_spawnvp(long ptr)
 @ stdcall __wine_ctrl_routine(ptr)
 @ cdecl -private -arch=ppc64 __wine_init_teb(ptr)
+@ cdecl -arch=ppc64 __wine_guest__initterm(ptr ptr)
+@ cdecl -arch=ppc64 __wine_guest__initterm_e(ptr ptr)
 @ extern -private __wine_syscall_dispatcher
 @ extern -private __wine_unix_call_dispatcher
 @ extern -private -arch=arm64ec __wine_unix_call_dispatcher_arm64ec

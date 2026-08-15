@@ -1816,6 +1816,26 @@ static NTSTATUS MODULE_InitDLL( WINE_MODREF *wm, UINT reason, LPVOID lpReserved 
 
     __TRY
     {
+#ifdef __powerpc64__
+        /* Same rule as call_tls_callbacks(): a guest image's entry point is
+         * guest code and must go through the emulator.  call_dll_entry_point
+         * would bctrl straight into x86-64 bytes. */
+        const IMAGE_NT_HEADERS *nt = RtlImageNtHeader( module );
+        USHORT machine = nt ? nt->FileHeader.Machine : 0;
+
+        if (machine && machine != current_machine)
+        {
+            if (machine == IMAGE_FILE_MACHINE_AMD64)
+                retv = call_guest_dll_entry_point( entry, module, reason, lpReserved );
+            else
+            {
+                WARN( "not calling entry point %p of machine %04x image %p natively\n",
+                      entry, machine, module );
+                retv = TRUE;
+            }
+        }
+        else
+#endif
         retv = call_dll_entry_point( entry, module, reason, lpReserved );
         if (!retv)
             status = STATUS_DLL_INIT_FAILED;
@@ -2851,7 +2871,8 @@ static NTSTATUS get_dll_load_path_search_flags( LPCWSTR module, DWORD flags, WCH
  * Open a file for a new dll. Helper for find_dll_file.
  */
 static NTSTATUS open_dll_file( UNICODE_STRING *nt_name, WINE_MODREF **pwm, HANDLE *mapping,
-                               SECTION_IMAGE_INFORMATION *image_info, struct file_id *id )
+                               SECTION_IMAGE_INFORMATION *image_info, struct file_id *id,
+                               USHORT machine )
 {
     FILE_BASIC_INFORMATION info;
     OBJECT_ATTRIBUTES attr;
@@ -2900,7 +2921,14 @@ static NTSTATUS open_dll_file( UNICODE_STRING *nt_name, WINE_MODREF **pwm, HANDL
     if (!status)
     {
         NtQuerySection( *mapping, SectionImageInformation, image_info, sizeof(*image_info), NULL );
-        if (!is_valid_binary( handle, image_info ))
+        /* is_valid_binary() accepts every machine this host can run, native and
+         * emulated alike.  That is too weak when the caller is binding a guest
+         * import: a native ppc64 module of the right name would pass it and get
+         * spliced into a guest call.  When a machine is demanded, require it
+         * exactly, and report the mismatch as NOT_SUPPORTED so the caller keeps
+         * searching the rest of the path rather than stopping on the wrong file. */
+        if (!is_valid_binary( handle, image_info ) ||
+            (machine && image_info->Machine != machine))
         {
             TRACE( "%s is for arch %x, continuing search\n", debugstr_us(nt_name), image_info->Machine );
             status = STATUS_NOT_SUPPORTED;
@@ -3334,7 +3362,7 @@ static NTSTATUS find_builtin_without_file( const WCHAR *name, USHORT machine, UN
         RtlAppendUnicodeToString( new_name, pe_subdir );
         RtlAppendUnicodeToString( new_name, L"\\" );
         RtlAppendUnicodeToString( new_name, name );
-        status = open_dll_file( new_name, pwm, mapping, image_info, id );
+        status = open_dll_file( new_name, pwm, mapping, image_info, id, machine );
         if (status != STATUS_DLL_NOT_FOUND) goto done;
 
         new_name->Length = len;
@@ -3343,7 +3371,7 @@ static NTSTATUS find_builtin_without_file( const WCHAR *name, USHORT machine, UN
         RtlAppendUnicodeToString( new_name, pe_subdir );
         RtlAppendUnicodeToString( new_name, L"\\" );
         RtlAppendUnicodeToString( new_name, name );
-        status = open_dll_file( new_name, pwm, mapping, image_info, id );
+        status = open_dll_file( new_name, pwm, mapping, image_info, id, machine );
         if (status != STATUS_DLL_NOT_FOUND) goto done;
         RtlFreeUnicodeString( new_name );
     }
@@ -3356,12 +3384,12 @@ static NTSTATUS find_builtin_without_file( const WCHAR *name, USHORT machine, UN
         RtlAppendUnicodeToString( new_name, pe_subdir );
         RtlAppendUnicodeToString( new_name, L"\\" );
         RtlAppendUnicodeToString( new_name, name );
-        status = open_dll_file( new_name, pwm, mapping, image_info, id );
+        status = open_dll_file( new_name, pwm, mapping, image_info, id, machine );
         if (status != STATUS_DLL_NOT_FOUND) goto done;
         new_name->Length = len;
         RtlAppendUnicodeToString( new_name, L"\\" );
         RtlAppendUnicodeToString( new_name, name );
-        status = open_dll_file( new_name, pwm, mapping, image_info, id );
+        status = open_dll_file( new_name, pwm, mapping, image_info, id, machine );
         if (status == STATUS_NOT_SUPPORTED) found_image = TRUE;
         else if (status != STATUS_DLL_NOT_FOUND) goto done;
         RtlFreeUnicodeString( new_name );
@@ -3382,7 +3410,7 @@ done:
  */
 static NTSTATUS search_dll_file( LPCWSTR paths, LPCWSTR search, UNICODE_STRING *nt_name,
                                  WINE_MODREF **pwm, HANDLE *mapping, SECTION_IMAGE_INFORMATION *image_info,
-                                 struct file_id *id )
+                                 struct file_id *id, USHORT machine )
 {
     WCHAR *name;
     BOOL found_image = FALSE;
@@ -3412,7 +3440,7 @@ static NTSTATUS search_dll_file( LPCWSTR paths, LPCWSTR search, UNICODE_STRING *
         nt_name->Buffer = NULL;
         if ((status = RtlDosPathNameToNtPathName_U_WithStatus( name, nt_name, NULL, NULL ))) goto done;
 
-        status = open_dll_file( nt_name, pwm, mapping, image_info, id );
+        status = open_dll_file( nt_name, pwm, mapping, image_info, id, machine );
         if (status == STATUS_NOT_SUPPORTED) found_image = TRUE;
         else if (status != STATUS_DLL_NOT_FOUND) goto done;
         RtlFreeUnicodeString( nt_name );
@@ -3457,12 +3485,22 @@ static NTSTATUS find_dll_file( const WCHAR *load_path, const WCHAR *libname, USH
     {
         if ((*pwm = find_basename_module( libname, machine ))) return STATUS_SUCCESS;
         if (find_loaded) return STATUS_DLL_NOT_FOUND;
-        status = search_dll_file( machine_dir, libname, nt_name, pwm, mapping, image_info, id );
+        status = search_dll_file( machine_dir, libname, nt_name, pwm, mapping, image_info, id, machine );
         /* Nothing stages guest modules into the prefix -- they are builtins and
          * live in the build or install tree like every other one -- so not
          * finding a file there is the normal case, not a failure. */
         if (status == STATUS_DLL_NOT_FOUND)
             status = find_builtin_without_file( libname, machine, nt_name, pwm, mapping, image_info, id );
+        /* Not every module a guest imports is a builtin.  Real applications ship
+         * their own DLLs next to the executable -- SDL2, the VC runtimes, a
+         * game's own engine libraries -- and those are guest images too, so the
+         * ordinary search path is a legitimate place to find them.  What must
+         * not happen is binding to a NATIVE module of the same name, and that is
+         * now prevented where it belongs: search_dll_file() demands this exact
+         * machine and keeps walking the path when a candidate does not match,
+         * rather than the whole path being refused up front. */
+        if (status == STATUS_DLL_NOT_FOUND)
+            status = search_dll_file( load_path, libname, nt_name, pwm, mapping, image_info, id, machine );
         if (status == STATUS_NOT_SUPPORTED) status = STATUS_INVALID_IMAGE_FORMAT;
         return status;
     }
@@ -3501,7 +3539,7 @@ static NTSTATUS find_dll_file( const WCHAR *load_path, const WCHAR *libname, USH
 
     if (RtlDetermineDosPathNameType_U( libname ) == RtlPathTypeRelative)
     {
-        status = search_dll_file( load_path, libname, nt_name, pwm, mapping, image_info, id );
+        status = search_dll_file( load_path, libname, nt_name, pwm, mapping, image_info, id, 0 );
         switch (status)
         {
         case STATUS_NOT_SUPPORTED:
@@ -3514,7 +3552,7 @@ static NTSTATUS find_dll_file( const WCHAR *load_path, const WCHAR *libname, USH
         }
     }
     else if (!(status = RtlDosPathNameToNtPathName_U_WithStatus( libname, nt_name, NULL, NULL )))
-        status = open_dll_file( nt_name, pwm, mapping, image_info, id );
+        status = open_dll_file( nt_name, pwm, mapping, image_info, id, 0 );
 
     if (status == STATUS_NOT_SUPPORTED) status = STATUS_INVALID_IMAGE_FORMAT;
 
@@ -3544,7 +3582,7 @@ static NTSTATUS load_dll( const WCHAR *load_path, const WCHAR *libname, DWORD fl
     TRACE( "looking for %s in %s\n", debugstr_w(libname), debugstr_w(load_path) );
 
     if (system && system_dll_path.Buffer && !get_machine_system_dir( machine ))
-        nts = search_dll_file( system_dll_path.Buffer, libname, &nt_name, pwm, &mapping, &image_info, &id );
+        nts = search_dll_file( system_dll_path.Buffer, libname, &nt_name, pwm, &mapping, &image_info, &id, 0 );
 
     if (nts)
     {

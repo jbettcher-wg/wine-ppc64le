@@ -1374,10 +1374,91 @@ static ULONG_PTR call_guest_function_args( void *fn, ULONG_PTR a0, ULONG_PTR a1,
  * detach: (module, reason, reserved), MS-x64, through the generic argument
  * thunk.  The same native->guest direction as the atexit handlers.
  */
+/***********************************************************************
+ *           __wine_guest__initterm / __wine_guest__initterm_e   (NTDLL.@)
+ *
+ * What a guest image's import of the C runtime's _initterm resolves to
+ * (GUEST-IMPL in msvcrt.thunks / ucrtbase.thunks, forwarded here from those
+ * modules' .spec).  The table is the CALLER's, so for a guest caller every
+ * entry is x86-64 code while the walker is ppc64 -- msvcrt's own _initterm
+ * would bctrl straight into it, which is the c000001d a game's SDL2.dll died
+ * on during PROCESS_ATTACH.
+ *
+ * These live in ntdll rather than in msvcrt/data.c for two reasons: the guest
+ * machinery is here, and data.c is shared by every CRT variant in the tree
+ * (crtdll, msvcrtd, msvcr70/71/80, ...), none of which should grow a
+ * dependency on it.
+ *
+ * A thunk's callback mask cannot describe this: _initterm takes a pointer to
+ * an ARRAY of function pointers, not a function pointer, so each entry is
+ * wrapped as it is reached.  wrap_guest_callback() returns NULL and non-guest
+ * pointers unchanged, so a mixed or native table stays correct and a native
+ * caller -- which never goes through this redirect anyway -- is unaffected.
+ */
+static void *wrap_guest_callback( void *fn );
+
+void CDECL __wine_guest__initterm( void (**start)(void), void (**end)(void) )
+{
+    void (**cur)(void);
+
+    TRACE( "(%p,%p)\n", start, end );
+    for (cur = start; cur < end; cur++)
+    {
+        void (*fn)(void);
+
+        if (!*cur) continue;
+        fn = wrap_guest_callback( *cur );
+        TRACE( "calling %p (guest %p)\n", fn, *cur );
+        fn();
+    }
+}
+
+int CDECL __wine_guest__initterm_e( int (**start)(void), int (**end)(void) )
+{
+    int (**cur)(void);
+    int res = 0;
+
+    TRACE( "(%p,%p)\n", start, end );
+    for (cur = start; !res && cur < end; cur++)
+    {
+        int (*fn)(void);
+
+        if (!*cur) continue;
+        fn = wrap_guest_callback( *cur );
+        res = fn();
+        if (res) TRACE( "function %p failed: %#x\n", *cur, res );
+    }
+    return res;
+}
+
+
 void call_guest_tls_callback( void *callback, void *module, UINT reason )
 {
     TRACE( "callback %p module %p reason %u\n", callback, module, reason );
     call_guest_function_args( callback, (ULONG_PTR)module, reason, 0, 0 );
+}
+
+
+/***********************************************************************
+ *           call_guest_dll_entry_point
+ *
+ * A guest image's DllMain: (module, reason, reserved), MS-x64, through the
+ * same generic argument thunk as the TLS callbacks.  It is separate from
+ * call_guest_tls_callback only because DllMain RETURNS a value and a
+ * PIMAGE_TLS_CALLBACK does not -- a DllMain that returns FALSE has to become
+ * STATUS_DLL_INIT_FAILED, so the BOOL cannot be dropped.
+ *
+ * Until an application's own DLLs became loadable this had no callers: every
+ * guest module in the process was one of our own thunk builtins, whose entry
+ * point is a trap stub rather than guest code.  The first real one -- a game's
+ * XAudio2_9Redist.dll -- went through call_dll_entry_point instead and died
+ * c000001d, x86-64 bytes executed as ppc64 off a plain bctrl.
+ */
+BOOL call_guest_dll_entry_point( void *entry, void *module, UINT reason, void *reserved )
+{
+    TRACE( "entry %p module %p reason %u reserved %p\n", entry, module, reason, reserved );
+    return (BOOL)(DWORD)call_guest_function_args( entry, (ULONG_PTR)module, reason,
+                                                  (ULONG_PTR)reserved, 0 );
 }
 
 
