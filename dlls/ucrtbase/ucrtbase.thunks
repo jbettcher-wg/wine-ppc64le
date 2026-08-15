@@ -166,3 +166,11 @@ strcpy                        0x00000A1C  2  int   string.h:53
 strcspn                       0x00000A1D  2  int   string.h:55
 strlen                        0x00000A1E  1  int   string.h:57
 wcslen                        0x00000A1F  1  int   corecrt_wstring.h:63
+
+# _initterm walks a table of the CALLER's initializers.  For a guest caller
+# those entries are x86-64 code and this walker is ppc64, so the guest import
+# is redirected to a form that wraps each entry as it is reached.  A callback
+# mask cannot express this: the argument is a pointer to an ARRAY of function
+# pointers, not a function pointer.
+GUEST-IMPL   _initterm                        __wine_guest__initterm
+GUEST-IMPL   _initterm_e                      __wine_guest__initterm_e

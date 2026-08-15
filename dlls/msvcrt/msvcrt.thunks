@@ -326,3 +326,11 @@ printf              0x00000C15  1  int   stdio.h:701     variadic=vprintf  # spe
 # corroborates the three fixed arguments independently.  msvcrt.dll really does
 # export _snprintf regardless of which declaration the header hands a caller.
 _snprintf           0x00000C16  3  int   stdio.h:778     variadic=_vsnprintf  # spec:917 (ptr long str)
+
+# _initterm walks a table of the CALLER's initializers.  For a guest caller
+# those entries are x86-64 code and this walker is ppc64, so the guest import
+# is redirected to a form that wraps each entry as it is reached.  A callback
+# mask cannot express this: the argument is a pointer to an ARRAY of function
+# pointers, not a function pointer.
+GUEST-IMPL   _initterm                        __wine_guest__initterm
+GUEST-IMPL   _initterm_e                      __wine_guest__initterm_e

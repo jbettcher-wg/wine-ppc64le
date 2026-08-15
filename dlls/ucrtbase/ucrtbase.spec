@@ -426,6 +426,8 @@
 @ cdecl _initialize_wide_environment()
 @ cdecl _initterm(ptr ptr)
 @ cdecl _initterm_e(ptr ptr)
+@ cdecl -arch=ppc64 __wine_guest__initterm(ptr ptr) ntdll.__wine_guest__initterm
+@ cdecl -arch=ppc64 __wine_guest__initterm_e(ptr ptr) ntdll.__wine_guest__initterm_e
 @ cdecl _invalid_parameter_noinfo()
 @ cdecl _invalid_parameter_noinfo_noreturn()
 @ stub _invoke_watson
