@@ -364,6 +364,45 @@ struct vulkan_driver_funcs
     void (*p_map_device_extensions)( struct vulkan_device_extensions *extensions );
 };
 
+/* HWND -> VkSurfaceKHR for FOREIGN Vulkan instances (ppc64le native lane).
+ *
+ * The native-lane D3D12/D3D11 engines (vkd3d-proton, DXVK) are native ELF
+ * libraries holding raw VkInstances from the system loader; those cannot pass
+ * through win32u's client-instance wrapping (win32u_vkCreateWin32SurfaceKHR
+ * dereferences the vulkan_client_object wrapper).  This export drives the
+ * same client-surface machinery -- get_unused_client_surface,
+ * driver_funcs->p_vulkan_surface_create, set_window_pixel_format -- for a
+ * caller-owned instance, by fabricating the minimal struct vulkan_instance
+ * the driver create callbacks actually consume: host.instance plus the
+ * resolved vkCreate*SurfaceKHR pointers.  Display-server-agnostic by
+ * construction: winex11 and winewayland both implement the seam above.
+ *
+ * All four calls must be made from Wine threads, never from the engines' raw
+ * worker threads.  The returned VkSurfaceKHR lives on the CALLER's instance
+ * and is destroyed by the caller (vkd3d destroys the surfaces its factory
+ * returns); surface_destroy releases only the win32u side.
+ *
+ * Design: vkd3d-ppc64le/docs/presentation-design.md §3.1/§4. */
+#define WINE_HWND_SURFACE_VERSION 1
+
+struct hwnd_surface_funcs
+{
+    /* Create a presentable VkSurfaceKHR for hwnd on the caller's instance.
+     * gipa is the caller's vkGetInstanceProcAddr (the system loader's).
+     * Returns an opaque cookie owning the client surface. */
+    VkResult (*surface_create)( HWND hwnd, VkInstance instance,
+                                PFN_vkGetInstanceProcAddr gipa,
+                                VkSurfaceKHR *surface, void **cookie );
+    /* The two hooks win32u_vkQueuePresentKHR performs around a present:
+     * update before, present after. */
+    void (*surface_update)( void *cookie );
+    void (*surface_presented)( void *cookie, VkResult present_result );
+    /* Detach and release the client surface. */
+    void (*surface_destroy)( void *cookie );
+};
+
+const struct hwnd_surface_funcs *__wine_get_hwnd_surface_funcs( UINT version );
+
 #endif /* WINE_UNIX_LIB */
 
 #endif /* __WINE_VULKAN_DRIVER_H */

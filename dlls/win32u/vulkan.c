@@ -3152,6 +3152,149 @@ const struct vulkan_funcs *__wine_get_vulkan_driver( UINT version )
     return &vulkan_funcs;
 }
 
+/***********************************************************************
+ * ppc64le native lane: HWND surfaces for foreign Vulkan instances.
+ *
+ * The design and the reasons live in wine/vulkan_driver.h next to
+ * struct hwnd_surface_funcs and in
+ * vkd3d-ppc64le/docs/presentation-design.md §3.1/§4.  The short form: the
+ * native-lane engines (vkd3d-proton, DXVK) own raw VkInstances from the
+ * system loader; the driver create callbacks consume only host.instance
+ * plus one resolved vkCreate*SurfaceKHR pointer from the vulkan_instance
+ * they are given, so a minimal fabricated wrapper lets the existing
+ * client-surface machinery serve a foreign instance unchanged.
+ */
+
+struct hwnd_surface
+{
+    struct client_surface *client;         /* the driver's client surface */
+    struct vulkan_instance *instance;      /* fabricated wrapper, owned here */
+    HWND hwnd;
+};
+
+static VkResult hwnd_surface_create( HWND hwnd, VkInstance client_instance,
+                                     PFN_vkGetInstanceProcAddr gipa,
+                                     VkSurfaceKHR *ret, void **cookie )
+{
+    static pthread_once_t init_once = PTHREAD_ONCE_INIT;
+    struct vulkan_instance *instance;
+    struct hwnd_surface *surface;
+    VkSurfaceKHR host_surface;
+    VkResult res;
+
+    TRACE( "hwnd %p, instance %p, gipa %p\n", hwnd, client_instance, gipa );
+
+    if (!hwnd || !client_instance || !gipa || !ret || !cookie) return VK_ERROR_INITIALIZATION_FAILED;
+
+    pthread_once( &init_once, vulkan_init_once );
+    if (!vulkan_handle)
+    {
+        ERR( "no system vulkan loader; cannot serve foreign surfaces\n" );
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
+
+    if (!(surface = calloc( 1, sizeof(*surface) ))) return VK_ERROR_OUT_OF_HOST_MEMORY;
+    if (!(instance = calloc( 1, sizeof(*instance) )))
+    {
+        free( surface );
+        return VK_ERROR_OUT_OF_HOST_MEMORY;
+    }
+
+    /* The minimal surface the driver create callbacks consume.  The version
+     * gate on this export is the fuse for upstream widening this set. */
+    instance->host.instance = client_instance;
+    instance->p_vkCreateXlibSurfaceKHR =
+        (PFN_vkCreateXlibSurfaceKHR)gipa( client_instance, "vkCreateXlibSurfaceKHR" );
+    instance->p_vkCreateWaylandSurfaceKHR =
+        (PFN_vkCreateWaylandSurfaceKHR)gipa( client_instance, "vkCreateWaylandSurfaceKHR" );
+    if (!instance->p_vkCreateXlibSurfaceKHR && !instance->p_vkCreateWaylandSurfaceKHR)
+    {
+        ERR( "caller's instance resolves no platform surface creation entry point; "
+             "were the WSI extensions enabled on it?\n" );
+        free( instance );
+        free( surface );
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+
+    surface->hwnd = hwnd;
+    surface->instance = instance;
+
+    if (!(surface->client = get_unused_client_surface( hwnd, 0 ))) res = VK_ERROR_OUT_OF_HOST_MEMORY;
+    else
+    {
+        res = driver_funcs->p_vulkan_surface_create( surface->client, instance, &host_surface );
+        use_window_client_surface( surface->client, !res );
+    }
+    if (res)
+    {
+        WARN( "driver surface create failed for hwnd %p, res %d\n", hwnd, res );
+        if (surface->client) client_surface_release( surface->client );
+        free( instance );
+        free( surface );
+        return res;
+    }
+    set_window_pixel_format( hwnd, -1, TRUE );
+
+    TRACE( "created host surface 0x%s on foreign instance %p for hwnd %p\n",
+           wine_dbgstr_longlong( host_surface ), client_instance, hwnd );
+
+    *ret = host_surface;
+    *cookie = surface;
+    return VK_SUCCESS;
+}
+
+static void hwnd_surface_update( void *cookie )
+{
+    struct hwnd_surface *surface = cookie;
+    if (!surface) return;
+    client_surface_update( surface->client );
+}
+
+static void hwnd_surface_presented( void *cookie, VkResult present_result )
+{
+    struct hwnd_surface *surface = cookie;
+    if (!surface) return;
+    client_surface_present( surface->client );
+    if (present_result < VK_SUCCESS)
+        WARN( "present returned %d for hwnd %p\n", present_result, surface->hwnd );
+}
+
+static void hwnd_surface_destroy( void *cookie )
+{
+    struct hwnd_surface *surface = cookie;
+
+    if (!surface) return;
+    TRACE( "hwnd %p cookie %p\n", surface->hwnd, cookie );
+
+    /* The VkSurfaceKHR itself belongs to the caller's instance and is
+     * destroyed there. */
+    client_surface_release( surface->client );
+    free( surface->instance );
+    free( surface );
+}
+
+static const struct hwnd_surface_funcs hwnd_surface_funcs =
+{
+    .surface_create = hwnd_surface_create,
+    .surface_update = hwnd_surface_update,
+    .surface_presented = hwnd_surface_presented,
+    .surface_destroy = hwnd_surface_destroy,
+};
+
+/***********************************************************************
+ *      __wine_get_hwnd_surface_funcs  (win32u.so)
+ */
+const struct hwnd_surface_funcs *__wine_get_hwnd_surface_funcs( UINT version )
+{
+    if (version != WINE_HWND_SURFACE_VERSION)
+    {
+        ERR( "version mismatch, caller wants %u but win32u has %u\n",
+             version, WINE_HWND_SURFACE_VERSION );
+        return NULL;
+    }
+    return &hwnd_surface_funcs;
+}
+
 /* unix side client-like instance wrapper to fit with the vulkan wrapping infrastructure */
 struct instance_wrapper
 {

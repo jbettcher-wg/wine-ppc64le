@@ -567,5 +567,8 @@ W32KAPI NTSTATUS WINAPI NtGdiDdDDIWaitForSynchronizationObjectFromCpu( const D3D
 /* Wine extensions */
 W32KAPI const struct vulkan_funcs *__wine_get_vulkan_driver( UINT version );
 W32KAPI const struct opengl_funcs *__wine_get_opengl_driver( UINT version );
+/* ppc64le native lane: HWND surfaces for foreign Vulkan instances; the
+ * struct and version gate live in wine/vulkan_driver.h (unix side only) */
+W32KAPI const struct hwnd_surface_funcs *__wine_get_hwnd_surface_funcs( UINT version );
 
 #endif /* _NTGDI_ */
