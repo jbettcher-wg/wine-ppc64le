@@ -1,0 +1,3 @@
+# vkd3d-proton's meson build tree, created by the generated Makefile's
+# dlls/d3d12/libvkd3d-proton-d3d12.so rule when srcdir == builddir.
+/vkd3d-build/

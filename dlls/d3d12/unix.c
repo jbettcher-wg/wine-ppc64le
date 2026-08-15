@@ -10,11 +10,17 @@
  * the high registers, the same argument dlls/ntdll's call_native_thunk
  * makes).
  *
- * vkd3d-proton is found via VKD3D_PROTON_LIB_DIR when set (the bring-up
- * arrangement, pointing at a build tree), or the ordinary dynamic-linker
- * search otherwise.  The d3d12 front-end .so loads -d3d12core.so itself, the
- * same way upstream's own front-end does -- we deliberately reuse that
- * mechanism rather than duplicating its search logic here.
+ * vkd3d-proton is found, in order: VKD3D_PROTON_LIB_DIR when set (an
+ * override for pointing at a scratch build); next to this unixlib itself,
+ * which is where the Wine build puts it -- the Makefile rule added by
+ * configure.ac drives vkd3d's meson build and symlinks the front end into
+ * dlls/d3d12/ beside d3d12.so, so a clean `./configure && make` needs no
+ * environment at all; and finally the ordinary dynamic-linker search, which
+ * is what a system-installed copy resolves through.  The front-end .so loads
+ * -d3d12core.so itself, the same way upstream's own front end does (its
+ * build-tree DT_RUNPATH survives the symlink, since $ORIGIN is resolved
+ * after following it) -- we deliberately reuse that mechanism rather than
+ * duplicating its search logic here.
  *
  * Copyright 2026 the ppc64le port authors
  *
@@ -71,7 +77,8 @@ static wide_func flat_funcs[FLAT_FUNC_COUNT];
 static NTSTATUS d3d12_unix_init( void *args )
 {
     const char *dir = getenv( "VKD3D_PROTON_LIB_DIR" );
-    char path[512];
+    char path[1024];
+    Dl_info info;
     unsigned int i;
 
     if (vkd3d_handle) return STATUS_SUCCESS;
@@ -83,12 +90,35 @@ static NTSTATUS d3d12_unix_init( void *args )
         if (!vkd3d_handle)
             ERR( "cannot load %s: %s\n", path, dlerror() );
     }
+    /* The build places a symlink to vkd3d-proton next to this unixlib.  It
+     * must be resolved before the dlopen: the front end finds its
+     * -d3d12core.so half through DT_RUNPATH=$ORIGIN/../d3d12core, and glibc
+     * expands $ORIGIN from the path the object was loaded by, NOT from its
+     * realpath -- measured here: loading through the symlink loses d3d12core. */
+    if (!vkd3d_handle && dladdr( (void *)d3d12_unix_init, &info ) && info.dli_fname)
+    {
+        const char *slash = strrchr( info.dli_fname, '/' );
+        if (slash && (size_t)(slash - info.dli_fname) + sizeof(VKD3D_SONAME) + 1 < sizeof(path))
+        {
+            char *real;
+            snprintf( path, sizeof(path), "%.*s/%s",
+                      (int)(slash - info.dli_fname), info.dli_fname, VKD3D_SONAME );
+            if ((real = realpath( path, NULL )))
+            {
+                vkd3d_handle = dlopen( real, RTLD_NOW | RTLD_LOCAL );
+                if (!vkd3d_handle)
+                    WARN( "cannot load %s: %s\n", real, dlerror() );
+                free( real );
+            }
+            else TRACE( "no %s beside the unixlib, trying the linker path\n", VKD3D_SONAME );
+        }
+    }
     if (!vkd3d_handle)
         vkd3d_handle = dlopen( VKD3D_SONAME, RTLD_NOW | RTLD_LOCAL );
     if (!vkd3d_handle)
     {
-        ERR( "cannot load %s: %s -- set VKD3D_PROTON_LIB_DIR or put it on "
-             "the linker path\n", VKD3D_SONAME, dlerror() );
+        ERR( "cannot load %s: %s -- did the build's vkd3d step run?  "
+             "(VKD3D_PROTON_LIB_DIR overrides the search)\n", VKD3D_SONAME, dlerror() );
         return STATUS_DLL_NOT_FOUND;
     }
     for (i = 0; i < FLAT_FUNC_COUNT; i++)

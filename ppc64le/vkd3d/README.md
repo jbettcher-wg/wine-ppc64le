@@ -5,6 +5,19 @@ commit** rather than a fork — the same arrangement as `dxvk-ppc64le`, so the
 provenance of every changed line is `git diff` and the LGPL obligations below
 stay cheap to meet.
 
+**Authority.** This project exists in two places:
+`hangover-ppc64le/wine-upstream/ppc64le/vkd3d/` (the fold, inside the Wine
+repo) and the standalone `vkd3d-ppc64le/` working copy. **The fold is
+authoritative**: the Wine build drives its meson build (`build-for-wine.sh`),
+reads `interfaces_d3d12.json` at build time (`dlls/d3d12/d3d12.thunks`
+COM-JSON), and versions all of it in the wine repo. The standalone copy is a
+mirror for work outside the Wine tree; when the two disagree, the fold wins,
+and the `dxvk-ppc64le/thunk` generators point at the fold for the same reason
+(`gen_interfaces.D3D12_JSON`). `interfaces_d3d12.json` deliberately has **one
+copy anywhere** — the guest and native halves of the COM boundary are emitted
+by different generators from it, and a second copy that drifted would only be
+caught at attach time by the runtime IID cross-check.
+
 ```sh
 ./bootstrap.sh              # clone at the pinned commit, apply vkd3d-patches/
 ./bootstrap.sh --check      # verify an existing src/ matches, change nothing
@@ -86,11 +99,28 @@ upstream `FAILED (5 failures)`.
 
 ## Building
 
-`[MEASURED] 2026-08-14` upstream vkd3d-proton at the pinned commit, with this
-series applied, **builds for ppc64le at `-mcpu=power8`** — library, tests,
-demos and programs, 282 targets, no errors. It needs `widl`
-(`hangover-ppc64le/wine-build/tools/widl/widl` will do), meson, ninja and
-glslang.
+**The Wine build does this for you.** `./configure && make` in a Wine build
+tree runs `build-for-wine.sh` (via the "ppc64le native D3D12 lane" rule in
+configure.ac), which bootstraps `src/` if absent, builds the two native
+libraries with meson/ninja into `$(top_builddir)/ppc64le/vkd3d-build/`, and
+symlinks `libvkd3d-proton-d3d12.so` into `dlls/d3d12/` next to the d3d12
+unixlib, which dlopens it there — no environment variable, no install step.
+The libraries are consumed from the meson **build** layout on purpose: meson
+bakes `DT_RUNPATH=$ORIGIN/../d3d12core` into the front end there (and strips
+it on install), which is what lets it find its d3d12core half with no
+`LD_LIBRARY_PATH`. `VKD3D_PROTON_LIB_DIR` survives in `dlls/d3d12/unix.c`
+purely as an override for pointing at a scratch build.
+
+`[MEASURED] 2026-08-15, AC922` the wine-driven build produces the two
+libraries (206 ninja targets) and `probes/check-d3d12-headless.sh` passes
+from a clean build directory with no vkd3d environment variables set.
+
+For standalone work (tests, demos — not built by the Wine rule), the manual
+recipe still holds. `[MEASURED] 2026-08-14`: upstream vkd3d-proton at the
+pinned commit, with this series applied, **builds for ppc64le at
+`-mcpu=power8`** — library, tests, demos and programs, 282 targets, no
+errors. It needs `widl` (`hangover-ppc64le/wine-build/tools/widl/widl` will
+do), meson, ninja and glslang.
 
 ```sh
 PATH=$HOME/Development/powerpc64le-ports/hangover-ppc64le/wine-build/tools/widl:$PATH \
@@ -99,16 +129,18 @@ PATH=$HOME/Development/powerpc64le-ports/hangover-ppc64le/wine-build/tools/widl:
 ninja -C build-native -j 176
 ```
 
-That is a compile, not a port. Nothing here claims the result runs, and the
-`d3d12` test binary has not been executed on this machine. Whether
-vkd3d-proton *works* on ppc64le is a separate question that this series does
-not answer.
+The `d3d12` test binary has still not been executed on this machine; what HAS
+run end to end is the headless probe above (device creation, fence
+signal/wait, copy-queue round trip, compute dispatch on RADV).
 
 ## Layout
 
 | Path | |
 |---|---|
 | `bootstrap.sh` | reconstructs `src/` at the pinned commit with the series applied |
+| `build-for-wine.sh` | the make↔meson seam: called by the generated Makefile, builds the two native libraries the d3d12 unixlib dlopens |
+| `interfaces_d3d12.json` | the ONE copy of the D3D12 surface table — consumed by `dlls/d3d12/d3d12.thunks` (COM-JSON) and by the `dxvk-ppc64le/thunk` generators; regenerate with `gen_interfaces.py --surface d3d12` there |
+| `gen-headers.sh` | widl-compiles vkd3d's idl into `generated-headers/` |
 | `vkd3d-patches/` | our changes to vkd3d-proton, as a revertible series |
 | `probes/` | the before/after for the series |
 | `docs/` | `feasibility.md`, `fence-callback.md` |

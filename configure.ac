@@ -3967,6 +3967,24 @@ dlls/wineandroid.drv/wine-debug.apk: dlls/wineandroid.drv/build.gradle ${wine_sr
 	cd dlls/wineandroid.drv && env ANDROID_HOME=\"\$(ANDROID_HOME)\" \$(GRADLE) -q -Psrcdir=$srcdir assembleDebug
 	mv dlls/wineandroid.drv/build/outputs/apk/debug/wine-debug.apk \$[@]])
 
+dnl Rules for the ppc64le native D3D12 lane: vkd3d-proton is part of the
+dnl build, not scaffolding loaded out of /tmp.  Its meson build is driven from
+dnl here (the wineandroid gradle rule above is the precedent for make driving
+dnl a foreign build system), and the front-end library is symlinked next to
+dnl the d3d12 unixlib, which dlopens it there -- no environment variable, no
+dnl staging step, no install.  The symlink preserves meson's build-tree
+dnl DT_RUNPATH ($ORIGIN resolves through the symlink to the meson layout, so
+dnl the d3d12core half is found too).  ppc64le/vkd3d/build-for-wine.sh holds
+dnl the meson side of the seam.
+
+WINE_APPEND_RULE(
+[dlls/d3d12/libvkd3d-proton-d3d12.so: tools/widl/widl dummy
+	@${wine_srcdir}ppc64le/vkd3d/build-for-wine.sh \$(CURDIR)/ppc64le/vkd3d-build \$(CURDIR)
+	@rm -f \$[@] && ln -s ../../ppc64le/vkd3d-build/libs/d3d12/libvkd3d-proton-d3d12.so \$[@]
+all: dlls/d3d12/libvkd3d-proton-d3d12.so
+clean::
+	rm -rf ppc64le/vkd3d-build dlls/d3d12/libvkd3d-proton-d3d12.so])
+
 dnl Misc rules
 
 AC_SUBST([EXTERNAL_SUBDIRS],["_AC_EXTERNAL_SUBDIRS"])
