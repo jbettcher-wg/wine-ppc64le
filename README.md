@@ -30,9 +30,15 @@ Honest, and in progress.
 | `wineboot -u` | **works** — full prefix, services registered, and the prefix runs programs |
 | Wine's own test suite | runs **as x86-64 guests** — `mspatcha` 2145/0, `apphelp` 15/0, `advapi32:registry` 6367 executed |
 | Running an x86-64 PE | **works** — real Windows programs run to completion |
-| Guest imports → native code | **works**, generated at build time by `tools/spec2thunk` |
+| Guest imports → native code | **works**, generated at build time by `tools/spec2thunk` — 30+ modules |
+| An application's **own** DLLs | **load and run** — not just Wine builtins |
+| Guest `DllMain`, C++ static initializers | **run as guest code** |
+| Floating point across the boundary | **works** — `probes/check-fp-marshal.sh`, 11/11 |
+| Microsoft's real `msvcp140.dll` | **runs as an x86-64 guest module** |
 | Guest threads, callbacks, TLS, SEH | **work** — see below |
 | D3D12 → native vkd3d-proton | **works**, including **pixels on screen** |
+| `vulkan-1` guest thunks | **252 exports, 0 refused** |
+| **A commercial game** | **no** — see "Where real games stop" |
 
 `ntdll` cannot be a PE and never will be: its TEB lives in an initial-exec
 `__thread`, and a PE image has nowhere to put a static TLS block. It is built as
@@ -106,6 +112,48 @@ a live session. Presentation goes through Wine's own win32u client-surface
 layer, the one `winevulkan` uses, so both the X11 and Wayland drivers are served
 by construction and vkd3d-proton needs no changes at all. vkd3d is built by this
 tree's `make`.
+
+### Where real games stop
+
+**No commercial game runs yet.** Two were pointed at the port, and both got far
+enough to be useful rather than far enough to play.
+
+Getting there closed a run of gaps that were structural rather than per-title,
+and each is worth naming because each will recur:
+
+* the loader refused the *whole* search path for a guest image, so an
+  application's own DLLs — `SDL2.dll` sitting beside the `.exe` that imports it
+  — were invisible. `open_dll_file()` now demands an exact machine and keeps
+  walking the path, so guest modules resolve while a native module still cannot
+  be spliced into a guest call;
+* a guest `DllMain` was called natively, executing x86-64 bytes as ppc64;
+* the C runtime's `_initterm` walks the *caller's* table of static
+  initializers, and native code `bctrl`'d straight into guest ones;
+* floating point had no path at all. MS-x64 indexes FP argument registers by
+  **position**, ELFv2 by **order** — but ELFv2 indexes its GPRs by position
+  even so, an FP argument taking its FPR and *skipping* its GPR. Packing the
+  integers down instead put `ldexp(double,int)`'s exponent in the wrong
+  register, and it returned its input unscaled: a **wrong number, not a
+  crash**. `probes/check-fp-marshal.sh` compares against compile-time-known
+  answers precisely because that class is invisible to "did it start";
+* `LoadLibraryEx` was not intercepted, so a guest got a native `HMODULE` and
+  then `NULL` from every `GetProcAddress` on it;
+* apisets were not resolved on the runtime `LoadLibrary` path, so every probe
+  for an `api-ms-win-*` set answered `NULL`.
+
+Rather than translate the MSVC C++ ABI, **Microsoft's own `msvcp140.dll` is
+loaded as an x86-64 guest module** and runs under the emulator — which only
+became possible once application DLLs resolved.
+
+Where the two stop today:
+
+* **Quake II (2023 remaster)** — every DLL initializes and the game reaches its
+  own code, then dereferences a global that its one writer never set. Not a
+  thunk, sentinel or ABI problem.
+* **DOOM (2016, Vulkan build)** — every import resolves, including all 252
+  `vulkan-1` exports, and it dies in `steam_api64.dll` with `STATUS_STACK_OVERFLOW`.
+  That is Steam's DRM shim with no Steam client to talk to, so it is not
+  obviously a porting failure at all.
 
 **Known gaps.** System COM is not finished: `CoCreateInstance` still hands a
 guest a native vtable, so ole32-dependent tests reach `main` and stop there.
