@@ -3521,8 +3521,11 @@ static void output_source_thunks( struct makefile *make, struct incl_file *sourc
     install_data_file( make, strmake( "%s.dll", obj ), name,
                        strmake( "$(libdir)/wine/%s", dir ), NULL );
 
-    output( "%s: %s %s %s\n", obj_dir_path( make, name ), source->filename,
-            spec2thunk, spec2thunk_sig );
+    /* The signature oracle reads the widl-generated headers out of the build
+     * tree; without this dependency a fresh -j build races the thunk against
+     * "make include" and spec2thunk fails with "cannot find wtypes.h". */
+    output( "%s: %s %s %s include/wtypes.h\n", obj_dir_path( make, name ),
+            source->filename, spec2thunk, spec2thunk_sig );
     output( "\t%s%s --spec %s --body=trap --out $@\n",
             cmd_prefix( "THUNK" ), spec2thunk, source->filename );
 }

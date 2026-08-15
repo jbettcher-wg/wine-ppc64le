@@ -1,0 +1,36 @@
+# AMD64 thunk export spec for the guest d3d12.dll -- the FIRST COM-mode
+# module.  Read dlls/kernel32/kernel32.thunks for the trap ABI banner; what is
+# different here is WHERE EVERYTHING COMES FROM, and that difference is the
+# point:
+#
+#   * The export list is vkd3d-proton's own d3d12.def, NOT Wine's d3d12.spec.
+#     The surface we promise the guest is the surface the native target
+#     implements -- and the native d3d12.dll in this tree IS vkd3d-proton
+#     behind a unixlib (see dlls/d3d12).  Generating this module from Wine's
+#     .spec would describe Wine's deprecated libs/vkd3d forwarder, the one
+#     implementation this port specifically replaces.
+#
+#   * The signature oracle reads vkd3d-proton's widl-generated headers
+#     (ppc64le/vkd3d/generated-headers, produced by ppc64le/vkd3d/gen-headers.sh
+#     from the pinned upstream's IDL), not Wine's d3d12.h.  Same reason: the
+#     declarations must be the ones the implementation was compiled from.
+#     vkd3d_d3d12.h drags in <windows.h> itself, so it is the whole TU.
+#
+#   * COM-JSON adds the per-interface vtable stub arrays and the
+#     __wine_com_thunk_info table: 117 interfaces, 3,149 slots, one 5-byte
+#     trap stub per slot at the same 16-byte stride as the flat stubs.  The
+#     interfaces JSON is generated from the SAME headers by
+#     dxvk-ppc64le/thunk/gen_interfaces.py.  No marshalling knowledge lives in
+#     this module -- it is pure trap surface; dispatch and marshalling belong
+#     to the native d3d12.dll's __wine_com_dispatch.
+#
+# ppc64le/vkd3d/src is the bootstrap checkout (gitignored; run
+# ppc64le/vkd3d/bootstrap.sh once per tree) -- FROM-DEF and vkd3d_windows.h
+# live there at the pinned commit.
+
+DLL         d3d12.dll
+FROM-DEF    ../../ppc64le/vkd3d/src/libs/d3d12/d3d12.def
+COM-JSON    ../../ppc64le/vkd3d/interfaces_d3d12.json
+PROBE-INCLUDE vkd3d_d3d12.h
+INCLUDE-DIR ../../ppc64le/vkd3d/generated-headers
+INCLUDE-DIR ../../ppc64le/vkd3d/src/include

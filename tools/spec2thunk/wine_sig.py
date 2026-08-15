@@ -432,18 +432,30 @@ def crt_defines_for_dll(dll):
 class WineHeaders:
     def __init__(self, include_dir, generated_dir=None, clang='clang',
                  target='x86_64-windows-gnu', workdir=None, defines=(),
-                 batch=None):
+                 batch=None, probe_src=None, extra_includes=()):
+        """probe_src: the translation unit the oracle reads, when the module's
+        declarations do not live in Wine's headers at all.  The d3d12 thunk is
+        the motivating case: its surface is vkd3d-proton's own widl output
+        (PROBE-INCLUDE lines in the .thunks file), never Wine's d3d12.h --
+        thunking a graphics module toward Wine's implementation is the one
+        thing the generator must make unrepresentable.  extra_includes are -I
+        directories searched BEFORE Wine's include tree for the same reason.
+        Neither relaxes a check: the reconstruction probe still compiles
+        against whatever TU is named here."""
         self.include_dir = os.path.abspath(os.path.expanduser(include_dir))
         self.generated_dir = (os.path.abspath(os.path.expanduser(generated_dir))
                               if generated_dir else None)
         self.defines = list(defines)
+        self.extra_includes = [os.path.abspath(os.path.expanduser(d))
+                               for d in extra_includes]
         self.clang = clang
         self.target = target
         self.workdir = workdir or tempfile.mkdtemp(prefix='winesig-')
         os.makedirs(self.workdir, exist_ok=True)
+        self.probe_src = probe_src if probe_src is not None else PROBE_SRC
         self._probe = os.path.join(self.workdir, 'wt_probe.c')
         with open(self._probe, 'w') as f:
-            f.write(PROBE_SRC)
+            f.write(self.probe_src)
         self._cache = {}
         # name -> [decl, ...] for the WHOLE header surface, built on first use.
         # None until then; see _build_index() and the BATCHING banner above.
@@ -461,7 +473,7 @@ class WineHeaders:
     # ---------------------------------------------------------------- clang
 
     def _incargs(self):
-        a = []
+        a = ['-I' + d for d in self.extra_includes]
         if self.generated_dir:
             a += ['-I' + self.generated_dir]
         a += ['-I' + self.include_dir, '-I' + os.path.join(self.include_dir, 'msvcrt')]
@@ -682,7 +694,7 @@ class WineHeaders:
         return L
 
     def _probe_source(self, name, ret, params, variadic=False):
-        return PROBE_SRC + ''.join(
+        return self.probe_src + ''.join(
             self._probe_chunk(name, ret, params, variadic))
 
     def _compile_probe(self, name, src):
@@ -747,8 +759,8 @@ class WineHeaders:
         if not items:
             return
 
-        lines = [PROBE_SRC]
-        nl = PROBE_SRC.count('\n')          # lines consumed so far
+        lines = [self.probe_src]
+        nl = self.probe_src.count('\n')     # lines consumed so far
         spans = []                          # (first_line, last_line, key)
         for i, (key, name, ret, params, variadic) in enumerate(items):
             chunk = self._probe_chunk(name, ret, params, variadic, tag='_%d' % i)

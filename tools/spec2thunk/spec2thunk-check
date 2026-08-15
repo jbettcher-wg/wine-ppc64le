@@ -474,6 +474,8 @@ class SpecScan:
 
 def parse_spec(path):
     dll, exports, from_spec, excludes = None, [], None, []
+    extra = dict(from_def=None, com_json=None, probe_includes=[],
+                 include_dirs=[])
     with open(path) as f:
         for raw in f:
             line = raw.split('#', 1)[0].strip()
@@ -485,6 +487,18 @@ def parse_spec(path):
                 continue
             if parts[0].upper() == 'FROM-SPEC':
                 from_spec = parts[1]
+                continue
+            if parts[0].upper() == 'FROM-DEF':
+                extra['from_def'] = parts[1]
+                continue
+            if parts[0].upper() == 'COM-JSON':
+                extra['com_json'] = parts[1]
+                continue
+            if parts[0].upper() == 'PROBE-INCLUDE':
+                extra['probe_includes'].append(parts[1])
+                continue
+            if parts[0].upper() == 'INCLUDE-DIR':
+                extra['include_dirs'].append(parts[1])
                 continue
             if parts[0].upper() == 'EXCLUDE':
                 excludes.append(parts[1])
@@ -505,7 +519,190 @@ def parse_spec(path):
                                 void=(retkind == 'void'), header=hdr,
                                 line=int(ln), variadic_impl=impl,
                                 asserted=True))
-    return dll, exports, from_spec, excludes
+    return dll, exports, from_spec, excludes, extra
+
+
+# ------------------------------------------- independent .def / JSON readers
+# COM MODE.  A COM-mode module's export list comes from the native target's
+# own .def (vkd3d-proton's d3d12.def) and its stub arrays from an interfaces
+# JSON.  Both are re-read here with this file's own readers -- the inputs are
+# shared with the generator (they ARE the list, the way kernel32.spec is), the
+# code is not.
+
+class ModuleDefList:
+    """Independent re-derivation of the export names of a .def file."""
+
+    def __init__(self, path):
+        self.path = os.path.abspath(os.path.expanduser(path))
+
+    def eligible(self):
+        names, in_exports = [], False
+        with open(self.path, errors='replace') as fh:
+            for lineno, raw in enumerate(fh, 1):
+                line = raw.split(';', 1)[0].strip()
+                if not line:
+                    continue
+                parts = line.split()
+                key = parts[0].upper()
+                if key == 'LIBRARY':
+                    in_exports = False
+                    continue
+                if key == 'EXPORTS':
+                    in_exports = True
+                    parts = parts[1:]
+                    if not parts:
+                        continue
+                elif not in_exports:
+                    continue
+                name = parts[0].split('=', 1)[0]
+                if any(p.upper() in ('NONAME', 'DATA') for p in parts[1:]):
+                    continue
+                names.append(dict(name=name, line=lineno, nargs=None))
+        if not names:
+            raise Fail('%s: no export names' % self.path)
+        return names
+
+
+COM_INFO_VERSION = 1
+COM_INFO_FIELDS = 5             # version, iface_count, stride, trap_off, ifaces_rva
+COM_IFACE_ENTRY = 24            # GUID(16) + slot_count(4) + stubs_rva(4)
+
+
+def parse_guid_text(text):
+    """Own reader: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' -> the 16 bytes a
+    Windows GUID struct holds (Data1/2/3 little-endian, Data4 as written)."""
+    m = re.fullmatch(r'([0-9a-fA-F]{8})-([0-9a-fA-F]{4})-([0-9a-fA-F]{4})-'
+                     r'([0-9a-fA-F]{4})-([0-9a-fA-F]{12})', text.strip())
+    if not m:
+        raise Fail('malformed uuid %r' % text)
+    return (struct.pack('<IHH', int(m.group(1), 16), int(m.group(2), 16),
+                        int(m.group(3), 16))
+            + bytes.fromhex(m.group(4) + m.group(5)))
+
+
+def load_com_json(path):
+    """-> [(name, guid bytes, slot_count)], sorted by name -- the generator's
+    documented order, re-derived here from the JSON with this file's reader."""
+    import json
+    with open(path) as f:
+        d = json.load(f)
+    out = []
+    for name in sorted(d['interfaces']):
+        i = d['interfaces'][name]
+        slots = i['slots']
+        got = [s['slot'] for s in slots]
+        if got != list(range(len(slots))):
+            raise Fail('%s: %s slot numbers are not contiguous from 0'
+                       % (path, name))
+        out.append((name, parse_guid_text(i['uuid']), len(slots)))
+    return out
+
+
+def check_com_section(r, pe, exp, com_json_path, flat_count, flat_stubs_rva):
+    """The COM-mode invariants, against the image bytes alone."""
+    want = load_com_json(com_json_path)
+    r.note('com json', '%s: %d interface(s), %d slot(s)'
+           % (os.path.basename(com_json_path), len(want),
+              sum(n for _, _, n in want)))
+
+    info_rva = exp.get('__wine_com_thunk_info')
+    if not r.check(bool(info_rva), 'c1 __wine_com_thunk_info exported by name',
+                   '0x%08x' % (info_rva or 0)):
+        return
+    try:
+        fields = struct.unpack_from('<%dI' % COM_INFO_FIELDS,
+                                    pe.read(info_rva, 4 * COM_INFO_FIELDS))
+    except Fail as e:
+        r.check(False, 'c1b __wine_com_thunk_info readable', str(e))
+        return
+    version, iface_count, stride, trap_off, ifaces_rva = fields
+    r.note('__wine_com_thunk_info',
+           'ver=%d iface_count=%d stride=%d trap_off=%d ifaces_rva=0x%x'
+           % fields)
+    r.check(version == COM_INFO_VERSION,
+            'c2 com info version == %d' % COM_INFO_VERSION, str(version))
+    r.check(stride == STRIDE, 'c3 com stride == 16', str(stride))
+    r.check(trap_off == TRAP_OFF['trap'],
+            'c4 com trap_off == 3 (mov r10,rcx before the trap)', str(trap_off))
+    r.check(iface_count == len(want),
+            'c5 iface_count matches the interfaces JSON',
+            '%d vs %d' % (iface_count, len(want)))
+    for tag, rva in (('__wine_com_thunk_info', info_rva),
+                     ('ifaces_rva', ifaces_rva)):
+        s = pe.section_of(rva)
+        r.check(s is not None and not (s['flags'] & IMAGE_SCN_MEM_WRITE),
+                'c6 %s is in a non-writable section' % tag,
+                ('%s flags=0x%08x' % (s['name'], s['flags'])) if s else 'none')
+    if iface_count != len(want):
+        return
+
+    entries = []
+    try:
+        for i in range(iface_count):
+            raw = pe.read(ifaces_rva + i * COM_IFACE_ENTRY, COM_IFACE_ENTRY)
+            iid = raw[:16]
+            slot_count, stubs_rva = struct.unpack_from('<II', raw, 16)
+            entries.append((iid, slot_count, stubs_rva))
+    except Fail as e:
+        r.check(False, 'c7 iface entries readable', str(e))
+        return
+
+    bad_iid = ['%s: image %s json %s' % (want[i][0], entries[i][0].hex(),
+                                         want[i][1].hex())
+               for i in range(iface_count) if entries[i][0] != want[i][1]]
+    r.check(not bad_iid, 'c7 every IID matches the JSON, in sorted-name order',
+            '; '.join(bad_iid[:4]) if bad_iid else '%d IIDs' % iface_count)
+    r.check(len({e[0] for e in entries}) == iface_count,
+            'c8 IIDs are unique', '%d distinct' % len({e[0] for e in entries}))
+    bad_n = ['%s: image %d json %d' % (want[i][0], entries[i][1], want[i][2])
+             for i in range(iface_count) if entries[i][1] != want[i][2]]
+    r.check(not bad_n, 'c9 every slot_count matches the JSON',
+            '; '.join(bad_n[:6]) if bad_n
+            else '%d slots total' % sum(e[1] for e in entries))
+
+    # Stub arrays: geometry, then bytes.
+    sec_bad, align_bad = [], []
+    regions = [(flat_stubs_rva, flat_stubs_rva + flat_count * STRIDE, '(flat)')]
+    for i, (iid, slot_count, stubs_rva) in enumerate(entries):
+        s = pe.section_of(stubs_rva)
+        if s is None or s['name'] != '.thunk' or \
+           not (s['flags'] & IMAGE_SCN_MEM_EXECUTE):
+            sec_bad.append(want[i][0])
+        end = stubs_rva + slot_count * STRIDE
+        if s is not None and end > s['vaddr'] + max(s['vsize'], s['rsize']):
+            sec_bad.append('%s (overruns .thunk)' % want[i][0])
+        if stubs_rva % STRIDE:
+            align_bad.append(want[i][0])
+        regions.append((stubs_rva, end, want[i][0]))
+    r.check(not sec_bad, 'c10 every stub array lives inside executable .thunk',
+            '; '.join(sec_bad[:6]) if sec_bad else '%d arrays' % iface_count)
+    r.check(not align_bad, 'c11 every stub array is 16-byte aligned',
+            '; '.join(align_bad[:6]) if align_bad else '')
+    regions.sort()
+    overlap = ['%s/%s' % (regions[i][2], regions[i + 1][2])
+               for i in range(len(regions) - 1)
+               if regions[i][1] > regions[i + 1][0]]
+    r.check(not overlap,
+            'c12 stub arrays do not overlap each other or the flat stubs',
+            '; '.join(overlap[:6]) if overlap else '%d regions' % len(regions))
+
+    trap_body = expect_stub('trap', 0)
+    body_bad, checked = [], 0
+    for i, (iid, slot_count, stubs_rva) in enumerate(entries):
+        try:
+            raw = pe.read(stubs_rva, slot_count * STRIDE)
+        except Fail as e:
+            body_bad.append('%s: %s' % (want[i][0], e))
+            continue
+        for n in range(slot_count):
+            if raw[n * STRIDE:(n + 1) * STRIDE] != trap_body:
+                body_bad.append('%s slot %d: %s' % (
+                    want[i][0], n, raw[n * STRIDE:(n + 1) * STRIDE].hex()))
+        checked += slot_count
+    r.check(not body_bad,
+            'c13 every COM stub is byte-identical to the trap body',
+            '; '.join(body_bad[:4]) if body_bad
+            else '%d stubs verified' % checked)
 
 
 def expect_stub(mode, imm):
@@ -548,8 +745,16 @@ def main():
     r = Report()
     print("=== checking %s (body=%s) ===" % (args.image, args.body))
     spec_dll, overrides, from_spec, excludes = None, [], None, []
+    extra = dict(from_def=None, com_json=None, probe_includes=[],
+                 include_dirs=[])
     if args.spec:
-        spec_dll, overrides, from_spec, excludes = parse_spec(args.spec)
+        spec_dll, overrides, from_spec, excludes, extra = parse_spec(args.spec)
+
+    def spec_relative(p):
+        if os.path.isabs(p) or not args.spec:
+            return p
+        return os.path.join(os.path.dirname(os.path.abspath(args.spec)), p)
+
     if args.from_spec:
         from_spec = args.from_spec
     elif from_spec == 'auto':
@@ -564,7 +769,20 @@ def main():
     # actually carries, in image order, each with whatever assertion columns a
     # .thunks override gave it.
     ov = {e['name']: e for e in overrides}
-    if from_spec:
+    if extra['from_def']:
+        from_def = spec_relative(extra['from_def'])
+        eligible = [e for e in ModuleDefList(from_def).eligible()
+                    if e['name'] not in set(excludes)]
+        listed = []
+        for e in eligible:
+            o = ov.get(e['name'])
+            listed.append(dict(o, spec_nargs=None) if o else
+                          dict(name=e['name'], imm=None, nargs=None, void=None,
+                               header=None, line=None, variadic_impl=None,
+                               asserted=False, spec_nargs=None))
+        if not spec_dll:
+            spec_dll = os.path.splitext(os.path.basename(from_def))[0] + '.dll'
+    elif from_spec:
         eligible = [e for e in WineSpecList(from_spec).eligible()
                     if e['name'] not in set(excludes)]
         listed = []
@@ -639,7 +857,7 @@ def main():
     # --require-complete; see the WineSpecList docstring for why this file
     # does not re-derive the refusal decision itself.
     img_names = [n for n, rva in sorted(exp.items(), key=lambda kv: kv[1])
-                 if n != '__wine_thunk_info']
+                 if n not in ('__wine_thunk_info', '__wine_com_thunk_info')]
     pos_of = {e['name']: i for i, e in enumerate(listed)}
     invented = [n for n in img_names if n not in pos_of]
     r.check(not invented, '5b every exported name is in the export list',
@@ -887,9 +1105,18 @@ def main():
             if e['variadic_impl'] and e['variadic_impl'] not in want_names:
                 want_names.append(e['variadic_impl'])
 
-        scan = HeaderScan(args.wine_include)
-        hits = scan.find(want_names)
-        r.note('header scan', '%d headers in %s' % (len(scan.files), scan.dir))
+        # A COM-mode module's declarations live in the INCLUDE-DIR trees the
+        # .thunks names (vkd3d-proton's generated headers), not in Wine's.
+        # Scan those too and merge; the wine-include scan stays exactly as it
+        # was for every module that names none.
+        scans = [HeaderScan(spec_relative(d)) for d in extra['include_dirs']]
+        scans.append(HeaderScan(args.wine_include))
+        hits = {n: [] for n in want_names}
+        for scan in scans:
+            for n, hs in scan.find(want_names).items():
+                hits[n] += hs
+        r.note('header scan', '; '.join('%d headers in %s'
+                                        % (len(s.files), s.dir) for s in scans))
         nodecl = [n for n in spec_names if n not in by_spec and not hits[n]]
         r.check(not nodecl, '11c every export has a declaration in Wine headers',
                 'not found: %s' % nodecl if nodecl else
@@ -1079,6 +1306,14 @@ def main():
                           (', VARIADIC -> %s'
                            % (impls[i] if i < len(impls) else '???')) if v else ''),
                        'from %s:%d  %s%s' % (h['file'], h['line'], h['ret'], via))
+
+    # -- c. COM mode: stub arrays and __wine_com_thunk_info
+    if extra['com_json']:
+        try:
+            check_com_section(r, pe, exp, spec_relative(extra['com_json']),
+                              count, stubs_rva)
+        except Fail as e:
+            r.check(False, 'c0 COM section parses', str(e))
 
     print()
     print("%d checks, %d FAIL" % (r.n, r.bad))

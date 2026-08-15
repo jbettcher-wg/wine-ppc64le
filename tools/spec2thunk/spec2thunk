@@ -185,7 +185,27 @@ IMAGE_BASE = 0x180000000
 # --------------------------------------------------------------------------
 
 def parse_spec(path):
-    """Read a .thunks file -> (dll, exports, from_spec, excludes).
+    """Read a .thunks file -> (dll, exports, from_spec, excludes, extra).
+
+    `extra` carries the COM-mode and foreign-surface directives:
+        from_def       -- FROM-DEF <mod>.def: export list from a module
+                          definition file (vkd3d-proton's d3d12.def).  A .def
+                          carries neither arity nor types, so entries from it
+                          rest on the clang oracle ALONE and are announced as
+                          such -- there is no second reading to cross-check.
+        com_json       -- COM-JSON <interfaces.json>: emit per-interface COM
+                          stub arrays and __wine_com_thunk_info from the named
+                          interface table (see the COM MODE banner below).
+        probe_includes -- PROBE-INCLUDE <header>: the oracle's translation
+                          unit becomes exactly these #includes, replacing the
+                          Wine-centric default.  This is how a module whose
+                          surface is NOT declared in Wine's headers (d3d12:
+                          vkd3d-proton's own widl output) keeps the oracle
+                          pointed at the headers its implementation was
+                          actually compiled from.
+        include_dirs   -- INCLUDE-DIR <dir>: extra -I directories for the
+                          oracle, searched before Wine's include tree.
+    Relative paths are relative to the .thunks file that names them.
 
     TWO ROLES, AND THE FILE SAYS WHICH.  Without a FROM-SPEC line the export
     lines ARE the list, exactly as they always were.  With one, the list comes
@@ -203,6 +223,8 @@ def parse_spec(path):
     from_spec = None
     excludes = []
     exports = []          # (name, imm32, nargs, returns_void, header, line)
+    extra = dict(from_def=None, com_json=None, probe_includes=[],
+                 include_dirs=[])
     with open(path) as f:
         for lineno, raw in enumerate(f, 1):
             line = raw.split('#', 1)[0].strip()
@@ -213,6 +235,27 @@ def parse_spec(path):
                 if len(parts) != 2:
                     sys.exit("%s:%d: DLL needs exactly one argument" % (path, lineno))
                 dll = parts[1]
+                continue
+            if parts[0].upper() in ('FROM-DEF', 'COM-JSON'):
+                key = parts[0].lower().replace('-', '_')
+                if len(parts) != 2:
+                    sys.exit("%s:%d: %s needs exactly one path"
+                             % (path, lineno, parts[0]))
+                if extra[key] is not None:
+                    sys.exit("%s:%d: a second %s line" % (path, lineno, parts[0]))
+                extra[key] = parts[1]
+                continue
+            if parts[0].upper() == 'PROBE-INCLUDE':
+                if len(parts) != 2:
+                    sys.exit("%s:%d: PROBE-INCLUDE needs exactly one header"
+                             % (path, lineno))
+                extra['probe_includes'].append(parts[1])
+                continue
+            if parts[0].upper() == 'INCLUDE-DIR':
+                if len(parts) != 2:
+                    sys.exit("%s:%d: INCLUDE-DIR needs exactly one directory"
+                             % (path, lineno))
+                extra['include_dirs'].append(parts[1])
                 continue
             if parts[0].upper() == 'FROM-SPEC':
                 if len(parts) != 2:
@@ -281,14 +324,18 @@ def parse_spec(path):
                                 specline=lineno))
     if dll is None:
         sys.exit("%s: no 'DLL <name>' line" % path)
-    if not exports and from_spec is None:
+    if not exports and from_spec is None and extra['from_def'] is None:
         sys.exit("%s: no exports" % path)
+    if from_spec is not None and extra['from_def'] is not None:
+        sys.exit("%s: FROM-SPEC and FROM-DEF are mutually exclusive -- one "
+                 "module has one authoritative export list" % path)
     names = [e['name'] for e in exports]
     if len(set(names)) != len(names):
         sys.exit("%s: duplicate export names" % path)
-    if '__wine_thunk_info' in names:
-        sys.exit("%s: __wine_thunk_info is reserved" % path)
-    return dll, exports, from_spec, excludes
+    for reserved in ('__wine_thunk_info', '__wine_com_thunk_info'):
+        if reserved in names:
+            sys.exit("%s: %s is reserved" % (path, reserved))
+    return dll, exports, from_spec, excludes, extra
 
 
 # --------------------------------------------------------------------------
@@ -485,6 +532,207 @@ def exports_from_wine_spec(path, overrides=None, excludes=(), start_imm=0):
                      n, 'no such line in the .spec at all'))
                      for n in unknown))
     return out, skipped, dropped
+
+
+# --------------------------------------------------------------------------
+# THE EXPORT LIST, DERIVED FROM A MODULE DEFINITION (.def) FILE
+# --------------------------------------------------------------------------
+# For a graphics module the export surface we promise the guest is the surface
+# the NATIVE TARGET implements -- vkd3d-proton's d3d12.def, not Wine's
+# d3d12.spec.  Generating a graphics thunk from a Wine .spec toward Wine's own
+# implementation is the one construction this tool must keep unrepresentable
+# (the native namesake would be Wine's forwarder into libs/vkd3d, exactly the
+# implementation the port replaces), so COM-mode modules name a .def instead.
+#
+# A .def carries ONLY names: no types, no arity, not even an argument list.
+# Every signature therefore rests on the clang oracle alone, with no second
+# reading to cross-check -- weaker than the .spec path, and announced loudly
+# at generation time rather than papered over.  The oracle still refuses
+# anything it cannot prove is register-passable, exactly as everywhere else.
+# --------------------------------------------------------------------------
+
+def parse_module_def(path):
+    """Read a .def -> (library name or None, ordered export names)."""
+    library, names, in_exports = None, [], False
+    with open(path, errors='replace') as f:
+        for lineno, raw in enumerate(f, 1):
+            line = raw.split(';', 1)[0].strip()
+            if not line:
+                continue
+            parts = line.split()
+            key = parts[0].upper()
+            if key == 'LIBRARY':
+                library = parts[1] if len(parts) > 1 else None
+                in_exports = False
+                continue
+            if key == 'EXPORTS':
+                in_exports = True
+                parts = parts[1:]
+                if not parts:
+                    continue
+            elif not in_exports:
+                continue
+            name = parts[0]
+            # `Name @ordinal` and `Name @ordinal NONAME` forms: the name still
+            # exists in the export table unless NONAME says otherwise, and a
+            # thunk binds by name, so NONAME entries are skipped like -noname.
+            if any(p.upper() == 'NONAME' for p in parts[1:]):
+                continue
+            if any(p.upper() == 'DATA' for p in parts[1:]):
+                continue
+            if '=' in name:
+                name = name.split('=', 1)[0]
+            if not name.replace('_', 'a').isalnum():
+                sys.exit('%s:%d: export name %r is not a plain C identifier'
+                         % (path, lineno, name))
+            names.append(name)
+    if not names:
+        sys.exit('%s: no export names' % path)
+    if len(set(names)) != len(names):
+        sys.exit('%s: duplicate export names' % path)
+    return library, names
+
+
+def exports_from_module_def(path, overrides=None, excludes=(), start_imm=0):
+    """-> (export entries in .def order, dropped-by-EXCLUDE)."""
+    overrides = overrides or {}
+    library, names = parse_module_def(path)
+    excluded = set(excludes)
+    out, dropped = [], []
+    for name in names:
+        if name in excluded:
+            dropped.append(name)
+            continue
+        ov = overrides.get(name)
+        if ov:
+            e = dict(ov, asserted=True)
+        else:
+            e = dict(name=name, imm=start_imm + len(out), nargs=None,
+                     returns_void=None, header=None, line=None,
+                     variadic_impl=None, asserted=False, spec_args=None,
+                     specline=0)
+        e['imm'] = e.get('imm', start_imm + len(out))
+        out.append(e)
+    unknown = sorted(set(overrides) - set(names))
+    if unknown:
+        sys.exit('%s: %d override(s) name an export this .def does not offer: %s'
+                 % (path, len(unknown), ', '.join(unknown)))
+    return library, out, dropped
+
+
+# --------------------------------------------------------------------------
+# COM MODE: per-interface stub arrays + __wine_com_thunk_info
+# --------------------------------------------------------------------------
+# Input is an interfaces JSON (dxvk-ppc64le/thunk/gen_interfaces.py output,
+# derived from the implementation's own widl-generated headers): per interface
+# a uuid and the FULL flattened vtable slot list.  The module gains, alongside
+# the flat-export machinery which is completely unchanged:
+#
+#   * one contiguous stub array per interface type -- slot_count stubs of the
+#     SAME 5-byte trap body at the same 16-byte stride as the flat stubs;
+#   * an exported __wine_com_thunk_info:
+#
+#         struct com_thunk_info
+#         {
+#             UINT version;      /* COM_INFO_VERSION */
+#             UINT iface_count;
+#             UINT stride;       /* 16 */
+#             UINT trap_off;     /* 3: mov r10,rcx ; syscall */
+#             UINT ifaces_rva;   /* iface_count x { GUID iid;
+#                                   UINT slot_count; UINT stubs_rva; } */
+#         };
+#
+# The guest-facing vtable for interface i is simply the address sequence
+# stubs_rva + n*stride, materialised by the native module's runtime at attach;
+# a trapping RIP maps back to (iface, slot) by the same exact-hit arithmetic
+# the flat stubs use.  NO marshalling knowledge lives here: the module is pure
+# trap surface, which is what lets one generator serve every COM module (d3d12
+# now, dxgi/d3d11 later) unchanged.
+#
+# INTERFACE ORDER IS SORTED BY NAME.  The dispatcher hands the native module a
+# bare (iface, slot) pair, so the guest module's interface indices and the
+# native module's generated tables must agree; both derive from the same JSON
+# and both sort by name, and spec2thunk-check re-derives the order from the
+# JSON independently.
+# --------------------------------------------------------------------------
+
+COM_INFO_VERSION = 1
+
+
+def parse_guid(text):
+    """'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' -> 16 GUID bytes as Windows
+    lays them out: Data1/2/3 little-endian, Data4 as written."""
+    m = re.fullmatch(r'([0-9a-fA-F]{8})-([0-9a-fA-F]{4})-([0-9a-fA-F]{4})-'
+                     r'([0-9a-fA-F]{4})-([0-9a-fA-F]{12})', text.strip())
+    if not m:
+        raise ValueError('malformed uuid %r' % text)
+    d1, d2, d3 = (int(m.group(i), 16) for i in (1, 2, 3))
+    d4 = bytes.fromhex(m.group(4) + m.group(5))
+    return struct.pack('<IHH', d1, d2, d3) + d4
+
+
+def load_com_interfaces(path):
+    """-> [dict(name, uuid(bytes), slot_count)], sorted by interface name."""
+    import json
+    with open(path) as f:
+        d = json.load(f)
+    ifaces = d['interfaces']
+    out = []
+    for name in sorted(ifaces):
+        i = ifaces[name]
+        slots = i['slots']
+        # The JSON's slot list is the FULL flattened vtable in order; refuse a
+        # table with holes rather than emit a stub array whose index does not
+        # mean the slot number.
+        want = list(range(len(slots)))
+        got = [s['slot'] for s in slots]
+        if got != want:
+            sys.exit('%s: %s slot numbers are not 0..%d contiguous'
+                     % (path, name, len(slots) - 1))
+        if not slots:
+            sys.exit('%s: %s has no slots' % (path, name))
+        try:
+            uuid = parse_guid(i['uuid'])
+        except ValueError as e:
+            sys.exit('%s: %s: %s' % (path, name, e))
+        out.append(dict(name=name, uuid=uuid, slot_count=len(slots)))
+    dup = len(out) - len({i['uuid'] for i in out})
+    if dup:
+        sys.exit('%s: %d duplicate interface IIDs' % (path, dup))
+    return out
+
+
+def emit_com_asm(a, com_ifaces):
+    """Append the COM stub arrays (to .thunk) and info tables (to .rdata).
+    Called with the flat sections already emitted; `a` is the line sink."""
+    a('\t.section\t.thunk,"xr"')
+    a('\t.balign\t%d' % STRIDE)
+    body = stub_bytes('trap', 0)
+    for i, itf in enumerate(com_ifaces):
+        a('\t.globl\twine_com_stubs_%d' % i)
+        a('wine_com_stubs_%d:\t\t# %s, %d slots'
+          % (i, itf['name'], itf['slot_count']))
+        for _ in range(itf['slot_count']):
+            a('\t.byte\t' + ','.join('0x%02X' % c for c in body))
+    a('')
+    a('\t.section\t.rdata,"dr"')
+    a('\t.balign\t8')
+    a('\t.globl\twine_com_thunk_info')
+    a('wine_com_thunk_info:')
+    a('\t.long\t%d\t\t\t# version' % COM_INFO_VERSION)
+    a('\t.long\t%d\t\t\t# iface_count' % len(com_ifaces))
+    a('\t.long\t%d\t\t\t# stride' % STRIDE)
+    a('\t.long\t%d\t\t\t# trap_off' % TRAP_OFF['trap'])
+    a('\t.long\twine_com_ifacev@IMGREL\t# ifaces_rva')
+    a('')
+    a('\t.balign\t4')
+    a('wine_com_ifacev:')
+    for i, itf in enumerate(com_ifaces):
+        a('\t# %s' % itf['name'])
+        a('\t.byte\t' + ','.join('0x%02X' % c for c in itf['uuid']))
+        a('\t.long\t%d' % itf['slot_count'])
+        a('\t.long\twine_com_stubs_%d@IMGREL' % i)
+    a('')
 
 
 # --------------------------------------------------------------------------
@@ -715,7 +963,7 @@ def stub_bytes(mode, imm):
 # assembly / def emission
 # --------------------------------------------------------------------------
 
-def emit_asm(dll, exports, mode):
+def emit_asm(dll, exports, mode, com_ifaces=None):
     out = []
     a = out.append
     a('\t# generated by tools/spec2thunk -- do not edit')
@@ -780,6 +1028,8 @@ def emit_asm(dll, exports, mode):
             a('wine_thunk_impl_%d:' % i)
             a('\t.asciz\t"%s"' % e['impl'])
     a('')
+    if com_ifaces:
+        emit_com_asm(a, com_ifaces)
     a('\t# One absolute 64-bit pointer so the linker is forced to emit a')
     a('\t# base relocation directory; Wine relocates this image.')
     a('\t.balign\t8')
@@ -789,11 +1039,13 @@ def emit_asm(dll, exports, mode):
     return '\n'.join(out) + '\n'
 
 
-def emit_def(dll, exports):
+def emit_def(dll, exports, have_com=False):
     out = ['LIBRARY %s' % dll, 'EXPORTS']
     for i, e in enumerate(exports):
         out.append('    %s = wine_thunk_stub_%d' % (e['name'], i))
     out.append('    __wine_thunk_info = wine_thunk_info DATA')
+    if have_com:
+        out.append('    __wine_com_thunk_info = wine_com_thunk_info DATA')
     return '\n'.join(out) + '\n'
 
 
@@ -892,8 +1144,16 @@ def main():
 
     # ---------------- where the export list comes from
     dll, spec_exports, from_spec, excludes = None, [], None, []
+    extra = dict(from_def=None, com_json=None, probe_includes=[],
+                 include_dirs=[])
     if args.spec:
-        dll, spec_exports, from_spec, excludes = parse_spec(args.spec)
+        dll, spec_exports, from_spec, excludes, extra = parse_spec(args.spec)
+
+    def spec_relative(p):
+        if os.path.isabs(p) or not args.spec:
+            return p
+        return os.path.join(os.path.dirname(os.path.abspath(args.spec)), p)
+
     if args.from_spec:
         from_spec = args.from_spec
     elif from_spec == 'auto':
@@ -911,7 +1171,23 @@ def main():
                                      from_spec)
 
     wine_spec_skipped, wine_spec_dropped = [], []
-    if from_spec:
+    if extra['from_def']:
+        from_def = spec_relative(extra['from_def'])
+        if not os.path.isfile(from_def):
+            ap.error('no such .def: %s' % from_def)
+        overrides = {e['name']: e for e in spec_exports}
+        library, spec_exports, wine_spec_dropped = \
+            exports_from_module_def(from_def, overrides, excludes)
+        if not dll:
+            dll = library or (os.path.splitext(os.path.basename(from_def))[0]
+                              + '.dll')
+        print("EXPORT LIST  from %s -- a .def carries names ONLY, so every"
+              % from_def)
+        print("signature below rests on the clang oracle alone; there is no "
+              "second reading\nto cross-check.  The oracle still refuses "
+              "anything not provably register-passable.")
+        print()
+    elif from_spec:
         if not os.path.isfile(from_spec):
             ap.error('no such Wine .spec: %s' % from_spec)
         overrides = {e['name']: e for e in spec_exports}
@@ -933,8 +1209,17 @@ def main():
     if len(set(names)) != len(names):
         dup = sorted({n for n in names if names.count(n) > 1})
         sys.exit('duplicate export names: %s' % ', '.join(dup))
-    if '__wine_thunk_info' in names:
-        sys.exit('__wine_thunk_info is reserved')
+    for reserved in ('__wine_thunk_info', '__wine_com_thunk_info'):
+        if reserved in names:
+            sys.exit('%s is reserved' % reserved)
+
+    # ---------------- COM interfaces
+    com_ifaces = None
+    if extra['com_json']:
+        if args.body != 'trap':
+            sys.exit('COM-JSON requires --body=trap: a COM stub has no imm32 '
+                     'sentinel form, only the trap body')
+        com_ifaces = load_com_interfaces(spec_relative(extra['com_json']))
 
     stem = os.path.splitext(os.path.basename(dll))[0]
     tmp_builddir = None
@@ -957,10 +1242,17 @@ def main():
             ap.error('cannot find the widl-generated headers (wtypes.h); run '
                      'from the top of the build directory or pass '
                      '--wine-generated <builddir>/include')
+    probe_src = None
+    if extra['probe_includes']:
+        probe_src = ''.join('#include <%s>\n' % h
+                            for h in extra['probe_includes'])
     headers = wine_sig.WineHeaders(args.wine_include, args.wine_generated,
                                    clang=args.clang,
                                    workdir=os.path.join(args.builddir, 'sigprobe'),
-                                   defines=crt_defines)
+                                   defines=crt_defines,
+                                   probe_src=probe_src,
+                                   extra_includes=[spec_relative(d) for d in
+                                                   extra['include_dirs']])
     headers.sanity()
     specs = wine_sig.WineSpecs(args.wine_source)
     t0 = time.time()
@@ -1057,9 +1349,9 @@ def main():
     if lpath: os.makedirs(os.path.dirname(os.path.abspath(lpath)), exist_ok=True)
 
     with open(spath, 'w') as f:
-        f.write(emit_asm(dll, exports, args.body))
+        f.write(emit_asm(dll, exports, args.body, com_ifaces))
     with open(dpath, 'w') as f:
-        f.write(emit_def(dll, exports))
+        f.write(emit_def(dll, exports, have_com=bool(com_ifaces)))
 
     run([args.clang, '-target', 'x86_64-windows-gnu', '-c', spath, '-o', opath],
         args.verbose)
@@ -1080,6 +1372,11 @@ def main():
     print("e_lfanew     : 0x%x (signature stamped at 0x%02x..0x%02x)"
           % (e_lfanew, SIG_OFF, SIG_OFF + len(BUILTIN_SIG) - 1))
     print("trap_off     : %d" % TRAP_OFF[args.body])
+    if com_ifaces:
+        nslots = sum(i['slot_count'] for i in com_ifaces)
+        print("com mode     : %d interface(s), %d vtable slot(s), %d bytes of "
+              "stubs (version %d)"
+              % (len(com_ifaces), nslots, nslots * STRIDE, COM_INFO_VERSION))
     print("import lib   : %s" % (lpath or "(none; pass --implib if you need one)"))
     st = headers.stats
     print("oracle       : %d clang run(s) for %d export(s) in %.1fs "

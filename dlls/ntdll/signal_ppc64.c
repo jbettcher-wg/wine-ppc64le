@@ -1346,12 +1346,134 @@ static const struct thunk_override thunk_overrides[] =
 };
 
 /***********************************************************************
+ *           guest COM vtable thunks
+ *
+ * A COM-mode thunk module (tools/spec2thunk COM mode; first client d3d12)
+ * publishes a second table alongside __wine_thunk_info: per interface TYPE,
+ * one contiguous array of the same 5-byte trap stubs, one per vtable slot.
+ * A trapping RIP inside one of those arrays maps to (iface, slot) by the
+ * same exact-hit arithmetic the flat stubs use.
+ *
+ * This dispatcher stays deliberately ignorant of everything COM: argument
+ * classes, proxies, sret, floats and return placement all belong to the
+ * native namesake module, reached through its single __wine_com_dispatch
+ * export.  CONTRACT: __wine_com_dispatch( iface, slot, AMD64_CONTEXT * )
+ * returns STATUS_SUCCESS once it has fully served the call -- including
+ * writing ctx->Rax -- and THIS side then pops the guest return address.
+ */
+struct com_thunk_info
+{
+    UINT version;         /* 1 */
+    UINT iface_count;
+    UINT stride;          /* 16, same stub body as the flat thunks */
+    UINT trap_off;        /* 3 */
+    UINT ifaces_rva;      /* iface_count x struct com_thunk_iface */
+};
+#define COM_THUNK_INFO_VERSION 1
+
+struct com_thunk_iface
+{
+    GUID iid;
+    UINT slot_count;
+    UINT stubs_rva;
+};
+
+typedef NTSTATUS (WINAPI *com_dispatch_func)( UINT iface, UINT slot, AMD64_CONTEXT *ctx );
+
+struct com_thunk_hit
+{
+    com_dispatch_func dispatch;
+    UINT iface;
+    UINT slot;
+};
+
+/* Resolve a trapping RIP inside `mod` to a COM vtable slot, or FALSE.
+ * Caller holds the loader lock (the resolve below may LdrLoadDll). */
+static BOOL find_guest_com_target( LDR_DATA_TABLE_ENTRY *mod, ULONG_PTR rip,
+                                   struct com_thunk_hit *hit )
+{
+    /* the native __wine_com_dispatch, cached per guest module base */
+    static struct { void *base; com_dispatch_func fn; } cache[8];
+
+    ULONG_PTR base = (ULONG_PTR)mod->DllBase;
+    const struct com_thunk_info *info;
+    const struct com_thunk_iface *ifaces;
+    ANSI_STRING name;
+    HMODULE native;
+    void *proc;
+    UINT i, n;
+
+    RtlInitAnsiString( &name, "__wine_com_thunk_info" );
+    if (LdrGetProcedureAddress( mod->DllBase, &name, 0, (void **)&info ))
+        return FALSE;                        /* not a COM-mode module */
+    if (info->version != COM_THUNK_INFO_VERSION || !info->stride)
+    {
+        ERR( "%s has com thunk info version %u, expected %u\n",
+             debugstr_w(mod->BaseDllName.Buffer), info->version, COM_THUNK_INFO_VERSION );
+        return FALSE;
+    }
+    ifaces = (const struct com_thunk_iface *)(base + info->ifaces_rva);
+    for (i = 0; i < info->iface_count; i++)
+    {
+        ULONG_PTR start = base + ifaces[i].stubs_rva + info->trap_off;
+        UINT slot;
+
+        if (rip < start) continue;
+        slot = (rip - start) / info->stride;
+        if (slot >= ifaces[i].slot_count) continue;
+        if (start + (ULONG_PTR)slot * info->stride != rip)
+        {
+            /* inside this interface's stub array but not on a published trap
+             * site; the arrays do not overlap, so nothing else can claim it */
+            ERR( "%s: trap at %p is inside iface %u's stubs but off-site\n",
+                 debugstr_w(mod->BaseDllName.Buffer), (void *)rip, i );
+            return FALSE;
+        }
+
+        for (proc = NULL, n = 0; n < ARRAY_SIZE(cache); n++)
+            if (cache[n].base == mod->DllBase) { proc = (void *)cache[n].fn; break; }
+        if (!proc)
+        {
+            if (LdrGetDllHandle( NULL, 0, &mod->BaseDllName, &native ) &&
+                LdrLoadDll( NULL, 0, &mod->BaseDllName, &native ))
+            {
+                ERR( "no native %s to serve COM slots\n", debugstr_w(mod->BaseDllName.Buffer) );
+                return FALSE;
+            }
+            RtlInitAnsiString( &name, "__wine_com_dispatch" );
+            if (LdrGetProcedureAddress( native, &name, 0, &proc ))
+            {
+                ERR( "native %s exports no __wine_com_dispatch\n",
+                     debugstr_w(mod->BaseDllName.Buffer) );
+                return FALSE;
+            }
+            for (n = 0; n < ARRAY_SIZE(cache); n++)
+                if (!cache[n].base)
+                {
+                    cache[n].base = mod->DllBase;
+                    cache[n].fn = (com_dispatch_func)proc;
+                    break;
+                }
+        }
+        hit->dispatch = (com_dispatch_func)proc;
+        hit->iface = i;
+        hit->slot = slot;
+        TRACE( "%s com trap -> iface %u slot %u\n",
+               debugstr_w(mod->BaseDllName.Buffer), i, slot );
+        return TRUE;
+    }
+    return FALSE;
+}
+
+/***********************************************************************
  *           find_guest_thunk_target
  *
  * Resolve a trapping guest address to the native function it stands for, or
- * to the override that stands in for it.
+ * to the override that stands in for it.  A hit in a COM stub array instead
+ * fills *com and returns NULL.
  */
-static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_override_func *override )
+static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_override_func *override,
+                                      struct com_thunk_hit *com )
 {
     LIST_ENTRY *mark, *entry;
     void *ret = NULL;
@@ -1397,11 +1519,13 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
         /* The stub rescues the guest's first argument before trapping, so the
          * trap is at a fixed offset inside the stub rather than at its start;
          * the module publishes that offset.  Requiring an exact hit keeps a
-         * stray trap from anywhere else in the image out of the dispatch. */
-        if (rip < base + info->stubs_rva + info->trap_off) goto done;
+         * stray trap from anywhere else in the image out of the dispatch.
+         * Anything that is not a flat stub site may still be a COM vtable
+         * stub site of the same module; see find_guest_com_target. */
+        if (rip < base + info->stubs_rva + info->trap_off) goto try_com;
         idx = (rip - (base + info->stubs_rva + info->trap_off)) / info->stride;
-        if (idx >= info->count) goto done;
-        if (base + info->stubs_rva + info->trap_off + (ULONG_PTR)idx * info->stride != rip) goto done;
+        if (idx >= info->count) goto try_com;
+        if (base + info->stubs_rva + info->trap_off + (ULONG_PTR)idx * info->stride != rip) goto try_com;
 
         names = (const UINT *)(base + info->names_rva);
         sigs  = (const UINT *)(base + info->sigs_rva);
@@ -1460,6 +1584,10 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
         }
 
         ret = proc;
+        goto done;
+
+    try_com:
+        if (com) find_guest_com_target( mod, rip, com );
         goto done;
     }
 done:
@@ -1564,15 +1692,34 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
 {
     AMD64_CONTEXT *ctx = *(AMD64_CONTEXT **)args;
     thunk_override_func override = NULL;
+    struct com_thunk_hit com = { 0 };
     NTSTATUS status = STATUS_SUCCESS;
     ULONG_PTR a[THUNK_MAX_ARGS] = { 0 };
     UINT sig = 0, argc;
     ULONG_PTR ret;
     void *proc;
 
-    proc = find_guest_thunk_target( ctx->Rip, &sig, &override );
+    proc = find_guest_thunk_target( ctx->Rip, &sig, &override, &com );
     argc = THUNK_SIG_ARGC(sig);
-    if (!proc && !override)
+    if (com.dispatch)
+    {
+        /* A COM vtable slot.  The module behind __wine_com_dispatch owns all
+         * marshalling and has written ctx->Rax; this side owns control flow:
+         * pop the return address the guest's CALL pushed. */
+        status = com.dispatch( com.iface, com.slot, ctx );
+        if (status)
+        {
+            ERR( "com dispatch iface %u slot %u failed, status %08x\n",
+                 com.iface, com.slot, (UINT)status );
+            status = STATUS_ILLEGAL_INSTRUCTION;
+        }
+        else
+        {
+            ctx->Rip = *(DWORD64 *)(ULONG_PTR)ctx->Rsp;
+            ctx->Rsp += 8;
+        }
+    }
+    else if (!proc && !override)
     {
         ERR( "unhandled guest trap at %p\n", (void *)(ULONG_PTR)ctx->Rip );
         status = STATUS_ILLEGAL_INSTRUCTION;

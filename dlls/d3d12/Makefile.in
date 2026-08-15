@@ -1,7 +1,10 @@
 MODULE    = d3d12.dll
+UNIXLIB   = d3d12.so
 IMPORTLIB = d3d12
-IMPORTS   = dxgi dxguid wined3d gdi32 user32 uuid win32u
-EXTRAINCL = $(VKD3D_PE_CFLAGS)
+UNIX_LIBS = $(PTHREAD_LIBS)
+EXTRAINCL = -I$(srcdir)/../../ppc64le/vkd3d/generated-headers -I$(srcdir)/../../ppc64le/vkd3d/src/include
 
 SOURCES = \
-	d3d12_main.c
+	d3d12.thunks \
+	main.c \
+	unix.c
