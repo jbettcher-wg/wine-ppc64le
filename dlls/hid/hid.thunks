@@ -1,0 +1,36 @@
+# AMD64 thunk export spec -- hid.dll.
+#
+# From the 2026-08-17 Skyrim Special Edition triage, and the same finding as
+# the 2026-08-15 one that added dxgi's and d3d11's: SkyrimSE.exe imports this
+# module, Wine provides it as a NATIVE ppc64 builtin, and the loader correctly
+# refuses to splice that into a guest call -- reported as c000007b, four times
+# over, before the process reaches a single graphics call.  Nothing here is
+# hand-written: the export list comes from this module's own .spec.
+DLL hid.dll
+FROM-SPEC auto
+
+# THE MODULE LOADED AND EXPORTED NOTHING.  Measured before this line existed:
+# 0 of 38 eligible exports emitted, all 38 refused as "no declaration found in
+# Wine headers", so the generated PE had an empty export table -- it loads, and
+# every import of it binds to a missing-import sentinel.  Same class of gap as
+# dbghelp's, same one-line fix, and the reason is the same: the HID surface is
+# declared in the DDK headers, which the global probe (wine_sig.PROBE_SRC) does
+# not include because nothing else needs them.  hidsdi.h carries the HidD_*
+# half (device attributes, feature and input reports, the strings a controller
+# reports itself by); hidpi.h carries the HidP_* half (the preparsed-data
+# parser -- caps, usages, value ranges), and hidsdi.h does not pull it in.
+#
+# With both, 38 of 38 are emitted and NOTHING is refused: every HidD_/HidP_
+# entry point Wine implements is integer/pointer-class in both ABIs.  The six
+# names the .spec marks `@ stub` are skipped rather than refused -- Wine has no
+# implementation to reach, so a guest that imports HidD_GetConfiguration,
+# HidD_GetMsGenreDescriptor, HidD_Hello, HidD_SetConfiguration,
+# HidP_GetExtendedAttributes or HidP_UsageListDifference still binds a named
+# sentinel and dies naming the symbol, which is the honest answer for an entry
+# point that does not exist on this side either.
+#
+# NO CALLBACKS ANYWHERE IN THIS SURFACE, which is why it is this clean: the HID
+# API hands data back through caller-supplied buffers and preparsed-data blobs,
+# never through a function pointer native code retains.
+PROBE-EXTRA   ddk/hidsdi.h
+PROBE-EXTRA   ddk/hidpi.h

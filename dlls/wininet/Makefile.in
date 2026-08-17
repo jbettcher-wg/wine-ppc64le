@@ -9,6 +9,7 @@ VER_FILEDESCRIPTION_STR = "Wine Internet Connectivity"
 VER_PRODUCTVERSION      = 8,00,7601,17601
 
 SOURCES = \
+	wininet.thunks \
 	cookie.c \
 	dialogs.c \
 	ftp.c \

@@ -9,3 +9,60 @@
 # module's own .spec.
 DLL vcruntime140.dll
 FROM-SPEC auto
+
+# ---------------------------------------------------------------------------
+# The 2026-08-17 DOOM triage: hosting MICROSOFT'S OWN vcruntime CLIENTS
+# ---------------------------------------------------------------------------
+# DOOM (2016) loads Razer's CChromaEditorLibrary.dll, which pulls in
+# Microsoft's real mfc140u.dll -- a NATIVE x86-64 PE, so a guest image, so
+# every one of its imports has to be served from this machine's thunk surface.
+# Six of the VCRUNTIME140 names it imports were refused here as "no declaration
+# found in Wine headers" and became ordinal HOLES; the guest loader bound
+# ntdll's sentinel to each, and mfc140u's DllMain called the first of them --
+# __vcrt_InitializeCriticalSectionEx -- straight into 0xDEAD0001.
+#
+# The gap was tooling, not ABI.  Wine implements all six; it just declares them
+# in private headers or in no header at all.  So:
+#
+#   * _purecall comes from dlls/msvcrt/msvcrt.h via PROBE-EXTRA, exactly the
+#     way ucrtbase.thunks already gets _lock/_unlock/_amsg_exit.  That is a
+#     real clang-checked declaration, not an assertion.
+#
+#   * the other four use the .spec location column, the documented downgrade
+#     for an export Wine declares in NO header.  A .spec pins the arity and the
+#     argument classes but carries no return type, so the <int|void> column
+#     below is an unchecked human assertion.  Each is justified against the
+#     implementation it forwards to, named here so the claim can be rechecked:
+#       _CxxThrowException            dlls/msvcrt/cppexcept.h:149 -- WINAPI,
+#                                     DECLSPEC_NORETURN, (void*, const
+#                                     cxx_exception_type*).  "void" for the
+#                                     same reason exit() is void in
+#                                     ucrtbase.thunks: it never returns to the
+#                                     dispatcher at all.
+#       __std_terminate               forwards to ucrtbase.terminate (see
+#                                     ucrtbase.spec:147), which is noreturn.
+#       __std_type_info_destroy_list  dlls/msvcrt/cpp.c:1071 --
+#                                     void CDECL (SLIST_HEADER *).
+#       __vcrt_InitializeCriticalSectionEx
+#                                     dlls/vcruntime140/misc.c:46 --
+#                                     BOOL CDECL (CRITICAL_SECTION*, DWORD,
+#                                     DWORD).  BOOL is int class.
+#
+# __CxxFrameHandler3 IS DELIBERATELY LEFT A HOLE, and must stay one.  It is not
+# an API the guest calls; it is the LANGUAGE PERSONALITY ROUTINE named by the
+# guest image's own .pdata/UNWIND_INFO, invoked BY the unwinder with that
+# image's exception and context records and expected to walk that image's
+# funclet tables and resume in its code.  Thunking it would send a guest's
+# unwind into the host's ppc64 __CxxFrameHandler, which has neither the guest's
+# frame layout nor any way to resume x86-64 execution -- a silent wrong answer
+# where the hole is a named, diagnosable sentinel.  Serving it needs a real
+# guest-side EH personality, not an export line.  Nothing on mfc140u's LOAD
+# path reaches it (measured: the module now initialises and its exports call),
+# and a guest that actually throws C++ across this boundary must fail loudly.
+INCLUDE-DIR   ../msvcrt
+PROBE-EXTRA   msvcrt.h        # _purecall
+
+_CxxThrowException                 0x00000B01  2  void  vcruntime140.spec:2
+__std_terminate                    0x00000B02  0  void  vcruntime140.spec:42
+__std_type_info_destroy_list       0x00000B03  1  void  vcruntime140.spec:44
+__vcrt_InitializeCriticalSectionEx 0x00000B04  3  int   vcruntime140.spec:55

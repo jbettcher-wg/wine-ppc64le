@@ -2188,6 +2188,43 @@ PROC WINAPI wglGetProcAddress( LPCSTR name )
 }
 
 /***********************************************************************
+ *		__wine_gl_entry_point (OPENGL32.@)
+ *
+ * The address of an extension entry point BY NAME, with no current context
+ * and no extension gating.  Not an OpenGL function and not exported by any
+ * opengl32 on any Windows machine: it exists for the ppc64le port's guest
+ * thunk dispatcher, and nothing else may call it.
+ *
+ * A guest x86-64 image binds its OpenGL calls to trap stubs in an AMD64 thunk
+ * module, and ntdll resolves a trapping stub by looking its name up in this
+ * module's export table (dlls/ntdll/signal_ppc64.c, find_guest_thunk_target).
+ * That works for the 361 names opengl32 exports and for nothing else -- and
+ * "everything else" is every entry point OpenGL has gained since 1.1, all of
+ * which live only in the table below.  So the dispatcher asks here instead.
+ *
+ * Deliberately NOT wglGetProcAddress: that answers for the CURRENT context,
+ * and the resolution this serves happens when a stub is first CALLED, which
+ * is not when it was fetched.  The standard sequence -- create a throwaway
+ * context, fetch wglCreateContextAttribsARB, destroy the context, then call
+ * what was fetched -- has no current context at exactly the moment the
+ * address is needed.  Whether the guest may HAVE a given entry point is
+ * decided where it is asked for, by wglGetProcAddress above, which does the
+ * version and extension checks; by the time a stub traps, that question has
+ * already been answered yes.
+ */
+PROC WINAPI __wine_gl_entry_point( LPCSTR name )
+{
+    const struct registry_entry *func;
+
+    if (!name || !(func = get_function_entry( name )))
+    {
+        WARN( "%s is not an entry point this module can vend\n", debugstr_a(name) );
+        return NULL;
+    }
+    return (PROC)func->func;
+}
+
+/***********************************************************************
  *		wglRealizeLayerPalette (OPENGL32.@)
  */
 BOOL WINAPI wglRealizeLayerPalette(HDC hdc,

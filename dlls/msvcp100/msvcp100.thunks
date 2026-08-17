@@ -1,0 +1,21 @@
+# AMD64 thunk export spec -- msvcp100.dll.
+#
+# From the 2026-08-17 corpus pass.  Styx: Master of Shadows imports 65 exports
+# of the VC++ 2010 C++ standard library STATICALLY, and it had no guest thunk,
+# so the loader refused the native ppc64 module (c000007b) and the whole image
+# failed to load (c0000135) before one guest instruction ran.
+#
+# Every one of the 46 eligible exports is refused, and honestly so: they are
+# MSVC-mangled C++ member functions (?_Lockit_ctor@_Lockit@std@@SAXH@Z and its
+# kind) that no Wine header declares as flat prototypes, because they are not
+# flat prototypes -- they are a C++ ABI.  This file therefore emits a PE with
+# no exports.  That is still the fix it is for: the module LOADS, StyxGame.exe
+# gets past loader_init, and each of the 68 binds a named sentinel that faults
+# by name if reached, instead of the image never starting.
+#
+# The real answer for a C++ runtime on this port is the one msvcp140 already
+# takes for MFC: run MICROSOFT'S OWN msvcp100.dll as an x86-64 guest module
+# under the emulator rather than translating the MSVC C++ ABI.  See the
+# handoff in ppc64le/corpus/CATALOG.md.
+DLL msvcp100.dll
+FROM-SPEC auto

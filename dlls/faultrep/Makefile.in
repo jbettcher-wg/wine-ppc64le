@@ -5,4 +5,5 @@ IMPORTS   = advapi32
 EXTRADLLFLAGS = -Wb,--prefer-native
 
 SOURCES = \
+	faultrep.thunks \
 	faultrep.c

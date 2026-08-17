@@ -1,0 +1,39 @@
+# AMD64 thunk export spec -- wldap32.dll.
+#
+# From the 2026-08-17 corpus pass.  Boltgun imports this module STATICALLY and
+# it had no guest thunk, so the loader refused the native ppc64 module
+# (c000007b) and the whole image failed to load (c0000135).
+#
+# Boltgun imports it BY ORDINAL AND ONLY BY ORDINAL -- sixteen numbers, no
+# names, which is exactly the class of request the ordinal work of 2026-08-17
+# made answerable at all.  Measured, with the names Wine's own wldap32.spec
+# gives those numbers:
+#
+#   143 ldap_init          46 ldap_unbind_s       211 ldap_set_option
+#    60 ldap_simple_bind_s 50 ldap_search_s        41 ldap_msgfree
+#    22 ldap_err2string   200 ldap_memfree         26 ldap_first_entry
+#    27 ldap_next_entry    32 ldap_first_attribute 33 ldap_next_attribute
+#    35 ldap_get_values_len 79 ldap_value_free_len 30 ldap_get_dn
+#   301 ber_free
+DLL wldap32.dll
+FROM-SPEC auto
+
+# winldap.h is not in the oracle's default translation unit; without it every
+# one of the 244 eligible exports was refused.  With it, 169 are emitted.
+#
+# The 75 still refused -- including ten of Boltgun's sixteen -- are NOT a
+# shape this generator cannot describe.  They are the ANSI/Unicode pairs:
+# winldap.h declares ldap_initA (line 535) and ldap_initW (536) and never the
+# undecorated name, which it instead #defines through Wine's own A/W macro
+# (`#define ldap_memfree WINELIB_NAME_AW(ldap_memfree)` and its ~120 siblings).
+# The oracle looks up the export name the .spec publishes -- ldap_init -- and
+# finds no declaration under it.  The same macro-rename hides all 27 exports
+# of psapi.dll (see dlls/psapi/psapi.thunks), by a different macro and for a
+# different reason, which is what makes it a class rather than a quirk: the
+# oracle resolves an export NAME, and a header is entitled to declare that
+# name's implementation under another one.  It is a gap in the signature
+# oracle, not in this module, and ppc64le/corpus/CATALOG.md records it as
+# such rather than papering over it here.  Each of the ten keeps its ordinal
+# as a named sentinel, so a guest that CALLS one faults by name; Boltgun
+# imports them and, so far, calls none.
+PROBE-EXTRA   winldap.h

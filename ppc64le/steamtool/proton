@@ -1,0 +1,470 @@
+#!/bin/sh
+# wine-ppc64le-native -- Steam Play compatibility tool for the native ppc64le
+# Wine port.  Steam invokes it with the Proton protocol:
+#
+#     <tool>/proton <verb> <exe> [args...]
+#
+# Escaping the emulator
+# ---------------------
+# The Steam client here is the x86-64 Linux build running under FEX, so this
+# script starts life inside the emulator: the shebang is resolved against the
+# FEX RootFS and the shell running these lines is a guest x86-64 /bin/sh.
+# That is fine -- the shell work is trivial.  The one thing that matters is the
+# final exec of an absolute /home/... path to a native ppc64le Wine binary:
+#
+#   * binfmt_misc claims only x86-64 and i386 ELF images.  The FEX-x86_64 and
+#     FEX-x86 magic/mask pin e_machine to 0x3e and 0x03 respectively, so a
+#     ppc64le image (0x15) is never handed to the interpreter.
+#   * The FEX RootFS has no /home (it was renamed to home.quarantined-...),
+#     so nothing under /home is shadowed by the x86-64 sysroot.
+#
+# The kernel therefore runs the image directly on the host and the emulator is
+# left behind.  From then on the only emulated code is the game's own guest PE,
+# executed inside Wine by FexBridge (WINEFEXBRIDGE below).
+#
+# Everything is written to a per-run log under $STEAM_COMPAT_DATA_PATH.
+
+set -u
+
+verb=${1:-run}
+[ $# -gt 0 ] && shift
+
+# ---------------------------------------------------------------- locations --
+
+self=$0
+case $self in */*) ;; *) self=./$self ;; esac
+selfdir=$(cd "$(dirname "$self")" && pwd -P)   # resolves the compatibilitytools.d symlink
+
+# The tool lives at <wine-tree>/ppc64le/steamtool, so the tree is two up.
+tree=${WINE_PPC64LE_TREE:-}
+if [ -z "$tree" ] && [ -x "$selfdir/../../wine" ]; then
+    tree=$(cd "$selfdir/../.." && pwd -P)
+fi
+: "${tree:=$HOME/Projects/power8/wine-ppc64le}"
+
+wine=$tree/wine
+wineserver=$tree/server/wineserver
+
+# fastppcx86 bridge: the embedded emulator Wine dlopens when it meets a guest
+# PE.  The binfmt-registered FEX's own build dir comes first: that bridge is
+# rebuilt whenever the registered emulator is, so the inner and outer FEX stay
+# the same code.  The interpreter line in binfmt_misc names the build dir.
+bridge=
+reg_fex=$(sed -n 's/^interpreter //p' /proc/sys/fs/binfmt_misc/FEX-x86_64 2>/dev/null)
+reg_bridge=${reg_fex:+${reg_fex%/Bin/FEX}/Source/Tools/FexBridge/libfexbridge.so}
+for cand in \
+    ${WINE_PPC64LE_FEXBRIDGE:-} \
+    ${reg_bridge:-} \
+    "$tree/../fex-ppc64le/build/Source/Tools/FexBridge/libfexbridge.so" \
+    "$HOME/Projects/power8/fex-ppc64le/build/Source/Tools/FexBridge/libfexbridge.so"
+do
+    if [ -n "$cand" ] && [ -r "$cand" ]; then bridge=$cand; break; fi
+done
+
+# ------------------------------------------------------------------ logging --
+
+compat=${STEAM_COMPAT_DATA_PATH:-}
+if [ -z "$compat" ]; then
+    # Not launched by Steam; keep the same shape so the tool is testable.
+    compat=${TMPDIR:-/tmp}/wine-ppc64le-native-$$
+fi
+mkdir -p "$compat" 2>/dev/null
+
+log=$compat/wine-ppc64le-native-$(date +%Y%m%d-%H%M%S)-$$.log
+echo "wine-ppc64le-native: log -> $log" >&2
+
+exec 3>&1                  # Steam's stdout, for the path-translation verbs
+exec >>"$log" 2>&1
+
+say() { echo "[wine-ppc64le-native] $*"; }
+
+say "verb=$verb"
+say "argv=$*"
+say "cwd=$(pwd)"
+say "tree=$tree"
+say "wine=$wine"
+say "bridge=${bridge:-<none found>}"
+say "compat=$compat"
+
+echo
+echo "===== environment as received from Steam ====="
+env | sort
+echo "============================================="
+echo
+
+if [ ! -x "$wine" ]; then
+    say "FATAL: no native wine at $wine"
+    exit 1
+fi
+
+# -------------------------------------------------------------- sanitisation --
+#
+# Steam hands us the x86-64 client's environment.  Anything in it that names a
+# path, a shared object or an emulator knob belongs to the guest world and is
+# actively harmful on the native side -- an x86-64 LD_PRELOAD alone produces a
+# stream of "wrong ELF class" errors from the host ld.so on every process the
+# port starts.  Names that only carry data (SteamAppId, DISPLAY, XDG_*, audio,
+# D-Bus, locale, PROTON_*/DXVK_*/VKD3D_* tunables) are kept untouched.
+
+strip=0
+for name in $(env | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p'); do
+    case $name in
+    # x86-64 dynamic linker: library search paths, preloads, tunables.
+    LD_LIBRARY_PATH|LD_PRELOAD|LD_AUDIT|LD_DEBUG|LD_DEBUG_OUTPUT|\
+    LD_ASSUME_KERNEL|GLIBC_TUNABLES|GCONV_PATH|LOCPATH|\
+    SYSTEM_LD_LIBRARY_PATH|SYSTEM_PATH)                            ;;
+    # Steam runtime / pressure-vessel container plumbing.
+    STEAM_RUNTIME*|STEAM_ZENITY|STEAM_LINUX_RUNTIME*|\
+    PRESSURE_VESSEL_*|PV_*|SRT_*|CONTAINER_*|FLATPAK_*)            ;;
+    # Graphics and media loaders pointed at x86-64 ICDs, layers and drivers.
+    VK_ICD_FILENAMES|VK_DRIVER_FILES|VK_ADD_DRIVER_FILES|\
+    VK_LAYER_PATH|VK_ADD_LAYER_PATH|VK_INSTANCE_LAYERS|\
+    LIBGL_DRIVERS_PATH|LIBVA_DRIVERS_PATH|GBM_BACKENDS_PATH|\
+    __EGL_VENDOR_LIBRARY_DIRS|__EGL_VENDOR_LIBRARY_FILENAMES|\
+    OCL_ICD_FILENAMES|SDL_DYNAMIC_API|GST_PLUGIN_*|GTK_PATH|\
+    GIO_MODULE_DIR|GDK_PIXBUF_MODULE_FILE|PYTHONPATH|PYTHONHOME|PERL5LIB) ;;
+    # Outer emulator knobs.  The bridge inside Wine is FEX too, and it must
+    # start from its own defaults rather than whatever the launcher script set
+    # for the Steam client.  WINE_PPC64LE_KEEP_FEX_ENV=1 keeps them.
+    FEX_*)
+        [ "${WINE_PPC64LE_KEEP_FEX_ENV:-0}" = 1 ] && continue          ;;
+    # Wine loader state belonging to some other Wine (Proton's, usually).
+    WINEPREFIX|WINESERVER|WINELOADER|WINEDLLPATH|WINEARCH|\
+    WINEFEXBRIDGE|WINEESYNC|WINEFSYNC)                             ;;
+    *)  continue ;;
+    esac
+    unset "$name" 2>/dev/null && { say "strip $name"; strip=$((strip + 1)); }
+done
+say "stripped $strip variable(s)"
+
+# The inherited PATH leads into the Steam runtime's x86-64 bin directories.
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+say "PATH reset to $PATH"
+
+# ------------------------------------------------------------------- prefix --
+
+# Proton-style location.  If something else already made a prefix here -- the
+# user's Proton runs share $STEAM_COMPAT_DATA_PATH per app -- do not touch it:
+# a Proton prefix is full of Proton's own builtin DLLs and overrides.
+prefix=$compat/pfx
+if [ ! -e "$prefix/.wine-ppc64le-native" ] && \
+   { [ -e "$prefix/system.reg" ] || [ -e "$prefix/drive_c" ]; }; then
+    prefix=$compat/pfx-ppc64le-native
+    say "existing foreign prefix at $compat/pfx left alone; using $prefix"
+fi
+
+WINEPREFIX=$prefix
+export WINEPREFIX
+[ -n "$bridge" ] && { WINEFEXBRIDGE=$bridge; export WINEFEXBRIDGE; }
+say "WINEPREFIX=$WINEPREFIX"
+say "WINEFEXBRIDGE=${WINEFEXBRIDGE:-<unset>}"
+
+echo
+echo "===== environment handed to the native wine ====="
+env | sort
+echo "================================================"
+echo
+
+if [ "$verb" = destroyprefix ]; then
+    if [ -e "$prefix/.wine-ppc64le-native" ]; then
+        say "destroying $prefix"
+        rm -rf "$prefix"
+    else
+        say "refusing to destroy $prefix: not created by this tool"
+    fi
+    exit 0
+fi
+
+if [ ! -e "$prefix/.wine-ppc64le-native" ]; then
+    say "first run: wineboot --init in $prefix"
+    mkdir -p "$prefix"
+    if "$wine" wineboot --init; then
+        "$wineserver" -w
+        : > "$prefix/.wine-ppc64le-native"
+        say "prefix initialised"
+    else
+        say "FATAL: wineboot failed (rc=$?)"
+        exit 1
+    fi
+fi
+
+# -------------------------------------------------- Microsoft's MFC runtime --
+#
+# Some games load a plugin built against Microsoft's MFC redistributable.
+# DOOM (2016) is one: it LoadLibrary's Razer's CChromaEditorLibrary.dll, which
+# imports mfc140u.dll, and -- this is the part that matters -- it then calls
+# the function pointers it fetched from that plugin WITHOUT CHECKING whether
+# the load succeeded.  Its own loader null-checks each GetProcAddress and
+# returns -1; the caller discards the -1 and calls anyway.  So a prefix with no
+# MFC is a NULL call into 0x0 at engine init.
+#
+# That is not a defect of this port.  It is what Windows does too: mfc140u.dll
+# ships in the VC++ 2015+ redistributable, and on a machine without it
+# LoadLibrary fails and DOOM dies exactly the same way.  Nothing here can or
+# should synthesise MFC.
+#
+# What this port CAN fix is an accident of its own making.  The tool declines
+# to touch a foreign Proton prefix (see above) and makes its own beside it, so
+# a user who already provisioned $compat/pfx -- with protontricks, winetricks
+# vcrun2015, or the redistributable's own installer -- finds our prefix empty
+# of the runtime they installed for this very game.  Their files, their two
+# prefixes for their one app, on the one disk: copy them across.  Nothing is
+# downloaded, nothing is redistributed, and the foreign prefix is only READ.
+#
+# Idempotent and checked every run, not only at prefix creation: a prefix made
+# before this existed must pick the runtime up too.
+#
+# system32 rather than the guest system directory C:\windows\sysx8664: the
+# guest branch of find_dll_file() searches the machine's own system dir first,
+# then builtins, then the ordinary load path -- and system32 is on that load
+# path.  Measured: a guest LoadLibraryA("mfc140u.dll") resolves it there.
+# sysx8664 exists in no prefix this tool has ever made, so putting the first
+# file in the tree into it would be a new mechanism to no purpose.
+sys32=$prefix/drive_c/windows/system32
+foreign=$compat/pfx/drive_c/windows/system32
+mfc_have=0 mfc_missing=
+
+for dll in mfc140u.dll mfc140.dll; do
+    if [ -f "$sys32/$dll" ]; then
+        mfc_have=$((mfc_have + 1))
+        continue
+    fi
+    if [ -f "$foreign/$dll" ]; then
+        if cp -f "$foreign/$dll" "$sys32/.$dll.tmp" 2>/dev/null &&
+           mv -f "$sys32/.$dll.tmp" "$sys32/$dll" 2>/dev/null; then
+            say "provisioned $dll from the app's Proton prefix ($foreign)"
+            mfc_have=$((mfc_have + 1))
+        else
+            rm -f "$sys32/.$dll.tmp" 2>/dev/null
+            say "could not copy $dll from $foreign into $sys32"
+            mfc_missing="$mfc_missing $dll"
+        fi
+    else
+        mfc_missing="$mfc_missing $dll"
+    fi
+done
+
+if [ "$mfc_have" = 0 ]; then
+    say "no MFC runtime in $sys32 and none to copy from $foreign;$mfc_missing"
+    say "  a game whose plugin needs it (DOOM 2016 -> CChromaEditorLibrary.dll)"
+    say "  will fail that LoadLibrary and may then call a NULL pointer, exactly"
+    say "  as it would on Windows without the VC++ redistributable.  To fix it,"
+    say "  install the redistributable into a prefix for this app --"
+    say "  'protontricks ${SteamAppId:-<appid>} vcrun2015' or 'winetricks vcrun2015' with"
+    say "  WINEPREFIX=$prefix -- and run again.  Nothing is downloaded here."
+fi
+
+# ------------------------------------------------------------ Steam bridge --
+#
+# A Windows game reaches Steam through steam_api64.dll, which reads
+# HKCU\Software\Valve\Steam\ActiveProcess to find a steamclient DLL and then
+# talks to the client through it.  On this port that DLL is the tree's own
+# guest steamclient64.dll (dlls/steamclient64), and the real Steam client
+# library lives in a separate x86-64 Linux helper process -- see
+# ppc64le/steamapi/.  Two things therefore have to happen before the game
+# starts, and both belong here rather than in wine.inf:
+#
+#   * THE HELPER HAS TO BE RUNNING, and something has to tell the game which
+#     port it is on.  Only a launcher can do that.  It is also why the run
+#     verbs below no longer exec: this script now owns a child process, so it
+#     has to outlive the game in order to stop it again.  A stale helper would
+#     hold a Steam connection open after the game is gone.
+#
+#   * THE REGISTRY VALUES HAVE TO EXIST.  They are Steam-specific state about
+#     a Steam launch, so they are written per launch by the thing that knows a
+#     Steam launch is happening, rather than baked into every prefix wineboot
+#     ever creates.  The pid value is NOT written here: it has to name a live
+#     process in this prefix, and the process that owns the Steam connection
+#     is the game itself -- so steamclient64.dll writes it from its own
+#     DllMain, which is Proton's steam_helper trick minus the helper .exe.
+#
+# SteamClientDll64 is a BARE NAME, not the absolute path Windows would have.
+# The port's guest loader refuses a path outright (load_guest_library in
+# dlls/ntdll/signal_ppc64.c: "a guest namespace has no files, so a path means
+# nothing") and resolves a bare name through the AMD64 search order, which
+# finds the builtin.  If that refusal is ever relaxed this can become a path.
+#
+# WINE_PPC64LE_NO_STEAM_BRIDGE=1 turns the whole thing off, which is the
+# supported way to see what a run looks like without it.
+
+helper_pid=
+bridge_stop() {
+    if [ -n "$helper_pid" ]; then
+        say "stopping the steam bridge helper (pid $helper_pid)"
+        kill "$helper_pid" 2>/dev/null
+        wait "$helper_pid" 2>/dev/null
+        helper_pid=
+    fi
+}
+trap 'bridge_stop' EXIT INT TERM
+
+bridge_start() {
+    helper=$tree/ppc64le/steamapi/helper/steamhelper
+    if [ ! -x "$helper" ]; then
+        say "building the steam bridge helper"
+        if ! "$tree/ppc64le/steamapi/helper/build-helper.sh"; then
+            say "helper build FAILED; the game will see no Steam client"
+            return 1
+        fi
+    fi
+
+    helper_log=$compat/steamhelper-$$.log
+    # --exit-when-idle belts the EXIT trap above.  A trap does not run when
+    # THIS script is killed with SIGKILL, which is how a stuck run gets cleaned
+    # up, and a helper leaked that way sits holding a port and a connection to
+    # the user's Steam client indefinitely (measured: one found still running
+    # hours later).  The helper also arms PR_SET_PDEATHSIG for the same reason;
+    # this covers the other order, where the script exits without the trap
+    # firing but the helper's game has already gone.  One launch is one client
+    # connection, so "idle" here means "the game is gone".
+    "$helper" --serve --port 0 --exit-when-idle >"$helper_log" 2>&1 &
+    helper_pid=$!
+
+    n=0
+    while [ $n -lt 100 ]; do
+        port=$(sed -n 's/.*listening on 127\.0\.0\.1:\([0-9][0-9]*\).*/\1/p' \
+                   "$helper_log" 2>/dev/null | head -1)
+        [ -n "$port" ] && break
+        kill -0 "$helper_pid" 2>/dev/null || { helper_pid=; break; }
+        n=$((n + 1))
+        sleep 0.1
+    done
+    if [ -z "${port:-}" ]; then
+        say "the steam bridge helper did not come up; see $helper_log"
+        bridge_stop
+        return 1
+    fi
+
+    STEAM_BRIDGE_ADDR=127.0.0.1:$port
+    export STEAM_BRIDGE_ADDR
+    say "steam bridge helper on $STEAM_BRIDGE_ADDR (pid $helper_pid, log $helper_log)"
+
+    "$wine" reg add 'HKCU\Software\Valve\Steam\ActiveProcess' /v SteamClientDll64 \
+        /t REG_SZ /d 'steamclient64.dll' /f >/dev/null 2>&1
+    "$wine" reg add 'HKCU\Software\Valve\Steam\ActiveProcess' /v Universe \
+        /t REG_SZ /d 'Public' /f >/dev/null 2>&1
+    "$wine" reg add 'HKCU\Software\Valve\Steam' /v SteamPath \
+        /t REG_SZ /d 'C:\Program Files (x86)\Steam' /f >/dev/null 2>&1
+    say "wrote ActiveProcess\\SteamClientDll64=steamclient64.dll"
+    # steam_api reads ActiveProcess\PID and checks it names a LIVE process
+    # before it will load any client DLL at all -- Proton's steam.exe helper
+    # writes its own pid.  There is no helper exe here, so name the prefix's
+    # services.exe, which outlives every run in this session; steam_api only
+    # liveness-checks it, and every pipe call after the load goes through our
+    # steamclient64 rather than anything keyed to that pid.
+    svcpid=$("$wine" winedbg --command "info proc" 2>/dev/null | \
+             awk '/services.exe/ { gsub(/^[ =]+/, "", $0); print $1; exit }')
+    if [ -n "$svcpid" ]; then
+        "$wine" reg add 'HKCU\Software\Valve\Steam\ActiveProcess' /v PID \
+            /t REG_DWORD /d $((0x$svcpid)) /f >/dev/null 2>&1
+        say "wrote ActiveProcess\\PID=0x$svcpid (services.exe)"
+    else
+        say "WARNING: no services.exe pid found; steam_api will say Steam is not running"
+    fi
+    # Deliberately NOT written: SteamClientDll (the 32-bit name).  There is no
+    # 32-bit guest steamclient here, and naming a DLL that does not exist would
+    # move a 32-bit game's failure from "no value" to "load failed" without
+    # making it work.
+    return 0
+}
+
+case $verb in
+run|runinprefix|waitforexitandrun)
+    if [ "${WINE_PPC64LE_NO_STEAM_BRIDGE:-0}" = 1 ]; then
+        say "steam bridge disabled by WINE_PPC64LE_NO_STEAM_BRIDGE"
+    else
+        bridge_start || say "continuing without a steam bridge"
+    fi
+    # Per-game settings, protonfixes-style: <tool>/appconfig/<appid>.env is
+    # applied if present, one NAME=VALUE per line, comments allowed.  A value
+    # the caller already set (a Steam launch option) is kept, so the file is
+    # a default rather than an override.
+    appcfg=$selfdir/appconfig/${SteamAppId:-none}.env
+    if [ -f "$appcfg" ]; then
+        say "applying $appcfg"
+        while IFS= read -r line; do
+            case $line in ''|\#*) continue ;; esac
+            name=${line%%=*}
+            if eval "[ -z \"\${$name:-}\" ]"; then
+                export "$line"
+                say "  $line"
+            else
+                say "  keeping caller's $name"
+            fi
+        done < "$appcfg"
+    fi
+    # Some games ship more than one binary and Steam's launch config picks the
+    # wrong one for this port -- DOOM (2016) defaults to the OpenGL DOOMx64.exe
+    # where only the Vulkan DOOMx64vk.exe is served.  WINE_PPC64LE_RUN_EXE in a
+    # game's launch options names a replacement: a bare name resolves beside
+    # the exe Steam asked for, an absolute path is taken as-is.  Explicit,
+    # logged, and refused loudly when the file is not there -- silently
+    # launching the original would report the wrong binary's failure.
+    if [ -n "${WINE_PPC64LE_RUN_EXE:-}" ] && [ $# -ge 1 ]; then
+        case $WINE_PPC64LE_RUN_EXE in
+        */*) swap=$WINE_PPC64LE_RUN_EXE ;;
+        *)   swap=$(dirname "$1")/$WINE_PPC64LE_RUN_EXE ;;
+        esac
+        if [ -f "$swap" ]; then
+            say "WINE_PPC64LE_RUN_EXE: $1 -> $swap"
+            shift
+            set -- "$swap" "$@"
+        else
+            say "FATAL: WINE_PPC64LE_RUN_EXE names $swap, which does not exist"
+            exit 1
+        fi
+    fi
+    # A crashing guest raises winedbg's GUI on the user's desktop, and Steam
+    # runs background probes (d3ddriverquery64.exe) under this tool whose
+    # crashes must not pop dialogs -- Proton suppresses its debugger for the
+    # same reason.  Overriding winedbg.exe out makes start_debugger's
+    # CreateProcess fail, so the unhandled-exception filter falls through to
+    # terminating the process, which is what a background probe's crash
+    # should be.  The user's own WINEDLLOVERRIDES entries are kept.
+    # WINE_PPC64LE_WINEDBG=1 restores the debugger.
+    if [ "${WINE_PPC64LE_WINEDBG:-0}" != 1 ]; then
+        WINEDLLOVERRIDES="winedbg.exe=d${WINEDLLOVERRIDES:+;$WINEDLLOVERRIDES}"
+        export WINEDLLOVERRIDES
+        say "winedbg suppressed (WINEDLLOVERRIDES=$WINEDLLOVERRIDES)"
+    fi
+    ;;
+esac
+
+# --------------------------------------------------------------------- run --
+
+case $verb in
+getcompatpath)
+    # unix path -> windows path, on Steam's stdout
+    "$wine" winepath -w "$@" >&3
+    exit $?
+    ;;
+getnativepath)
+    # windows path -> unix path, on Steam's stdout
+    "$wine" winepath -u "$@" >&3
+    exit $?
+    ;;
+run|runinprefix)
+    # No longer an exec: this script owns the bridge helper and has to be here
+    # to stop it when the game is gone.  The EXIT trap does that.
+    say "run $wine $*"
+    "$wine" "$@"
+    rc=$?
+    say "game exited rc=$rc"
+    exit $rc
+    ;;
+waitforexitandrun)
+    say "run $wine $*"
+    "$wine" "$@"
+    rc=$?
+    say "game exited rc=$rc; waiting for wineserver"
+    "$wineserver" -w
+    say "wineserver gone"
+    exit $rc
+    ;;
+*)
+    say "unknown verb '$verb'; treating as run"
+    "$wine" "$@"
+    exit $?
+    ;;
+esac

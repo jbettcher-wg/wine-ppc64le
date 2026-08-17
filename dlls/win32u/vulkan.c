@@ -1818,6 +1818,101 @@ static BOOL extents_equals( const VkExtent2D *extents, const RECT *rect )
     return extents->width == rect->right - rect->left && extents->height == rect->bottom - rect->top;
 }
 
+/* The end of a present-mode fallback list; no VkPresentModeKHR has this value. */
+#define PRESENT_MODE_END ((VkPresentModeKHR)~0u)
+
+/* The present modes to fall back through when the host WSI will not give the
+ * application the number of swapchain images it asked for, most faithful to the
+ * requested one first.  Every entry is still checked against what the surface
+ * actually reports before it is used. */
+static const VkPresentModeKHR present_mode_fallbacks[][4] =
+{
+    [VK_PRESENT_MODE_IMMEDIATE_KHR]    = { VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_RELAXED_KHR,
+                                           VK_PRESENT_MODE_FIFO_KHR, PRESENT_MODE_END },
+    [VK_PRESENT_MODE_MAILBOX_KHR]      = { VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_FIFO_RELAXED_KHR,
+                                           VK_PRESENT_MODE_FIFO_KHR, PRESENT_MODE_END },
+    [VK_PRESENT_MODE_FIFO_KHR]         = { PRESENT_MODE_END },
+    [VK_PRESENT_MODE_FIFO_RELAXED_KHR] = { VK_PRESENT_MODE_FIFO_KHR, PRESENT_MODE_END },
+};
+
+/* Create the host swapchain, and make sure it has the number of images the
+ * application asked for.
+ *
+ * On Windows a swapchain created with minImageCount = N has exactly N images.
+ * The spec calls the field a minimum and a host WSI may lawfully give more, but
+ * no Windows ICD does, so Windows renderers are written to N: several size a
+ * fixed array from it and index that array by the acquired image index.  Mesa's
+ * Wayland WSI raises a VK_PRESENT_MODE_MAILBOX_KHR swapchain to four images
+ * whatever was asked, because its mailbox queue needs four, and its X11 WSI does
+ * the same for MAILBOX and IMMEDIATE whenever it has to wait on fences.  The
+ * caller is told VK_SUCCESS and there is nothing in the result to tell it that
+ * anything happened.  Measured on this machine, asking for two through
+ * VK_PRESENT_MODE_MAILBOX_KHR: two on Windows, four here.
+ *
+ * Normalising that is the same job adjust_surface_capabilities() already does
+ * for maxImageCount == 0 and for the surface extents -- make a Windows program
+ * see Windows numbers.  Where the count and the present mode cannot both be
+ * had, the IMAGE COUNT wins: it is a hard resource contract the caller builds
+ * its frame graph around, whereas the present mode is a latency preference, and
+ * every mode tried here is one the surface itself reports as supported.  Mesa
+ * makes exactly this trade in the other direction under its
+ * vk_x11_strict_image_count option, which its own drirc turns on by executable
+ * name for DOOM (2016), Rainbow Six Siege, Rainbow Six Extraction and gfxbench
+ * -- per driver, per platform and per title.  Doing it here costs one
+ * create/destroy pair in the case that needs it, and covers every caller on
+ * every host WSI.
+ */
+static VkResult create_host_swapchain( struct vulkan_device *device, struct surface *surface,
+                                       VkSwapchainCreateInfoKHR *create_info_host, UINT32 wanted,
+                                       VkSwapchainKHR *host_swapchain )
+{
+    struct vulkan_physical_device *physical_device = device->physical_device;
+    struct vulkan_instance *instance = physical_device->instance;
+    VkPresentModeKHR modes_buffer[8];
+    UINT32 mode_count = ARRAY_SIZE(modes_buffer), image_count = 0, next = 0, i;
+    const VkPresentModeKHR *fallbacks;
+    VkResult res;
+
+    if (instance->p_vkGetPhysicalDeviceSurfacePresentModesKHR( physical_device->host.physical_device,
+                                                               surface->obj.host.surface, &mode_count,
+                                                               modes_buffer ))
+        mode_count = 0;
+
+    fallbacks = create_info_host->presentMode < ARRAY_SIZE(present_mode_fallbacks) ?
+                present_mode_fallbacks[create_info_host->presentMode] : NULL;
+
+    for (;;)
+    {
+        if ((res = device->p_vkCreateSwapchainKHR( device->host.device, create_info_host, NULL, host_swapchain )))
+            return res;
+
+        image_count = 0;
+        if (device->p_vkGetSwapchainImagesKHR( device->host.device, *host_swapchain, &image_count, NULL ))
+            return VK_SUCCESS;   /* the host will not say; keep what it made */
+        if (image_count <= wanted) return VK_SUCCESS;
+
+        /* more images than were asked for: walk to the next fallback mode this
+         * surface actually supports */
+        while (fallbacks && fallbacks[next] != PRESENT_MODE_END)
+        {
+            for (i = 0; i < mode_count; i++) if (modes_buffer[i] == fallbacks[next]) break;
+            if (i < mode_count) break;
+            next++;
+        }
+        if (!fallbacks || fallbacks[next] == PRESENT_MODE_END) break;
+
+        WARN( "present mode %u gave %u images for a request of %u, retrying with mode %u\n",
+              create_info_host->presentMode, image_count, wanted, fallbacks[next] );
+        device->p_vkDestroySwapchainKHR( device->host.device, *host_swapchain, NULL );
+        create_info_host->presentMode = fallbacks[next++];
+        /* the caller's oldSwapchain was consumed by the attempt just destroyed */
+        create_info_host->oldSwapchain = VK_NULL_HANDLE;
+    }
+
+    WARN( "no supported present mode gives %u swapchain images; this one has %u\n", wanted, image_count );
+    return VK_SUCCESS;
+}
+
 static VkResult win32u_vkCreateSwapchainKHR( VkDevice client_device, const VkSwapchainCreateInfoKHR *create_info,
                                              const VkAllocationCallbacks *allocator, VkSwapchainKHR *ret )
 {
@@ -1866,7 +1961,8 @@ static VkResult win32u_vkCreateSwapchainKHR( VkDevice client_device, const VkSwa
 
     if (!(swapchain = calloc( 1, sizeof(*swapchain) ))) return VK_ERROR_OUT_OF_HOST_MEMORY;
 
-    if ((res = device->p_vkCreateSwapchainKHR( device->host.device, &create_info_host, NULL, &host_swapchain )))
+    if ((res = create_host_swapchain( device, surface, &create_info_host, create_info->minImageCount,
+                                      &host_swapchain )))
     {
         free( swapchain );
         return res;

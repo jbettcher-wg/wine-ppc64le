@@ -1,0 +1,30 @@
+# AMD64 thunk export spec for the guest mfreadwrite.dll -- COM mode.
+#
+# COM-JSON is ppc64le/mf/interfaces_mf.json, the SAME file
+# dlls/mfplat/mfplat.thunks and dlls/mf/mf.thunks name: all three guest
+# modules publish an identical roster, so one winecom instance in native
+# mfplat.dll serves proxies whose vtables came from any of them.  The native
+# namesake here exports no dispatcher of its own -- mfreadwrite.spec forwards
+# __wine_com_dispatch to mfplat's, because there can only be one instance
+# (libs/winecom state is per-linkee).
+#
+# See dlls/mfplat/mfplat.thunks for the surface's banner, and
+# dlls/mfreadwrite/mfcom.c for why the SYNCHRONOUS IMFSourceReader is the
+# path that matters and the async construction of the same object is refused.
+DLL mfreadwrite.dll
+FROM-SPEC auto
+
+PROBE-EXTRA mfapi.h
+PROBE-EXTRA mfidl.h
+PROBE-EXTRA mfreadwrite.h
+PROBE-EXTRA mftransform.h
+PROBE-EXTRA mferror.h
+
+COM-JSON  ../../ppc64le/mf/interfaces_mf.json
+
+GUEST-IMPL   DllGetClassObject                     __wine_guest_DllGetClassObject
+GUEST-IMPL   MFCreateSourceReaderFromURL           __wine_guest_MFCreateSourceReaderFromURL
+GUEST-IMPL   MFCreateSourceReaderFromByteStream    __wine_guest_MFCreateSourceReaderFromByteStream
+GUEST-IMPL   MFCreateSourceReaderFromMediaSource   __wine_guest_MFCreateSourceReaderFromMediaSource
+GUEST-IMPL   MFCreateSinkWriterFromURL             __wine_guest_MFCreateSinkWriterFromURL
+GUEST-IMPL   MFCreateSinkWriterFromMediaSink       __wine_guest_MFCreateSinkWriterFromMediaSink

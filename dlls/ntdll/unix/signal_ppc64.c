@@ -1067,8 +1067,40 @@ NTSTATUS call_emu_trap_dispatcher( void *func, void *ctx )
     ULONG ret_len;
     ULONG_PTR sp;
 
-    if (!func) return STATUS_INVALID_PARAMETER;
-    if ((char *)get_kernel_stack( data ) + min_kernel_stack > (char *)&frame) return STATUS_STACK_OVERFLOW;
+    if (!func)
+    {
+        ERR( "no PE-side trap dispatcher registered for this run\n" );
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    /* THE KERNEL STACK, AND WHY THIS REFUSAL MUST NAME ITSELF.
+     *
+     * Every crossing in either direction spends kernel stack.  A guest thunk
+     * call pushes a syscall frame here; a native->guest REVERSE call pushes
+     * another through unix_emu_run_entry; and the emulator's JIT runs on this
+     * stack too.  Before reverse proxies the nest was bounded at one level --
+     * guest calls native, native returns -- so this check was unreachable in
+     * practice.  It is reachable now, because a callback-driven API nests
+     * without a bound the port controls: OnBufferEnd calls SubmitSourceBuffer
+     * calls back, and each round trip is two more frames.
+     *
+     * This used to return silently, and the whole run then died as
+     * "guest trap ... ended the run with no consuming handler" -- a message
+     * that names neither the cause nor the depth, which is the one thing this
+     * file is not allowed to do.  Measured on DOOM (2016): the game reached
+     * here with its audio engine already running and the log said nothing
+     * about a stack. */
+    if ((char *)get_kernel_stack( data ) + min_kernel_stack > (char *)&frame)
+    {
+        ERR( "kernel stack exhausted entering the guest trap dispatcher: %ld "
+             "bytes left of %ld, below the %ld-byte floor.  This is CROSSING "
+             "DEPTH, not a big frame: each guest->native trap and each "
+             "native->guest reverse call spends some of this stack, and a "
+             "callback-driven API nests them.\n",
+             (long)((char *)&frame - (char *)get_kernel_stack( data )),
+             (long)kernel_stack_size, (long)min_kernel_stack );
+        return STATUS_STACK_OVERFLOW;
+    }
 
     /* Verification hook.  WINEEMUKERNELSTACK=1 enters the dispatcher on the
      * kernel stack it was called on instead, which is what happened before this

@@ -6,5 +6,6 @@ EXTRADLLFLAGS = -Wb,--prefer-native
 VER_FILEDESCRIPTION_STR = "Wine HID"
 
 SOURCES = \
+	hid.thunks \
 	hidd.c \
 	hidp.c

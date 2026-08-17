@@ -1,0 +1,83 @@
+# AMD64 thunk export spec for the guest d3d10.dll -- COM mode.
+#
+# NEW IN THIS LANE, and only partly.  Wine's d3d10.dll had no guest thunk at
+# all, so a guest that imported it died on a missing library before it could be
+# told anything.  Now it loads, its two device-creation entry points work, and
+# everything else answers E_NOTIMPL by name.  That is a smaller surface than
+# the other three modules in this lane offer, and the reason is worth stating
+# once here and once in d3d10.spec:
+#
+#   DXVK SHIPS NO d3d10.dll.  Upstream removed it and kept d3d10core, which is
+#   a thin layer over its own d3d11 and is what dlls/d3d10core serves.  The
+#   rest of what d3d10.dll exports -- the effects framework, the state-block
+#   helpers, the shader reflection -- is WINE'S OWN implementation, C code
+#   written against ID3D10Device.  On this lane an ID3D10Device is a guest
+#   proxy whose vtable is an array of x86-64 trap stubs, so that C code driving
+#   one would execute those bytes as ppc64 on its first call.  Serving it needs
+#   either a reverse-proxy runtime (so a native caller can hold a guest object)
+#   or a native D3D10 effects implementation, and neither exists.  GUEST-REFUSE
+#   is the honest answer in the meantime: E_NOTIMPL, loudly, by name.
+#
+# The exports NOT listed below are neither refused nor wrapped, because they
+# carry no interface at all: the D3D10StateBlockMask* family is pure bit
+# arithmetic over a caller-owned struct, and the profile getters return a
+# pointer to a static ASCII string, which a guest can read exactly as it is.
+#
+# COM-JSON is ppc64le/dxvk/interfaces_dxvk.json, the same roster d3d11.dll,
+# dxgi.dll and d3d10core.dll publish.  Four modules, one roster, one winecom
+# instance -- see dlls/d3d11/main.c.
+
+DLL       d3d10.dll
+FROM-SPEC auto
+COM-JSON  ../../ppc64le/dxvk/interfaces_dxvk.json
+
+GUEST-IMPL D3D10CreateDevice              __wine_guest_D3D10CreateDevice
+GUEST-IMPL D3D10CreateDeviceAndSwapChain  __wine_guest_D3D10CreateDeviceAndSwapChain
+
+# THE THREE THE AUDIT AGREES CARRY AN INTERFACE.  Each takes an ID3D10Device or
+# vends an ID3D10Effect/ID3D10EffectPool/ID3D10StateBlock, all of them rostered,
+# and each is implemented by Wine's own native C in this module.
+GUEST-REFUSE D3D10CreateEffectFromMemory      Wine's own effects runtime, native C over ID3D10Device
+GUEST-REFUSE D3D10CreateEffectPoolFromMemory  ditto; also vends ID3D10EffectPool
+GUEST-REFUSE D3D10CreateStateBlock            takes ID3D10Device, vends ID3D10StateBlock
+
+# THE NINE THE AUDIT DOES NOT SEE, AND THAT IS A FINDING RATHER THAN A
+# PREFERENCE.  Every one of these vends an ID3D10Blob (or takes an
+# ID3D10Include), and none of those is a ROSTERED interface -- the roster is
+# DXVK's D3D11/DXGI/D3D10 surface and the blob interfaces are d3dcommon's.
+# spec2thunk's flat-surface audit classifies a parameter as interface-bearing
+# when it names a rostered interface, a known carrier struct or a bare void**,
+# so it calls a GUEST-REFUSE on these STALE and would let them pass through --
+# handing the guest a native vtable it would then call as x86-64.  The same
+# blind spot dlls/xaudio2_9/xaudio2_9.thunks documents for its XAPO factories,
+# and the same answer: EXCLUDE binds a guest import to the per-symbol
+# 0xdead0000 sentinel, so an application that wants to compile a shader faults
+# with the symbol's own name instead of crashing inside a native blob.  Serving
+# them properly means rostering ID3D10Blob and friends, which is its own piece
+# of work and is not what a D3D10 title needs first.
+EXCLUDE D3D10CompileEffectFromMemory
+EXCLUDE D3D10CompileShader
+EXCLUDE D3D10DisassembleShader
+EXCLUDE D3D10ReflectShader
+EXCLUDE D3D10CreateBlob
+EXCLUDE D3D10GetInputSignatureBlob
+EXCLUDE D3D10GetOutputSignatureBlob
+EXCLUDE D3D10GetInputAndOutputSignatureBlob
+EXCLUDE D3D10GetShaderDebugInfo
+
+# THE THREE PROFILE GETTERS PASS, and the reason is checked rather than
+# assumed: each takes an ID3D10Device and NEVER DEREFERENCES IT.  Wine's
+# implementations (dlls/d3d10/d3d10_main.c:246 and the two below it) are
+# three-line stubs that FIXME the pointer and return a pointer to a static
+# ASCII string -- "vs_4_0", "gs_4_0", "ps_4_0" -- which a guest reads exactly
+# as it is, in the same address space.  If they ever grow a real
+# GetFeatureLevel call this must become an EXCLUDE.
+GUEST-PASS D3D10GetVertexShaderProfile   ID3D10Device never dereferenced; returns a static ASCII string
+GUEST-PASS D3D10GetGeometryShaderProfile ID3D10Device never dereferenced; returns a static ASCII string
+GUEST-PASS D3D10GetPixelShaderProfile    ID3D10Device never dereferenced; returns a static ASCII string
+
+# Internal names, kept out of the guest export list; see dlls/d3d11/d3d11.thunks.
+EXCLUDE __wine_com_dispatch
+EXCLUDE __wine_com_refuse
+EXCLUDE __wine_guest_D3D10CreateDevice
+EXCLUDE __wine_guest_D3D10CreateDeviceAndSwapChain

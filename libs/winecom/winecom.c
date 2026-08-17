@@ -22,12 +22,19 @@
  * same interfaces JSON cannot silently disagree.  All slots trap, including
  * AddRef/Release/QueryInterface (simplicity first).
  *
- * TRANSLATE-IN (design §6.3, forward half).  An interface-typed IN value is
- * never blindly unwrapped: one of our proxies unwraps to its host pointer,
- * NULL stays NULL, and anything else is a guest-implemented object, which
- * refuses loudly until reverse proxies (§6) exist.  This replaces the
- * original d3d12 runtime's unconditional unwrap -- strictly safer: an
- * unrecognised pointer used to be dereferenced as a proxy.
+ * TRANSLATE-IN (design §6.3).  An interface-typed IN value is never blindly
+ * unwrapped: one of our proxies unwraps to its host pointer, NULL stays NULL,
+ * and anything else is a guest-IMPLEMENTED object.  That last case is what
+ * reverse.c serves -- it gets a REVERSE PROXY, a native vtable whose slots
+ * enter the guest method through the emulator -- on a surface that asked for
+ * one (WINECOM_SF_REVERSE) and with the interface type the generated table
+ * recorded in xaux.  A surface that did not, or a table row with no type,
+ * still refuses loudly, which is the fail-closed default this replaced the
+ * original d3d12 runtime's unconditional unwrap with.
+ *
+ * THE OTHER HALF IS IN reverse.c, and the two are one runtime rather than two:
+ * they share the surface, the intern lock and each other's identity tests, so
+ * that an object crossing the boundary twice comes back as itself.
  *
  * WINEEMUNOCOMWRAP=1 is the negative control, same shape as
  * WINEEMUNOGSTHREADS / WINEEMUNOCBWRAP: winecom_wrap hands the RAW host
@@ -53,6 +60,8 @@
 #include "wine/debug.h"
 #include "wine/winecom.h"
 
+#include "winecom_private.h"
+
 WINE_DEFAULT_DEBUG_CHANNEL(winecom);
 
 /* ---------------------------------------------------------------- proxies */
@@ -63,24 +72,28 @@ struct com_proxy
                                  guest sees -- *(void**)proxy is its vtable */
     void       *host;         /* native/host interface pointer */
     LONG        refs;         /* guest-visible refcount, served here */
-    UINT        iface;        /* index into surface->ifaces[] */
+    UINT        iface;        /* index into wc_surface->ifaces[] */
     struct com_proxy *next;   /* intern-table chain */
 };
 
 #define INTERN_BUCKETS 256
 
-static CRITICAL_SECTION com_cs;
+/* THE intern lock, shared with reverse.c through winecom_private.h: a proxy of
+ * either direction can be created while the other kind is being looked up -- a
+ * reverse call whose argument is a forward proxy does exactly that -- and two
+ * locks would be two lock orders. */
+CRITICAL_SECTION wc_cs;
 static CRITICAL_SECTION_DEBUG com_cs_debug =
 {
-    0, 0, &com_cs,
+    0, 0, &wc_cs,
     { &com_cs_debug.ProcessLocksList, &com_cs_debug.ProcessLocksList },
-      0, 0, { (DWORD_PTR)(__FILE__ ": winecom com_cs") }
+      0, 0, { (DWORD_PTR)(__FILE__ ": winecom wc_cs") }
 };
-static CRITICAL_SECTION com_cs = { &com_cs_debug, -1, 0, 0, 0, 0 };
+CRITICAL_SECTION wc_cs = { &com_cs_debug, -1, 0, 0, 0, 0 };
 
 static struct com_proxy *intern[INTERN_BUCKETS];
 
-static const struct winecom_surface *surface;
+const struct winecom_surface *wc_surface;
 
 /* Guest-facing vtables: guest_vtbls[i][n] is the address of slot n's trap
  * stub in the guest module's stub array for interface i. */
@@ -176,38 +189,38 @@ static BOOL com_check_module( HMODULE guest, const struct com_thunk_info **info_
     if (LdrGetProcedureAddress( guest, &name, 0, &ptr ))
     {
         ERR( "%s: guest module %p exports no __wine_com_thunk_info\n",
-             surface->name, guest );
+             wc_surface->name, guest );
         return FALSE;
     }
     info = ptr;
     if (info->version != COM_THUNK_INFO_VERSION || info->stride != 16)
     {
         ERR( "%s: guest com thunk info version %u stride %u not supported\n",
-             surface->name, info->version, info->stride );
+             wc_surface->name, info->version, info->stride );
         return FALSE;
     }
-    if (info->iface_count != surface->iface_count)
+    if (info->iface_count != wc_surface->iface_count)
     {
         ERR( "%s: guest module has %u interfaces, marshal table has %u -- "
              "the two generators read different interface JSONs\n",
-             surface->name, info->iface_count, surface->iface_count );
+             wc_surface->name, info->iface_count, wc_surface->iface_count );
         return FALSE;
     }
     entries = (const struct com_iface_entry *)(base + info->ifaces_rva);
-    for (i = 0; i < surface->iface_count; i++)
+    for (i = 0; i < wc_surface->iface_count; i++)
     {
-        if (!IsEqualGUID( &entries[i].iid, &surface->ifaces[i].iid ))
+        if (!IsEqualGUID( &entries[i].iid, &wc_surface->ifaces[i].iid ))
         {
             ERR( "%s: interface %u (%s) IID mismatch between guest module "
-                 "and marshal table\n", surface->name, i,
-                 surface->ifaces[i].name );
+                 "and marshal table\n", wc_surface->name, i,
+                 wc_surface->ifaces[i].name );
             return FALSE;
         }
-        if (entries[i].slot_count != surface->ifaces[i].slot_count)
+        if (entries[i].slot_count != wc_surface->ifaces[i].slot_count)
         {
             ERR( "%s: interface %s: guest %u slots, table %u\n",
-                 surface->name, surface->ifaces[i].name,
-                 entries[i].slot_count, surface->ifaces[i].slot_count );
+                 wc_surface->name, wc_surface->ifaces[i].name,
+                 entries[i].slot_count, wc_surface->ifaces[i].slot_count );
             return FALSE;
         }
     }
@@ -226,17 +239,17 @@ static BOOL com_runtime_init_once( void )
 
     nowrap = com_env_flag( L"WINEEMUNOCOMWRAP" );
 
-    if (!(guest = find_guest_module( surface->guest_modules,
-                                     surface->module_count )))
+    if (!(guest = find_guest_module( wc_surface->guest_modules,
+                                     wc_surface->module_count )))
     {
         ERR( "%s: no guest thunk module in this process; COM dispatch "
-             "cannot work\n", surface->name );
+             "cannot work\n", wc_surface->name );
         return FALSE;
     }
     /* validate every loaded candidate, materialise from the first */
-    for (i = 0; i < surface->module_count; i++)
+    for (i = 0; i < wc_surface->module_count; i++)
     {
-        HMODULE mod = find_guest_module( &surface->guest_modules[i], 1 );
+        HMODULE mod = find_guest_module( &wc_surface->guest_modules[i], 1 );
         if (mod && !com_check_module( mod, NULL )) return FALSE;
     }
     if (!com_check_module( guest, &info )) return FALSE;
@@ -245,20 +258,20 @@ static BOOL com_runtime_init_once( void )
     entries = (const struct com_iface_entry *)(base + info->ifaces_rva);
 
     total_slots = 0;
-    for (i = 0; i < surface->iface_count; i++) total_slots += entries[i].slot_count;
+    for (i = 0; i < wc_surface->iface_count; i++) total_slots += entries[i].slot_count;
 
     if (!(guest_vtbls = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0,
-                                         surface->iface_count * sizeof(*guest_vtbls)
-                                         + surface->iface_count * sizeof(*iface_slot_base)
+                                         wc_surface->iface_count * sizeof(*guest_vtbls)
+                                         + wc_surface->iface_count * sizeof(*iface_slot_base)
                                          + total_slots * sizeof(UINT64) + total_slots )))
         return FALSE;
-    iface_slot_base = (UINT *)(guest_vtbls + surface->iface_count);
-    guest_vtbl_block = (UINT64 *)(iface_slot_base + surface->iface_count);
+    iface_slot_base = (UINT *)(guest_vtbls + wc_surface->iface_count);
+    guest_vtbl_block = (UINT64 *)(iface_slot_base + wc_surface->iface_count);
     refuse_logged = (unsigned char *)(guest_vtbl_block + total_slots);
     memset( refuse_logged, 0, total_slots );
 
     off = 0;
-    for (i = 0; i < surface->iface_count; i++)
+    for (i = 0; i < wc_surface->iface_count; i++)
     {
         iface_slot_base[i] = off;
         guest_vtbls[i] = guest_vtbl_block + off;
@@ -277,10 +290,10 @@ static BOOL com_runtime_init_once( void )
         if (guest_vtbl_block[n] > guest_vtbl_hi) guest_vtbl_hi = guest_vtbl_block[n];
     }
     TRACE( "%s: materialised %u guest vtable slots across %u interfaces from %p\n",
-           surface->name, total_slots, i, guest );
+           wc_surface->name, total_slots, i, guest );
     if (nowrap)
         ERR( "%s: WINEEMUNOCOMWRAP=1 -- interface pointers will cross RAW; "
-             "expect guest calls into native vtables\n", surface->name );
+             "expect guest calls into native vtables\n", wc_surface->name );
     return TRUE;
 }
 
@@ -294,8 +307,8 @@ BOOL winecom_attach( const struct winecom_surface *s )
         if (state == 3) return FALSE;
         NtYieldExecution();
     }
-    surface = s;
-    if (!com_runtime_init_once())
+    wc_surface = s;
+    if (!com_runtime_init_once() || !wc_reverse_init())
     {
         InterlockedExchange( &com_init_state, 3 );
         return FALSE;
@@ -309,12 +322,53 @@ static BOOL com_ready( void )
     return com_init_state == 2;
 }
 
+BOOL wc_ready( void )
+{
+    return com_ready();
+}
+
+BOOL wc_nowrap( void )
+{
+    return nowrap > 0;
+}
+
 /* ------------------------------------------------------------ host calls */
 
 void winecom_host_release( void *host )
 {
     UINT64 args[16] = { 0 };
-    surface->invoke( host, 2 /* IUnknown::Release */, 1, args );
+    wc_surface->invoke( host, 2 /* IUnknown::Release */, 1, args );
+}
+
+/* A [local] INTERFACE HAS NO REFERENCE MANAGEMENT AT ALL, and slot 2 of one is
+ * a real method with a real effect.  On the audio surfaces it is
+ * IXAudio2Voice::SetEffectChain: a voice is destroyed by DestroyVoice, has no
+ * Release to call, and calling "Release" on one tears its effect chain off
+ * instead.
+ *
+ * Both audio clients had grown a guard of their own against exactly this --
+ * dlls/xaudio2_9/guestcom.c keeps a registry of live voice hosts and refuses
+ * slot 2 on one, and dlls/combase's system-COM invoker does the same -- and
+ * MEASURED on DOOM (2016), the combase guard fired three times on one voice
+ * during audio setup.  It fired because THIS layer asked, and it asked because
+ * the surplus-reference drop below did not know what kind of interface it was
+ * holding.
+ *
+ * So the knowledge moves here, where the interface index is already in hand.
+ * The clients' guards stay as backstops and should now never fire; if one
+ * does, it is saying something this function got wrong. */
+static void host_release_iface( void *host, UINT iface )
+{
+    if (!host) return;
+    if (iface < wc_surface->iface_count &&
+        (wc_surface->ifaces[iface].flags & WINECOM_IF_LOCAL))
+    {
+        TRACE( "not dropping a reference on %s %p: a [local] interface has no "
+               "reference count and its slot 2 is an ordinary method\n",
+               wc_surface->ifaces[iface].name, host );
+        return;
+    }
+    winecom_host_release( host );
 }
 
 static HRESULT host_qi( void *host, const GUID *riid, void **out )
@@ -324,7 +378,7 @@ static HRESULT host_qi( void *host, const GUID *riid, void **out )
     *out = NULL;
     args[1] = (UINT64)(ULONG_PTR)riid;
     args[2] = (UINT64)(ULONG_PTR)out;
-    return (HRESULT)surface->invoke( host, 0 /* QueryInterface */, 3, args );
+    return (HRESULT)wc_surface->invoke( host, 0 /* QueryInterface */, 3, args );
 }
 
 /* ------------------------------------------------------- proxy operations */
@@ -332,8 +386,8 @@ static HRESULT host_qi( void *host, const GUID *riid, void **out )
 UINT winecom_iface_from_iid( const GUID *riid )
 {
     UINT i;
-    for (i = 0; i < surface->iface_count; i++)
-        if (IsEqualGUID( riid, &surface->ifaces[i].iid )) return i;
+    for (i = 0; i < wc_surface->iface_count; i++)
+        if (IsEqualGUID( riid, &wc_surface->ifaces[i].iid )) return i;
     return ~0u;
 }
 
@@ -341,29 +395,51 @@ void *winecom_wrap( void *host, UINT iface )
 {
     UINT bucket = (UINT)(((ULONG_PTR)host >> 4) % INTERN_BUCKETS);
     struct com_proxy *p;
+    void *guest;
 
     if (!host) return NULL;
+
+    /* THE ROUND TRIP.  `host` may be one of the REVERSE proxies -- a native
+     * vtable this runtime built around an object the guest implemented -- on
+     * its way back to the guest that wrote it.  Wrapping one would give the
+     * guest a forward proxy whose host is a reverse proxy whose guest is the
+     * object the guest already has, and the guest's identity comparison
+     * against its own pointer would fail.  So it comes back as itself: one
+     * guest reference for the caller, and the native reference winecom_wrap
+     * was handed is consumed by releasing the reverse proxy. */
+    if ((guest = wc_reverse_guest( host )))
+    {
+        TRACE( "host %p is our reverse proxy for guest %p; returning the "
+               "guest's own pointer\n", host, guest );
+        wc_guest_addref( guest, iface );
+        wc_reverse_release( host );
+        return guest;
+    }
+
     if (nowrap)
     {
         ERR( "WINEEMUNOCOMWRAP: handing raw host %s %p to the guest\n",
-             surface->ifaces[iface].name, host );
+             wc_surface->ifaces[iface].name, host );
         return host;
     }
-    RtlEnterCriticalSection( &com_cs );
+    RtlEnterCriticalSection( &wc_cs );
     for (p = intern[bucket]; p; p = p->next)
         if (p->host == host && p->iface == iface) break;
     if (p)
     {
         p->refs++;
-        RtlLeaveCriticalSection( &com_cs );
-        winecom_host_release( host );  /* surplus reference */
+        RtlLeaveCriticalSection( &wc_cs );
+        /* The surplus reference: this pair is already interned and already
+         * holds one, so the one the caller handed us goes back.  Unless the
+         * interface has no reference count -- see host_release_iface. */
+        host_release_iface( host, iface );
         return p;
     }
     if (!(p = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, sizeof(*p) )))
     {
-        RtlLeaveCriticalSection( &com_cs );
-        ERR( "out of memory interning %s %p\n", surface->ifaces[iface].name, host );
-        winecom_host_release( host );
+        RtlLeaveCriticalSection( &wc_cs );
+        ERR( "out of memory interning %s %p\n", wc_surface->ifaces[iface].name, host );
+        host_release_iface( host, iface );
         return NULL;
     }
     p->guest_vtbl = guest_vtbls[iface];
@@ -372,8 +448,8 @@ void *winecom_wrap( void *host, UINT iface )
     p->iface = iface;
     p->next = intern[bucket];
     intern[bucket] = p;
-    RtlLeaveCriticalSection( &com_cs );
-    TRACE( "wrapped %s host %p as proxy %p\n", surface->ifaces[iface].name,
+    RtlLeaveCriticalSection( &wc_cs );
+    TRACE( "wrapped %s host %p as proxy %p\n", wc_surface->ifaces[iface].name,
            host, p );
     return p;
 }
@@ -394,15 +470,15 @@ static struct com_proxy *proxy_from_pointer( void *ptr )
     {
         /* points into the materialised block: confirm it is an interface
          * base, then confirm the pointer is interned */
-        for (i = 0; i < surface->iface_count; i++)
+        for (i = 0; i < wc_surface->iface_count; i++)
             if ((const void *)guest_vtbls[i] == cand->guest_vtbl)
             {
                 UINT bucket = (UINT)(((ULONG_PTR)cand->host >> 4) % INTERN_BUCKETS);
                 struct com_proxy *p;
-                RtlEnterCriticalSection( &com_cs );
+                RtlEnterCriticalSection( &wc_cs );
                 for (p = intern[bucket]; p; p = p->next)
                     if (p == cand) break;
-                RtlLeaveCriticalSection( &com_cs );
+                RtlLeaveCriticalSection( &wc_cs );
                 return p;
             }
     }
@@ -422,40 +498,50 @@ void *winecom_unwrap( void *maybe_proxy )
     return p->host;
 }
 
-BOOL winecom_translate_in( void *guest_seen, void **host_out )
+/* The forward half of the classifier, for reverse.c: is this guest-visible
+ * pointer one of OUR proxies, and if so what is behind it.  winecom_to_native
+ * (reverse.c) is the whole classifier and this is the half that knows about
+ * forward proxies. */
+BOOL wc_forward_host( void *ptr, void **host_out )
 {
     struct com_proxy *p;
 
     *host_out = NULL;
-    if (!guest_seen) return TRUE;
-    if ((p = proxy_from_pointer( guest_seen )))
-    {
-        *host_out = p->host;
-        return TRUE;
-    }
-    /* A guest-implemented object: needs a reverse proxy (design §6), which
-     * does not exist yet.  Refusing here is the fail-closed answer; the
-     * caller turns it into a loud E_NOTIMPL. */
-    return FALSE;
+    if (!ptr) return FALSE;
+    if (!(p = proxy_from_pointer( ptr ))) return FALSE;
+    *host_out = p->host;
+    return TRUE;
+}
+
+static ULONG proxy_release( struct com_proxy *p );
+
+/* Drop one guest-visible reference from a forward proxy the reverse
+ * dispatcher minted so a guest method could be handed a native object. */
+void wc_forward_release( void *ptr )
+{
+    struct com_proxy *p = proxy_from_pointer( ptr );
+
+    if (p) proxy_release( p );
 }
 
 static ULONG proxy_addref( struct com_proxy *p )
 {
     ULONG refs;
-    RtlEnterCriticalSection( &com_cs );
+    RtlEnterCriticalSection( &wc_cs );
     refs = ++p->refs;
-    RtlLeaveCriticalSection( &com_cs );
+    RtlLeaveCriticalSection( &wc_cs );
     return refs;
 }
 
 static ULONG proxy_release( struct com_proxy *p )
 {
+    UINT iface = p->iface;   /* read before the free below */
     UINT bucket = (UINT)(((ULONG_PTR)p->host >> 4) % INTERN_BUCKETS);
     struct com_proxy **link;
     void *host = NULL;
     ULONG refs;
 
-    RtlEnterCriticalSection( &com_cs );
+    RtlEnterCriticalSection( &wc_cs );
     refs = --p->refs;
     if (!refs)
     {
@@ -463,12 +549,12 @@ static ULONG proxy_release( struct com_proxy *p )
             if (*link == p) { *link = p->next; break; }
         host = p->host;
     }
-    RtlLeaveCriticalSection( &com_cs );
+    RtlLeaveCriticalSection( &wc_cs );
     if (!refs)
     {
         TRACE( "destroying proxy %p (%s host %p)\n", p,
-               surface->ifaces[p->iface].name, host );
-        winecom_host_release( host );
+               wc_surface->ifaces[p->iface].name, host );
+        host_release_iface( host, iface );
         RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, p );
     }
     return refs;
@@ -483,6 +569,17 @@ static HRESULT proxy_qi( struct com_proxy *p, const GUID *riid, void **ppv )
     if (!ppv) return E_POINTER;
     *ppv = NULL;
     if (!riid) return E_INVALIDARG;
+    if (wc_surface->ifaces[p->iface].flags & WINECOM_IF_LOCAL)
+    {
+        /* Slot 0 of a [local] interface is a real method -- GetVoiceDetails,
+         * not QueryInterface -- so there is nothing to ask.  A client with
+         * [local] interfaces claims them before this dispatcher sees them, so
+         * reaching here means the roster and the claim disagree. */
+        ERR( "%s is [local] and has no QueryInterface; the client did not "
+             "claim it before winecom_dispatch saw it\n",
+             wc_surface->ifaces[p->iface].name );
+        return E_NOINTERFACE;
+    }
     idx = winecom_iface_from_iid( riid );
     if (idx == ~0u)
     {
@@ -490,7 +587,7 @@ static HRESULT proxy_qi( struct com_proxy *p, const GUID *riid, void **ppv )
          * it a host pointer handed to the guest would be called as x86-64
          * code.  Refuse loudly instead. */
         WARN( "%s: QI for unknown IID %s refused\n",
-              surface->ifaces[p->iface].name, debugstr_guid(riid) );
+              wc_surface->ifaces[p->iface].name, debugstr_guid(riid) );
         return E_NOINTERFACE;
     }
     hr = host_qi( p->host, riid, &host_out );
@@ -521,8 +618,8 @@ static void refuse_once( UINT iface, UINT slot, const char *name, const char *wh
     unsigned char *flag = &refuse_logged[iface_slot_base[iface] + slot];
     if (*flag) return;
     *flag = 1;
-    FIXME( "%s: refusing %s (iface %u slot %u): %s\n", surface->name,
-           name ? name : surface->ifaces[iface].name, iface, slot,
+    FIXME( "%s: refusing %s (iface %u slot %u): %s\n", wc_surface->name,
+           name ? name : wc_surface->ifaces[iface].name, iface, slot,
            why ? why : "no marshal plan" );
 }
 
@@ -535,7 +632,7 @@ HRESULT winecom_wrap_out_iface( HRESULT hr, const GUID *riid, void **ppv )
     if (idx == ~0u)
     {
         ERR( "%s: an interface for unknown IID %s; releasing it rather than "
-             "handing the guest a host vtable\n", surface->name,
+             "handing the guest a host vtable\n", wc_surface->name,
              debugstr_guid(riid) );
         winecom_host_release( *ppv );
         *ppv = NULL;
@@ -550,6 +647,17 @@ void winecom_wrap_static( void **p, UINT iface )
     if (p && *p) *p = winecom_wrap( *p, iface );
 }
 
+/* Give back every reverse proxy this call borrowed for an in-parameter.  A
+ * callee that took its own reference keeps the object alive; a callee that did
+ * not lets the proxy -- and with it the one guest reference it holds -- go. */
+static void release_borrows( const UINT64 *args, const UINT *borrowed, UINT count )
+{
+    UINT n;
+
+    for (n = 0; n < count; n++)
+        winecom_to_native_end( (void *)(ULONG_PTR)args[borrowed[n]] );
+}
+
 NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
 {
     const struct winecom_iface *itf;
@@ -560,12 +668,19 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
     UINT64 *arr_heap = NULL;
     UINT64 ret;
     UINT i, n, ppv_idx = 0, riid_idx = 0;
-    UINT out_static_idx[4], n_out_static = 0;
+    UINT out_static_idx[8], n_out_static = 0;
+    UINT out_arr_idx[8], n_out_arr = 0;
+    /* Argument positions holding a REVERSE proxy this call minted for a
+     * guest-implemented in-parameter.  Borrowed for the duration of the call
+     * and given back on every path out of it -- see release_borrows(). */
+    UINT borrowed[16], n_borrowed = 0;
+    const UINT64 *arr_borrowed = NULL;
+    UINT n_arr_borrowed = 0;
     BOOL have_ppv = FALSE;
 
     if (!com_ready()) return STATUS_DLL_INIT_FAILED;
-    if (iface >= surface->iface_count) return STATUS_INVALID_PARAMETER;
-    itf = &surface->ifaces[iface];
+    if (iface >= wc_surface->iface_count) return STATUS_INVALID_PARAMETER;
+    itf = &wc_surface->ifaces[iface];
     if (slot >= itf->slot_count) return STATUS_INVALID_PARAMETER;
 
     proxy = (struct com_proxy *)(ULONG_PTR)ctx->R10;
@@ -577,7 +692,7 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
     }
     if (proxy->iface != iface)
         WARN( "proxy %p says iface %u (%s), stub says %u (%s)\n", proxy,
-              proxy->iface, surface->ifaces[proxy->iface].name, iface, itf->name );
+              proxy->iface, wc_surface->ifaces[proxy->iface].name, iface, itf->name );
 
     /* IUnknown's three slots head every vtable and are served from the proxy
      * table; Release of the last reference is the only crossing. */
@@ -612,7 +727,7 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
 
     if (sl->flags & WINECOM_F_HAND)
     {
-        ctx->Rax = surface->hand_funcs[sl->aux]( proxy->host, slot, ctx );
+        ctx->Rax = wc_surface->hand_funcs[sl->aux]( proxy->host, slot, ctx );
         return STATUS_SUCCESS;
     }
 
@@ -629,23 +744,56 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
             break;
         case WINECOM_CA_IFACE_IN:
         {
+            /* One of our proxies unwraps to its host; NULL stays NULL; a
+             * guest-IMPLEMENTED object gets a REVERSE proxy of the type the
+             * signature declared, which the table records in xaux for exactly
+             * this (a surface without WINECOM_SF_REVERSE, or a table that
+             * predates the xaux row, still refuses -- fail closed).  The
+             * reverse proxy is BORROWED for the duration of the call and given
+             * back below, so a callee that took its own reference keeps the
+             * object and a callee that did not lets it go. */
             void *host;
-            if (!winecom_translate_in( (void *)(ULONG_PTR)raw, &host ))
+            if (!winecom_to_native( (void *)(ULONG_PTR)raw,
+                                    (sl->xaux && (sl->xmask & (1u << (i - 1))))
+                                        ? sl->xaux[i - 1] : ~0u, &host ))
             {
                 refuse_once( iface, slot, sl->name,
-                             "guest-implemented object as an in-parameter; "
-                             "reverse proxies (design step 5) not built yet" );
+                             "guest-implemented object as an in-parameter that "
+                             "this surface cannot reverse-proxy" );
                 if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
+                release_borrows( args, borrowed, n_borrowed );
                 ctx->Rax = (UINT)E_NOTIMPL;
                 return STATUS_SUCCESS;
             }
             args[i] = (UINT64)(ULONG_PTR)host;
+            if (host && n_borrowed < ARRAYSIZE(borrowed)) borrowed[n_borrowed++] = i;
             break;
         }
         case WINECOM_CA_IFACE_OUT_STATIC:
             args[i] = raw;
             if (raw && n_out_static < ARRAYSIZE(out_static_idx))
                 out_static_idx[n_out_static++] = i;
+            break;
+        case WINECOM_CA_IFACE_ARR_OUT_STATIC:
+            /* The array itself is the caller's buffer, so it crosses as an
+             * address; what needs doing is on the way back, where every
+             * element the callee wrote is a HOST pointer that must become a
+             * proxy before the guest sees it.  Unlike CA_IFACE_ARR_IN there
+             * is no copy: the callee writes the guest's own storage, and we
+             * replace each element in place. */
+            args[i] = raw;
+            if (!sl->caux)
+            {
+                refuse_once( iface, slot, sl->name,
+                             "interface out-array with no caux count-parameter "
+                             "table; the generator must emit one" );
+                if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
+                release_borrows( args, borrowed, n_borrowed );
+                ctx->Rax = (UINT)E_NOTIMPL;
+                return STATUS_SUCCESS;
+            }
+            if (raw && n_out_arr < ARRAYSIZE(out_arr_idx))
+                out_arr_idx[n_out_arr++] = i;
             break;
         case WINECOM_CA_PPV_OUT:
             args[i] = raw;
@@ -662,6 +810,7 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
                              "non-NULL completion event needs the eventfd "
                              "relay" );
                 if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
+                release_borrows( args, borrowed, n_borrowed );
                 ctx->Rax = (UINT)E_NOTIMPL;
                 return STATUS_SUCCESS;
             }
@@ -682,23 +831,36 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
             else if (!(dst = arr_heap = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0,
                                                          count * sizeof(*dst) )))
             {
+                release_borrows( args, borrowed, n_borrowed );
                 ctx->Rax = (UINT)E_OUTOFMEMORY;
                 return STATUS_SUCCESS;
             }
             for (n = 0; n < count; n++)
             {
+                /* Element by element, the same classifier the scalar case
+                 * uses.  A reverse proxy minted here is NOT recorded in
+                 * borrowed[] -- that array is indexed by argument position and
+                 * an array has one position for many objects -- so the element
+                 * proxies are given back by their own loop after the call. */
                 void *host;
-                if (!winecom_translate_in( src[n], &host ))
+                if (!winecom_to_native( src[n],
+                                        (sl->xaux && (sl->xmask & (1u << (i - 1))))
+                                            ? sl->xaux[i - 1] : ~0u, &host ))
                 {
                     refuse_once( iface, slot, sl->name,
                                  "guest-implemented object in an array "
-                                 "in-parameter; reverse proxies not built yet" );
+                                 "in-parameter that this surface cannot "
+                                 "reverse-proxy" );
+                    while (n--) winecom_to_native_end( (void *)(ULONG_PTR)dst[n] );
                     if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
+                    release_borrows( args, borrowed, n_borrowed );
                     ctx->Rax = (UINT)E_NOTIMPL;
                     return STATUS_SUCCESS;
                 }
                 dst[n] = (UINT64)(ULONG_PTR)host;
             }
+            arr_borrowed = dst;
+            n_arr_borrowed = count;
             args[i] = (UINT64)(ULONG_PTR)dst;
             break;
         }
@@ -706,13 +868,17 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
             refuse_once( iface, slot, sl->name, "argument class with no "
                          "runtime marshal path" );
             if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
+            release_borrows( args, borrowed, n_borrowed );
             ctx->Rax = (UINT)E_NOTIMPL;
             return STATUS_SUCCESS;
         }
     }
 
-    ret = surface->invoke( proxy->host, slot, sl->argc, args );
+    ret = wc_surface->invoke( proxy->host, slot, sl->argc, args );
 
+    release_borrows( args, borrowed, n_borrowed );
+    for (n = 0; n < n_arr_borrowed; n++)
+        winecom_to_native_end( (void *)(ULONG_PTR)arr_borrowed[n] );
     if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
 
     if (have_ppv && SUCCEEDED((HRESULT)ret))
@@ -743,6 +909,20 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
             if (out && *out)
                 *out = winecom_wrap( *out, sl->xaux[out_static_idx[n] - 1] );
         }
+    }
+    /* Out-arrays are wrapped whatever the return value: the methods that
+     * carry them are the void-returning state readbacks (OMGetRenderTargets
+     * and its family), where RAX is scratch and SUCCEEDED() of scratch is
+     * meaningless. */
+    for (n = 0; n < n_out_arr; n++)
+    {
+        UINT idx = out_arr_idx[n];
+        void **out = (void **)(ULONG_PTR)args[idx];
+        UINT count = (UINT)winecom_read_arg( ctx, sl->caux[idx - 1] + 1 );
+        UINT k;
+
+        for (k = 0; k < count; k++)
+            if (out[k]) out[k] = winecom_wrap( out[k], sl->xaux[idx - 1] );
     }
 
     if (sl->flags & WINECOM_F_RET_VIA_ARG)

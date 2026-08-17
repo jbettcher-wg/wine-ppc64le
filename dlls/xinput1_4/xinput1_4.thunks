@@ -11,3 +11,9 @@
 # the shortest route from a real game's draw calls to this machine's GPU.
 DLL xinput1_4.dll
 FROM-SPEC auto
+
+# All nine eligible exports were refused as "no declaration in any Wine
+# header" and the module emitted had none at all.  DOOM imports ordinals 2
+# and 3 -- XInputGetState and XInputSetState, by number and with no name, so
+# there was not even a symbol in the failure to go on.
+PROBE-EXTRA   xinput.h

@@ -1,0 +1,658 @@
+#!/usr/bin/env python3
+#
+# gen-steamrpc -- derive the cross-process marshal descriptors for the
+# lsteamclient bridge from Proton's own generated params structs.
+#
+# WHAT THIS EXISTS FOR.  Proton's lsteamclient already reduces every Steamworks
+# method to a flat `struct <iface>_<version>_<method>_params` handed across a
+# PE<->unix boundary that shares an address space, so a pointer inside a params
+# struct needs no marshalling at all there.  This port stretches that boundary
+# across a PROCESS: the unix half runs as an x86-64 Linux helper under FEX,
+# because the real steamclient.so is x86-64 SysV and native Wine here is
+# ppc64le.  Every pointer inside a params struct therefore has to be copied,
+# and copying needs a size and a direction, which Proton's structs do not
+# carry.
+#
+# Rather than hand-classify ~6500 methods, this reads the generated header and
+# classifies each pointer field by its C type and, where the type alone is not
+# enough (char */void */byte pointers, and typed arrays), by the NEXT field's
+# name -- the same "count/len/size/num" idiom Proton's own generator asserts
+# on.  Everything it cannot classify becomes a NAMED REFUSAL rather than a
+# guess: a refused method returns its default value and logs its own name and
+# the reason once, in the tree's sentinel style.  A wrong size here is a
+# silent memory bug in someone else's game, so the classifier fails closed.
+#
+# The output is C, not data, so that every size is a `sizeof` and every offset
+# an `offsetof` evaluated by the compiler that also compiles the params
+# structs.  The generator never needs to know a struct layout.
+#
+# Usage:  tools/steamrpc/gen-steamrpc <proton-lsteamclient-dir> <out.c>
+#
+# Copyright 2026 the ppc64le port authors
+#
+# This library is free software; you can redistribute it and/or modify it
+# under the terms of the GNU Lesser General Public License as published by the
+# Free Software Foundation; either version 2.1 of the License, or (at your
+# option) any later version.
+
+import glob
+import os
+import re
+import sys
+
+# ------------------------------------------------- Valve's array annotations
+#
+# WHY THE SDK HEADERS ARE READ AT ALL, when everything else here comes out of
+# Proton's generated params structs.
+#
+# A params struct says `uint64_t *handlesOut`.  It does not say that the
+# Steamworks contract for ISteamInput::GetConnectedControllers is "handlesOut
+# points at a STEAM_INPUT_MAX_COUNT-sized array".  Nothing downstream of the
+# struct can tell that pointer apart from `int8_t *pbAchieved`, which really
+# does point at one object -- and the classifier below used to treat both the
+# same way, sizing the copy with a bare sizeof(*field).
+#
+# MEASURED CONSEQUENCE: the helper allocated 8 bytes for handlesOut, the real
+# steamclient.so wrote 16 handles (128 bytes) into it, and the 120 bytes past
+# the end landed on glibc's next chunk header.  The helper died of
+# `free(): invalid size` at DOOM's title screen, taking the game's Steam
+# connection with it -- which is what this file's own header comment means by
+# "a wrong size here is a silent memory bug in someone else's game".  It was
+# not silent for long, but it was in the wrong process.
+#
+# Valve annotates every array parameter in the SDK headers, which Proton
+# vendors, so the contract IS in the tree and was simply never read:
+#
+#     virtual int GetConnectedControllers(
+#         STEAM_OUT_ARRAY_COUNT( STEAM_INPUT_MAX_COUNT, ... ) InputHandle_t *handlesOut ) = 0;
+#
+# This reads those annotations and makes them authoritative over the "the next
+# field is named like a size" guess below.  A capacity that is a compile-time
+# constant becomes the real byte count; a capacity that names another
+# parameter becomes a SIZED field measured against THAT field rather than
+# against whichever field happens to come next; and a capacity that is neither
+# is refused by name.  Nothing here guesses: an annotation the generator
+# cannot resolve fails closed.
+
+# The annotation forms the vendored SDKs actually use (measured across all 65
+# steamworks_sdk_* directories, not assumed).  All of them put the count first.
+ANNOT_RE = re.compile(
+    r'STEAM_(?:OUT_ARRAY_COUNT|OUT_ARRAY_CALL|ARRAY_COUNT_D|ARRAY_COUNT|'
+    r'BUFFER_COUNT|OUT_STRING_COUNT)\s*\(\s*'
+    r'([^,()]+?)\s*(?:,[^()]*?)?\)\s*'          # the count expression
+    r'(?:const\s+)?[A-Za-z_][\w:]*\s*\*+\s*'    # the pointee type
+    r'(\w+)')                                   # the parameter name
+
+VIRTUAL_RE = re.compile(
+    r'virtual\s+[^;{]*?\b(\w+)\s*\(([^;{]*)\)\s*(?:const\s*)?=\s*0\s*;', re.S)
+
+DEFINE_RE = re.compile(r'^#define\s+(\w+)\s+(\d+)\s*$', re.M)
+
+# Annotations Valve wrote wrongly and later corrected, resolved here by name
+# rather than by whichever SDK the loader happened to read last.  Both of
+# these were found by the disagreement check below firing, which is what it is
+# for; the check still fires for anything not listed here.
+#
+#   ISteamUGC::GetQueryUGCAdditionalPreview( ..., char *pchURLOrVideoID,
+#       uint32 cchURLSize, char *pchOriginalFileName,
+#       uint32 cchOriginalFileNameSize, ... )
+#
+#   Every SDK from 133 to 161 annotates pchOriginalFileName with
+#   STEAM_OUT_STRING_COUNT(cchURLSize) -- the count of the OTHER buffer.  162
+#   through 165 spell it cchOriginalFileNameSize.  The later spelling is taken
+#   for all versions: cchOriginalFileNameSize is a parameter in every one of
+#   them, it is the value the caller actually sized that buffer with, and the
+#   typo's own value would under-size the copy whenever a game passes a short
+#   URL buffer and a long file-name buffer.
+ANNOT_FIXUP = {
+    ('GetQueryUGCAdditionalPreview', 'pchOriginalFileName'):
+        ('param', 'cchOriginalFileNameSize'),
+}
+
+
+def load_array_annotations(src_dir):
+    """(method, param) -> ('const', n) | ('param', name), from the SDK headers.
+
+    Keyed by method and parameter NAME rather than by interface version,
+    because Proton flattens one method into up to two dozen versioned params
+    structs and the contract is the same in all of them.  A capacity that two
+    SDK versions disagree about is a hard error rather than a coin toss: that
+    disagreement is exactly the kind of thing that produced the overflow this
+    function exists to prevent.
+    """
+    out, seen = {}, {}
+
+    for d in sorted(glob.glob(os.path.join(src_dir, 'steamworks_sdk_*'))):
+        consts = {}
+        headers = sorted(glob.glob(os.path.join(d, '*.h')))
+        for h in headers:
+            for m in DEFINE_RE.finditer(open(h, errors='replace').read()):
+                consts[m.group(1)] = int(m.group(2))
+        for h in headers:
+            text = open(h, errors='replace').read()
+            for vm in VIRTUAL_RE.finditer(text):
+                method, args = vm.group(1), vm.group(2)
+                for am in ANNOT_RE.finditer(args):
+                    cap, pname = am.group(1).strip(), am.group(2)
+                    if cap in consts:
+                        val = ('const', consts[cap])
+                    elif re.fullmatch(r'\d+', cap):
+                        val = ('const', int(cap))
+                    else:
+                        val = ('param', cap)
+                    key = (method, pname)
+                    if key in ANNOT_FIXUP:
+                        val = ANNOT_FIXUP[key]
+                    if key in out and out[key] != val:
+                        raise SystemExit(
+                            'gen-steamrpc: %s.%s is annotated %r in %s and %r '
+                            'in %s; resolve the disagreement rather than '
+                            'picking one'
+                            % (method, pname, val, os.path.basename(d),
+                               out[key], seen[key]))
+                    out[key] = val
+                    seen[key] = os.path.basename(d)
+    return out
+
+
+ARRAY_ANNOT = {}          # filled by emit(); see load_array_annotations
+
+
+def annotation_for(method, pname):
+    """The annotation for one params field, or None.
+
+    `method` is Proton's struct name -- ISteamInput_SteamInput006_GetDigital-
+    ActionOrigins -- whose trailing component is the SDK method.  The longest
+    matching suffix wins, and an ambiguous match is an error rather than a
+    choice.
+    """
+    hits = {v for (m, p), v in ARRAY_ANNOT.items()
+            if p == pname and method.endswith('_' + m)}
+    if len(hits) > 1:
+        raise SystemExit('gen-steamrpc: %s.%s matches %d different SDK '
+                         'annotations' % (method, pname, len(hits)))
+    return hits.pop() if hits else None
+
+
+# ---------------------------------------------------------------- classifier
+
+# A field name that follows a pointer and means "how many".  Same word list
+# Proton's gen_wrapper.py uses to assert on sized structs, plus the Hungarian
+# prefixes the SDK actually spells sizes with (cch = count of chars, cub =
+# count of unsigned bytes, cb = count of bytes).
+SIZE_WORDS = ('count', 'len', 'size', 'num', 'max', 'cch', 'cub', 'cb')
+
+def is_size_name(name):
+    low = name.lower()
+    if any(w in low for w in SIZE_WORDS):
+        return True
+    # cchName / cubData style prefixes that the word list above would miss
+    return low.startswith(('cch', 'cub', 'cb', 'ccb'))
+
+INTEGER_TYPES = {
+    'int8_t': 1, 'uint8_t': 1, 'char': 1, 'int16_t': 2, 'uint16_t': 2,
+    'int32_t': 4, 'uint32_t': 4, 'int64_t': 8, 'uint64_t': 8,
+    'float': 4, 'double': 8, 'int': 4, 'void': 1,
+}
+
+# Pointee types that themselves contain pointers.  Copying the top-level
+# object would hand the helper (or the guest) an address from the other
+# process, so these are refused by name rather than shallow-copied.
+DEEP_TYPES = {
+    'w_SteamParamStringArray_t',
+    'SteamParamStringArray_t',
+    'SteamNetworkingConfigValue_t',
+    'SteamNetworkingMessage_t',
+}
+
+def deep_type(base):
+    if base in DEEP_TYPES:
+        return True
+    # every generated w_/u_ SteamNetworkingMessage_t_<sdk> carries a data ptr
+    return 'SteamNetworkingMessage_t' in base or 'ParamStringArray' in base
+
+
+# Types the SDK headers only forward-declare on the PE side: there is no
+# layout to take a sizeof of, so there is no length to send.
+INCOMPLETE_TYPES = {
+    'SteamDatagramRelayAuthTicket',
+    'SteamDatagramHostedAddress',
+    'SteamDatagramGameCoordinatorServerLogin',
+}
+
+
+# Methods whose function-pointer parameter is a GUEST address that Proton's
+# unix side only ever STORES.  When the Steam client fires such a hook, the
+# unix side does not call the guest function: it queues a callback entry
+# carrying that address, and the PE side calls it while draining the queue
+# (steamclient_main.c, execute_pending_callbacks).  That is a pull channel, so
+# it works just as well with a process boundary in the middle as without one,
+# and the pointer needs no marshalling at all -- it is an opaque 64 bits
+# travelling in the params blob.  Each entry names the unix-side code that
+# does the storing, so the claim can be rechecked after a re-vendor.
+QUEUED_FUNCPTR = {
+    # unixlib.cpp: stores w_steam_api_warning_message_hook, queues
+    # WARNING_MESSAGE_HOOK from u_steam_api_warning_message_hook().
+    'SetWarningMessageHook': 'manual_convert_SetWarningMessageHook_pFunction',
+    # unixlib.cpp: stores w_steam_networking_socket_debug_output, queues
+    # SOCKETS_DEBUG_OUTPUT.
+    'SetDebugOutputFunction': 'manual_convert_SetDebugOutputFunction_pfnFunc',
+    # unix_steam_input_manual.cpp: stores w_EnableActionEventCallbacks_152,
+    # queues CALL_CDECL_FUNC_DATA via queue_cdecl_func_callback().
+    'EnableActionEventCallbacks': 'unix_steam_input_manual.cpp',
+}
+
+
+def queued_funcptr(method):
+    return any(method.endswith('_' + m) for m in QUEUED_FUNCPTR)
+
+
+class Refuse(Exception):
+    pass
+
+
+def size_neighbour(fields, i):
+    """The name of the field after fields[i], if it is a usable element count.
+
+    The SDK's own idiom: a buffer parameter is immediately followed by the
+    count of what fits in it.  Returns None when the next field is absent, is
+    not named like a size, or is not a plain integer.
+    """
+    if i + 1 >= len(fields):
+        return None
+    nxt_name, nxt_type = fields[i + 1]
+    if (is_size_name(nxt_name) and not nxt_type.endswith('*')
+            and nxt_type in INTEGER_TYPES and INTEGER_TYPES[nxt_type] <= 8):
+        return nxt_name
+    return None
+
+
+def classify(fields, i, method):
+    """Classify fields[i] (name, ctype).  Returns a dict, or raises Refuse."""
+    name, ctype = fields[i]
+
+    if ctype == 'FUNCPTR':
+        if queued_funcptr(method):
+            return None              # opaque 64 bits; the queue delivers it
+        raise Refuse("takes a callback function pointer that Proton's own "
+                     'unix side drops -- it substitutes a stub and FIXMEs -- '
+                     'so bridging the call would silently discard a guest '
+                     'function pointer')
+    if ctype.startswith('ARRAY:'):
+        return dict(name=name, kind='FIXED', flags='INOUT',
+                    elem='%s' % ctype.split(':', 1)[1])
+
+    if not ctype.endswith('*'):
+        return None                      # by-value field, travels in the blob
+
+    const = ctype.startswith('const ')
+    base = ctype[6:] if const else ctype
+    base = base[:-1].strip()             # drop the '*'
+
+    if base.endswith('*'):
+        raise Refuse('takes a pointer to a pointer; the pointee graph is not '
+                     'described by the params struct')
+    if base.startswith('w_ISteamMatchmaking'):
+        # Proton DOES queue these back to the guest vtable, so the callback
+        # itself would cross.  The family is refused for the other half of
+        # its contract: RequestLANServerList and friends hand the guest an
+        # HServerListRequest that is a `struct w_request` in unix memory, and
+        # GetServerDetails expects the guest to read the gameserveritem_t
+        # array hanging off it.  A response the guest cannot read the results
+        # of is worse than no response.
+        raise Refuse('ISteamMatchmakingServers hands back a request handle '
+                     'that lives in helper memory and is dereferenced on the '
+                     'guest side; the response interface would ride the '
+                     'callback queue, the results would not')
+    if base.startswith('w_ISteam'):
+        raise Refuse('takes a game-implemented callback interface the helper '
+                     'would have to call synchronously; reaching a guest '
+                     'vtable from the helper process is not built')
+    if base in INCOMPLETE_TYPES:
+        raise Refuse('points at a type the PE side only forward-declares, so '
+                     'it has no size to marshal')
+    if deep_type(base):
+        raise Refuse('points at a struct that itself contains pointers')
+
+    flags = 'IN' if const else 'INOUT'
+
+    # VALVE'S OWN ANNOTATION FIRST, ahead of every guess below.  This is the
+    # only place in the classifier where the SDK states the contract outright
+    # instead of it being inferred from a field name, so nothing may override
+    # it -- see load_array_annotations() for what went wrong when it was not
+    # consulted at all.
+    annot = annotation_for(method, name)
+    if annot:
+        kind, cap = annot
+        if kind == 'const':
+            # A fixed-capacity array: the count is a compile-time constant in
+            # the SDK header and the caller is contractually required to
+            # supply that many elements.
+            return dict(name=name, kind='FIXED', flags=flags,
+                        elem='%d * sizeof(*((_P *)0)->%s)' % (cap, name))
+        # The capacity names another parameter.  It has to BE one, it has to
+        # be a plain integer, and it has to have survived into the params
+        # struct.  Valve's annotations are hand-written and several name
+        # something that is none of those.
+        others = dict(fields)
+        usable = (cap in others and not others[cap].endswith('*')
+                  and others[cap] in INTEGER_TYPES)
+        if not usable:
+            # The annotation still established the load-bearing fact -- this
+            # parameter is an ARRAY, not a pointer to one object -- so the
+            # sizeof(*field) fallback at the bottom of this function must not
+            # be reached.  Where the struct plainly carries the length anyway
+            # (ISteamInventory::DeserializeResult is annotated with a
+            # punOutBufferSize that is not a parameter; the buffer's real
+            # count, unBufferSize, sits right after it) that neighbour is
+            # used.  Where it does not -- a count that lives BEHIND a pointer,
+            # which is the SDK's "ask for the size, then ask again" idiom --
+            # there is nothing in the blob to read and the method is refused
+            # by name.  Guessing here is what put a 4-byte allocation under a
+            # 32-byte write.
+            alt = size_neighbour(fields, i)
+            if not alt:
+                if cap in others and others[cap].endswith('*'):
+                    raise Refuse('is annotated as an array whose count %s is '
+                                 'itself a pointer, so the count is not in the '
+                                 'params blob to read' % cap)
+                raise Refuse('is annotated as an array counted by %s, which is '
+                             'not a usable parameter of this method' % cap)
+            cap = alt
+        return dict(name=name, kind='SIZED', flags=flags,
+                    elem='sizeof(*((_P *)0)->%s)' % name if base != 'void' else '1',
+                    lenname=cap)
+
+    # A const char * is a NUL-terminated string: its length is its own
+    # content, which is the one buffer shape that needs no size parameter.
+    if base == 'char' and const:
+        return dict(name=name, kind='STR', flags='IN')
+
+    # A length-bearing neighbour makes this a caller buffer.  The length is in
+    # ELEMENTS of the pointee; for one-byte pointees that is also bytes, which
+    # is how the SDK spells every char/void/byte buffer.
+    nxt_name = size_neighbour(fields, i)
+    if nxt_name:
+        return dict(name=name, kind='SIZED', flags=flags,
+                    elem='sizeof(*((_P *)0)->%s)' % name if base != 'void' else '1',
+                    lenname=nxt_name)
+
+    if base == 'void':
+        raise Refuse('takes an untyped buffer with no length parameter')
+    if base == 'char':
+        raise Refuse('takes a char buffer with no length parameter')
+
+    # A pointer to exactly one object of a complete type: the size is the
+    # compiler's.  const means the helper only reads it.
+    return dict(name=name, kind='FIXED', flags=flags,
+                elem='sizeof(*((_P *)0)->%s)' % name)
+
+
+# ------------------------------------------------------------------- parsing
+
+FIELD_RE = re.compile(r'^(.*?)\b([A-Za-z_]\w*)$')
+FUNCPTR_RE = re.compile(r'\(\s*\*\s*(?:W_CDECL\s+|W_STDCALL\s+)?(\w+)\s*\)\s*\(')
+ARRAY_PTR_RE = re.compile(r'^(\w[\w ]*?)\s*\(\s*\*\s*(\w+)\s*\)\s*\[\s*(\d+)\s*\]$')
+
+
+def parse_fields(body):
+    out = []
+    for line in body.split('\n'):
+        line = re.sub(r'/\*.*?\*/', ' ', line).strip().rstrip(';').strip()
+        if not line or line.startswith('#'):
+            continue
+        m = ARRAY_PTR_RE.match(line)
+        if m:
+            out.append((m.group(2), 'ARRAY:%s * %s' % (m.group(3), 1)))
+            continue
+        m = FUNCPTR_RE.search(line)
+        if m:
+            out.append((m.group(1), 'FUNCPTR'))
+            continue
+        m = FIELD_RE.match(line)
+        if not m:
+            raise SystemExit('gen-steamrpc: cannot parse field %r' % line)
+        out.append((m.group(2), m.group(1).strip()))
+    return out
+
+
+def parse_structs(text):
+    """(name, [(field, ctype)]) for every non-wow64 *_params struct, in order."""
+    res = []
+    for m in re.finditer(r'struct (\w+)_params\n\{\n(.*?)\n\};', text, re.S):
+        name = m.group(1)
+        if name.startswith('wow64_'):
+            continue
+        res.append((name, parse_fields(m.group(2))))
+    return res
+
+
+def parse_codes(text):
+    m = re.search(r'enum unix_funcs\n\{\n(.*?)\n\};', text, re.S)
+    if not m:
+        raise SystemExit('gen-steamrpc: no enum unix_funcs')
+    return [l.strip().rstrip(',') for l in m.group(1).split('\n') if l.strip()]
+
+
+# ------------------------------------------------------- hand-written methods
+#
+# The dozen params structs Proton writes by hand in unixlib.h are not shaped
+# like the generated ones, so their descriptors are written here rather than
+# derived.  Each one is justified where it sits.
+
+MANUAL = {
+    # g_tmppath is a 4096-byte PE-side scratch buffer the unix side keeps a
+    # pointer to and writes DOS paths into.  Across a process boundary the
+    # helper writes its OWN copy, so the client syncs it back after every call
+    # and rebases any params pointer that landed inside it -- see steamrpc.c.
+    'steamclient_init': [
+        ('g_tmppath', 'SIZED_CONST', 'INOUT', 'TEMP_PATH_BUFFER_LENGTH'),
+        ('steam_app_id', 'STR', 'IN', None),
+        ('ignore_child_processes', 'STR', 'IN', None),
+    ],
+    'steamclient_init_registry': [],
+    # ptr is a client buffer of exactly buf.len bytes; the unix side memcpy()s
+    # the u_buffer into it.  The length lives in another FIELD's member, which
+    # the generated form cannot express.
+    'steamclient_get_unix_buffer': [
+        ('ptr', 'SIZED_EXPR', 'OUT', '(_p)->buf.len'),
+    ],
+    'steamclient_CreateInterface': [
+        ('name', 'STR', 'IN', None),
+        ('return_code', 'FIXED', 'INOUT', None),
+    ],
+    # callback is a client buffer of `size` bytes (may be NULL/0 on the probing
+    # call, which the wire handles as a zero-length blob).
+    'steamclient_next_callback': [
+        ('callback', 'SIZED_EXPR', 'INOUT', '(_p)->size'),
+    ],
+    'steamclient_Steam_GetAPICallResult': [
+        ('w_callback', 'SIZED_EXPR', 'INOUT', '(_p)->w_callback_len'),
+        ('failed', 'FIXED', 'INOUT', None),
+    ],
+    'steamclient_Steam_BGetCallback': [
+        ('w_msg', 'FIXED', 'INOUT', None),
+        ('ignored', 'FIXED', 'INOUT', None),
+    ],
+    # The outer struct, then the buffer its m_pubParam member points at: the
+    # unix side writes the callback payload through that pointer, and it is
+    # the one place in the whole surface where a marshalled struct contains a
+    # live client pointer.  See STEAMRPC_NESTED in steamrpc_wire.h.
+    'steamclient_callback_message_receive': [
+        ('w_msg', 'FIXED', 'INOUT', None),
+        ('w_msg', 'RAW', 'INOUT',
+         '{ "w_msg->m_pubParam", offsetof(_P, w_msg), STEAMRPC_IN | STEAMRPC_OUT,\n'
+         '      STEAMRPC_K_NESTED, offsetof(w_CallbackMsg_t, m_pubParam),\n'
+         '      offsetof(w_CallbackMsg_t, m_cubParam) |\n'
+         '      (sizeof(((w_CallbackMsg_t *)0)->m_cubParam) << 16) },'),
+    ],
+    'steamclient_Steam_FreeLastCallback': [],
+    'steamclient_Steam_ReleaseThreadLocalMemory': [],
+    'steamclient_Steam_IsKnownInterface': [('version', 'STR', 'IN', None)],
+    'steamclient_Steam_NotifyMissingInterface': [('version', 'STR', 'IN', None)],
+}
+
+# The networking-message calls hand raw message pointers both ways; the
+# message bodies live in helper memory and are refused by name.
+MANUAL_REFUSE = {
+    'steamclient_networking_messages_receive_144':
+        'networking messages carry helper-side data pointers',
+    'steamclient_networking_messages_receive_147':
+        'networking messages carry helper-side data pointers',
+    'steamclient_networking_messages_receive_153a':
+        'networking messages carry helper-side data pointers',
+    'steamclient_networking_message_release_147':
+        'networking messages carry helper-side data pointers',
+    'steamclient_networking_message_release_153a':
+        'networking messages carry helper-side data pointers',
+}
+
+
+def emit(src_dir, out_path):
+    global ARRAY_ANNOT
+
+    gen = open(os.path.join(src_dir, 'unixlib_generated.h')).read()
+    hand = open(os.path.join(src_dir, 'unixlib.h')).read()
+
+    ARRAY_ANNOT = load_array_annotations(src_dir)
+    if not ARRAY_ANNOT:
+        raise SystemExit('gen-steamrpc: found no STEAM_*_COUNT annotations '
+                         'under %s; without them every array parameter would '
+                         'be sized as one element, which is the overflow this '
+                         'refuses to re-emit' % src_dir)
+
+    codes = parse_codes(gen)
+    structs = dict(parse_structs(gen))
+    structs.update(dict(parse_structs(hand)))
+
+    o = []
+    w = o.append
+    w("/* Generated by tools/steamrpc/gen-steamrpc from Proton's lsteamclient.\n"
+      " * Do not edit; edit the generator and re-run it. */\n\n")
+    w('#include "steamrpc_private.h"\n\n')
+
+    refused = 0
+    nfields = 0
+    bodies = []
+    table = []
+
+    for code in codes:
+        assert code.startswith('unix_'), code
+        name = code[5:]
+        fields = structs.get(name)
+        if fields is None:
+            # steamclient_init_registry is called with a NULL params pointer
+            if name not in MANUAL or MANUAL[name]:
+                raise SystemExit('gen-steamrpc: no params struct for %s' % name)
+            table.append((code, name, None, None, None, 0))
+            continue
+
+        reason = MANUAL_REFUSE.get(name)
+        descs = []
+        if reason is None and name in MANUAL:
+            for fname, kind, flags, extra in MANUAL[name]:
+                d = dict(name=fname, kind=kind, flags=flags, expr=extra)
+                if kind == 'FIXED':
+                    d['elem'] = 'sizeof(*((_P *)0)->%s)' % fname
+                descs.append(d)
+        elif reason is None:
+            try:
+                for i in range(len(fields)):
+                    d = classify(fields, i, name)
+                    if d:
+                        descs.append(d)
+            except Refuse as e:
+                reason = str(e)
+
+        if reason is not None:
+            refused += 1
+            table.append((code, name, None, None, reason, None))
+            continue
+
+        nfields += len(descs)
+        sym = lenfn = None
+        if descs:
+            sym = 'f_%s' % name
+            b = ['#define _P struct %s_params\n' % name]
+            exprs = [(i, d) for i, d in enumerate(descs)
+                     if d['kind'] in ('SIZED_EXPR', 'SIZED_CONST')]
+            if exprs:
+                lenfn = 'len_%s' % name
+                b.append('static unsigned int %s( const void *_v, unsigned int _i )\n'
+                         '{\n    const _P *_p = (const _P *)_v;\n'
+                         '    switch (_i)\n    {\n' % lenfn)
+                for i, d in exprs:
+                    b.append('    case %d: return (unsigned int)(%s);\n'
+                             % (i, d['expr'].replace('(_p)', '_p')))
+                b.append('    }\n    (void)_p;\n    return 0;\n}\n')
+            b.append('static const struct steamrpc_field %s[] =\n{\n' % sym)
+            for d in descs:
+                b.append(_emit_field(name, d))
+            b.append('};\n#undef _P\n\n')
+            bodies.append(''.join(b))
+        table.append((code, name, sym, lenfn, None, None))
+
+    w(''.join(bodies))
+    w('const struct steamrpc_method steamrpc_methods[] =\n{\n')
+    for code, name, sym, lenfn, reason, zero in table:
+        if reason is not None:
+            w('    [%s] = { "%s", 0, 0, NULL, "%s", NULL },\n'
+              % (code, name, reason.replace('"', '\\"')))
+        elif zero is not None:
+            w('    [%s] = { "%s", 0, 0, NULL, NULL, NULL },\n' % (code, name))
+        else:
+            w('    [%s] = { "%s", sizeof(struct %s_params), %s, %s, NULL, %s },\n'
+              % (code, name, name,
+                 '0' if not sym else 'ARRAY_SIZE(%s)' % sym,
+                 'NULL' if not sym else sym,
+                 lenfn or 'NULL'))
+    w('};\n\n')
+    w('C_ASSERT( ARRAY_SIZE(steamrpc_methods) == STEAMRPC_METHOD_COUNT );\n\n')
+    w('const unsigned int steamrpc_method_count = ARRAY_SIZE(steamrpc_methods);\n')
+
+    with open(out_path, 'w') as f:
+        f.write(''.join(o))
+
+    # The helper indexes Proton's __wine_unix_call_funcs[] with the same code
+    # the client sends, and that array's length is not visible outside its own
+    # translation unit.  Emitting the count here is what stops the two ends
+    # from disagreeing about the size of the table -- both C_ASSERT on it.
+    with open(os.path.join(os.path.dirname(out_path) or '.',
+                           'steamrpc_count.h'), 'w') as f:
+        f.write('/* Generated by tools/steamrpc/gen-steamrpc.  Do not edit. */\n'
+                '#ifndef __STEAMRPC_COUNT_H\n'
+                '#define __STEAMRPC_COUNT_H\n'
+                '#define STEAMRPC_METHOD_COUNT %d\n'
+                '#endif\n' % len(codes))
+
+    sys.stderr.write('gen-steamrpc: %d methods, %d bridged, %d refused, '
+                     '%d marshalled fields\n'
+                     % (len(codes), len(codes) - refused, refused, nfields))
+
+
+def _emit_field(mname, d):
+    off = 'offsetof(_P, %s)' % d['name']
+    flags = {'IN': 'STEAMRPC_IN', 'OUT': 'STEAMRPC_OUT',
+             'INOUT': 'STEAMRPC_IN | STEAMRPC_OUT'}[d['flags']]
+    if d['kind'] == 'STR':
+        return ('    { "%s", %s, %s, STEAMRPC_K_STR, 0, 0 },\n'
+                % (d['name'], off, flags))
+    if d['kind'] == 'FIXED':
+        return ('    { "%s", %s, %s, STEAMRPC_K_FIXED, %s, 0 },\n'
+                % (d['name'], off, flags, d['elem']))
+    if d['kind'] == 'SIZED':
+        return ('    { "%s", %s, %s, STEAMRPC_K_SIZED, %s,\n'
+                '      offsetof(_P, %s) | (sizeof(((_P *)0)->%s) << 16) },\n'
+                % (d['name'], off, flags, d['elem'], d['lenname'], d['lenname']))
+    if d['kind'] == 'RAW':
+        return '    %s\n' % d['expr']
+    if d['kind'] in ('SIZED_EXPR', 'SIZED_CONST'):
+        return ('    { "%s", %s, %s, STEAMRPC_K_EXPR, 0, 0 },\n'
+                % (d['name'], off, flags))
+    raise SystemExit('gen-steamrpc: unknown kind %s in %s' % (d['kind'], mname))
+
+
+if __name__ == '__main__':
+    if len(sys.argv) != 3:
+        raise SystemExit('usage: gen-steamrpc <proton-lsteamclient-dir> <out.c>')
+    emit(sys.argv[1], sys.argv[2])

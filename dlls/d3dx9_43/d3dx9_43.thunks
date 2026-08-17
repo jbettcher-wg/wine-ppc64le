@@ -1,0 +1,17 @@
+# AMD64 thunk export spec -- d3dx9_43.dll.
+#
+# The June 2010 SDK's D3DX9, and the single most-imported member of the
+# family: anything built against the last DirectX SDK links this one.  From
+# the 2026-08-17 everyday-DLL pass, and the same finding as its d3dx9_42
+# sibling -- read dlls/d3dx9_42/d3dx9_42.thunks for the whole argument, the
+# measured before/after, the two named refusals and the honest note about the
+# interface half.  This file is that file's export list with a different
+# D3DX_SDK_VERSION; everything said there applies here unchanged.
+#
+# The other thirty d3dx9_NN modules are one copy of this file each and are
+# deliberately not added: each costs a clang oracle run of 300-odd exports at
+# every build, and 24..41 and 43's siblings are pre-2007 SDKs.  When one is
+# needed, this file plus a Makefile.in line is the whole change.
+DLL d3dx9_43.dll
+FROM-SPEC auto
+PROBE-EXTRA   d3dx9.h

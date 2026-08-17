@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""
+guestpe -- compile and link a real x86-64 Windows PE DLL from C sources.
+
+Every other guest-facing module in this tree ends up on the guest side as a
+spec2thunk trap stub: an AMD64 PE whose every export is three instructions
+that trap back into the host, where ntdll's dispatcher marshals MS-x64 to
+ELFv2 and calls the native ppc64 implementation.  steamclient64.dll cannot be
+served that way -- see dlls/lsteamclient/steamclient_guest.h for the reasons
+-- so it is real compiled machine code the guest CPU (well: the guest
+instruction stream FEX executes) actually runs.  This tool is the whole
+"compiler" for that: given a small declarative source list (a .guestpe
+file -- see dlls/lsteamclient/steamclient64.guestpe for the annotated
+original and its keyword reference), it runs clang once per source with the
+x86_64-windows-gnu target and links the result against the guest thunk DLLs
+of whatever this module imports.
+
+WHY A SEPARATE TOOL AND NOT MORE make RULES.  tools/makedep.c's
+output_source_guestpe() emits ONE rule for the whole DLL, exactly as it does
+for a .thunks file: make's job is dependency tracking (does steamclient64.dll
+need to be relinked), not orchestrating 47 separate compiler invocations with
+their own object-file rules threaded through Wine's already-elaborate
+per-architecture SOURCES machinery, none of which this module uses (there is
+no ppc64 half, no IMPORTS=, no multiarch object_files[] arrays -- see
+output_source_guestpe's own comment for exactly what make DOES track: the
+.guestpe file, this script, the .def file, every explicit SOURCE line, and
+the guest thunk DLLs named by IMPORT lines).
+
+Everything this script needs to know beyond "which files" -- the target
+triple, the include paths, the warning flags, the entry point convention --
+is the fixed, hand-verified recipe recorded in the task that produced this
+file; it is NOT reconstructed from Wine's normal winegcc/winebuild flags,
+because none of those apply to a module with no native half.
+
+Copyright 2026 the ppc64le port authors
+
+This library is free software; you can redistribute it and/or modify it
+under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at
+your option) any later version.
+"""
+
+import argparse
+import glob
+import os
+import subprocess
+import sys
+
+
+def run(cmd):
+    proc = subprocess.run(cmd)
+    if proc.returncode:
+        sys.exit(proc.returncode)
+
+
+def object_name(relpath):
+    """Flatten a module-relative source path into a single-component object
+    file name -- e.g. "proton/steamclient_main.c" -> "proton_steamclient_main.o".
+    Sources live in exactly two directories (the module root and proton/), so
+    this cannot collide; it exists only so every .o lands directly in
+    --objdir without needing to recreate the source tree's subdirectories
+    there."""
+    base, ext = os.path.splitext(relpath)
+    if ext != ".c":
+        sys.exit("guestpe: %s is not a .c source" % relpath)
+    return base.replace("/", "_").replace("\\", "_") + ".o"
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--out", required=True, help="path of the DLL to produce")
+    ap.add_argument("--def", dest="defpath", required=True, help="path of the .def export list")
+    ap.add_argument("--entry", required=True, help="PE entry point symbol")
+    ap.add_argument("--topdir", required=True,
+                     help="build/source tree root -- supplies -I<topdir>/include etc.")
+    ap.add_argument("--moduledir", required=True,
+                     help="dlls/lsteamclient itself -- SOURCE/GLOB paths are relative to this")
+    ap.add_argument("--objdir", required=True, help="scratch directory for intermediate .o files")
+    ap.add_argument("--source", action="append", default=[], metavar="RELPATH",
+                     help="one module-relative .c source (repeatable)")
+    ap.add_argument("--glob", action="append", default=[], dest="globs", metavar="PATTERN",
+                     help="a module-relative shell glob of .c sources (repeatable)")
+    ap.add_argument("--import", action="append", default=[], dest="imports", metavar="NAME=PATH",
+                     help="a guest thunk DLL to link against, name=path (repeatable)")
+    args = ap.parse_args()
+
+    sources = list(args.source)
+    for pattern in args.globs:
+        matches = sorted(glob.glob(os.path.join(args.moduledir, pattern)))
+        if not matches:
+            sys.exit("guestpe: --glob %r matched nothing under %s" % (pattern, args.moduledir))
+        sources += [os.path.relpath(m, args.moduledir) for m in matches]
+
+    os.makedirs(args.objdir, exist_ok=True)
+
+    # The exact recipe measured by hand on op4k -- see tools/guestpe's own
+    # module header.  Do not add or remove a flag here without re-measuring;
+    # in particular -D_MSVCR_VER=0 selects the msvcrt (not UCRT) declarations
+    # to match the msvcrt.dll thunk linked below, and -Wno-pragma-pack is
+    # required because Wine's pshpack1.h/poppack.h nest inside Proton's own
+    # (intentionally, and correctly) and clang warns about the nesting.
+    compile_cmd = [
+        "clang", "-target", "x86_64-windows-gnu", "-nostdlibinc",
+        "-I%s" % os.path.join(args.topdir, "include"),
+        "-I%s" % os.path.join(args.topdir, "include", "msvcrt"),
+        "-I%s" % args.moduledir,
+        "-I%s" % os.path.join(args.moduledir, "proton"),
+        "-D_MSVCR_VER=0", "-D__WINESRC__",
+        "-include", "steamclient_guest.h",
+        "-Wall", "-Wno-pragma-pack", "-O1", "-fno-builtin", "-g",
+    ]
+
+    objects = []
+    for rel in sources:
+        objpath = os.path.join(args.objdir, object_name(rel))
+        run(compile_cmd + ["-c", "-o", objpath, os.path.join(args.moduledir, rel)])
+        objects.append(objpath)
+
+    import_paths = []
+    for spec in args.imports:
+        if "=" not in spec:
+            sys.exit("guestpe: --import %r is not NAME=PATH" % spec)
+        import_paths.append(spec.split("=", 1)[1])
+
+    # lld links directly against the thunk DLLs' export tables below --  no
+    # import libraries needed, and none are built for this arch anyway.
+    link_cmd = [
+        "clang", "-target", "x86_64-windows-gnu", "-fuse-ld=lld",
+        "-nostdlib", "-shared",
+        "-Wl,--subsystem,windows", "-Wl,--entry=%s" % args.entry,
+        "-o", args.out,
+    ] + objects + [args.defpath] + import_paths
+
+    run(link_cmd)
+
+
+if __name__ == "__main__":
+    main()

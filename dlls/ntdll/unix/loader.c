@@ -1176,17 +1176,137 @@ static __thread BOOL emu_thread_exc_pending;
  * proving the stash is load-bearing.  Read once outside signal context. */
 static int emu_no_fault_stash = -1;
 
+/* WINEEMUNOSTACKSIZE=1: size every guest stack from the image and ignore what
+ * the thread itself asked for -- the negative control for the per-thread guest
+ * stack size, and exactly what this file did before it had one.  Read once,
+ * outside signal context, like the flag above. */
+static int emu_no_stack_size = -1;
+
 /* the innermost run's guest stack bounds on this thread (base > limit, the
  * stack grows down); guest TEB frames are validated against these */
 static __thread void *emu_guest_stack_base;
 static __thread void *emu_guest_stack_limit;
 
+
+/***********************************************************************
+ *           the TEB's stack description across the machine boundary
+ *
+ * A thread that runs guest code has TWO stacks: the native ppc64 one Wine
+ * gave it at creation, and the guest stack emu_run_loop() allocates below.
+ * There is one TEB and it is shared -- the emulator's GS base is this
+ * thread's own TEB, see unixcall_emu_run_entry() -- so NtTib.StackBase and
+ * NtTib.StackLimit can only describe one stack at a time, and both readers
+ * are real code that this port has to be right for:
+ *
+ *   GUEST code reads gs:[0x08] and gs:[0x10] directly.  Every function MSVC
+ *   compiles with a frame larger than a page begins with a call to __chkstk,
+ *   which loads gs:[0x10] and, if the new RSP is below it, touches one byte
+ *   per page from there downwards.  With the NATIVE bounds in the TEB and a
+ *   guest stack that happens to lie below them, the very first byte __chkstk
+ *   touches is the native stack's guard page.  Measured, not deduced: DOOM
+ *   (2016) died in steam_api64.dll's CRT startup with c00000fd whose
+ *   ExceptionInformation[1] was exactly the native StackLimit minus one page,
+ *   raised from the `movb $0, (%r11)` at the top of that module's __chkstk.
+ *   It had been read as Steam DRM declining to run without a Steam client.
+ *
+ *   the HOST's fault handler reads them through is_inside_thread_stack() to
+ *   decide whether a guard-page hit is a stack that should grow.  With the
+ *   native bounds in the TEB the guest stack cannot grow past its initial
+ *   commit at all: its guard page is not inside "the" thread stack, so it
+ *   becomes STATUS_GUARD_PAGE_VIOLATION and the guest dies at one megabyte.
+ *
+ * So the TEB describes whichever machine is currently executing: the guest
+ * stack strictly inside fexbridge_run(), the native stack everywhere else --
+ * including inside a trap, where native Wine code runs on the native stack
+ * and Wine's own SEH validates its frames against these same two fields.
+ *
+ * The switch reads the outgoing values back rather than assuming them,
+ * because grow_thread_stack() moves NtTib.StackLimit down as a stack grows:
+ * what has to be reinstalled on the next run is the grown limit, not the one
+ * the stack was allocated with.
+ *
+ * One thing is deliberately NOT restored to the pre-port behaviour: while a
+ * run is active, a guard-page hit on the NATIVE stack is now classified as a
+ * guard-page violation rather than as a stack overflow, because the TEB no
+ * longer describes it.  That case is the emulator's own JIT overflowing
+ * Wine's stack, it is fatal either way, and both spellings reach the same
+ * emu_handle_fault() arm -- so it costs a status code on a path that is a
+ * bug in the port, in exchange for the guest's stack behaving like a
+ * Windows thread stack on every path that is not.
+ */
+struct emu_teb_stack
+{
+    void *base;      /* NtTib.StackBase   -- highest address, exclusive */
+    void *limit;     /* NtTib.StackLimit  -- lowest committed address */
+    void *dealloc;   /* DeallocationStack -- lowest reserved address */
+};
+
+/* the native stack of this thread.  Captured once: init_thread_stack() sets
+ * it at thread creation and nothing moves it afterwards. */
+static __thread struct emu_teb_stack emu_native_teb_stack;
+
+/* the innermost run's guest stack as the TEB last knew it */
+static __thread struct emu_teb_stack emu_guest_teb_stack;
+
+static void emu_capture_native_teb_stack(void)
+{
+    TEB *teb = NtCurrentTeb();
+
+    if (emu_native_teb_stack.base) return;
+    emu_native_teb_stack.base    = teb->Tib.StackBase;
+    emu_native_teb_stack.limit   = teb->Tib.StackLimit;
+    emu_native_teb_stack.dealloc = teb->DeallocationStack;
+}
+
+/* install `in`, reading what was there into `out` (which may be NULL) */
+static void emu_teb_stack_switch( const struct emu_teb_stack *in, struct emu_teb_stack *out )
+{
+    TEB *teb = NtCurrentTeb();
+
+    if (out)
+    {
+        out->base    = teb->Tib.StackBase;
+        out->limit   = teb->Tib.StackLimit;
+        out->dealloc = teb->DeallocationStack;
+    }
+    if (!in->base)
+    {
+        /* Only reachable if a trap fired on a thread that never entered
+         * unixcall_emu_run_entry(), which is the one place a guest run can
+         * start.  Refuse rather than write zeroes into the TEB's stack
+         * description, which would make every later fault unclassifiable. */
+        ERR( "no stack description to install in the TEB; leaving it alone\n" );
+        return;
+    }
+    teb->Tib.StackBase     = in->base;
+    teb->Tib.StackLimit    = in->limit;
+    teb->DeallocationStack = in->dealloc;
+}
+
 static int emu_trap_thunk( void *thread, void *ctx, void *user )
 {
-    NTSTATUS status = call_emu_trap_dispatcher( p_emu_trap_dispatcher, ctx );
+    struct emu_teb_stack guest_saved;
+    NTSTATUS status;
+
+    /* everything below this line is native code on the native stack */
+    emu_teb_stack_switch( &emu_native_teb_stack, &guest_saved );
+    status = call_emu_trap_dispatcher( p_emu_trap_dispatcher, ctx );
+    emu_teb_stack_switch( &guest_saved, NULL );
 
     if (status == STATUS_THREAD_IS_TERMINATING) emu_thread_exit_requested = TRUE;
     else if (status == STATUS_EMU_GUEST_EXCEPTION) emu_thread_exc_pending = TRUE;
+    else if (status)
+    {
+        /* A status the run loop has no flag for.  It ends the run all the
+         * same, and the run loop's "no consuming handler" message cannot say
+         * why because by then the status is gone -- so it is said HERE, where
+         * it is still in hand.  The one that reaches this in practice is
+         * STATUS_STACK_OVERFLOW out of call_emu_trap_dispatcher, which is
+         * crossing depth; see the comment there. */
+        ERR( "the guest trap dispatcher could not be entered, status %08x; "
+             "the run will end with no handler having consumed the trap\n",
+             (UINT)status );
+    }
     /* FEXBRIDGE_TRAP_CONTINUE / _EXIT */
     return status ? 1 : 0;
 }
@@ -1274,26 +1394,80 @@ static void emu_alloc_hlt_page(void)
  */
 static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread )
 {
-    static const SIZE_T guest_stack_size = 0x800000;  /* 8 MiB, as the one-shot */
-
     struct thread_data *data = get_thread_data();
+    struct emu_teb_stack prev_teb_stack, native_saved;
     AMD64_CONTEXT ctx = { 0 };
     EXCEPTION_RECORD rec;
     INITIAL_TEB stack;
     NTSTATUS status;
     void *prev_base, *prev_limit, *stack_addr;
-    SIZE_T free_size = 0;
+    SIZE_T free_size = 0, reserve_size;
     ULONG_PTR rsp;
     int r;
 
     pthread_once( &emu_hlt_once, emu_alloc_hlt_page );
     if (!emu_hlt_page) return STATUS_NO_MEMORY;
 
-    if ((status = virtual_alloc_thread_stack( &stack, 0, 0, guest_stack_size, 0x100000, TRUE )))
+    /* The guest stack is sized by what THIS THREAD asked for, and the request
+     * has already been recorded in a place this side can read: the thread's own
+     * native stack.
+     *
+     * A thread that runs guest code has two stacks, and only one of them is
+     * created by anything the application called.  A guest CreateThread( ...,
+     * dwStackSize, ... ) is an ordinary thunk call into native kernel32, so
+     * kernelbase applies STACK_SIZE_PARAM_IS_A_RESERVATION (dwStackSize is the
+     * RESERVE with the flag, the COMMIT without it -- dlls/kernelbase/thread.c),
+     * NtCreateThreadEx carries both to init_thread_stack(), and
+     * virtual_alloc_thread_stack() resolves them into one mapping of
+     * max(reserve, commit) with the image's own values substituted for whatever
+     * was left zero.  By the time the new thread reaches here, that whole
+     * computation is already expressed as a pair of addresses in its TEB.  So
+     * the guest stack asks for the same size, and every rule the request had to
+     * obey -- the flag, the image defaults, the one-megabyte floor, the
+     * granularity rounding -- was obeyed once, by Wine, in the one place that
+     * owns those rules.  A second copy of that arithmetic here would be a
+     * second place to get it wrong.
+     *
+     * A zero reserve, which is what this asked for before, means "the image's
+     * SizeOfStackReserve" -- right for the initial thread and wrong for every
+     * worker: DOOM (2016) asks for 8 MiB workers ("Starting stack size in KB:
+     * 8388608" in its own startup log) against a PE that reserves 2 MiB, so its
+     * threads got a quarter of the stack they asked for while gs:[0x10] told
+     * them so.  Nothing crashes at that; the guest simply runs out of stack
+     * somewhere its author had proved it could not.
+     *
+     * The initial thread is unchanged by construction: its native stack IS the
+     * image default, so mirroring it computes the same number the zero did.
+     *
+     * WINEEMUNOSTACKSIZE=1 is the negative control, same shape as
+     * WINEEMUNOGSTHREADS: size the guest stack from the image and ignore the
+     * thread, which is exactly the old behaviour, so a gate that asserts a
+     * requested size has something to go red against. */
+    if (emu_no_stack_size == -1)
     {
-        ERR( "cannot allocate a guest stack, status %08x\n", (UINT)status );
+        const char *str = getenv( "WINEEMUNOSTACKSIZE" );
+        emu_no_stack_size = (str && *str == '1');
+        if (emu_no_stack_size)
+            ERR( "WINEEMUNOSTACKSIZE: guest stacks will be sized from the image, "
+                 "ignoring what each thread asked for\n" );
+    }
+    reserve_size = 0;
+    if (!emu_no_stack_size && emu_native_teb_stack.base && emu_native_teb_stack.dealloc)
+        reserve_size = (char *)emu_native_teb_stack.base - (char *)emu_native_teb_stack.dealloc;
+
+    if ((status = virtual_alloc_thread_stack( &stack, 0, 0, reserve_size, 0, TRUE )))
+    {
+        ERR( "cannot allocate a guest stack of %lu bytes, status %08x\n",
+             (unsigned long)reserve_size, (UINT)status );
         return status;
     }
+    /* Traced because it is otherwise unobservable from outside the guest: the
+     * bounds are published only through the TEB, which the guest reads
+     * directly, so "what stack did this run get" has no other answer. */
+    TRACE( "guest stack for %p: base %p committed %p reserved %p (%lu bytes, from %s)\n",
+           params->entry, stack.StackBase, stack.StackLimit, stack.DeallocationStack,
+           (unsigned long)((char *)stack.StackBase - (char *)stack.DeallocationStack),
+           reserve_size ? "this thread's own stack" : "the image" );
 
     /* MS-x64 entry frame, exactly the one-shot's documented shape: the
      * caller reserved 32 bytes of shadow space and CALL pushed a return
@@ -1314,6 +1488,14 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
     emu_guest_stack_base  = stack.StackBase;
     emu_guest_stack_limit = stack.DeallocationStack;
 
+    /* and this, which is the same stack described the way the TEB describes
+     * a stack: committed limit rather than reserved base, because it is what
+     * guest __chkstk probes against and what grow_thread_stack() moves */
+    prev_teb_stack = emu_guest_teb_stack;
+    emu_guest_teb_stack.base    = stack.StackBase;
+    emu_guest_teb_stack.limit   = stack.StackLimit;
+    emu_guest_teb_stack.dealloc = stack.DeallocationStack;
+
     for (;;)
     {
         /* only a stash written during THIS run may be consumed below; a
@@ -1321,7 +1503,11 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
          * as a guest exception */
         if (data) data->emu_fault_rec_valid = FALSE;
 
+        /* guest code is about to execute: the TEB describes its stack until
+         * it stops, whether it stops by trapping, faulting or returning */
+        emu_teb_stack_switch( &emu_guest_teb_stack, &native_saved );
         r = p_fexbridge_run( thread, &ctx );
+        emu_teb_stack_switch( &native_saved, &emu_guest_teb_stack );
 
         if (r == EMU_RUN_HLT)
         {
@@ -1396,6 +1582,7 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
 
     emu_guest_stack_base  = prev_base;
     emu_guest_stack_limit = prev_limit;
+    emu_guest_teb_stack   = prev_teb_stack;
     stack_addr = stack.DeallocationStack;
     NtFreeVirtualMemory( NtCurrentProcess(), &stack_addr, &free_size, MEM_RELEASE );
     return status;
@@ -1428,6 +1615,12 @@ static NTSTATUS unixcall_emu_run_entry( void *args )
 
     pthread_once( &emu_bridge_once, emu_load_bridge );
     if (emu_bridge_status) return emu_bridge_status;
+
+    /* Before anything can trap: this is the only entry into guest execution,
+     * and on the way in the TEB still describes the native stack.  True of a
+     * nested run too -- emu_trap_thunk() has already put the native stack
+     * back by the time a trap dispatcher gets here. */
+    emu_capture_native_teb_stack();
 
     /* The dispatcher and the bridge's trap handler are process-global and were
      * being rewritten on every call.  With one guest thread that was merely

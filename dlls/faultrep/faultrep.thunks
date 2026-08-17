@@ -1,0 +1,16 @@
+# AMD64 thunk export spec -- faultrep.dll.
+#
+# From the 2026-08-17 corpus pass.  Styx: Master of Shadows imports this
+# module STATICALLY -- one export, ReportFault -- and it had no guest thunk,
+# so the loader refused the native ppc64 module (c000007b) and the whole image
+# failed to load (c0000135).
+#
+# No export is emitted, and the report says exactly why for each: eleven are
+# SKIPPED because Wine has no implementation to call (they are .spec stubs --
+# a thunk into a stub would be a trap that reaches nothing), and three,
+# ReportFault among them, are REFUSED because no Wine header declares them.
+# Each binds a named sentinel.  The fix this file is for is that the module
+# LOADS and the image starts; a crash reporter that is never called because
+# the game never crashes is the outcome we want anyway.
+DLL faultrep.dll
+FROM-SPEC auto

@@ -184,3 +184,37 @@ GUEST-IMPL   _initterm_e                      __wine_guest__initterm_e
 INCLUDE-DIR   ../msvcrt
 PROBE-EXTRA   mtdll.h
 PROBE-EXTRA   msvcrt.h        # _amsg_exit, __dllonexit
+
+# ---------------------------------------------------------------------------
+# The 2026-08-17 DOOM triage: the CRT surface MICROSOFT'S mfc140u.dll imports
+# ---------------------------------------------------------------------------
+# DOOM (2016) loads Razer's CChromaEditorLibrary.dll, which pulls in
+# Microsoft's real mfc140u.dll.  That is a native x86-64 PE, so a guest image,
+# so its imports bind here -- and its api-ms-win-crt-* imports are apiset names
+# that resolve to this module in the guest namespace.  Eighteen of them were
+# ordinal holes and got ntdll's sentinel.
+#
+# Fifteen were the MULTIBYTE string surface, refused as "no declaration in any
+# Wine header" for the same tooling reason _lock and _unlock were: they are
+# declared in include/msvcrt/mbstring.h, which nothing already in the oracle's
+# translation unit pulls in.  One PROBE-EXTRA serves all fifteen and the rest
+# of _mbs* with them -- the header declares the whole family, so broadening it
+# costs nothing and is strictly more of this module's real surface.
+PROBE-EXTRA   mbstring.h      # _mbschr, _mbsstr, _ismbcspace, ... (the _mbs* family)
+
+# The last two Wine declares in NO header, so they take the .spec location
+# column -- the documented downgrade, where <int|void> becomes an unchecked
+# human assertion.  Both are justified against the implementation they reach:
+#   _resetstkoflw    dlls/msvcrt/misc.c:407 -- int CDECL (void).
+#   _seh_filter_dll  forwards to __CppXcptFilter (ucrtbase.spec:1882), an
+#                    exception filter, so int (the EXCEPTION_* disposition).
+# ldiv IS DELIBERATELY LEFT A HOLE.  mfc140u imports it, but it returns ldiv_t
+# BY VALUE and the descriptor has no way to say that: a return is one 64-bit
+# slot or it is refused.  ldiv_t happens to be exactly 8 bytes of two integers
+# and both ABIs would in fact hand it back in one register, but that is an
+# aggregate-return rule this generator does not model, and inventing a
+# descriptor that is right by coincidence is the one thing this file must not
+# do.  Nothing on mfc140u's load path calls it (measured -- the module
+# initialises and its exports run); a guest that does gets the named sentinel.
+_resetstkoflw                 0x00000A20  0  int   ucrtbase.spec:1871
+_seh_filter_dll               0x00000A21  2  int   ucrtbase.spec:1882

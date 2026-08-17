@@ -1,0 +1,76 @@
+# AMD64 thunk export spec -- d2d1.dll.
+#
+# From the 2026-08-17 everyday-DLL pass.  This module had NO guest thunk at
+# all: the loader found the native ppc64 builtin, correctly refused to splice
+# it into a guest call, and every import reported c000007b before the process
+# ran an instruction.  The export list is this module's own .spec.
+DLL d2d1.dll
+FROM-SPEC auto
+
+# d2d1.h is generated from d2d1.idl and is not in the global probe
+# (wine_sig.PROBE_SRC).  d2d1_3.h is the umbrella -- 1_3 includes 1_2 includes
+# 1_1 includes d2d1.h -- so one line declares the whole family plus
+# D2D1_FACTORY_TYPE and D2D1_CREATION_PROPERTIES.  Measured: 0 of 12 before,
+# 9 of 12 after.
+PROBE-EXTRA   d2d1_3.h
+
+# --------------------------------------------------------- what is served
+# The six that cross unchanged are the ones that carry only values:
+# D2D1IsMatrixInvertible, D2D1InvertMatrix, D2D1SinCos, D2D1Tan,
+# D2D1Vec3Length and D2D1ComputeMaximumScaleFactor.  Four of those are
+# floating point (fp=0x00020101, 0x00020707 and so on in the report) and are
+# carried by marshal_thunk_args_fp/call_native_thunk_fp in ntdll -- an FP
+# argument reaches this port's host side now, which is why they are here at
+# all rather than in the refusal list below.
+
+# -------------------------------------------------- the three interface ones
+# GUEST-IMPL points the GUEST's export at a wrapper in the native module
+# (dlls/d2d1/guestthunk.c) that answers E_NOTIMPL and says why, by name.  The
+# plain names are untouched and still serve native ppc64 callers.
+#
+#   D2D1CreateFactory        vends ID2D1Factory
+#   D2D1CreateDevice         takes IDXGIDevice, vends ID2D1Device
+#   D2D1CreateDeviceContext  takes IDXGISurface, vends ID2D1DeviceContext
+#
+# The two that take an interface IN are the sharper hazard and worth stating
+# separately: dxgi already HAS a roster on this port
+# (ppc64le/dxvk/interfaces_dxvk.json, published by dlls/dxgi's guest thunk),
+# so a guest holding an IDXGIDevice holds a PROXY whose vtable is x86-64 trap
+# stubs.  Passing that straight to native d2d1 would have it bctrl into
+# x86-64 bytes -- the same defect as an unwrapped out-parameter, in the other
+# direction, and one that a pass-through here would introduce rather than
+# merely fail to fix.
+#
+# WHAT WOULD LIFT THEM: this module joining a winecom roster.  It is a real
+# amount of work and it is not blocked on anything mysterious -- ID2D1Factory
+# is 17 slots and vends ID2D1RenderTarget/ID2D1Geometry/ID2D1StrokeStyle, and
+# the whole surface is by-value D2D1_POINT_2F/D2D1_RECT_F/D2D1_COLOR_F
+# aggregates, which is exactly the by-value-float shape gen_winecom.py refuses
+# by design.  Direct2D would need hand-written slots for most of its drawing
+# calls, so it is a project, not a line.
+GUEST-IMPL D2D1CreateFactory        __wine_guest_D2D1CreateFactory
+GUEST-IMPL D2D1CreateDevice         __wine_guest_D2D1CreateDevice
+GUEST-IMPL D2D1CreateDeviceContext  __wine_guest_D2D1CreateDeviceContext
+
+# Internal names, kept out of the guest export list entirely: the guest never
+# imports them, they are only the native symbols the redirects resolve to.
+EXCLUDE    __wine_guest_D2D1CreateFactory
+EXCLUDE    __wine_guest_D2D1CreateDevice
+EXCLUDE    __wine_guest_D2D1CreateDeviceContext
+
+# --------------------------------------------------------------- the ceiling
+# Three refusals from the oracle, all "not integer/pointer class", all the
+# same cause: a by-value D2D1 aggregate of floats.
+#
+#   D2D1MakeRotateMatrix     argument 1 (D2D1_POINT_2F)
+#   D2D1MakeSkewMatrix       argument 2 (D2D1_POINT_2F)
+#   D2D1ConvertColorSpace    return value (D2D1_COLOR_F)
+#
+# A D2D1_POINT_2F is two floats passed BY VALUE.  MS-x64 splits it across
+# XMM registers by field; ELFv2 passes it in f-registers by a different rule
+# entirely, and the descriptor this port publishes has no way to say
+# "aggregate of two floats" -- its floating-point word names whole ARGUMENT
+# POSITIONS, not fields inside them.  Refusing is the only honest answer, and
+# all three are absent from the export table and bind to a named sentinel.
+# D2D1InvertMatrix and D2D1IsMatrixInvertible, which take the same matrix by
+# POINTER, are served.

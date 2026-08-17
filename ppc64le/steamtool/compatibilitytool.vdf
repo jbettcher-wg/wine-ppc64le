@@ -1,0 +1,18 @@
+"compatibilitytools"
+{
+  "compat_tools"
+  {
+    "wine-ppc64le-native" // Internal name of this tool
+    {
+      // Installed as a subdirectory of compatibilitytools.d (usually a symlink
+      // back into ppc64le/steamtool in the Wine tree), so the install path is
+      // relative to this file.
+      "install_path" "."
+
+      "display_name" "Wine ppc64le (native)"
+
+      "from_oslist"  "windows"
+      "to_oslist"    "linux"
+    }
+  }
+}

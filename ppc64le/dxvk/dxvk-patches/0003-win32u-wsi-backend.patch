@@ -1,0 +1,482 @@
+diff --git a/src/d3d11/d3d11.sym b/src/d3d11/d3d11.sym
+index 91c8598..cd084ad 100644
+--- a/src/d3d11/d3d11.sym
++++ b/src/d3d11/d3d11.sym
+@@ -5,6 +5,11 @@
+     D3D11CreateDeviceAndSwapChain;
+     D3D11On12CreateDevice;
+ 
++    /* The win32u WSI backend's registration entry point.  Exported from
++       EVERY library because src/wsi is a static library and each of these
++       carries its own copy of it -- see ppc64le/dxvk/dxvk_win32u_wsi.h. */
++    dxvk_wsi_win32u_register;
++
+   local:
+     *;
+ };
+diff --git a/src/d3d9/d3d9.sym b/src/d3d9/d3d9.sym
+index bbfaee0..6601d10 100644
+--- a/src/d3d9/d3d9.sym
++++ b/src/d3d9/d3d9.sym
+@@ -21,6 +21,11 @@
+     Direct3DCreate9On12;
+     Direct3DCreate9On12Ex;
+ 
++    /* The win32u WSI backend's registration entry point.  Exported from
++       EVERY library because src/wsi is a static library and each of these
++       carries its own copy of it -- see ppc64le/dxvk/dxvk_win32u_wsi.h. */
++    dxvk_wsi_win32u_register;
++
+   local:
+     *;
+ };
+diff --git a/src/dxgi/dxgi.sym b/src/dxgi/dxgi.sym
+index d527d64..f29b48c 100644
+--- a/src/dxgi/dxgi.sym
++++ b/src/dxgi/dxgi.sym
+@@ -6,6 +6,11 @@
+     DXGIDeclareAdapterRemovalSupport;
+     DXGIGetDebugInterface1;
+ 
++    /* The win32u WSI backend's registration entry point.  Exported from
++       EVERY library because src/wsi is a static library and each of these
++       carries its own copy of it -- see ppc64le/dxvk/dxvk_win32u_wsi.h. */
++    dxvk_wsi_win32u_register;
++
+   local:
+     *;
+ };
+diff --git a/src/dxvk/dxvk_presenter.cpp b/src/dxvk/dxvk_presenter.cpp
+index f0d2651..248103c 100644
+--- a/src/dxvk/dxvk_presenter.cpp
++++ b/src/dxvk/dxvk_presenter.cpp
+@@ -1245,6 +1245,14 @@ namespace dxvk {
+   void Presenter::destroySurface() {
+     m_vki->vkDestroySurfaceKHR(m_vki->instance(), m_surface, nullptr);
+ 
++    /* The WSI backend may own state BESIDE the Vulkan handle: the win32u
++     * backend's surfaces live on a Wine client surface for the application's
++     * window, and without this the client window outlives every swapchain
++     * that ever used it and stays on screen.  After the destroy, not before,
++     * so the Vulkan object is already gone when Wine releases what it was
++     * built on.  Every other backend inherits a no-op. */
++    wsi::destroySurface(m_surface);
++
+     m_surface = VK_NULL_HANDLE;
+   }
+ 
+diff --git a/src/wsi/foreign/wsi_platform_foreign.h b/src/wsi/foreign/wsi_platform_foreign.h
+index 53a6fdc..cf82294 100644
+--- a/src/wsi/foreign/wsi_platform_foreign.h
++++ b/src/wsi/foreign/wsi_platform_foreign.h
+@@ -139,7 +139,11 @@ namespace dxvk::wsi {
+             VkInstance                instance,
+             VkSurfaceKHR*             pSurface) override;
+ 
+-  private:
++  /* protected, not private: the win32u driver (wsi_win32u_foreign.h) derives
++   * from this one to inherit the monitor answers and the deliberate no-ops on
++   * somebody else's window, and overrides only the four calls that reach a
++   * real window. */
++  protected:
+ 
+     bool     m_useX11 = false;
+ 
+diff --git a/src/wsi/foreign/wsi_win32u_foreign.cpp b/src/wsi/foreign/wsi_win32u_foreign.cpp
+new file mode 100644
+index 0000000..10e057b
+--- /dev/null
++++ b/src/wsi/foreign/wsi_win32u_foreign.cpp
+@@ -0,0 +1,224 @@
++#if defined(DXVK_WSI_FOREIGN)
++
++#include "wsi_win32u_foreign.h"
++
++#include "../../util/util_error.h"
++#include "../../util/util_string.h"
++#include "../../util/log/log.h"
++
++/* The ONE copy of the ABI, carried in the Wine tree rather than here: this
++ * directory is a gitignored upstream checkout reconstructed by
++ * ppc64le/dxvk/bootstrap.sh, so a declaration living here would be recreated
++ * from a patch on every clean build while the Wine side's copy would not be --
++ * which is exactly how two copies drift.  The relative path is ugly and is
++ * meant to be: it names the fold, and the fold is authoritative. */
++#include "../../../../dxvk_win32u_wsi.h"
++
++#include <atomic>
++#include <cstdint>
++
++namespace dxvk::wsi {
++
++  /* Registered by Wine before any DXVK entry point is called (dlls/d3d11's
++   * unixlib does it immediately after dlopen, and counts the libraries it
++   * reached).  Read on every present, so it is an atomic rather than a
++   * mutex: registration happens once, on the loader's thread, before anything
++   * else in this library has run. */
++  static std::atomic<const struct dxvk_win32u_wsi_ops*> s_ops = { nullptr };
++
++
++  static const struct dxvk_win32u_wsi_ops* ops() {
++    return s_ops.load(std::memory_order_acquire);
++  }
++
++
++  /* Said once, not once per frame: a swapchain that cannot get a surface
++   * calls back here on every present attempt, and a message repeated sixty
++   * times a second is a message nobody reads. */
++  static void warnUnregistered(const char* what) {
++    static std::atomic<bool> s_warned = { false };
++
++    if (!s_warned.exchange(true)) {
++      Logger::err(str::format(
++        "win32u WSI: ", what, " with no callback table registered.  This "
++        "backend presents through Wine's win32u client-surface layer and "
++        "Wine registers itself through " DXVK_WIN32U_WSI_REGISTER_NAME " at "
++        "load time; nothing else can answer for a Wine window handle.  Either "
++        "this library was loaded by something that is not this port's d3d11 "
++        "unixlib, or DXVK_WSI_DRIVER=Win32u was set by hand in a process that "
++        "has no Wine in it."));
++    }
++  }
++
++
++  Win32uWsiDriver::Win32uWsiDriver()
++  : ForeignWsiDriver(false) {
++    /* The base constructor has already logged its synthetic screen size,
++     * which is what getWindowSize falls back to when Wine cannot answer. */
++    Logger::info(str::format("win32u WSI: presenting through Wine's "
++      "client-surface layer, callback table ",
++      ops() ? "registered" : "NOT YET REGISTERED"));
++  }
++
++
++  Win32uWsiDriver::~Win32uWsiDriver() {
++  }
++
++
++  std::vector<const char *> Win32uWsiDriver::getInstanceExtensions() {
++    const struct dxvk_win32u_wsi_ops* o = ops();
++
++    if (!o || !o->instance_extensions) {
++      warnUnregistered("instance extension query");
++      return { };
++    }
++
++    std::vector<const char *> result;
++
++    for (const char *const *p = o->instance_extensions(); p && *p; p++)
++      result.push_back(*p);
++
++    /* Empty is a legitimate answer -- a headless session has no platform
++     * surface extension -- but it is also what a broken registration looks
++     * like, so the count is logged either way and once only. */
++    static std::atomic<bool> s_logged = { false };
++
++    if (!s_logged.exchange(true)) {
++      std::string names;
++      for (const char* n : result)
++        names += (names.empty() ? "" : ", ") + std::string(n);
++
++      Logger::info(str::format("win32u WSI: instance extensions from Wine: ",
++        result.size(), result.empty() ? "" : " (" + names + ")"));
++    }
++
++    return result;
++  }
++
++
++  void Win32uWsiDriver::getWindowSize(
++          HWND      hWindow,
++          uint32_t* pWidth,
++          uint32_t* pHeight) {
++    const struct dxvk_win32u_wsi_ops* o = ops();
++    uint32_t w = 0, h = 0;
++
++    if (o && o->window_size && o->window_size(uint64_t(reinterpret_cast<uintptr_t>(hWindow)), &w, &h) && w && h) {
++      if (pWidth)  *pWidth  = w;
++      if (pHeight) *pHeight = h;
++      return;
++    }
++
++    /* Wine could not answer -- a destroyed window, or a call arriving on a
++     * thread that may not enter win32u.  The base class's synthetic screen
++     * size is the honest fallback: DXVK only consults this when the
++     * application asked for a zero-sized swapchain, and a swapchain sized to
++     * the virtual screen is visibly wrong rather than silently wrong. */
++    ForeignWsiDriver::getWindowSize(hWindow, pWidth, pHeight);
++  }
++
++
++  bool Win32uWsiDriver::isWindow(HWND hWindow) {
++    const struct dxvk_win32u_wsi_ops* o = ops();
++
++    if (!hWindow)
++      return false;
++
++    if (o && o->is_window)
++      return o->is_window(uint64_t(reinterpret_cast<uintptr_t>(hWindow))) != 0;
++
++    return true;
++  }
++
++
++  VkResult Win32uWsiDriver::createSurface(
++          HWND                      hWindow,
++          PFN_vkGetInstanceProcAddr pfnVkGetInstanceProcAddr,
++          VkInstance                instance,
++          VkSurfaceKHR*             pSurface) {
++    const struct dxvk_win32u_wsi_ops* o = ops();
++
++    if (!o || !o->surface_create) {
++      warnUnregistered("surface creation");
++      return VK_ERROR_INITIALIZATION_FAILED;
++    }
++
++    if (!hWindow) {
++      /* DXGI's composition and core-window swapchains reach here with no
++       * window; upstream's backends answer by creating one of their own.
++       * This backend owns no windows, so there is nothing to fabricate. */
++      Logger::err("win32u WSI: refusing to create a surface for a null HWND -- "
++        "this backend presents to Wine windows and creates none of its own");
++      return VK_ERROR_INITIALIZATION_FAILED;
++    }
++
++    uint64_t surface = 0;
++    VkResult vr = VkResult(o->surface_create(
++      uint64_t(reinterpret_cast<uintptr_t>(hWindow)),
++      reinterpret_cast<void*>(instance),
++      reinterpret_cast<void*>(pfnVkGetInstanceProcAddr),
++      &surface));
++
++    if (vr != VK_SUCCESS) {
++      Logger::err(str::format("win32u WSI: Wine refused a surface for HWND ",
++        hWindow, ", VkResult ", vr));
++      return vr;
++    }
++
++    *pSurface = reinterpret_cast<VkSurfaceKHR>(static_cast<uintptr_t>(surface));
++    return VK_SUCCESS;
++  }
++
++
++  void Win32uWsiDriver::destroySurface(VkSurfaceKHR surface) {
++    const struct dxvk_win32u_wsi_ops* o = ops();
++
++    if (!surface || !o || !o->surface_destroy)
++      return;
++
++    o->surface_destroy(uint64_t(reinterpret_cast<uintptr_t>(surface)));
++  }
++
++
++  static bool createWin32uWsiDriver(WsiDriver **driver) {
++    try {
++      *driver = new Win32uWsiDriver();
++    } catch (const DxvkError& e) {
++      Logger::err(str::format("win32u WSI: ", e.message()));
++      return false;
++    }
++    return true;
++  }
++
++
++  WsiBootstrap Win32uWSI = {
++    "Win32u",
++    createWin32uWsiDriver
++  };
++
++}
++
++
++/* Exported from every DXVK library this lane loads.  It has to be per-library
++ * because src/wsi is a static library: libdxvk_dxgi.so and libdxvk_d3d11.so
++ * each link their own copy of this translation unit, with their own s_ops and
++ * their own WsiDriver, and the D3D11 surface is created by DXGI's copy while
++ * the D3D9 one is created by d3d9's.  Registering into only one of them
++ * produces a swapchain that reports success and presents nowhere, which is
++ * the failure this whole lane exists to make impossible. */
++extern "C" int32_t dxvk_wsi_win32u_register( const struct dxvk_win32u_wsi_ops *ops ) {
++  if (!ops || ops->abi != DXVK_WIN32U_WSI_ABI) {
++    dxvk::Logger::err(dxvk::str::format(
++      "win32u WSI: refusing a callback table with abi ",
++      ops ? ops->abi : 0u, "; this library was built against ",
++      uint32_t(DXVK_WIN32U_WSI_ABI), ".  ppc64le/dxvk/dxvk_win32u_wsi.h and "
++      "the DXVK patch series have come apart -- re-run "
++      "ppc64le/dxvk/bootstrap.sh --check."));
++    return 0;
++  }
++
++  dxvk::wsi::s_ops.store(ops, std::memory_order_release);
++  return 1;
++}
++
++#endif
+diff --git a/src/wsi/foreign/wsi_win32u_foreign.h b/src/wsi/foreign/wsi_win32u_foreign.h
+new file mode 100644
+index 0000000..c4fe033
+--- /dev/null
++++ b/src/wsi/foreign/wsi_win32u_foreign.h
+@@ -0,0 +1,67 @@
++#pragma once
++
++#if defined(DXVK_WSI_FOREIGN)
++
++#include "wsi_platform_foreign.h"
++
++namespace dxvk::wsi {
++
++  /**
++   * \brief win32u WSI driver -- the window belongs to Wine
++   *
++   * The third mode of the foreign family, and the one that actually presents.
++   * Headless has no surface; X11Foreign builds one from a raw XID on a second
++   * X connection, which is a documented dead end under Wayland. This one owns
++   * nothing at all: the HWND it is handed is a Wine window handle, and every
++   * question about it -- its size, whether it still exists, what VkSurfaceKHR
++   * presents to it -- is asked of Wine through the callback table Wine
++   * registers at load time (../../../../dxvk_win32u_wsi.h).
++   *
++   * That is what makes it display-server-agnostic: win32u's client-surface
++   * machinery is the layer winevulkan sits on, so winex11 hands back a surface
++   * on a child X window and winewayland one on a wl_subsurface, and neither
++   * spelling reaches this file.
++   *
++   * The HWND is passed through as an integer and is never dereferenced here.
++   * It is void*-sized on both the x86-64 guest and ppc64le, and it is the
++   * SAME handle on both sides of the emulated boundary -- the guest PE calls
++   * Wine's own user32, so there is one window-handle namespace in the process,
++   * which is the fact that lets DXGI_SWAP_CHAIN_DESC::OutputWindow cross
++   * unconverted.
++   *
++   * Everything the base class does for monitors and window geometry is
++   * inherited unchanged: one synthetic monitor, and every call that would
++   * move, restyle or restack somebody else's window is a no-op that reports
++   * success, because the owner of the window decides its geometry and DXVK
++   * follows through VkSurfaceCapabilitiesKHR::currentExtent.
++   */
++  class Win32uWsiDriver : public ForeignWsiDriver {
++
++  public:
++
++    Win32uWsiDriver();
++
++    ~Win32uWsiDriver();
++
++    std::vector<const char *> getInstanceExtensions() override;
++
++    void getWindowSize(
++            HWND      hWindow,
++            uint32_t* pWidth,
++            uint32_t* pHeight) override;
++
++    bool isWindow(HWND hWindow) override;
++
++    VkResult createSurface(
++            HWND                      hWindow,
++            PFN_vkGetInstanceProcAddr pfnVkGetInstanceProcAddr,
++            VkInstance                instance,
++            VkSurfaceKHR*             pSurface) override;
++
++    void destroySurface(VkSurfaceKHR surface) override;
++
++  };
++
++}
++
++#endif
+diff --git a/src/wsi/meson.build b/src/wsi/meson.build
+index 26495e8..52d710b 100644
+--- a/src/wsi/meson.build
++++ b/src/wsi/meson.build
+@@ -14,6 +14,7 @@ wsi_src = [
+   'foreign/wsi_platform_foreign.cpp',
+   'foreign/wsi_window_foreign.cpp',
+   'foreign/wsi_x11_foreign.cpp',
++  'foreign/wsi_win32u_foreign.cpp',
+   'glfw/wsi_monitor_glfw.cpp',
+   'glfw/wsi_platform_glfw.cpp',
+   'glfw/wsi_window_glfw.cpp',
+diff --git a/src/wsi/wsi_platform.cpp b/src/wsi/wsi_platform.cpp
+index 8ee949e..830189a 100644
+--- a/src/wsi/wsi_platform.cpp
++++ b/src/wsi/wsi_platform.cpp
+@@ -17,6 +17,7 @@ namespace dxvk::wsi {
+ #endif
+ #if defined(DXVK_WSI_FOREIGN)
+     &HeadlessWSI,
++    &Win32uWSI,
+ #endif
+ #if defined(DXVK_WSI_FOREIGN_X11)
+     &X11ForeignWSI,
+@@ -200,6 +201,14 @@ namespace dxvk::wsi {
+     return s_driver->createSurface(hWindow, pfnVkGetInstanceProcAddr, instance, pSurface);
+   }
+ 
++  void destroySurface(VkSurfaceKHR surface) {
++    /* Reachable while the driver is being torn down -- a Presenter may outlive
++     * wsi::quit() by one destructor -- and "we have no WSI driver" is not a
++     * reason to fault, it is a reason to have nothing to release. */
++    if (s_driver)
++      s_driver->destroySurface(surface);
++  }
++
+   HMONITOR getDefaultMonitor() {
+     return s_driver->getDefaultMonitor();
+   }
+diff --git a/src/wsi/wsi_platform.h b/src/wsi/wsi_platform.h
+index 0e6b235..5645d8c 100644
+--- a/src/wsi/wsi_platform.h
++++ b/src/wsi/wsi_platform.h
+@@ -115,6 +115,18 @@ namespace dxvk::wsi {
+             PFN_vkGetInstanceProcAddr pfnVkGetInstanceProcAddr,
+             VkInstance          instance,
+             VkSurfaceKHR*       pSurface) = 0;
++
++    /**
++     * \brief Release whatever the backend owns behind a surface
++     *
++     * Called just after the VkSurfaceKHR is destroyed. Backends that hand
++     * out a surface belonging to somebody else -- the win32u backend, whose
++     * surfaces live on a Wine client surface for the application's window --
++     * have state to release that DXVK cannot see. Not pure virtual: a
++     * backend that owns nothing beyond the Vulkan handle inherits this and
++     * behaves exactly as it did before.
++     */
++    virtual void destroySurface(VkSurfaceKHR surface) { }
+   };
+ 
+   struct WsiBootstrap {
+@@ -127,6 +139,7 @@ namespace dxvk::wsi {
+ #endif
+ #if defined(DXVK_WSI_FOREIGN)
+   extern WsiBootstrap HeadlessWSI;
++  extern WsiBootstrap Win32uWSI;
+ #endif
+ #if defined(DXVK_WSI_FOREIGN_X11)
+   extern WsiBootstrap X11ForeignWSI;
+diff --git a/src/wsi/wsi_window.h b/src/wsi/wsi_window.h
+index 55d8254..70bbb8f 100644
+--- a/src/wsi/wsi_window.h
++++ b/src/wsi/wsi_window.h
+@@ -201,4 +201,20 @@ namespace dxvk::wsi {
+           VkInstance          instance,
+           VkSurfaceKHR*       pSurface);
+ 
++  /**
++    * \brief Tell the backend a surface it made is going away
++    *
++    * The VkSurfaceKHR itself is destroyed by the caller, as it always was.
++    * This exists because a backend may own state BESIDE the Vulkan handle --
++    * the win32u backend holds a Wine client surface for the window, and
++    * nothing else in DXVK's WSI interface would ever tell it to let go, so
++    * the client window would outlive the swapchain and stay on screen.
++    * Backends that own nothing inherit the default and do nothing, so the
++    * behaviour of every existing driver is unchanged.
++    *
++    * \param [in] surface The surface being destroyed
++    */
++  void destroySurface(
++          VkSurfaceKHR        surface);
++
+ }

@@ -1,21 +1,44 @@
+# The native ppc64le D3D11 lane: this module is DXVK behind a COM thunk, the
+# same shape as dlls/d3d12 and vkd3d-proton.  See dlls/d3d11/main.c.
+#
+# Wine's own wined3d-backed implementation (async.c, buffer.c, d3d11_main.c,
+# decoder.c, device.c, inputlayout.c, shader.c, state.c, texture.c, utils.c,
+# view.c) is deliberately LEFT IN THE TREE and dropped from SOURCES rather
+# than deleted: it is upstream Wine's, unmodified, and keeping it unbuilt
+# makes this lane a reversible change to one file instead of a 19,000-line
+# deletion to review.  Nothing links it.
+#
+# win32u is imported by the PE side, not linked by the unixlib: the PE half
+# answers DXVK's two questions about a window (its client size, and whether it
+# still exists) with NtUserGetClientRect/NtUserIsWindow on the application's
+# own thread and pushes the answers down.  The unixlib deliberately does NOT
+# link -lwin32u -- see the note in ../d3d12/unix_win32u.c about the DT_NEEDED a
+# headless build tree cannot satisfy.
 MODULE    = d3d11.dll
+UNIXLIB   = d3d11.so
 IMPORTLIB = d3d11
-IMPORTS   = dxguid uuid dxgi wined3d
-EXTRAINCL = $(VKD3D_PE_CFLAGS)
+IMPORTS   = winecom win32u
+UNIX_LIBS = $(PTHREAD_LIBS)
+# ppc64le/dxvk holds the ONE copy of the WSI callback ABI the DXVK patch
+# series and dlls/d3d11/unix.c both compile against.
+#
+# BOTH VARIABLES, AND THE SAME PATH IN EACH, which is what dlls/d3d12 does and
+# is not redundancy.  makedep uses them for different things (tools/makedep.c):
+# EXTRAINCL's -I entries go into include_paths, which is how makedep RESOLVES
+# the #include while generating dependencies, and UNIX_CFLAGS is what actually
+# reaches the compiler for a unix source.  [MEASURED] with UNIX_CFLAGS alone,
+# makedep fails with "dxvk_win32u_wsi.h: No such file or directory" and leaves
+# the Makefile unregenerated -- so the build then compiles with a STALE
+# Makefile and the failure looks like the flag was ignored.  With EXTRAINCL
+# alone, makedep is happy and the compile line has no -I at all.
+EXTRAINCL   = -I$(srcdir)/../../ppc64le/dxvk
+UNIX_CFLAGS = -I$(srcdir)/../../ppc64le/dxvk
 
 VER_FILEDESCRIPTION_STR = "Wine Direct3D"
 VER_PRODUCTVERSION      = 7,0,6002,18107
 
 SOURCES = \
 	d3d11.thunks \
-	async.c \
-	buffer.c \
-	d3d11_main.c \
-	decoder.c \
-	device.c \
-	inputlayout.c \
-	shader.c \
-	state.c \
-	texture.c \
-	utils.c \
-	view.c
+	main.c \
+	unix.c \
+	unix_win32u.c

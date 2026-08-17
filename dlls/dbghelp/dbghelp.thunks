@@ -11,3 +11,14 @@
 # the shortest route from a real game's draw calls to this machine's GPU.
 DLL dbghelp.dll
 FROM-SPEC auto
+
+# Every one of its 140 eligible exports was refused as "no declaration in any
+# Wine header", so the module emitted was a real PE with NO exports -- which
+# loads, and binds every import of it to a missing-import sentinel.  Measured:
+# DOOM (2016) installs its own crash reporter during startup with
+# SymSetOptions( SymGetOptions() & ~SYMOPT_UNDNAME | 0x2010 ) at
+# DOOMx64vk.exe+0x3272e5, and called 0xdead0017 -- the sentinel the loader
+# handed it for dbghelp.dll.SymGetOptions.  dbghelp.h is not in the global
+# probe (nothing else needs it), so it is appended here exactly as vulkan-1
+# appends wine/vulkan.h.
+PROBE-EXTRA   dbghelp.h

@@ -1,0 +1,29 @@
+# AMD64 thunk export spec for the guest d3d10core.dll -- COM mode.
+#
+# New in this lane: Wine's d3d10core had no guest thunk at all, so a guest
+# that imported it died on a missing library.  DXVK implements d3d10core as a
+# thin layer over its own d3d11, and its ID3D10Device1 interfaces are in the
+# same roster (ppc64le/dxvk/gen_interfaces.py adds d3d10.h and d3d10_1.h to
+# the D3D11+DXGI baseline: +26 interfaces, +429 slots after IID dedup), so serving it costs
+# this file, a .spec of forwards, and nothing else.
+#
+# Native d3d10core.dll forwards its flat exports and __wine_com_dispatch into
+# d3d11.dll, which owns the single winecom instance.
+
+DLL       d3d10core.dll
+FROM-SPEC auto
+COM-JSON  ../../ppc64le/dxvk/interfaces_dxvk.json
+
+GUEST-IMPL D3D10CoreCreateDevice __wine_guest_D3D10CoreCreateDevice
+
+# Nine of these modules' exports are private entry points Wine ships in a
+# .spec and declares in no header, so the clang oracle would refuse them and
+# the guest module would simply not have them -- for d3d10core, that is EVERY
+# export.  This header declares them with their real interface types, so the
+# oracle can type them AND the audit below can see what they carry.
+PROBE-EXTRA dxvk_flat_surface.h
+INCLUDE-DIR ../../ppc64le/dxvk
+
+# Internal names, kept out of the guest export list; see dlls/d3d11/d3d11.thunks.
+EXCLUDE __wine_com_dispatch
+EXCLUDE __wine_guest_D3D10CoreCreateDevice

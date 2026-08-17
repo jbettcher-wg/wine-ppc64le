@@ -187,3 +187,20 @@
 @ stdcall RegisterClassNameW(wstr)
 @ stdcall UninitializeFlatSB(long)
 @ stdcall _TrackMouseEvent(ptr)
+
+# The guest-side entry points for the nine exports above that take guest code.
+# An x86-64 guest's DPA_Sort (and its eight siblings) resolves HERE
+# (tools/spec2thunk GUEST-IMPL, named in comctl32.thunks) rather than at the
+# plain name; each wrapper swaps the application's comparator, enumerator,
+# dialog procedure or page callback for one of ntdll's guest-callback
+# trampolines before calling the real export, which is untouched and still
+# serves native ppc64 callers.  See dlls/comctl32/guestthunk.c.
+@ stdcall __wine_guest_CreatePropertySheetPageA(ptr)
+@ stdcall __wine_guest_CreatePropertySheetPageW(ptr)
+@ stdcall __wine_guest_DPA_DestroyCallback(ptr ptr ptr)
+@ stdcall __wine_guest_DPA_EnumCallback(ptr ptr ptr)
+@ stdcall __wine_guest_DPA_Search(ptr ptr long ptr long long)
+@ stdcall __wine_guest_DPA_Sort(ptr ptr long)
+@ stdcall __wine_guest_DSA_DestroyCallback(ptr ptr ptr)
+@ stdcall __wine_guest_PropertySheetA(ptr)
+@ stdcall __wine_guest_PropertySheetW(ptr)

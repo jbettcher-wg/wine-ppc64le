@@ -1,0 +1,210 @@
+# AMD64 thunk export spec -- comctl32.dll.
+#
+# From the 2026-08-17 everyday-DLL pass.  comctl32 is the window machinery
+# every launcher and configuration dialog is built out of -- image lists,
+# tooltips, property sheets, the subclassing helpers -- and this module had NO
+# guest thunk at all: the loader found the native ppc64 builtin, correctly
+# refused to splice it into a guest call, and every import reported c000007b
+# before the process ran an instruction.  The export list is this module's own
+# .spec.
+DLL comctl32.dll
+FROM-SPEC auto
+
+# No PROBE-EXTRA is needed for the bulk of it.  commctrl.h and prsht.h are
+# already reachable from the global probe (wine_sig.PROBE_SRC includes
+# shlobj.h, which pulls commctrl.h in), and 94 of 181 eligible exports resolve
+# on the first try.  Of the rest, 67 are `-noname` -- exported by ordinal only,
+# so there is no name for a guest to bind and spec2thunk skips them -- and 20
+# are refused as "no declaration found in Wine headers", which for this module
+# means either a private DPA/DSA/MRU entry point or one of the A/W-neutral
+# names Wine forwards (PropertySheet -> PropertySheetA and friends), whose
+# public "declaration" is a WINELIB_NAME_AW macro and therefore not a
+# declaration at all.
+
+# --------------------------------------------------------- the callback class
+# comctl32 takes guest code in three shapes.  TWO ARE SERVED NOW, by wrappers
+# in this module (dlls/comctl32/guestthunk.c) that resolve ntdll's exported
+# trampoline factory __wine_guest_wrap_callback with LdrGetProcedureAddress
+# and swap the application's pointer for a native trampoline before calling
+# the real export.  The third is still refused, and for a reason that has
+# changed -- see below, because it is the finding of this pass.
+#
+# 1.  THE COMPARATOR / ENUMERATOR ARGUMENTS -- SERVED.  DPA_Sort, DPA_Search,
+#     DPA_EnumCallback, DPA_DestroyCallback and DSA_DestroyCallback each take
+#     a function pointer that native comctl32 calls once per element, from a
+#     native frame.  This is the class dlls/ntdll/signal_ppc64.c's override
+#     table already handles for msvcrt's qsort/bsearch and gdi32's
+#     EnumFontFamilies, and five rows there would have done -- but a row there
+#     is a row in a file this module does not own, and it no longer needs one:
+#     the export makes the wrapping the caller's own business, which is where
+#     the knowledge of what the argument MEANS already lives.  All three
+#     callback types (PFNDPACOMPARE, PFNDPAENUMCALLBACK, PFNDSAENUMCALLBACK)
+#     return INT and take two or three arguments, so all five take the narrow
+#     sign-extended trampoline.
+#
+# 2.  THE PROPERTY SHEET PROCEDURES -- SERVED.  See the next section.
+#
+# 3.  THE SUBCLASS PROCEDURE -- STILL REFUSED, AND THE REASON IS NOT THE ONE
+#     THIS FILE USED TO GIVE.  It is not that nothing can wrap a callback.  It
+#     is that a SUBCLASSPROC takes SIX arguments:
+#
+#       LRESULT CALLBACK (HWND, UINT, WPARAM, LPARAM, UINT_PTR uIdSubclass,
+#                         DWORD_PTR dwRefData)
+#
+#     and ntdll's trampoline carries FOUR.  call_guest_function_args() in
+#     dlls/ntdll/signal_ppc64.c writes RCX/RDX/R8/R9 into a parameter block and
+#     tail-jumps to the guest, and its own comment states the limit: "A
+#     callback with stack arguments (five or more) would need a thunk that
+#     builds a frame; nothing in the corpus has one, and this is where it would
+#     go."  MS-x64 passes arguments five and six on the stack.  A wrapped guest
+#     SUBCLASSPROC would therefore receive a correct hwnd/msg/wParam/lParam and
+#     GARBAGE for its subclass id and its own reference data -- a silent wrong
+#     answer, and strictly worse than the missing import it is today.
+#
+#     THE HANDOFF, and it is in a file this pass does not edit
+#     (dlls/ntdll/signal_ppc64.c, currently held by the winecom re-entrancy
+#     work).  Two parts:
+#
+#       a. a six-argument form of call_guest_function_args().  The existing
+#          thunk tail-jumps, which is why it cannot place stack arguments; the
+#          six-argument one has to reserve a frame, store a4/a5 at [rsp+0x20]
+#          and [rsp+0x28], CALL rather than JMP, and unwind.  Sketched, NOT
+#          verified by the author of this note:
+#
+#            sub rsp,0x48 / mov rax,[rcx] / mov rdx,[rcx+0x10] /
+#            mov r8,[rcx+0x18] / mov r9,[rcx+0x20] / mov r10,[rcx+0x28] /
+#            mov r11,[rcx+0x30] / mov [rsp+0x20],r10 / mov [rsp+0x28],r11 /
+#            mov rcx,[rcx+0x08] / call rax / add rsp,0x48 / ret
+#
+#          (0x48 keeps the 16-byte alignment MS-x64 wants at the callee's
+#          entry, given that run_entry aligns the thunk's own entry as if it
+#          had been called.)
+#       b. a trampoline whose stub forwards r7..r8 as well, or -- simpler and
+#          the shape this file would prefer -- a second factory export
+#            @ cdecl -arch=ppc64 __wine_guest_wrap_callback6(ptr long)
+#          so that the arity stays a property of the SLOT, exactly as the
+#          return width already is.
+#
+#     With (a) and (b) the rows here become two more GUEST-IMPL lines and two
+#     more wrappers in guestthunk.c, and the identity a Set/Remove pair turns
+#     on needs nothing else: the pool already returns the SAME stub for the
+#     same (guest target, width), so wrapping in both places is the whole
+#     mechanism and a mapping table would be a second source of truth for it.
+#     (GetWindowSubclass is `-noname` in the .spec -- exported by ordinal only
+#     -- so it is skipped for want of a name either way, and it would need the
+#     same wrap for the same identity reason the day it is not.)
+#
+# Until then the two remain ABSENT from the export table and bind to a distinct
+# missing-import sentinel: a guest that subclasses a control dies at 0xdead00nn
+# with the symbol in the loader's WARN, at the moment it subclasses, rather
+# than reading a garbage dwRefData five messages later.  DefSubclassProc is NOT
+# excluded -- it takes no pointer, and a guest with no subclass installed never
+# reaches it.
+EXCLUDE SetWindowSubclass
+EXCLUDE RemoveWindowSubclass
+
+GUEST-IMPL DPA_Sort                 __wine_guest_DPA_Sort
+GUEST-IMPL DPA_Search               __wine_guest_DPA_Search
+GUEST-IMPL DPA_EnumCallback         __wine_guest_DPA_EnumCallback
+GUEST-IMPL DPA_DestroyCallback      __wine_guest_DPA_DestroyCallback
+GUEST-IMPL DSA_DestroyCallback      __wine_guest_DSA_DestroyCallback
+
+# ------------------------------------------------------- the property sheets
+# SERVED, and this is what changed.  A PROPSHEETPAGE has `pfnDlgProc` -- and it
+# is not optional the way a comdlg32 hook is.  It is the page's dialog
+# procedure, comctl32 stores it and dispatches every message the page receives
+# to it, and there is no flag that turns it off.  PROPSHEETPAGE additionally
+# has an optional `pfnCallback` (PSP_USECALLBACK) and PROPSHEETHEADER has
+# `pfnCallback` (PSH_USECALLBACK).  None of the three ever passes through
+# RegisterClass or SetWindowLongPtr(GWLP_WNDPROC), so the override rows that
+# make a guest's own window work do nothing here.
+#
+# A pass-through would hand native comctl32 an x86-64 dialog procedure and
+# user32's callback dispatcher SWALLOWS what a dialog procedure raises -- the
+# exact silent failure the emu_RegisterClass banner records for DOOM's WNDPROC:
+# "ignoring exception c000001d", a page that never processes a message, and no
+# error anywhere.
+#
+# So each of the four is redirected to a wrapper that COPIES the struct, wraps
+# the procedures in the copy and calls the real export with it -- the
+# emu_RegisterClassEx shape, in the module that owns the struct.  A copy and
+# not an in-place swap, unlike comdlg32's dialog hooks, because a
+# PROPSHEETHEADER is `const` on the way in, is never written back through, and
+# may perfectly well live in a guest's .rdata.
+#
+# THREE THINGS THE COPY HAS TO GET RIGHT, all of them properties of comctl32's
+# own code rather than of the API:
+#
+#   * the ppsp array is packed by EACH ENTRY'S OWN dwSize, not by sizeof --
+#     PropertySheetA walks it with `pByte += ((LPCPROPSHEETPAGEA)pByte)->dwSize`
+#     and CreatePropertySheetPage copies each page with `memcpy(ppsp, page,
+#     page->dwSize)`.  A sizeof-strided copy would read past the last page and
+#     give comctl32 the wrong stride;
+#   * a phpage[] entry is EITHER an HPROPSHEETPAGE or, by a leniency of Wine's
+#     own, a raw PROPSHEETPAGE -- PropertySheetA tests the magic cookie and
+#     falls back to CreatePropertySheetPage on anything else.  Handles came
+#     from the wrapped CreatePropertySheetPage and travel untouched; a raw
+#     entry has never been wrapped by anybody and is copied and wrapped here;
+#   * pfnDlgProc returns INT_PTR and takes the WIDE trampoline; pfnCallback
+#     (either kind) returns UINT/INT and takes the narrow one.  Both take four
+#     arguments or fewer, which is what makes them servable at all.
+GUEST-IMPL PropertySheetA           __wine_guest_PropertySheetA
+GUEST-IMPL PropertySheetW           __wine_guest_PropertySheetW
+GUEST-IMPL CreatePropertySheetPageA __wine_guest_CreatePropertySheetPageA
+GUEST-IMPL CreatePropertySheetPageW __wine_guest_CreatePropertySheetPageW
+
+# Internal names, kept out of the guest export list entirely: the guest never
+# imports them, they are only the native symbols the redirects resolve to.
+EXCLUDE __wine_guest_DPA_Sort
+EXCLUDE __wine_guest_DPA_Search
+EXCLUDE __wine_guest_DPA_EnumCallback
+EXCLUDE __wine_guest_DPA_DestroyCallback
+EXCLUDE __wine_guest_DSA_DestroyCallback
+EXCLUDE __wine_guest_PropertySheetA
+EXCLUDE __wine_guest_PropertySheetW
+EXCLUDE __wine_guest_CreatePropertySheetPageA
+EXCLUDE __wine_guest_CreatePropertySheetPageW
+
+# ------------------------------------------------------------ the COM surface
+# Three exports carry an interface pointer and this module publishes no
+# winecom roster, so each would cross with a vtable of the wrong machine's
+# code.  Excluded by name:
+#
+#   HIMAGELIST_QueryInterface  vends an IImageList as a NATIVE ppc64 vtable
+#   ImageList_Read             takes an IStream IN -- and a guest holding one
+#   ImageList_Write            holds a PROXY from combase's syscom roster,
+#                              whose vtable is x86-64 trap stubs, so native
+#                              comctl32 calling it would bctrl into x86-64
+#                              bytes.  This one a pass-through would CREATE,
+#                              not merely fail to fix.
+#
+# ImageList_Duplicate, ImageList_Merge and the rest of the image-list surface
+# take and return HIMAGELISTs, which are handles rather than interfaces on
+# this path, and are served.
+EXCLUDE HIMAGELIST_QueryInterface
+EXCLUDE ImageList_Read
+EXCLUDE ImageList_Write
+
+# --------------------------------------------------------------- what is left
+# MEASURED BY THIS BUILD: 89 emitted, 20 oracle-refused, 14 dropped by the
+# EXCLUDE lines above -- and those fourteen are five real refusals (two
+# subclass entry points, three COM ones) plus the nine internal __wine_guest_*
+# names added to comctl32.spec for the redirects, which no guest ever imports.
+# The guest module's export table therefore carries 90 names: the 89 plus
+# __wine_thunk_info.  It was 80 before this pass, which lifted nine.
+#
+# They are the useful ones: InitCommonControls and InitCommonControlsEx (which
+# is what registers every control class, and the first thing any dialog-driven
+# program calls), the whole ImageList_* surface bar the three above, the
+# FlatSB_* scroll bars, the DPA_/DSA_ containers INCLUDING their comparator and
+# enumerator entry points, the property sheets, CreateToolbarEx,
+# CreateStatusWindow{A,W}, DrawStatusText{A,W}, CreateUpDownControl,
+# MakeDragList, DefSubclassProc, GetMUILanguage/InitMUILanguage,
+# DestroyPropertySheetPage and _TrackMouseEvent.
+#
+# The 67 `-noname` skips are not a gap in this module: comctl32 exports its
+# private allocator (Alloc/ReAlloc/Free/GetSize), the MRU list and the DPA
+# stream helpers by ORDINAL ONLY, with no name in the export table at all.  A
+# guest importing one of those imports it by ordinal, which is a different
+# binding path -- see the ordinal-import check in ppc64le/vkd3d -- and not one
+# a name-keyed export list can serve.

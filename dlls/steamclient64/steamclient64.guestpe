@@ -1,0 +1,92 @@
+# steamclient64.guestpe -- declarative source list for the guest x86-64
+# steamclient64.dll.
+#
+# WHY THIS DIRECTORY IS NAMED steamclient64, NOT lsteamclient (Proton's own
+# name for it).  A guest LoadLibraryA/W walks find_builtin_dll() in
+# dlls/ntdll/unix/loader.c, whose prepend_build_dir_path() constructs
+# <build_dir>/dlls/<name-without-extension>/<arch_dir>/<name>.<ext> --
+# literally the source directory name, not any spec/def LIBRARY line or
+# module variable.  Proton gets away with a lsteamclient/ directory because
+# its own build stages the result into a Steam-named file afterward; this
+# port does not stage anything into a prefix, so the source directory has
+# to already be spelled the way the game's LoadLibraryA("steamclient64.dll")
+# spells it, or the load fails before this file's contents matter at all.
+#
+# Every other guest-facing module in this tree is a native ppc64
+# implementation plus a spec2thunk trap-stub thunk (see dlls/combase/
+# combase.thunks for that shape).  This module has no native half at all --
+# see steamclient_guest.h for why a Steamworks vtable can't be served that
+# way -- so its "SOURCES" entry is not a normal .c list either: it names
+# tools/guestpe/guestpe, which compiles and links these sources with clang's
+# x86_64-windows-gnu target into one real PE DLL.  makedep.c's
+# output_source_guestpe() is the only code that reads this file; see its
+# header comment for the make-dependency side of this contract.
+#
+# Six keywords, one per line, "KEYWORD value".  A line whose first
+# non-blank character is '#' is a comment, and blank lines are ignored --
+# this file is never scanned for C-style #include/#pragma the way an
+# ordinary source is (the .guestpe extension is absent from makedep.c's
+# parse_functions[] table, exactly like .thunks and .spec), so nothing
+# above this line has any effect on the build.
+#
+#   DLL      the output DLL's own name -- documentary only.  The actual
+#            target name comes from THIS file's own basename, the same way
+#            combase.thunks names combase's thunk DLL.
+#   ENTRY    the PE entry point symbol passed to the linker.
+#   DEF      module-relative path to the .def export list.
+#   IMPORT   the base name of a guest x86-64 thunk DLL (built by ANOTHER
+#            module's own "SOURCES = *.thunks" line) this module links
+#            against.  makedep resolves it to a real build path with the
+#            same submake lookup add_import_libs() uses for ordinary
+#            IMPORTS=, and adds it as a REAL Makefile prerequisite: relink
+#            when kernel32's export table changes underneath this one.
+#   SOURCE   one compilable C source, module-relative.  Each SOURCE line
+#            becomes a real Makefile prerequisite of steamclient64.dll, so
+#            touching it -- steamrpc.c, say -- rebuilds the DLL.  This is
+#            the "add a source, add a line, no makedep change" contract.
+#   GLOB     a shell glob of sources, module-relative, expanded by
+#            tools/guestpe/guestpe AT BUILD TIME rather than by makedep.
+#            NOT individually tracked: make cannot depend on a filename it
+#            doesn't have yet, and hand-listing 39 near-identical
+#            winISteam*.c wrappers just to get per-file tracking would cost
+#            more in review noise than it buys.  Consequence, stated
+#            plainly: adding, removing, or renaming a file that matches a
+#            GLOB is not picked up by an incremental "make" -- touch this
+#            file (or rerun config.status) afterwards.  Editing the
+#            CONTENTS of a file the glob already matched is unaffected --
+#            make has no idea the file exists, but the driver recompiles
+#            everything the glob matches on every run regardless, so the
+#            new contents are in the next build no matter what triggered it.
+
+DLL      steamclient64.dll
+ENTRY    DllMain
+DEF      steamclient64.def
+
+IMPORT   kernel32
+IMPORT   msvcrt
+IMPORT   ntdll
+IMPORT   user32
+IMPORT   ws2_32
+# steamclient_main.c writes HKCU\Software\Valve\Steam\ActiveProcess\pid at
+# load time with RegCreateKeyExW/RegSetValueExW/RegCloseKey.
+IMPORT   advapi32
+
+# Proton's own PE-side entry points and interface-independent glue.
+SOURCE   proton/steamclient_main.c
+SOURCE   proton/steamclient_generated.c
+SOURCE   proton/steam_input_manual.c
+SOURCE   proton/steam_matchmaking_manual.c
+SOURCE   proton/steam_networking_manual.c
+
+# This port's half of the bridge to the native Steam client -- see
+# steamrpc.c's own header for the design, and steamrpc_chkstk.c's for why
+# the stack probe clang emits for load_steamclient()'s two 4096-byte
+# buffers needs a hand-written implementation here.
+SOURCE   steamrpc.c
+SOURCE   steamrpc_generated.c
+SOURCE   steamrpc_chkstk.c
+
+# The 39 generated per-interface wrappers, one per ISteamXxxNNN version --
+# see the GLOB keyword's comment above for why these are not enumerated
+# individually, and what that costs.
+GLOB     proton/winISteam*.c

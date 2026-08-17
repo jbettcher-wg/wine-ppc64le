@@ -62,7 +62,10 @@
 
 #include "wine/debug.h"
 
-#define HPROPSHEETPAGE_MAGIC 0x5A9234E3
+/* HPROPSHEETPAGE_MAGIC is in comctl32.h: guestthunk.c has to recognise a real
+ * HPROPSHEETPAGE in a PROPSHEETHEADER's phpage array, exactly as PropertySheetA
+ * below does, and a second copy of the cookie would be a second thing to keep
+ * in step. */
 
 /******************************************************************************
  * Data structures

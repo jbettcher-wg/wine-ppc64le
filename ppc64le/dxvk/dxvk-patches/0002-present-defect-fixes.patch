@@ -1,0 +1,335 @@
+diff --git a/src/d3d11/d3d11_device.cpp b/src/d3d11/d3d11_device.cpp
+index cc4598d..6a29e41 100644
+--- a/src/d3d11/d3d11_device.cpp
++++ b/src/d3d11/d3d11_device.cpp
+@@ -1820,6 +1820,20 @@ namespace dxvk {
+   
+   
+   HRESULT STDMETHODCALLTYPE D3D11Device::GetDeviceRemovedReason() {
++    /* Must agree with what Present returns. DxgiSwapChain::PresentBase reports
++     * DXGI_ERROR_DEVICE_REMOVED once the display-server connection is gone,
++     * and an application's recovery path for that starts by asking here why.
++     * Answering S_OK would send it straight back into the present loop it was
++     * just told to leave.
++     *
++     * Asked of the adapter, NOT of wsi::isDisplayLost(): this library has its
++     * own private copy of src/wsi whose WsiDriver is never created, so it
++     * would always answer "not lost" [MEASURED]. DxgiSwapChain latches the
++     * loss on the adapter object both libraries share. See
++     * DxvkAdapter::markDisplayLost. */
++    if (unlikely(m_dxvkDevice->adapter()->isDisplayLost()))
++      return DXGI_ERROR_DEVICE_REMOVED;
++
+     VkResult status = m_dxvkDevice->getDeviceStatus();
+ 
+     switch (status) {
+diff --git a/src/dxgi/dxgi_swapchain.cpp b/src/dxgi/dxgi_swapchain.cpp
+index 0ab89f8..4a2b27c 100644
+--- a/src/dxgi/dxgi_swapchain.cpp
++++ b/src/dxgi/dxgi_swapchain.cpp
+@@ -341,6 +341,34 @@ namespace dxvk {
+     return PresentBase(SyncInterval, PresentFlags, pPresentParameters);
+   }
+ 
++  HRESULT DxgiSwapChain::ReportDisplayLost() {
++    /* Latch the loss on the DxvkAdapter so that ID3D11Device::
++     * GetDeviceRemovedReason can agree with what we are about to return.
++     * It cannot reach the WSI layer itself -- see DxvkAdapter::
++     * markDisplayLost for why -- but it does hold this same adapter object.
++     *
++     * Resolved lazily and cached: this runs on the present path, and the
++     * QueryInterface is only needed once. A presenter that is not DXVK's own
++     * (vkd3d-proton's D3D12 swap chain implements IDXGIVkSwapChain too) will
++     * simply not answer the private adapter interface, in which case the
++     * Present return value below still stands on its own. */
++    if (!m_dxvkAdapterResolved) {
++      m_dxvkAdapterResolved = true;
++
++      Com<IDXGIDXVKAdapter> dxvkAdapter;
++
++      if (m_adapter != nullptr && SUCCEEDED(m_adapter->QueryInterface(
++            __uuidof(IDXGIDXVKAdapter), reinterpret_cast<void**>(&dxvkAdapter))))
++        m_dxvkAdapter = dxvkAdapter->GetDXVKAdapter();
++    }
++
++    if (m_dxvkAdapter != nullptr)
++      m_dxvkAdapter->markDisplayLost();
++
++    return DXGI_ERROR_DEVICE_REMOVED;
++  }
++
++
+   HRESULT STDMETHODCALLTYPE DxgiSwapChain::PresentBase(
+           UINT                      SyncInterval,
+           UINT                      PresentFlags,
+@@ -349,6 +377,32 @@ namespace dxvk {
+     if (SyncInterval > 4)
+       return DXGI_ERROR_INVALID_CALL;
+ 
++    /* ---- a dead display-server connection must not look like success ------
++     *
++     * The `wsi::isWindow(m_window)` guard below silently skips the present
++     * when the window cannot be queried, leaving hr at S_OK. On Win32 that is
++     * benign: IsWindow() only fails for a destroyed HWND, and a destroyed HWND
++     * usually means the app is on its way out anyway. On a backend whose
++     * windows live on a display-server connection it is not benign at all --
++     * when the connection dies, isWindow() fails for every window forever, so
++     * every subsequent Present drops its frame and returns S_OK. Measured:
++     * 300 presents after the X server was killed, 0 failures
++     * [docs/present-proof-radv.md §7]. An application has no way to notice; a
++     * game would render forever into nothing.
++     *
++     * DXGI_ERROR_DEVICE_REMOVED is the right code rather than E_FAIL or
++     * DXGI_ERROR_INVALID_CALL. It is documented as a Present return value, it
++     * is the one failure D3D applications are actually required to handle
++     * (release everything, re-create the device, and GetDeviceRemovedReason()
++     * agrees -- see D3D11Device::GetDeviceRemovedReason), and the situation is
++     * genuinely unrecoverable for this device: the Display* is unusable and
++     * cannot be reopened without tearing the device down.
++     *
++     * Checked before anything else touches the window so that the round trips
++     * in isMinimized/isOccluded/isWindow are skipped once the answer is known. */
++    if (unlikely(wsi::isDisplayLost()))
++      return ReportDisplayLost();
++
+     if ((m_desc.SwapEffect == DXGI_SWAP_EFFECT_DISCARD || m_desc.SwapEffect == DXGI_SWAP_EFFECT_SEQUENTIAL) && wsi::isMinimized(m_window))
+       return DXGI_STATUS_OCCLUDED;
+     bool occluded = !m_descFs.Windowed && wsi::isOccluded(m_window) && !wsi::isMinimized(m_window);
+@@ -371,6 +425,16 @@ namespace dxvk {
+       hr = m_presenter->Present(SyncInterval, PresentFlags, nullptr);
+     }
+ 
++    /* isWindow() is itself a round trip, and on the foreign X11 backend it is
++     * the call that usually notices the loss first -- the IO error is raised
++     * from inside XGetWindowAttributes on this very line
++     * [docs/present-proof-radv.md §7, symbolised backtrace]. Re-check, so that
++     * the present which discovers the death reports it, instead of returning
++     * S_OK once and only failing from the next call onwards. The same re-check
++     * covers a loss noticed inside m_presenter->Present. */
++    if (unlikely(wsi::isDisplayLost()))
++      return ReportDisplayLost();
++
+     if (PresentFlags & DXGI_PRESENT_TEST)
+       return hr == S_OK && occluded ? DXGI_STATUS_OCCLUDED : hr;
+ 
+diff --git a/src/dxgi/dxgi_swapchain.h b/src/dxgi/dxgi_swapchain.h
+index 69e9cb6..35d7102 100644
+--- a/src/dxgi/dxgi_swapchain.h
++++ b/src/dxgi/dxgi_swapchain.h
+@@ -185,6 +185,12 @@ namespace dxvk {
+     UINT                            m_presentId;
+     bool                            m_ModeChangeInProgress = false;
+ 
++    /* The one object libdxvk_dxgi.so and libdxvk_d3d11.so demonstrably
++     * share, used to carry "the display is gone" across the library
++     * boundary. Resolved on first use, on the present path. */
++    dxvk::Rc<dxvk::DxvkAdapter>     m_dxvkAdapter;
++    bool                            m_dxvkAdapterResolved = false;
++
+     Com<IDXGIVkSwapChain>           m_presenter;
+     Com<IDXGIVkSwapChain1>          m_presenter1;
+     Com<IDXGIVkSwapChain2>          m_presenter2;
+@@ -250,6 +256,10 @@ namespace dxvk {
+             UINT                      SyncInterval,
+             UINT                      PresentFlags,
+       const DXGI_PRESENT_PARAMETERS*  pPresentParameters);
++
++    /* Latches the loss on the shared DxvkAdapter and returns
++     * DXGI_ERROR_DEVICE_REMOVED. See the definition. */
++    HRESULT ReportDisplayLost();
+   };
+   
+ }
+diff --git a/src/dxvk/dxvk_adapter.h b/src/dxvk/dxvk_adapter.h
+index 79e1787..c37f469 100644
+--- a/src/dxvk/dxvk_adapter.h
++++ b/src/dxvk/dxvk_adapter.h
+@@ -315,8 +315,40 @@ namespace dxvk {
+         return m_linkedToDGPU;
+     }
+ 
++    /**
++     * \brief Records that the display-server connection has been lost
++     *
++     * The adapter is an odd home for a window-system fact, and it is here
++     * for one concrete reason: it is the only object the DXGI and D3D11
++     * shared libraries provably share. DXVK builds libdxvk_dxgi.so and
++     * libdxvk_d3d11.so with only their public entry points exported, so
++     * every static in src/wsi and src/dxvk exists twice, once per library
++     * -- and in a D3D11 process only DXGI's copy ever creates a WsiDriver
++     * [MEASURED: D3D11's `s_driver` is null; the surface is created for it
++     * by DXGI through IDXGIVkSurfaceFactory]. D3D11Device therefore cannot
++     * ask the WSI layer anything at all. It can, however, reach this
++     * object: D3D11CreateDevice takes DXGI's own DxvkAdapter through
++     * IDXGIDXVKAdapter::GetDXVKAdapter (d3d11_main.cpp:34), so both
++     * libraries hold the same instance.
++     *
++     * Losing the connection is process-wide and terminal, which is why an
++     * adapter-wide latch loses no information: every device on it is
++     * equally unable to present.
++     */
++    void markDisplayLost() {
++      m_displayLost.store(true, std::memory_order_release);
++    }
++
++    /**
++     * \brief Whether the display-server connection has been lost
++     * \returns \c true once markDisplayLost has been called
++     */
++    bool isDisplayLost() const {
++      return m_displayLost.load(std::memory_order_acquire);
++    }
++
+   private:
+-    
++
+     DxvkInstance*           m_instance  = nullptr;
+     VkPhysicalDevice        m_handle    = VK_NULL_HANDLE;
+     D3DKMT_HANDLE           m_kmtLocal = 0;
+@@ -328,6 +360,8 @@ namespace dxvk {
+     Rc<DxvkAdapter>     m_linkedIGPUAdapter;
+     bool                m_linkedToDGPU = false;
+ 
++    std::atomic<bool>   m_displayLost = { false };
++
+     std::array<DxvkAdapterMemoryStats, VK_MAX_MEMORY_HEAPS> m_memoryStats = { };
+ 
+     Rc<DxvkDevice> createDevice(bool safeMode);
+diff --git a/src/dxvk/dxvk_context.cpp b/src/dxvk/dxvk_context.cpp
+index f33a265..b07009c 100644
+--- a/src/dxvk/dxvk_context.cpp
++++ b/src/dxvk/dxvk_context.cpp
+@@ -7,9 +7,34 @@
+ 
+ #include "dxvk_device.h"
+ #include "dxvk_context.h"
++#include "../util/util_env.h"
+ 
+ namespace dxvk {
+-  
++
++  /* ---- deferred-clear diagnostics, off unless asked for -------------------
++   *
++   * The question these answer cannot be answered from outside the process:
++   * "is a clear still sitting in m_deferredClears when the swap chain blitter
++   * samples the image?". Source reading says yes; docs/present-proof-radv.md
++   * §9.3 flagged that as unverified. DXVK_DEBUG_DEFERRED_CLEARS=1 makes every
++   * defer and every flush say so on stderr, with the image handle, so the
++   * lifetime of one clear can be followed across a Present.
++   *
++   * DXVK_NO_EXTERNAL_CLEAR_FLUSH=1 disables the fix in beginExternalRendering
++   * so the identical binary can be shown to fail without it. It follows the
++   * DXVK_WSI_FOREIGN_NO_IOERROR_HANDLER precedent in src/wsi/foreign: nothing
++   * except a falsification harness should ever set it. */
++  static bool debugDeferredClears() {
++    static const bool s_value = dxvk::env::getEnvVar("DXVK_DEBUG_DEFERRED_CLEARS") == "1";
++    return s_value;
++  }
++
++  static bool externalClearFlushDisabled() {
++    static const bool s_value = dxvk::env::getEnvVar("DXVK_NO_EXTERNAL_CLEAR_FLUSH") == "1";
++    return s_value;
++  }
++
++
+   DxvkContext::DxvkContext(const Rc<DxvkDevice>& device)
+   : m_device      (device),
+     m_common      (&device->m_objects),
+@@ -202,6 +227,47 @@ namespace dxvk {
+ 
+ 
+   Rc<DxvkCommandList> DxvkContext::beginExternalRendering() {
++    // External consumers of the command list -- the swap chain blitter, and
++    // D3D9's GetFrontBufferData -- read images directly rather than going
++    // through acquireResources(), which is the only thing that retires a
++    // deferred clear (dxvk_context.cpp, acquireResources -> flushDeferredClear).
++    // A clear still pending here would therefore never be recorded at all, and
++    // the external reader would sample whatever the image held beforehand.
++    // That is exactly what a clear-then-Present frame does: no draw and no
++    // render pass follows the clear, so nothing else ever touches the image.
++    //
++    // endCurrentCommands() does not help: it calls endCurrentPass(true), and
++    // the suspend flag makes endRenderPass() skip prepareShaderReadableImages(),
++    // which is where flushClears() lives. prepareSharedImages() below flushes
++    // clears for `shared` images only, which is the same fix for the narrower
++    // case of a resource handed to another API -- a swap chain back buffer is
++    // not shared, so it is not covered.
++    //
++    // Ending the render pass first is required: performClears() opens render
++    // passes of its own. Flushing barriers afterwards mirrors what
++    // prepareShaderReadableImages() and prepareSharedImages() do, and makes the
++    // clear visible to the external reader before the command buffer is closed.
++    if (!m_deferredClears.empty() && !externalClearFlushDisabled()) {
++      if (unlikely(debugDeferredClears())) {
++        Logger::warn(str::format("beginExternalRendering: flushing ",
++          m_deferredClears.size(), " deferred clear(s)"));
++
++        for (const auto& clear : m_deferredClears) {
++          Logger::warn(str::format("  image ", clear.imageView->image()->handle(),
++            " clearAspects 0x", std::hex, clear.clearAspects,
++            " discardAspects 0x", clear.discardAspects, std::dec));
++        }
++      }
++
++      this->endCurrentPass(true);
++      this->flushClears(false);
++      this->flushBarriers();
++    } else if (unlikely(debugDeferredClears())) {
++      Logger::warn(str::format("beginExternalRendering: ", m_deferredClears.size(),
++        " deferred clear(s) pending, NOT flushed",
++        externalClearFlushDisabled() ? " (DXVK_NO_EXTERNAL_CLEAR_FLUSH=1)" : ""));
++    }
++
+     // Flush and invalidate everything
+     endCurrentCommands();
+     beginCurrentCommands();
+@@ -2202,6 +2268,12 @@ namespace dxvk {
+     }
+ 
+     m_deferredClears.push_back({ imageView, 0, clearAspects, clearValue });
++
++    if (unlikely(debugDeferredClears())) {
++      Logger::warn(str::format("deferClear: image ", imageView->image()->handle(),
++        " aspects 0x", std::hex, clearAspects, std::dec,
++        " -> ", m_deferredClears.size(), " pending"));
++    }
+   }
+ 
+ 
+@@ -2242,6 +2314,11 @@ namespace dxvk {
+ 
+ 
+   void DxvkContext::flushClearsInline() {
++    if (unlikely(debugDeferredClears() && !m_deferredClears.empty())) {
++      Logger::warn(str::format("flushClearsInline: ",
++        m_deferredClears.size(), " clear(s)"));
++    }
++
+     small_vector<VkClearAttachment, MaxNumRenderTargets + 1u> attachments;
+ 
+     for (auto& clear : m_deferredClears) {
+@@ -2308,6 +2385,11 @@ namespace dxvk {
+ 
+   void DxvkContext::flushClears(
+           bool                      useRenderPass) {
++    if (unlikely(debugDeferredClears() && !m_deferredClears.empty())) {
++      Logger::warn(str::format("flushClears(useRenderPass=", useRenderPass, "): ",
++        m_deferredClears.size(), " clear(s)"));
++    }
++
+     DxvkClearBatch clearBatch;
+ 
+     for (const auto& clear : m_deferredClears) {
+@@ -7651,6 +7733,12 @@ namespace dxvk {
+     if (dstIndex < srcIndex) {
+       m_deferredClears.resize(dstIndex);
+ 
++      if (unlikely(debugDeferredClears())) {
++        Logger::warn(str::format("flushDeferredClear: image ", image.handle(),
++          " retired ", srcIndex - dstIndex, " clear(s), ",
++          m_deferredClears.size(), " still pending"));
++      }
++
+       // Need to call this *after* removing the clear from the
+       // list since this will try to run clears out-of-order.
+       performClears(clearBatch);

@@ -5,4 +5,5 @@ IMPORTS   = $(FAUDIO_PE_LIBS)
 EXTRAINCL = $(FAUDIO_PE_CFLAGS)
 
 SOURCES = \
+	x3daudio1_7.thunks \
 	x3daudio.c

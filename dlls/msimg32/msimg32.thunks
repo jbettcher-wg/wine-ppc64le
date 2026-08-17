@@ -11,3 +11,43 @@
 # the shortest route from a real game's draw calls to this machine's GPU.
 DLL msimg32.dll
 FROM-SPEC auto
+
+# ---------------------------------------- the ceiling, measured 2026-08-17
+# This module is five exports and it emits two: GradientFill and
+# TransparentBlt, both declared in wingdi.h, which the global probe already
+# has.  The other three are refused and each for its own honest reason, so
+# they are written down rather than left as a number:
+#
+#   AlphaBlend      "argument 10 (BLENDFUNCTION) is not integer/pointer class"
+#       The one that matters, and the one this module exists for.  A
+#       BLENDFUNCTION is { BYTE BlendOp; BYTE BlendFlags; BYTE SourceConstant-
+#       Alpha; BYTE AlphaFormat; } -- FOUR BYTES, passed BY VALUE, and the
+#       thunk descriptor this port publishes describes integer and pointer
+#       slots only.
+#
+#       This one is CLOSEABLE and the route is worth recording, because the
+#       .spec already models it correctly: msimg32.spec says
+#       `AlphaBlend(long long long long long long long long long long long)`
+#       -- eleven integer classes, the tenth of which IS the BLENDFUNCTION.
+#       Both ABIs agree with that reading: MS-x64 passes a 4-byte aggregate in
+#       the low half of the argument register, and ppc64le ELFv2 passes it
+#       right-justified in a GPR, so the same 32 bits arrive in the same place.
+#       What blocks it is only that the ORACLE reads wingdi.h, where the type
+#       is spelled as a struct.  The fix is the dxvk_flat_surface.h pattern --
+#       a PROBE-EXTRA header declaring this one export with a DWORD in that
+#       position -- and it is deliberately NOT taken here, because asserting an
+#       ABI equivalence in a header is exactly the kind of claim that needs a
+#       value-checked gate behind it and this pass has not built one.  A guest
+#       that calls AlphaBlend today binds a named sentinel and dies naming the
+#       symbol; it does not blend the wrong pixels.
+#
+#   vSetDdrawflag   "no declaration found in Wine headers"
+#       Ordinal 1, no arguments, and undocumented on Windows too.  Wine's
+#       implementation is a no-op.
+#
+#   DllInitialize   "no declaration found in Wine headers"
+#       A loader entry point, not an API; a guest never imports it.
+#
+# NO CALLBACK AND NO INTERFACE CROSSES THIS BOUNDARY: all three real exports
+# forward straight into gdi32 (GdiAlphaBlend, GdiGradientFill,
+# GdiTransparentBlt) and take handles, rectangles and a vertex array.

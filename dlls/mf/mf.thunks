@@ -1,0 +1,65 @@
+# AMD64 thunk export spec for the guest mf.dll -- COM mode.
+#
+# COM-JSON is ppc64le/mf/interfaces_mf.json, the SAME file
+# dlls/mfplat/mfplat.thunks and dlls/mfreadwrite/mfreadwrite.thunks name, so
+# all three guest modules publish an identical roster and one winecom
+# instance in native mfplat.dll serves proxies whose vtables came from any of
+# them.  mf.spec forwards __wine_com_dispatch to mfplat's for the same reason
+# dxgi.spec forwards its to d3d11's: there can be only one instance.
+#
+# See dlls/mf/mfcom.c for how far the PIPELINE half actually goes -- every
+# object here is vended as a proxy and its methods dispatch, but
+# IMFMediaEventGenerator::BeginGetEvent hands MF an IMFAsyncCallback the guest
+# implements, and that is the reverse-proxy gap.
+DLL mf.dll
+FROM-SPEC auto
+
+PROBE-EXTRA mfapi.h
+PROBE-EXTRA mfidl.h
+PROBE-EXTRA mfreadwrite.h
+PROBE-EXTRA mftransform.h
+PROBE-EXTRA mferror.h
+
+COM-JSON  ../../ppc64le/mf/interfaces_mf.json
+
+# --- vending, with or without an interface going in ---
+GUEST-IMPL   DllGetClassObject                     __wine_guest_DllGetClassObject
+GUEST-IMPL   MFCreateAudioRendererActivate         __wine_guest_MFCreateAudioRendererActivate
+GUEST-IMPL   MFCreatePresentationClock             __wine_guest_MFCreatePresentationClock
+GUEST-IMPL   MFCreateSampleCopierMFT               __wine_guest_MFCreateSampleCopierMFT
+GUEST-IMPL   MFCreateSimpleTypeHandler             __wine_guest_MFCreateSimpleTypeHandler
+GUEST-IMPL   MFCreateStandardQualityManager        __wine_guest_MFCreateStandardQualityManager
+GUEST-IMPL   MFCreateTopoLoader                    __wine_guest_MFCreateTopoLoader
+GUEST-IMPL   MFCreateTopology                      __wine_guest_MFCreateTopology
+GUEST-IMPL   MFCreateTopologyNode                  __wine_guest_MFCreateTopologyNode
+GUEST-IMPL   MFCreateVideoRendererActivate         __wine_guest_MFCreateVideoRendererActivate
+GUEST-IMPL   MFCreateSequencerSource               __wine_guest_MFCreateSequencerSource
+GUEST-IMPL   MFCreateMediaSession                  __wine_guest_MFCreateMediaSession
+GUEST-IMPL   MFCreateAudioRenderer                 __wine_guest_MFCreateAudioRenderer
+GUEST-IMPL   MFCreateDeviceSource                  __wine_guest_MFCreateDeviceSource
+GUEST-IMPL   MFCreateMP3MediaSink                  __wine_guest_MFCreateMP3MediaSink
+GUEST-IMPL   MFCreateAC3MediaSink                  __wine_guest_MFCreateAC3MediaSink
+GUEST-IMPL   MFCreateADTSMediaSink                 __wine_guest_MFCreateADTSMediaSink
+GUEST-IMPL   MFCreate3GPMediaSink                  __wine_guest_MFCreate3GPMediaSink
+GUEST-IMPL   MFCreateFMPEG4MediaSink               __wine_guest_MFCreateFMPEG4MediaSink
+GUEST-IMPL   MFCreateMPEG4MediaSink                __wine_guest_MFCreateMPEG4MediaSink
+GUEST-IMPL   MFGetTopoNodeCurrentType              __wine_guest_MFGetTopoNodeCurrentType
+GUEST-IMPL   MFTranscodeGetAudioOutputAvailableTypes __wine_guest_MFTranscodeGetAudioOutputAvailableTypes
+GUEST-IMPL   MFEnumDeviceSources                   __wine_guest_MFEnumDeviceSources
+GUEST-IMPL   MFGetService                          __wine_guest_MFGetService
+GUEST-IMPL   MFRequireProtectedEnvironment         __wine_guest_MFRequireProtectedEnvironment
+GUEST-IMPL   MFShutdownObject                      __wine_guest_MFShutdownObject
+
+# mfplat's export reached through mf.dll's forward.  Both names MUST resolve
+# to the same wrapper, or the resolver would arrive unwrapped through one of
+# them -- which is precisely the kind of second door this audit exists to
+# close.
+GUEST-IMPL   MFCreateSourceResolver                __wine_guest_MFCreateSourceResolver
+
+# --- the reverse-proxy gap: a callback the game implements ---
+GUEST-IMPL   MFCreateSampleGrabberSinkActivate     __wine_guest_MFCreateSampleGrabberSinkActivate
+
+# --- a PROPVARIANT the callee fills in: served, with the tag audited ---
+GUEST-IMPL   MFGetSupportedMimeTypes               __wine_guest_MFGetSupportedMimeTypes
+GUEST-IMPL   MFGetSupportedSchemes                 __wine_guest_MFGetSupportedSchemes
+GUEST-IMPL   MFCreateSequencerSegmentOffset        __wine_guest_MFCreateSequencerSegmentOffset

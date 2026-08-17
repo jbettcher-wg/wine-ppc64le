@@ -3,4 +3,5 @@ IMPORTS   = uuid ole32
 IMPORTLIB = dxva2
 
 SOURCES = \
+	dxva2.thunks \
 	main.c

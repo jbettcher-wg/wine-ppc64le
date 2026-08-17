@@ -1418,22 +1418,11 @@ typedef struct DECLSPEC_ALIGN(16) _AMD64_CONTEXT {
     DWORD64 LastExceptionFromRip; /* 4c8 */
 } AMD64_CONTEXT;
 
-#ifdef __x86_64__
-
-#define CONTEXT_CONTROL CONTEXT_AMD64_CONTROL
-#define CONTEXT_INTEGER CONTEXT_AMD64_INTEGER
-#define CONTEXT_SEGMENTS CONTEXT_AMD64_SEGMENTS
-#define CONTEXT_FLOATING_POINT CONTEXT_AMD64_FLOATING_POINT
-#define CONTEXT_DEBUG_REGISTERS CONTEXT_AMD64_DEBUG_REGISTERS
-#define CONTEXT_XSTATE CONTEXT_AMD64_XSTATE
-#define CONTEXT_FULL CONTEXT_AMD64_FULL
-#define CONTEXT_ALL CONTEXT_AMD64_ALL
-
-typedef AMD64_CONTEXT CONTEXT, *PCONTEXT;
-typedef IMAGE_AMD64_RUNTIME_FUNCTION_ENTRY RUNTIME_FUNCTION, *PRUNTIME_FUNCTION;
-typedef SCOPE_TABLE_AMD64 SCOPE_TABLE, *PSCOPE_TABLE;
-
-typedef struct _KNONVOLATILE_CONTEXT_POINTERS
+/* Defined for every host, not only for x86-64 ones, exactly as the ARM64
+ * equivalents below are: a host that has to unwind x86-64 code it cannot
+ * execute -- ARM64EC, or the ppc64 guest lane -- needs the x86-64 shapes by
+ * name while its own CONTEXT means something else entirely. */
+typedef struct _KNONVOLATILE_CONTEXT_POINTERS_AMD64
 {
     union
     {
@@ -1482,7 +1471,28 @@ typedef struct _KNONVOLATILE_CONTEXT_POINTERS
             PULONG64 R15;
         } DUMMYSTRUCTNAME;
     } DUMMYUNIONNAME2;
-} KNONVOLATILE_CONTEXT_POINTERS, *PKNONVOLATILE_CONTEXT_POINTERS;
+} KNONVOLATILE_CONTEXT_POINTERS_AMD64, *PKNONVOLATILE_CONTEXT_POINTERS_AMD64;
+
+#ifdef __x86_64__
+
+#define CONTEXT_CONTROL CONTEXT_AMD64_CONTROL
+#define CONTEXT_INTEGER CONTEXT_AMD64_INTEGER
+#define CONTEXT_SEGMENTS CONTEXT_AMD64_SEGMENTS
+#define CONTEXT_FLOATING_POINT CONTEXT_AMD64_FLOATING_POINT
+#define CONTEXT_DEBUG_REGISTERS CONTEXT_AMD64_DEBUG_REGISTERS
+#define CONTEXT_XSTATE CONTEXT_AMD64_XSTATE
+#define CONTEXT_FULL CONTEXT_AMD64_FULL
+#define CONTEXT_ALL CONTEXT_AMD64_ALL
+
+typedef AMD64_CONTEXT CONTEXT, *PCONTEXT;
+typedef IMAGE_AMD64_RUNTIME_FUNCTION_ENTRY RUNTIME_FUNCTION, *PRUNTIME_FUNCTION;
+typedef SCOPE_TABLE_AMD64 SCOPE_TABLE, *PSCOPE_TABLE;
+typedef KNONVOLATILE_CONTEXT_POINTERS_AMD64 KNONVOLATILE_CONTEXT_POINTERS, *PKNONVOLATILE_CONTEXT_POINTERS;
+
+/* so that the one DISPATCHER_CONTEXT_AMD64 definition further down carries the
+ * plain struct tag on an x86-64 host, where it IS the native one; the ARM64
+ * block does exactly this for _DISPATCHER_CONTEXT_ARM64 */
+#define _DISPATCHER_CONTEXT_AMD64 _DISPATCHER_CONTEXT
 
 #endif /* __x86_64__ */
 
@@ -2273,6 +2283,24 @@ struct _EXCEPTION_RECORD;
 typedef EXCEPTION_DISPOSITION WINAPI EXCEPTION_ROUTINE(struct _EXCEPTION_RECORD*,PVOID,CONTEXT*,PVOID);
 typedef EXCEPTION_ROUTINE *PEXCEPTION_ROUTINE;
 
+/* Like DISPATCHER_CONTEXT_ARM64 below, defined for every host: it is the block
+ * an x86-64 language handler reads, so a host that dispatches x86-64 exceptions
+ * without being an x86-64 host needs its exact shape by name. */
+typedef struct _DISPATCHER_CONTEXT_AMD64
+{
+    ULONG64                              ControlPc;
+    ULONG64                              ImageBase;
+    IMAGE_AMD64_RUNTIME_FUNCTION_ENTRY  *FunctionEntry;
+    ULONG64                              EstablisherFrame;
+    ULONG64                              TargetIp;
+    AMD64_CONTEXT                       *ContextRecord;
+    PEXCEPTION_ROUTINE                   LanguageHandler;
+    PVOID                                HandlerData;
+    struct _UNWIND_HISTORY_TABLE        *HistoryTable;
+    DWORD                                ScopeIndex;
+    DWORD                                Fill0;
+} DISPATCHER_CONTEXT_AMD64, *PDISPATCHER_CONTEXT_AMD64;
+
 typedef struct _DISPATCHER_CONTEXT_ARM64
 {
     ULONG_PTR                     ControlPc;
@@ -2307,20 +2335,8 @@ typedef union _DISPATCHER_CONTEXT_NONVOLREG_ARM64
 
 #ifdef __x86_64__
 
-typedef struct _DISPATCHER_CONTEXT
-{
-    ULONG64                       ControlPc;
-    ULONG64                       ImageBase;
-    PRUNTIME_FUNCTION             FunctionEntry;
-    ULONG64                       EstablisherFrame;
-    ULONG64                       TargetIp;
-    PCONTEXT                      ContextRecord;
-    PEXCEPTION_ROUTINE            LanguageHandler;
-    PVOID                         HandlerData;
-    struct _UNWIND_HISTORY_TABLE *HistoryTable;
-    DWORD                         ScopeIndex;
-    DWORD                         Fill0;
-} DISPATCHER_CONTEXT, *PDISPATCHER_CONTEXT;
+#undef _DISPATCHER_CONTEXT_AMD64
+typedef DISPATCHER_CONTEXT_AMD64 DISPATCHER_CONTEXT, *PDISPATCHER_CONTEXT;
 
 #ifdef __arm64ec__
 
@@ -2763,6 +2779,15 @@ NTSYSAPI LONG               WINAPI RtlVirtualUnwind2(ULONG,ULONG_PTR,ULONG_PTR,R
 #ifdef __x86_64__
 NTSYSAPI BOOLEAN            WINAPI RtlIsEcCode(ULONG_PTR);
 #endif
+
+/* The language handler every table-driven __try/__except in C compiles against.
+ * ntdll has always exported it and unwind.c has always defined it; nothing in
+ * Wine's own tree calls it BY NAME, so it never needed a prototype -- but a
+ * declaration is what tools/spec2thunk's signature oracle reads, and without
+ * one the export is refused and a guest image whose .xdata names it cannot
+ * even bind its imports.  Declared for the same architectures that have a
+ * DISPATCHER_CONTEXT at all. */
+NTSYSAPI EXCEPTION_DISPOSITION WINAPI __C_specific_handler(EXCEPTION_RECORD*,void*,CONTEXT*,struct _DISPATCHER_CONTEXT*);
 
 #endif  /* __i386__ */
 #endif  /* _APISETRTLSUPPORT_ */

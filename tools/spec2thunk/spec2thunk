@@ -136,6 +136,13 @@ ran: kernel32.spec's RtlUnwindEx was one argument short of ntdll's, and
 kernel32/kernelbase spelled VerSetConditionMask's ULONGLONG as two `long`s,
 which is right on i386 and wrong on win64.  Both fixed.)
 
+THE .spec ALSO SUPPLIES *WHICH ORDINAL EACH NAME ANSWERS TO*, and so does a
+.def.  A guest may import by ordinal and carry no name at all -- Steam's
+d3ddriverquery64.exe imports d3d12.dll ordinal 101 and nothing else -- so the
+thunk's export table has to be numbered the way the real module's is, not the
+way the linker feels like numbering it.  See the ORDINALS banner further down
+for how that number is derived and why the gaps are left as gaps.
+
 A .thunks FILE IS NOW UNNECESSARY, NOT FORBIDDEN.  A module with nothing to say
 needs no file at all.  A module with a few things to say keeps a small one:
 
@@ -429,6 +436,84 @@ GUEST_CPU = 'x86_64'
 _SPEC_FUNC_TYPES = frozenset(('stdcall', 'cdecl', 'varargs', 'thiscall',
                               'fastcall'))
 
+# --------------------------------------------------------------------------
+# ORDINALS -- WHICH NUMBER EACH EXPORT ANSWERS TO
+# --------------------------------------------------------------------------
+# A guest may import BY ORDINAL and carry no name at all.  Steam's own
+# d3ddriverquery64.exe does exactly that: its d3d12.dll import descriptor names
+# ordinal 101 and nothing else, because that is the ordinal Microsoft's
+# d3d12.dll has always exported D3D12CreateDevice at, and Wine's d3d12.spec and
+# vkd3d-proton's d3d12.def both pin it there for that reason.
+#
+# So the thunk PE has to export that function AT THAT ORDINAL.  It did not: the
+# .def this tool wrote listed names only, and lld-link then numbers a plain
+# EXPORTS list 1..N in NAME order, which is not what any of these modules
+# publishes.  The guest's loader looked up 101 in a table numbered 1..8, found
+# nothing, and bound ntdll's missing-import sentinel -- so the first call went
+# to 0xdead0001 from d3ddriverquery64.exe+0x108e with no symbol anywhere near
+# it.  Ordinals are not the linker's business here; every export goes into the
+# .def with the number its own source pins.
+#
+# assign_ordinals() computes those numbers exactly the way the real module's
+# do get computed, by tools/winebuild/parser.c:assign_ordinals():
+#
+#   * base  = the LOWEST EXPLICIT ordinal in the file, or 1 if there is none
+#     (NOT 1 unconditionally -- d3d12 pins 101 and 102 and nothing else, so its
+#     base is 101 and its unnumbered exports start at 103);
+#   * every entry with no ordinal of its own takes the lowest free number from
+#     base upwards, IN FILE ORDER;
+#   * an entry this machine does not export at all (-arch=/-i386) is filtered
+#     out BEFORE any of that and consumes no number, exactly where winebuild's
+#     assign_exports() filters it.
+#
+# The entries this tool cannot thunk -- stubs, -noname, -register, and every
+# export the signature oracle refuses -- DO take part in the numbering and are
+# then simply not emitted.  Their ordinals become HOLES in the thunk's export
+# table, which is the honest outcome: a guest importing one of them reads a
+# zero address-table entry, ntdll names it in a WARN and binds a sentinel, and
+# every surviving export keeps the number the real module gives it.  Closing
+# the holes by renumbering would silently bind a guest's import of a refused
+# export to an unrelated function.
+# --------------------------------------------------------------------------
+
+MAX_ORDINALS = 65535            # tools/winebuild/build.h
+
+
+def assign_ordinals(records, path):
+    """Number a module's entry points the way winebuild does.
+
+    `records` are the entry points that survive the machine filter, in file
+    order; each is a dict with 'ordinal' (an int if the file pinned one, else
+    None) and 'lineno'.  Each record comes back with 'ordinal' filled in and
+    'ordinal_pinned' saying whether the file was the one that chose it.
+    Returns the highest ordinal in use, which is the module's whole ordinal
+    space: nothing this tool adds of its own may land inside it.
+    """
+    used = {}
+    for r in records:
+        r['ordinal_pinned'] = r['ordinal'] is not None
+        if r['ordinal'] is None:
+            continue
+        if not 0 < r['ordinal'] < MAX_ORDINALS:
+            sys.exit('%s:%d: ordinal %d is out of range 1..%d'
+                     % (path, r['lineno'], r['ordinal'], MAX_ORDINALS - 1))
+        if r['ordinal'] in used:
+            sys.exit('%s:%d: ordinal %d redefined; first defined at line %d'
+                     % (path, r['lineno'], r['ordinal'], used[r['ordinal']]))
+        used[r['ordinal']] = r['lineno']
+    nxt = min(used) if used else 1
+    for r in records:
+        if r['ordinal'] is not None:
+            continue
+        while nxt in used:
+            nxt += 1
+        if nxt >= MAX_ORDINALS:
+            sys.exit('%s:%d: too many entry points (max %d)'
+                     % (path, r['lineno'], MAX_ORDINALS))
+        r['ordinal'] = nxt
+        used[nxt] = r['lineno']
+    return max(used) if used else 0
+
 
 def _cpu_from_name(tok):
     for prefix, cpu in _CPU_NAMES:
@@ -471,18 +556,25 @@ def _spec_cpus(flags):
 
 
 def parse_wine_spec(path):
-    """Read a Wine .spec -> (ordered entries, skipped-with-reason).
+    """Read a Wine .spec -> (ordered entries, skipped-with-reason, ord limit).
 
-    An entry is dict(name, spec_args, spec_type, flags, specline).  `spec_args`
-    is the argument-type list exactly as the .spec spells it, kept for the
-    arity/class cross-check; it is never the source of a signature.
+    An entry is dict(name, ordinal, spec_args, spec_type, flags, specline).
+    `spec_args` is the argument-type list exactly as the .spec spells it, kept
+    for the arity/class cross-check; it is never the source of a signature.
+    `ordinal` is the number the real module answers to, from assign_ordinals().
 
     Everything the guest cannot bind to a named AMD64 export is skipped here
     rather than refused later, with the reason, so the two are not confused in
     the report: a `@ stub` has no implementation to call at all, and an
     -arch-restricted entry is simply not in this machine's export table.
+
+    The machine filter runs FIRST, before anything else about the line is
+    looked at, because that is where winebuild's assign_exports() runs it and
+    an entry that fails it consumes no ordinal.  Everything that passes it is
+    an entry point of the real module and is numbered, whether this tool can
+    thunk it or not.
     """
-    entries, skipped = [], []
+    entries, skipped, records = [], [], []
     with open(path, errors='replace') as f:
         for lineno, raw in enumerate(f, 1):
             line = raw.split('#', 1)[0].strip()
@@ -497,31 +589,32 @@ def parse_wine_spec(path):
             flags = []
             while rest and rest[0].startswith('-'):
                 flags.append(rest.pop(0)[1:])
-            if kind == 'stub':
-                name = rest[0].split('(')[0] if rest else '?'
-                skipped.append((name, lineno, 'stub -- Wine has no '
-                                'implementation to call'))
-                continue
-            if kind not in _SPEC_FUNC_TYPES:
-                # extern/variable/equate: data, not a callable entry point.
-                if rest:
-                    skipped.append((rest[0].split('(')[0], lineno,
-                                    '`@ %s` is not a callable entry point' % kind))
-                continue
-            if not rest:
-                continue
-            decl = ' '.join(rest)
-            name, _, tail = decl.partition('(')
-            name = name.strip()
-            args = tail.rpartition(')')[0].split() if '(' in decl else []
             cpus = _spec_cpus(flags)
             if cpus is not None and GUEST_CPU not in cpus:
-                skipped.append((name, lineno,
+                skipped.append((rest[0].split('(')[0] if rest else '?', lineno,
                                 'not exported for %s (-%s)'
                                 % (GUEST_CPU,
                                    ' -'.join(f for f in flags
                                              if f == 'i386' or f.startswith('arch=')))))
                 continue
+            if not rest:
+                continue
+            rec = dict(lineno=lineno,
+                       ordinal=int(ordinal) if ordinal != '@' else None)
+            records.append(rec)
+            if kind == 'stub':
+                skipped.append((rest[0].split('(')[0], lineno, 'stub -- Wine '
+                                'has no implementation to call'))
+                continue
+            if kind not in _SPEC_FUNC_TYPES:
+                # extern/variable/equate: data, not a callable entry point.
+                skipped.append((rest[0].split('(')[0], lineno,
+                                '`@ %s` is not a callable entry point' % kind))
+                continue
+            decl = ' '.join(rest)
+            name, _, tail = decl.partition('(')
+            name = name.strip()
+            args = tail.rpartition(')')[0].split() if '(' in decl else []
             if name == '@':
                 # `86 stdcall -i386 -private @(ptr) krnl386...`: exported by
                 # ordinal under no name at all.
@@ -543,14 +636,18 @@ def parse_wine_spec(path):
                                 'a CONTEXT, not an argument list'))
                 continue
             entries.append(dict(name=name, spec_args=args, spec_type=kind,
-                                flags=flags, specline=lineno))
+                                flags=flags, specline=lineno, rec=rec))
+    ord_limit = assign_ordinals(records, path)
+    for e in entries:
+        rec = e.pop('rec')
+        e['ordinal'], e['ordinal_pinned'] = rec['ordinal'], rec['ordinal_pinned']
     if not entries:
         sys.exit('%s: no usable export lines' % path)
-    return entries, skipped
+    return entries, skipped, ord_limit
 
 
 def exports_from_wine_spec(path, overrides=None, excludes=(), start_imm=0):
-    """-> (export entries in .spec order, skipped, dropped-by-EXCLUDE).
+    """-> (export entries in .spec order, skipped, dropped-by-EXCLUDE, limit).
 
     `overrides` maps an export name to a parsed .thunks line, which then
     supplies the assertion columns (and `variadic=`) for that one export
@@ -558,7 +655,7 @@ def exports_from_wine_spec(path, overrides=None, excludes=(), start_imm=0):
     asserted=False and is checked against the .spec's own arity instead.
     """
     overrides = overrides or {}
-    entries, skipped = parse_wine_spec(path)
+    entries, skipped, ord_limit = parse_wine_spec(path)
     excluded = set(excludes)
     out, dropped = [], []
     for e in entries:
@@ -568,7 +665,8 @@ def exports_from_wine_spec(path, overrides=None, excludes=(), start_imm=0):
         ov = overrides.get(e['name'])
         if ov:
             e = dict(ov, spec_args=e['spec_args'], spec_type=e['spec_type'],
-                     specline=e['specline'], asserted=True)
+                     specline=e['specline'], ordinal=e['ordinal'],
+                     ordinal_pinned=e['ordinal_pinned'], asserted=True)
         else:
             # No hand-written assertion to check: the header oracle is the only
             # source, cross-checked against this line's own arity.  imm is only
@@ -586,7 +684,7 @@ def exports_from_wine_spec(path, overrides=None, excludes=(), start_imm=0):
                  + '\n  '.join('%-30s %s' % (n, skipped_names.get(
                      n, 'no such line in the .spec at all'))
                      for n in unknown))
-    return out, skipped, dropped
+    return out, skipped, dropped, ord_limit
 
 
 # --------------------------------------------------------------------------
@@ -607,8 +705,15 @@ def exports_from_wine_spec(path, overrides=None, excludes=(), start_imm=0):
 # --------------------------------------------------------------------------
 
 def parse_module_def(path):
-    """Read a .def -> (library name or None, ordered export names)."""
-    library, names, in_exports = None, [], False
+    """Read a .def -> (library name or None, entry points, ordinal limit).
+
+    An entry point is dict(name, ordinal, ordinal_pinned); `name` is None for
+    the ones a thunk cannot serve.  Those are RETURNED rather than dropped
+    because a NONAME or DATA entry still occupies its ordinal in the module the
+    guest expects, and the numbering below has to count it -- see the ORDINALS
+    banner.  Nothing else looks at them.
+    """
+    library, entries, in_exports = None, [], False
     with open(path, errors='replace') as f:
         for lineno, raw in enumerate(f, 1):
             line = raw.split(';', 1)[0].strip()
@@ -628,33 +733,42 @@ def parse_module_def(path):
             elif not in_exports:
                 continue
             name = parts[0]
+            ordinal = None
+            for p in parts[1:]:
+                if p.startswith('@') and p[1:].isdigit():
+                    ordinal = int(p[1:])
+            e = dict(name=name, ordinal=ordinal, lineno=lineno)
+            entries.append(e)
             # `Name @ordinal` and `Name @ordinal NONAME` forms: the name still
             # exists in the export table unless NONAME says otherwise, and a
             # thunk binds by name, so NONAME entries are skipped like -noname.
-            if any(p.upper() == 'NONAME' for p in parts[1:]):
-                continue
-            if any(p.upper() == 'DATA' for p in parts[1:]):
+            if any(p.upper() in ('NONAME', 'DATA') for p in parts[1:]):
+                e['name'] = None
                 continue
             if '=' in name:
                 name = name.split('=', 1)[0]
             if not name.replace('_', 'a').isalnum():
                 sys.exit('%s:%d: export name %r is not a plain C identifier'
                          % (path, lineno, name))
-            names.append(name)
+            e['name'] = name
+    names = [e['name'] for e in entries if e['name']]
     if not names:
         sys.exit('%s: no export names' % path)
     if len(set(names)) != len(names):
         sys.exit('%s: duplicate export names' % path)
-    return library, names
+    ord_limit = assign_ordinals(entries, path)
+    return library, entries, ord_limit
 
 
 def exports_from_module_def(path, overrides=None, excludes=(), start_imm=0):
-    """-> (export entries in .def order, dropped-by-EXCLUDE)."""
+    """-> (library, export entries in .def order, dropped-by-EXCLUDE, limit)."""
     overrides = overrides or {}
-    library, names = parse_module_def(path)
+    library, entries, ord_limit = parse_module_def(path)
+    entries = [e for e in entries if e['name']]
     excluded = set(excludes)
     out, dropped = [], []
-    for name in names:
+    for entry in entries:
+        name = entry['name']
         if name in excluded:
             dropped.append(name)
             continue
@@ -667,12 +781,14 @@ def exports_from_module_def(path, overrides=None, excludes=(), start_imm=0):
                      variadic_impl=None, asserted=False, spec_args=None,
                      specline=0)
         e['imm'] = e.get('imm', start_imm + len(out))
+        e['ordinal'] = entry['ordinal']
+        e['ordinal_pinned'] = entry['ordinal_pinned']
         out.append(e)
-    unknown = sorted(set(overrides) - set(names))
+    unknown = sorted(set(overrides) - {e['name'] for e in entries})
     if unknown:
         sys.exit('%s: %d override(s) name an export this .def does not offer: %s'
                  % (path, len(unknown), ', '.join(unknown)))
-    return library, out, dropped
+    return library, out, dropped, ord_limit
 
 
 # --------------------------------------------------------------------------
@@ -1134,6 +1250,14 @@ def resolve_signatures(exports, headers, specs=None):
         sys.exit("FATAL: spec disagrees with Wine's headers:\n  "
                  + "\n  ".join(mismatches))
 
+    # An export whose signature came from a Wine .spec rather than a header --
+    # the documented last-resort downgrade.  Its `params` are .spec class
+    # tokens (ptr, long, str), not C types, so neither the WIDTHS probe nor the
+    # FP probe below may be handed them: both compile one translation unit for
+    # every request at once and answer for none of them if it fails.
+    def spec_cited(e):
+        return str(e['sig'].get('header') or '').endswith('.spec')
+
     # ------------------------------------------------------------------
     # Argument WIDTHS, from the same headers that supplied the signatures.
     # An MS-x64 caller stores a 32-bit argument with a 32-bit store and
@@ -1150,8 +1274,27 @@ def resolve_signatures(exports, headers, specs=None):
     # WineSpecs docstring warns that width is exactly what a .spec cannot
     # state.  Entries the header oracle did not verify (the .spec-cited
     # last-resort path) publish no mask, which is the old behaviour.
+    #
+    # A .spec-CITED entry MUST BE HELD OUT OF THE PROBE, not merely ignored in
+    # the answer -- the same hazard the FP stage below documents, which was
+    # fixed there and missed here.  widths() compiles ONE translation unit of
+    # `char wt_asz_n_i[sizeof(T)];` for EVERY request together and returns {}
+    # for ALL of them if that unit fails to compile.  A .spec-cited signature's
+    # `params` are .spec class tokens -- `ptr`, `long`, `str` -- which are not C
+    # types, so `sizeof(ptr)` failed the compile and took the whole module's
+    # mask with it.  MEASURED, and it was live: kernel32.thunks has always
+    # carried two .spec-cited entries (DelayLoadFailureHook,
+    # DelayLoadFailureHookLookup), and every one of kernel32's 1142 emitted
+    # exports was therefore publishing mask 0 -- HeapAlloc's DWORD flags came
+    # out 0x00003 instead of 0x20003, so the host read a 32-bit guest argument
+    # slot as 64 bits with stack garbage in the upper half.  That is precisely
+    # the mspatcha failure this stage exists to prevent, reintroduced module-
+    # wide by one unrelated entry.  Found while adding the four .spec-cited
+    # vcruntime140 entries the DOOM triage needs, which would have silently
+    # done the same to ucrtbase and vcruntime140.
     widths = headers.widths(
-        [(i, e['sig'].get('params')) for i, e in enumerate(accepted)])
+        [(i, e['sig'].get('params')) for i, e in enumerate(accepted)
+         if not spec_cited(e)])
     for i, e in enumerate(accepted):
         sizes = widths.get(i)
         if not sizes or len(sizes) != e['sig']['nargs']:
@@ -1181,10 +1324,24 @@ def resolve_signatures(exports, headers, specs=None):
     #   * a probe that did not answer at all.  Publishing no FP word for an
     #     export that has floating point would silently hand the host an
     #     integer register file, so it is a refusal, never a default.
+    # A .spec-CITED signature has no C types to ask clang about: its `params`
+    # are .spec class tokens (ptr, long, str) and its `ret` is the literal
+    # "<unverified>" string wine_sig.WineSpecs puts there.  Handing those to the
+    # probe produced no answer, and "no answer" is a refusal -- so every export
+    # on that documented downgrade path silently stopped being emitted the day
+    # the fp stage landed, including the two kernel32.thunks has always named.
+    # There is nothing to ask: WineSpecs.BAD_ARGS refuses `float` and `double`
+    # on the .spec's own word before this point, so a .spec-cited export that
+    # got this far is integer-classed by construction, and its return kind is
+    # the human int|void assertion the RETURN KIND NOT VERIFIED banner already
+    # prints.  Treat it exactly like an export with no params to probe.
+    # (spec_cited() itself is defined above the WIDTHS stage, which needs the
+    # same hold-out for the same reason -- see the note there.)
+
     fp_types = []
     for i, e in enumerate(accepted):
         params = e['sig'].get('params')
-        if params is None:
+        if params is None or spec_cited(e):
             continue
         ret = e['sig'].get('ret')
         fp_types.append((i, list(params) + ([ret] if ret and ret.strip() != 'void' else [])))
@@ -1195,7 +1352,7 @@ def resolve_signatures(exports, headers, specs=None):
         params = e['sig'].get('params')
         ret = e['sig'].get('ret')
         has_ret = bool(ret and ret.strip() != 'void')
-        if params is None:
+        if params is None or spec_cited(e):
             still.append(e)
             continue
         nargs = e['sig']['nargs']
@@ -1430,13 +1587,27 @@ def emit_asm(dll, exports, mode, com_ifaces=None):
     return '\n'.join(out) + '\n'
 
 
-def emit_def(dll, exports, have_com=False):
+def emit_def(dll, exports, have_com=False, ord_limit=0):
+    """The .def the thunk PE is linked from.
+
+    Each export carries the ordinal assign_ordinals() gave it, because a guest
+    may import by ordinal alone and lld-link's own numbering -- 1..N in NAME
+    order -- answers to nothing.  `ord_limit` is the module's whole ordinal
+    space; this tool's two info structures are exported past the end of it so
+    that an ordinal the thunk cannot serve stays a hole rather than resolving
+    to a table of RVAs.
+    """
     out = ['LIBRARY %s' % dll, 'EXPORTS']
     for i, e in enumerate(exports):
-        out.append('    %s = wine_thunk_stub_%d' % (e['name'], i))
-    out.append('    __wine_thunk_info = wine_thunk_info DATA')
+        out.append('    %s = wine_thunk_stub_%d%s'
+                   % (e['name'], i,
+                      ' @%d' % e['ordinal'] if e.get('ordinal') else ''))
+    info_ord = ord_limit + 1 if ord_limit else 0
+    out.append('    __wine_thunk_info = wine_thunk_info%s DATA'
+               % (' @%d' % info_ord if info_ord else ''))
     if have_com:
-        out.append('    __wine_com_thunk_info = wine_com_thunk_info DATA')
+        out.append('    __wine_com_thunk_info = wine_com_thunk_info%s DATA'
+                   % (' @%d' % (info_ord + 1) if info_ord else ''))
     return '\n'.join(out) + '\n'
 
 
@@ -1561,13 +1732,13 @@ def main():
             from_spec = os.path.join(os.path.dirname(os.path.abspath(args.spec)),
                                      from_spec)
 
-    wine_spec_skipped, wine_spec_dropped = [], []
+    wine_spec_skipped, wine_spec_dropped, ord_limit = [], [], 0
     if extra['from_def']:
         from_def = spec_relative(extra['from_def'])
         if not os.path.isfile(from_def):
             ap.error('no such .def: %s' % from_def)
         overrides = {e['name']: e for e in spec_exports}
-        library, spec_exports, wine_spec_dropped = \
+        library, spec_exports, wine_spec_dropped, ord_limit = \
             exports_from_module_def(from_def, overrides, excludes)
         if not dll:
             dll = library or (os.path.splitext(os.path.basename(from_def))[0]
@@ -1582,7 +1753,7 @@ def main():
         if not os.path.isfile(from_spec):
             ap.error('no such Wine .spec: %s' % from_spec)
         overrides = {e['name']: e for e in spec_exports}
-        spec_exports, wine_spec_skipped, wine_spec_dropped = \
+        spec_exports, wine_spec_skipped, wine_spec_dropped, ord_limit = \
             exports_from_wine_spec(from_spec, overrides, excludes)
         for e in spec_exports:
             e.setdefault('spec_path', from_spec)
@@ -1785,7 +1956,8 @@ def main():
     with open(spath, 'w') as f:
         f.write(emit_asm(dll, exports, args.body, com_ifaces))
     with open(dpath, 'w') as f:
-        f.write(emit_def(dll, exports, have_com=bool(com_ifaces)))
+        f.write(emit_def(dll, exports, have_com=bool(com_ifaces),
+                         ord_limit=ord_limit))
 
     run([args.clang, '-target', 'x86_64-windows-gnu', '-c', spath, '-o', opath],
         args.verbose)
@@ -1802,6 +1974,27 @@ def main():
     print("crt mode     : %s" % (' '.join(crt_defines) if crt_defines
                                  else '(none -- not a C runtime module)'))
     print("info version : %d" % INFO_VERSION)
+    if ord_limit and exports:
+        pinned = sum(1 for e in exports if e.get('ordinal_pinned'))
+        ords = sorted(e['ordinal'] for e in exports)
+        print("ordinals     : %d..%d over an ordinal space of 1..%d "
+              "(%d pinned by the export list, %d numbered from %d as "
+              "winebuild does); __wine_thunk_info at %d, past the end"
+              % (ords[0], ords[-1], ord_limit, pinned, len(ords) - pinned,
+                 min(e['ordinal'] for e in exports if e.get('ordinal_pinned'))
+                 if pinned else 1, ord_limit + 1))
+    elif ord_limit:
+        print("ordinals     : no export survived to carry one; the module's "
+              "ordinal space is 1..%d and __wine_thunk_info sits at %d"
+              % (ord_limit, ord_limit + 1))
+    else:
+        print("!! ORDINALS   : this export list pins none and derives none, so "
+              "the linker")
+        print("!! numbers the table 1..%d in NAME order.  A guest that imports "
+              "one of these" % len(exports))
+        print("!! by ordinal alone binds a sentinel, not a stub.  Only an "
+              "export list with")
+        print("!! no FROM-SPEC and no FROM-DEF reaches this state.")
     print("output       : %s" % outpath)
     print("e_lfanew     : 0x%x (signature stamped at 0x%02x..0x%02x)"
           % (e_lfanew, SIG_OFF, SIG_OFF + len(BUILTIN_SIG) - 1))
@@ -1848,12 +2041,14 @@ def main():
               "--report FILE)" % len(exports))
         return
 
-    print("idx  export                     imm32       desc    args ret   "
+    print("idx    ord  export                     imm32       desc    args ret   "
           "impl                       from")
     for i, e in enumerate(exports):
         s = e['sig']
-        print("%3d  %-26s 0x%08X  0x%05X %4d %-5s %-26s %s:%s"
-              % (i, e['name'], e['imm'], e['desc'], s['nargs'],
+        print("%3d  %5s  %-26s 0x%08X  0x%05X %4d %-5s %-26s %s:%s"
+              % (i, ('%d*' % e['ordinal']) if e.get('ordinal_pinned')
+                 else (e.get('ordinal') or '-'),
+                 e['name'], e['imm'], e['desc'], s['nargs'],
                  'void' if s['returns_void'] else 'int',
                  e['impl'] + (' (V)' if s.get('variadic') else ''),
                  s['header'], s['line']))

@@ -1,0 +1,20 @@
+# AMD64 thunk export spec -- d3dx11_43.dll.
+#
+# From the 2026-08-17 corpus pass.  Styx: Master of Shadows imports this
+# module STATICALLY and it had no guest thunk, so the loader refused the
+# native ppc64 module (c000007b) and the whole image failed to load
+# (c0000135).  Measured: the exe's import table names D3DX11CheckVersion and
+# nothing else -- the D3DX build-stamp check UE3 makes before it touches D3D11.
+DLL d3dx11_43.dll
+FROM-SPEC auto
+
+# d3dx11.h is not in the oracle's default translation unit; without it every
+# export was refused.  With it, 24 of 25 are emitted.
+#
+# The one still refused is D3DX11CheckVersion itself: no Wine header declares
+# it (it is not in d3dx11core.idl), so it keeps its ordinal as a named
+# sentinel and a guest that calls it faults by name.  The module now loads,
+# which is what stopped this title dead; whether Styx CALLS the version check
+# is a question for the run, and a measured call is what would earn the
+# .spec-location downgrade.
+PROBE-EXTRA   d3dx11.h

@@ -1,4 +1,5 @@
 STATICLIB = libwinecom.a
 
 SOURCES = \
+	reverse.c \
 	winecom.c

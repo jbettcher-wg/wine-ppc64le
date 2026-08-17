@@ -6,6 +6,8 @@ DELAYIMPORTS = mf
 EXTRADLLFLAGS = -Wb,--prefer-native
 
 SOURCES = \
+	mfreadwrite.thunks \
 	mf_classes.idl \
+	mfcom.c \
 	reader.c \
 	writer.c

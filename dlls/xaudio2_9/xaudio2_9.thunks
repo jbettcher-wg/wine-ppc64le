@@ -1,0 +1,65 @@
+# AMD64 thunk export spec for the guest xaudio2_9.dll -- COM mode.
+#
+# Read dlls/dsound/dsound.thunks first: this is the same arrangement -- a
+# NATIVE Wine implementation (xaudio_dll.c over FAudio) served to an emulated
+# x86-64 guest through libs/winecom -- with the two complications XAudio2 adds,
+# both of which dlls/xaudio2_9/guestcom.c explains at length:
+#
+#   * four of the six rostered interfaces are `[local]` and NOT
+#     IUnknown-derived, so the native module claims them in its own
+#     __wine_com_dispatch before libs/winecom can serve their slot 0 as
+#     QueryInterface;
+#   * a voice is destroyed by DestroyVoice, not by Release.
+#
+# WHY 2_9 AND NOT THE WHOLE FAMILY.  IXAudio2's IID and two of its method lists
+# are version-conditional, so each version is a DIFFERENT roster and needs its
+# own generated pair.  2_9 is the one modern titles link.  xaudio2_8 is a
+# mechanical repeat -- add "xaudio2_8" to SURFACES in ppc64le/audio/
+# gen_interfaces.py and gen_winecom.py, generate the two files, copy this file
+# and the three Makefile/spec lines.  xaudio2_7 is NOT mechanical: it exports
+# no creator at all, so a 2.7 guest reaches XAudio2 through
+# CoCreateInstance(CLSID_XAudio2_7), which lands in COMBASE's winecom instance
+# -- a different instance with a different roster, in which IXAudio2 does not
+# appear.  It is refused loudly at that end (E_NOINTERFACE with the IID named)
+# and it needs the XAudio2 family added to ppc64le/syscom/interfaces_syscom.json
+# rather than anything here.
+
+DLL       xaudio2_9.dll
+FROM-SPEC auto
+COM-JSON  ../../ppc64le/audio/interfaces_xaudio2_9.json
+
+# The oracle's default translation unit has neither xaudio2.h nor x3daudio.h,
+# and without them every export of this module would be refused for having no
+# declaration -- which is exactly the state x3daudio1_7.dll was in.
+PROBE-EXTRA xaudio2.h
+PROBE-EXTRA x3daudio.h
+
+GUEST-IMPL XAudio2Create                 __wine_guest_XAudio2Create
+GUEST-IMPL XAudio2CreateWithVersionInfo  __wine_guest_XAudio2CreateWithVersionInfo
+
+# The three XAPO factories vend an IUnknown -- an audio effect object -- and
+# IUnknown is not in this roster, so there is no guest stub vtable to give one.
+# They are EXCLUDED rather than GUEST-REFUSEd, and that is a finding rather
+# than a preference: spec2thunk's flat-surface audit classifies a parameter as
+# interface-bearing when it names a ROSTERED interface, a known carrier struct
+# or a bare void**, and `IUnknown **ppApo` is none of those -- so the audit
+# calls a GUEST-REFUSE on them STALE and would let them pass through, handing
+# the guest a native vtable it would then call as x86-64.  Excluding them binds
+# a guest import to the usual per-symbol 0xdead0000 sentinel, so an application
+# that wants a reverb faults with the symbol's own name instead of crashing
+# inside it.  The audit's blind spot is handed off separately; serving these
+# properly means rostering the XAPO interfaces (IXAPO, IXAPOParameters), which
+# is its own piece of work and is not needed to play a sound.
+EXCLUDE CreateAudioReverb
+EXCLUDE CreateAudioVolumeMeter
+EXCLUDE CreateFX
+
+# X3DAudioInitialize and X3DAudioCalculate are NOT here: they are flat maths
+# over plain structs, they carry no interface pointer, and the audit agrees.
+# X3DAudioInitialize's second argument is a by-value float, which the flat
+# thunk path has carried since cd4ea32c93d.
+
+EXCLUDE __wine_com_dispatch
+EXCLUDE __wine_com_refuse
+EXCLUDE __wine_guest_XAudio2Create
+EXCLUDE __wine_guest_XAudio2CreateWithVersionInfo

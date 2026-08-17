@@ -1,0 +1,24 @@
+# AMD64 thunk export spec -- dxva2.dll.
+#
+# From the 2026-08-17 corpus pass.  Boltgun imports this module STATICALLY and
+# it had no guest thunk, so the loader refused the native ppc64 module
+# (c000007b) and the whole image failed to load (c0000135).  Measured: the
+# exe's import table names DXVA2CreateDirect3DDeviceManager9 (ordinal 1) and
+# nothing else -- UE4's hardware video-decode probe.
+DLL dxva2.dll
+FROM-SPEC auto
+
+# dxva2api.h is not in the oracle's default translation unit, and it does not
+# compile on its own: it names D3DFORMAT and D3DPOOL, which come from
+# d3d9types.h.  So d3d9.h is appended FIRST and dxva2api.h second -- order
+# matters, PROBE-EXTRA lines are emitted in the order written.  Without them
+# every export was refused as "no declaration found in Wine headers".
+#
+# 35 of the 37 exports remain refused for that same reason: the DXVA2 surface
+# is declared almost entirely in the .idl's interfaces rather than as flat
+# prototypes, and this generator describes flat exports.  The one Boltgun
+# actually names is not among them -- DXVA2CreateDirect3DDeviceManager9 is
+# declared at dxva2api.h:1555 and is emitted.  Each of the other 35 keeps its
+# ordinal as a named sentinel, so a guest that calls one faults BY NAME.
+PROBE-EXTRA   d3d9.h
+PROBE-EXTRA   dxva2api.h

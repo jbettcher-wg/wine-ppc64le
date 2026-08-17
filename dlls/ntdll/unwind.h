@@ -220,4 +220,29 @@ static inline void context_arm_to_x64( ARM64EC_NT_CONTEXT *ec_ctx, const ARM64_N
 
 #endif /* __aarch64__ || __arm64ec__ */
 
+#ifdef __powerpc64__
+
+/* The x86-64 block of unwind.c, compiled a second time on this host against
+ * the guest's shapes (see the comment above it).  These are the pieces a guest
+ * SEH dispatch needs and the only ones: a table lookup and a virtual unwind
+ * over an AMD64_CONTEXT.  Not exported -- the same names in ntdll.spec are the
+ * ppc64 ones, which is exactly the point.
+ *
+ * They are pure functions of guest memory: they read a guest module's .pdata
+ * and .xdata and edit an AMD64_CONTEXT, and never execute or unwind anything on
+ * the host.  Host-side ELFv2/r2 unwinding is a wholly separate concern and is
+ * untouched by any of this. */
+extern IMAGE_AMD64_RUNTIME_FUNCTION_ENTRY * WINAPI RtlLookupFunctionEntry_amd64( ULONG_PTR pc,
+        ULONG_PTR *base, UNWIND_HISTORY_TABLE *table );
+extern NTSTATUS WINAPI RtlVirtualUnwind2_amd64( ULONG type, ULONG_PTR base, ULONG_PTR pc,
+        IMAGE_AMD64_RUNTIME_FUNCTION_ENTRY *function, AMD64_CONTEXT *context,
+        BOOLEAN *mach_frame_unwound, void **data, ULONG_PTR *frame_ret,
+        KNONVOLATILE_CONTEXT_POINTERS_AMD64 *ctx_ptr, ULONG_PTR *limit_low,
+        ULONG_PTR *limit_high, PEXCEPTION_ROUTINE *handler_ret, ULONG flags );
+extern PEXCEPTION_ROUTINE WINAPI RtlVirtualUnwind_amd64( ULONG type, ULONG64 base, ULONG64 pc,
+        IMAGE_AMD64_RUNTIME_FUNCTION_ENTRY *func, AMD64_CONTEXT *context, PVOID *handler_data,
+        ULONG64 *frame_ret, KNONVOLATILE_CONTEXT_POINTERS_AMD64 *ctx_ptr );
+
+#endif /* __powerpc64__ */
+
 #endif /* __WINE_NTDLL_UNWIND_H */

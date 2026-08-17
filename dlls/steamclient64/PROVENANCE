@@ -1,0 +1,75 @@
+Vendored source: Proton's lsteamclient
+======================================
+
+Everything under `proton/` is copied verbatim from Valve's Proton, except for
+three edits described below, each marked in place with a comment beginning
+"ppc64le port:".
+
+    upstream   https://github.com/ValveSoftware/Proton
+    tag        proton-11.0-1b
+    commit     0745bfbc4cf4365e8cf048b003990c59def29948
+    subtree    lsteamclient/   (vendored here as dlls/steamclient64/proton)
+    copied     2026-08-17
+
+Proton's own licensing applies to those files and their headers are unchanged:
+`proton/LICENSE` is the Steamworks SDK licence covering `proton/steamworks_sdk_*`,
+and the wrapper sources carry Wine's LGPL 2.1 headers.  Nothing here is
+redistributed; this is a build tree.
+
+Everything OUTSIDE `proton/` is this port's own, LGPL 2.1 like the rest of the
+tree:
+
+    steamrpc_wire.h        the frame format between the guest DLL and the helper
+    steamrpc_private.h     the marshal-descriptor shapes
+    steamrpc.c             the client: descriptors -> frames -> socket
+    steamrpc_generated.c   the descriptors, from tools/steamrpc/gen-steamrpc
+    steamrpc_count.h       ditto, the method count both ends C_ASSERT on
+    steamrpc_chkstk.c      the stack probe clang emits for a large frame
+    steamclient_guest.h    what Proton's PE side needs to compile for x86-64
+    steamclient64.def      the export list, ordinals from proton/lsteamclient.spec
+    steamclient64.guestpe  the build-lane control file
+
+
+Why the vendored tree is used TWICE
+-----------------------------------
+
+Proton's lsteamclient has two halves either side of a `WINE_UNIX_CALL`
+boundary, and this port compiles them for two different machines:
+
+  * the PE half (`proton/steamclient_main.c`, `proton/winISteam*.c`,
+    `proton/steamclient_generated.c`, the manual wrappers) becomes the guest
+    x86-64 Windows DLL `steamclient64.dll`, so that a game's Steamworks vtable
+    calls are x86-64 calling x86-64 exactly as they are under Proton;
+
+  * the unix half (`proton/unixlib*.cpp`, `proton/cppISteam*.cpp`,
+    `proton/unix_steam_*.cpp`, `proton/steamworks_sdk_*`) is compiled by
+    `ppc64le/steamapi/helper/build-helper.sh` into an x86-64 **Linux**
+    executable, because the real `~/.steam/sdk64/steamclient.so` is an x86-64
+    SysV ELF that native ppc64le Wine cannot load.
+
+Both halves are otherwise Proton's code doing Proton's work.  Only the
+boundary between them moved -- from a call within one process to a socket
+between two.
+
+
+The three edits to vendored files
+---------------------------------
+
+1. `proton/steamclient_main.c`, `get_unix_buffer()`.  Proton short-circuits
+   when the returned `u_buffer` pointer fits a `UINT_PTR`, because its unix
+   half shares the address space.  Here that pointer is a helper address which
+   always "fits" and never points at anything, so the short circuit is removed
+   rather than made conditional.
+
+2. `proton/steamclient_main.c`, `DllMain`.  One added call publishing
+   `ActiveProcess\pid`; see the comment there and in `steamrpc.c`.
+
+3. `proton/unixlib.h`, the `STEAMCLIENT_CALL` macro.  Proton `assert()`s that
+   a unix call never fails.  Across a process, "the helper is not there" is
+   the ordinary state of a game launched outside Steam, and the assert would
+   abort the game instead of letting it print its own SteamAPI_Init failure.
+
+Regenerating the descriptors after re-vendoring:
+
+    tools/steamrpc/gen-steamrpc dlls/steamclient64/proton \
+        dlls/steamclient64/steamrpc_generated.c

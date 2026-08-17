@@ -1,0 +1,51 @@
+# AMD64 thunk export spec -- dwrite.dll.
+#
+# From the 2026-08-17 everyday-DLL pass.  Anything built against a modern
+# Windows UI stack imports dwrite -- launchers, overlays, in-game browsers --
+# and this module had NO guest thunk at all: the loader found the native ppc64
+# builtin, correctly refused to splice it into a guest call, and the import
+# reported c000007b BEFORE the process ran a single instruction.  The export
+# list is this module's own .spec, which names exactly one entry point.
+DLL dwrite.dll
+FROM-SPEC auto
+
+# dwrite.h is generated from dwrite.idl and is not in the global probe
+# (wine_sig.PROBE_SRC).  dwrite_3.h is the umbrella -- it includes dwrite_2.h,
+# which includes dwrite_1.h, which includes dwrite.h -- so one line declares the
+# whole family and DWRITE_FACTORY_TYPE with it.  Measured: 0 of 1 before, 1 of 1
+# after.
+PROBE-EXTRA   dwrite_3.h
+
+# ------------------------------------------------------------ the refusal
+# THE ONE EXPORT VENDS AN INTERFACE, SO IT IS NOT A PASS-THROUGH.
+# DWriteCreateFactory writes an IDWriteFactory* through its third argument.
+# This module publishes no COM roster, so that pointer would reach the guest
+# as a NATIVE ppc64 vtable and the guest's first method call on it would
+# execute ppc64 bytes as x86-64.
+#
+# GUEST-IMPL points the GUEST's export at a wrapper in the native module
+# (dlls/dwrite/guestthunk.c) that answers E_NOTIMPL and says why, by name, in
+# an ERR.  The plain DWriteCreateFactory export is untouched and still serves
+# native ppc64 callers -- gdi32 and d2d1 both use it -- which is the whole
+# reason the redirect is on the guest side only.
+#
+# WHY THIS IS WORTH DOING AT ALL WHEN THE ONE EXPORT IS REFUSED.  Without a
+# .thunks file the module has no guest form, and a guest that merely LISTS
+# dwrite.dll in its import table dies at load with c000007b having run nothing.
+# With it the module loads, the process starts, and the failure -- if it comes
+# at all -- arrives at the call, as a documented HRESULT the caller can handle.
+# That is the same distinction dlls/dbghelp/dbghelp.thunks was written for.
+#
+# WHAT WOULD LIFT IT: a COM-JSON roster for the DirectWrite surface plus a
+# winecom instance in this module, exactly as dlls/dinput8 does in this same
+# series.  It is a large roster -- IDWriteFactory alone is 26 slots and it
+# vends IDWriteTextFormat, IDWriteTextLayout, IDWriteFontCollection,
+# IDWriteFontFace and IDWriteGdiInterop, each of which vends more -- and two of
+# its argument shapes have no winecom class yet: IDWriteTextRenderer and
+# IDWriteFontCollectionLoader are objects the APPLICATION implements and hands
+# to native code, which is the reverse-proxy direction (design §6, step 5).
+GUEST-IMPL DWriteCreateFactory  __wine_guest_DWriteCreateFactory
+
+# Internal name, kept out of the guest export list entirely: the guest never
+# imports it, it is only the native symbol the redirect above resolves to.
+EXCLUDE    __wine_guest_DWriteCreateFactory

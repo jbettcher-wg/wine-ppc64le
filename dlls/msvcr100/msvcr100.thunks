@@ -1,0 +1,112 @@
+# AMD64 thunk export spec -- msvcr100.dll.
+#
+# From the 2026-08-17 corpus pass.  Styx: Master of Shadows is built against
+# the VC++ 2010 runtime and imports 289 exports of this module STATICALLY --
+# as do eight of the wxWidgets DLLs it ships, and nvtt_64, libogg_64,
+# libvorbis_64 and libvorbisfile_64 -- and it had no guest thunk, so the
+# loader found the native ppc64 module, correctly refused to splice it into a
+# guest call (c000007b), and the whole image failed to load (c0000135) before
+# one guest instruction ran.
+#
+# 766 of 1185 eligible exports are emitted from this module's own .spec.  The
+# 419 refusals are named classes, not guesses -- the printf/scanf family
+# (true varargs, which need the variadic= column and a per-name v-variant);
+# the MSVC C++ EH ABI (_CxxThrowException, __CxxFrameHandler{,2,3},
+# __RTDynamicCast, __Cxx{Register,Unregister}ExceptionObject), which is the
+# guest image's OWN language personality and must not be sent into the host
+# unwinder, exactly as vcruntime140.__CxxFrameHandler3 is a documented hole in
+# ppc64le/thunks/check-import-chain.sh; the C++ mangled names, which are not
+# flat prototypes at all; and div/ldiv/lldiv/_cabs, which pass a struct by
+# value.  Each keeps its slot as a named sentinel.
+DLL msvcr100.dll
+FROM-SPEC auto
+
+# Six headers the oracle's default translation unit does not reach, and this
+# module's surface is declared across all of them.  Measured: they take the
+# emitted count from 666 to 766 -- a hundred exports that were named sentinels
+# purely because nothing had told the oracle where to look.  Each is here
+# because a name in THIS .spec needed it, not on speculation:
+#
+#   locale.h      setlocale, localeconv, _configthreadlocale
+#   setjmp.h      longjmp
+#   sys/utime.h   _wutime64 and the _utime family
+#   sys/timeb.h   _ftime64
+#   mbstring.h    _ismbblead and the _mbs* surface
+#   mtdll.h       _lock / _unlock -- the CRT's own locks, declared in no
+#                 public header at all.  msvcrt.thunks reaches them the same
+#                 way; INCLUDE-DIR points at ../msvcrt because that is this
+#                 module's PARENTSRC and where its implementation lives.
+INCLUDE-DIR   ../msvcrt
+PROBE-EXTRA   locale.h
+PROBE-EXTRA   setjmp.h
+PROBE-EXTRA   sys/utime.h
+PROBE-EXTRA   sys/timeb.h
+PROBE-EXTRA   mbstring.h
+PROBE-EXTRA   mtdll.h
+
+# _initterm walks a table of the CALLER's initializers.  For a guest caller
+# those entries are x86-64 code and this walker is ppc64, so the guest import
+# is redirected to a form that wraps each entry as it is reached.  A callback
+# mask cannot express this: the argument is a pointer to an ARRAY of function
+# pointers, not a function pointer.  Identical to the pair
+# dlls/msvcrt/msvcrt.thunks and dlls/ucrtbase/ucrtbase.thunks already carry,
+# and it needs the same two `-arch=ppc64` forwards in msvcr100.spec beside
+# _initterm_e, which this change adds.
+#
+# MEASURED, which is why these two lines exist rather than being anticipated.
+# Styx: Master of Shadows, 2026-08-17, once the fifteen missing thunk modules
+# let it past loader_init for the first time: its own bundled
+# wxmsw28u_vc_custom_64.dll reached PROCESS_ATTACH, its DllMain called
+# MSVCR100._initterm_e with a table at 0x1001CCBC0..0x1001CCBD0, and NATIVE
+# msvcr100 bctrl'd into the first entry --
+#
+#   trace:seh:find_guest_thunk_target L"MSVCR100.dll"._initterm_e -> (2 args)
+#   trace:seh:dispatch_exception code=c0000005 addr=00000001001BE2E4
+#     iar=00000001001be2e4  ctr=00000001001be2e4  lr=00003fffff1cc900
+#
+# ctr and iar are the same GUEST address (inside wxmsw28u at base
+# 0x100110000) while lr is inside native msvcr100's _initterm_e: the walker
+# jumped into x86-64 bytes.  loader_init then aborted the process, c0000005.
+# Exactly the failure README records for msvcrt and ucrtbase, in the one C
+# runtime that had never been given a guest thunk.  With these two lines the
+# same run reaches __wine_guest__initterm_e, runs the guest initializers as
+# guest code, and stops on the next thing instead.
+GUEST-IMPL   _initterm                        __wine_guest__initterm
+GUEST-IMPL   _initterm_e                      __wine_guest__initterm_e
+
+# ONE .spec-location override, and it is earned by a measured call rather than
+# anticipated -- which is the rule this pass held to everywhere (see
+# dlls/xapofx1_5/xapofx1_5.thunks for a hole deliberately left because nothing
+# had called it yet).
+#
+# With _initterm_e fixed, the very next thing the same Styx run did was call
+# the sentinel:
+#
+#   err:seh:dispatch_guest_exception guest called through a wild pointer:
+#     00000000DEAD0008 is in no guest image; the call was made from
+#     00000001001BE2F5 = L"wxmsw28u_vc_custom_64.dll"+ae2f5
+#   warn:module:import_dll No implementation for MSVCR100.dll._malloc_crt ...
+#     setting to 00000000DEAD0008
+#
+# _malloc_crt is the CRT's internal allocator and no Wine header declares it,
+# but nothing here is a guess about its shape: msvcr100.spec:1243 is
+# `@ cdecl _malloc_crt(long) malloc`, so it IS malloc -- one size_t argument,
+# a pointer return -- and dlls/msvcrt/heap.c:430 `void* CDECL malloc(size_t)`
+# is the implementation the forward names.  The .spec location in the last
+# column is the documented downgrade (see dlls/msvcp140/msvcp140.thunks): the
+# <int|void> column stops being machine-checked and becomes a human assertion,
+# and the assertion is that a pointer return is integer class.
+_malloc_crt                   0x0000A110  1  int   msvcr100.spec:1243
+
+# KNOWN LATENT HAZARD -- host->guest callback, NOT fixed here.  Read the
+# banner in dlls/msvcrt/msvcrt.thunks before debugging a crash in this module.
+# The registration-interception table in dlls/ntdll/signal_ppc64.c lists
+# msvcrt.dll and ucrtbase.dll for the callback-taking CRT entry points and
+# does NOT list msvcr100.dll -- so for a guest that reaches this module,
+# qsort's comparator, bsearch's, _beginthread/_beginthreadex's start routine,
+# _onexit/__dllonexit's table, _set_invalid_parameter_handler,
+# _set_purecall_handler and __setusermatherr all pass a RAW GUEST POINTER into
+# native code that will eventually bctrl it.  Styx imports every one of them.
+# That table is in a file this change does not own; the fix is a handful more
+# rows beside the existing msvcrt/ucrtbase ones, and it is filed in
+# ppc64le/corpus/CATALOG.md rather than done here.

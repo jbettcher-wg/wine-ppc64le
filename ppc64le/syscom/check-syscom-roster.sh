@@ -32,8 +32,17 @@ for a in "$@"; do
         *) BUILD=$a ;;
     esac
 done
+# An out-of-tree build directory if there is one, and otherwise this tree:
+# every other gate here defaults to the in-tree build the same way, and
+# looking only for a sibling wine-build made this script skip on a tree that
+# was perfectly capable of running it.
 [ -n "$BUILD" ] || BUILD=$(cd "$SRCTREE/../wine-build" 2>/dev/null && pwd)
-THUNK=$(cd "$SRCTREE/../.." && pwd)/dxvk-ppc64le/thunk
+[ -n "$BUILD" ] || BUILD=$SRCTREE
+# The generator tree sits BESIDE the wine tree, not one level above it.  The
+# old path was ../../dxvk-ppc64le/thunk, which does not exist anywhere, so
+# this gate exited 2 on every run and named a directory nobody could create
+# usefully.  A skip whose stated reason is wrong is worse than no skip.
+THUNK=${THUNK:-$(cd "$SRCTREE/.." && pwd)/dxvk-ppc64le/thunk}
 JSON="$HERE/interfaces_syscom.json"
 WORK=${WORK:-/tmp/syscom-roster-check}
 
@@ -41,9 +50,29 @@ say()  { echo "check-syscom-roster: $*"; }
 bad()  { echo "check-syscom-roster: FAIL $*" >&2; fail=1; }
 skip() { echo "check-syscom-roster: $*" >&2; exit 2; }
 
-[ -d "$THUNK" ] || skip "no generator tree at $THUNK"
 [ -f "$JSON" ] || skip "no committed roster at $JSON"
 [ -d "$BUILD/include" ] || skip "no build include dir under ${BUILD:-?}"
+[ -d "$THUNK" ] || skip "no generator tree at $THUNK (set THUNK= to point at it)"
+
+# Name what is missing, one thing at a time.  MEASURED 2026-08-17 on the tree
+# beside this one: gen_interfaces.py is there but carries no wine-syscom
+# surface (its SURFACES table is the dxvk/d3d9 one), and gen_vtbl_check.py and
+# gen_guid_check.py do not exist in it at all -- so layers 1, 2 and 3 each
+# have no instrument.  Until that generator tree grows them, this gate cannot
+# run, and it should say exactly that rather than blame a missing directory.
+missing=
+for g in gen_interfaces.py gen_vtbl_check.py gen_guid_check.py; do
+    [ -f "$THUNK/$g" ] || missing="$missing $g"
+done
+[ -z "$missing" ] || skip "the generator tree at $THUNK is missing:$missing -- \
+layers 1-3 have no instrument there.  The audio family's roster authority in \
+THIS tree is ppc64le/syscom/gen_syscom_audio.py, which regenerates \
+dlls/combase/syscom_marshal.h and cross-checks every reused row against this \
+roster; the header-vs-Wine-vtable and IID checks these three scripts perform \
+have no in-tree equivalent yet"
+grep -q "wine-syscom\|\"syscom\"" "$THUNK/gen_interfaces.py" 2>/dev/null || \
+    skip "$THUNK/gen_interfaces.py has no wine-syscom surface, so layer 1 \
+cannot regenerate $JSON"
 command -v clang >/dev/null || skip "need clang"
 command -v python3 >/dev/null || skip "need python3"
 

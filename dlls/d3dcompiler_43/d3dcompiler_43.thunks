@@ -1,0 +1,20 @@
+# AMD64 thunk export spec -- d3dcompiler_43.dll.
+#
+# From the 2026-08-17 corpus pass (ppc64le/corpus/CATALOG.md).  Two titles
+# import this module STATICALLY and it had no guest thunk at all, so the
+# loader found the native ppc64 module and correctly refused to splice it into
+# a guest call: c000007b.  A plain (non-delay-load) import failure fails the
+# WHOLE image, so ntdll's loader_init gave up with c0000135 before a single
+# guest instruction ran -- earlier than any wall this port had recorded.
+#
+# Measured 2026-08-17:
+#   Warhammer 40,000: Boltgun (Boltgun-Win64-Shipping.exe) imports
+#       D3DDisassemble  (ordinal 5)
+#   Styx: Master of Shadows (Binaries/Win64/StyxGame.exe) imports
+#       D3DCompile, D3DPreprocess, D3DReflect
+# All four are declared in include/d3dcompiler.h, which the signature oracle's
+# default translation unit already reaches, so no PROBE-EXTRA is needed and
+# all four are emitted.  Nothing here is hand-written: the export list comes
+# from this module's own .spec.
+DLL d3dcompiler_43.dll
+FROM-SPEC auto

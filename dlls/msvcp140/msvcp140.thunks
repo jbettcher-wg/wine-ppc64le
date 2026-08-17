@@ -9,3 +9,14 @@
 # module's own .spec.
 DLL msvcp140.dll
 FROM-SPEC auto
+
+# The 2026-08-17 DOOM triage.  Razer's CChromaEditorLibrary.dll -- the plugin
+# DOOM (2016) loads, and the reason mfc140u.dll is in the picture at all --
+# imports MSVCP140._Mtx_init_in_situ and called it at PROCESS_ATTACH, straight
+# into the sentinel (0xDEAD0004 from CChromaEditorLibrary.dll+0x109b).
+#
+# Wine implements it (dlls/msvcp90/misc.c:737, void __cdecl (_Mtx_t, int)) but
+# declares it in no header, so it takes the .spec location column -- the
+# documented downgrade, where the <int|void> column is an unchecked human
+# assertion.  "void" is that implementation's own return type.
+_Mtx_init_in_situ             0x00000E01  2  void  msvcp140.spec:3682

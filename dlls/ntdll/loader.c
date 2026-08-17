@@ -3785,7 +3785,9 @@ NTSTATUS WINAPI DECLSPEC_HOTPATCH LdrLoadDll(LPCWSTR search_path, DWORD *load_fl
  * imports do (load_dll with the importing module's machine), so the answer
  * is that machine's builtin thunk module or nothing.  There is deliberately
  * no native fallback -- see the machine_dir branch of find_dll_file.
- * Bare names only: a guest namespace has no files, so a path means nothing.
+ * Takes a bare name or a path: load_dll opens and machine-checks a path's
+ * file the same way it does a search-path hit, so a guest image on disk
+ * loads and anything else fails here rather than resolving natively.
  */
 NTSTATUS load_guest_dll( const WCHAR *name, USHORT machine, HMODULE *module )
 {
@@ -4834,6 +4836,71 @@ void loader_init( CONTEXT *context, void **entry )
             NtTerminateProcess( GetCurrentProcess(), status );
         }
         imports_fixup_done = TRUE;
+
+#ifdef __powerpc64__
+        /* On Windows, ntdll.dll is mapped into every process by the OS loader
+         * itself before any user code runs, so GetModuleHandleA("ntdll.dll")
+         * cannot fail there.  This port's guest module namespace instead holds
+         * only whatever the guest image's own static imports dragged in
+         * (find_guest_module() in signal_ppc64.c walks InMemoryOrderModuleList
+         * and deliberately never loads -- GetModuleHandle must not), and
+         * nothing statically imports ntdll.dll: guest code reaches it only
+         * through KERNEL32 forwards.  SteamStub v3.1's anti-debug prologue
+         * calls GetModuleHandleA("ntdll.dll") and GetProcAddress on the result
+         * without checking either for failure, so a guest namespace missing
+         * ntdll turned into a call through a NULL pointer at the image entry --
+         * the wall every Steam-DRM-wrapped guest title hit here.
+         *
+         * Seed the one guest module Windows itself guarantees present, once,
+         * right here: this image's own imports (including, ordinarily, a
+         * guest KERNEL32) are already fixed up, so the loader can serve guest
+         * modules, and nothing below this point has run a single guest
+         * instruction yet -- fixup_imports() only loads dependency modules,
+         * it does not attach them.  Only for a guest (AMD64) main image;
+         * a native ppc64 process has no guest namespace to seed. */
+        if (RtlImageNtHeader( wm->ldr.DllBase )->FileHeader.Machine == IMAGE_FILE_MACHINE_AMD64)
+        {
+            /* Negative-control knob for ppc64le/corpus/check-guest-ntdll-seed.sh's
+             * --sabotage run: WINEEMUNOGUESTNTDLLSEED=1 skips this seed entirely,
+             * reproducing the pre-fix namespace exactly, so the gate can prove it
+             * goes red where the unfixed port actually failed -- rather than red
+             * for some unrelated reason.  Read once: this whole block runs once
+             * per process, same as WINEEMUNOGSTHREADS in unix/loader.c reads its
+             * own knob once per thread. */
+            static const WCHAR flag_name[] = L"WINEEMUNOGUESTNTDLLSEED";
+            WCHAR flag[8];
+            SIZE_T flag_len;
+            BOOL no_seed = !RtlQueryEnvironmentVariable( NULL, flag_name, wcslen(flag_name),
+                                                         flag, ARRAY_SIZE(flag), &flag_len )
+                            && flag[0] == '1';
+
+            if (no_seed)
+                WARN( "WINEEMUNOGUESTNTDLLSEED: deliberately not seeding the guest module "
+                      "namespace with ntdll.dll\n" );
+            else
+            {
+                HMODULE guest_ntdll;
+                NTSTATUS gstatus = load_guest_dll( L"ntdll.dll", IMAGE_FILE_MACHINE_AMD64, &guest_ntdll );
+
+                if (gstatus)
+                {
+                    /* The guest ntdll.dll this seed loads is part of the tree,
+                     * not the game -- a failure here is a build or install defect,
+                     * not something any guest title can trigger, and every
+                     * process from this one on would silently reproduce the
+                     * SteamStub NULL-call wall this seed exists to close.  Loud
+                     * and fatal, the same treatment kernel32.dll's own load
+                     * failure gets a few lines above. */
+                    ERR( "could not seed the guest module namespace with ntdll.dll, status %lx -- "
+                         "GetModuleHandleA(\"ntdll.dll\") will wrongly answer NULL for the rest of "
+                         "this process, reproducing the SteamStub anti-debug NULL call this seed "
+                         "exists to prevent\n", gstatus );
+                    NtTerminateProcess( GetCurrentProcess(), gstatus );
+                }
+                else TRACE( "seeded the guest module namespace with ntdll.dll at %p\n", guest_ntdll );
+            }
+        }
+#endif
     }
     else
     {

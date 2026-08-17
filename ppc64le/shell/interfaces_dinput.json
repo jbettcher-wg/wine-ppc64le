@@ -1,0 +1,1042 @@
+{
+  "enums": [],
+  "iface_ptr_aliases": {
+    "LPDIRECTINPUTDEVICE8A": "IDirectInputDevice8A",
+    "LPDIRECTINPUTDEVICE8W": "IDirectInputDevice8W",
+    "LPDIRECTINPUTEFFECT": "IDirectInputEffect"
+  },
+  "interfaces": {
+    "IDirectInput8A": {
+      "base": "IUnknown",
+      "header": "dinput.h",
+      "slots": [
+        {
+          "name": "QueryInterface",
+          "owner": "IUnknown",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ],
+          "ret": "HRESULT",
+          "slot": 0
+        },
+        {
+          "name": "AddRef",
+          "owner": "IUnknown",
+          "params": [],
+          "ret": "ULONG",
+          "slot": 1
+        },
+        {
+          "name": "Release",
+          "owner": "IUnknown",
+          "params": [],
+          "ret": "ULONG",
+          "slot": 2
+        },
+        {
+          "name": "CreateDevice",
+          "owner": "IDirectInput8A",
+          "params": [
+            "REFGUID rguid",
+            "LPDIRECTINPUTDEVICE8A *lplpDirectInputDevice",
+            "LPUNKNOWN pUnkOuter"
+          ],
+          "ret": "HRESULT",
+          "slot": 3
+        },
+        {
+          "name": "EnumDevices",
+          "owner": "IDirectInput8A",
+          "params": [
+            "DWORD dwDevType",
+            "LPDIENUMDEVICESCALLBACKA lpCallback",
+            "LPVOID pvRef",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 4
+        },
+        {
+          "name": "GetDeviceStatus",
+          "owner": "IDirectInput8A",
+          "params": [
+            "REFGUID rguidInstance"
+          ],
+          "ret": "HRESULT",
+          "slot": 5
+        },
+        {
+          "name": "RunControlPanel",
+          "owner": "IDirectInput8A",
+          "params": [
+            "HWND hwndOwner",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 6
+        },
+        {
+          "name": "Initialize",
+          "owner": "IDirectInput8A",
+          "params": [
+            "HINSTANCE hinst",
+            "DWORD dwVersion"
+          ],
+          "ret": "HRESULT",
+          "slot": 7
+        },
+        {
+          "name": "FindDevice",
+          "owner": "IDirectInput8A",
+          "params": [
+            "REFGUID rguid",
+            "LPCSTR pszName",
+            "LPGUID pguidInstance"
+          ],
+          "ret": "HRESULT",
+          "slot": 8
+        },
+        {
+          "name": "EnumDevicesBySemantics",
+          "owner": "IDirectInput8A",
+          "params": [
+            "LPCSTR ptszUserName",
+            "LPDIACTIONFORMATA lpdiActionFormat",
+            "LPDIENUMDEVICESBYSEMANTICSCBA lpCallback",
+            "LPVOID pvRef",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 9
+        },
+        {
+          "name": "ConfigureDevices",
+          "owner": "IDirectInput8A",
+          "params": [
+            "LPDICONFIGUREDEVICESCALLBACK lpdiCallback",
+            "LPDICONFIGUREDEVICESPARAMSA lpdiCDParams",
+            "DWORD dwFlags",
+            "LPVOID pvRefData"
+          ],
+          "ret": "HRESULT",
+          "slot": 10
+        }
+      ],
+      "uuid": "bf798030-483a-4da2-aa99-5d64ed369700"
+    },
+    "IDirectInput8W": {
+      "base": "IUnknown",
+      "header": "dinput.h",
+      "slots": [
+        {
+          "name": "QueryInterface",
+          "owner": "IUnknown",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ],
+          "ret": "HRESULT",
+          "slot": 0
+        },
+        {
+          "name": "AddRef",
+          "owner": "IUnknown",
+          "params": [],
+          "ret": "ULONG",
+          "slot": 1
+        },
+        {
+          "name": "Release",
+          "owner": "IUnknown",
+          "params": [],
+          "ret": "ULONG",
+          "slot": 2
+        },
+        {
+          "name": "CreateDevice",
+          "owner": "IDirectInput8W",
+          "params": [
+            "REFGUID rguid",
+            "LPDIRECTINPUTDEVICE8W *lplpDirectInputDevice",
+            "LPUNKNOWN pUnkOuter"
+          ],
+          "ret": "HRESULT",
+          "slot": 3
+        },
+        {
+          "name": "EnumDevices",
+          "owner": "IDirectInput8W",
+          "params": [
+            "DWORD dwDevType",
+            "LPDIENUMDEVICESCALLBACKW lpCallback",
+            "LPVOID pvRef",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 4
+        },
+        {
+          "name": "GetDeviceStatus",
+          "owner": "IDirectInput8W",
+          "params": [
+            "REFGUID rguidInstance"
+          ],
+          "ret": "HRESULT",
+          "slot": 5
+        },
+        {
+          "name": "RunControlPanel",
+          "owner": "IDirectInput8W",
+          "params": [
+            "HWND hwndOwner",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 6
+        },
+        {
+          "name": "Initialize",
+          "owner": "IDirectInput8W",
+          "params": [
+            "HINSTANCE hinst",
+            "DWORD dwVersion"
+          ],
+          "ret": "HRESULT",
+          "slot": 7
+        },
+        {
+          "name": "FindDevice",
+          "owner": "IDirectInput8W",
+          "params": [
+            "REFGUID rguid",
+            "LPCWSTR pszName",
+            "LPGUID pguidInstance"
+          ],
+          "ret": "HRESULT",
+          "slot": 8
+        },
+        {
+          "name": "EnumDevicesBySemantics",
+          "owner": "IDirectInput8W",
+          "params": [
+            "LPCWSTR ptszUserName",
+            "LPDIACTIONFORMATW lpdiActionFormat",
+            "LPDIENUMDEVICESBYSEMANTICSCBW lpCallback",
+            "LPVOID pvRef",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 9
+        },
+        {
+          "name": "ConfigureDevices",
+          "owner": "IDirectInput8W",
+          "params": [
+            "LPDICONFIGUREDEVICESCALLBACK lpdiCallback",
+            "LPDICONFIGUREDEVICESPARAMSW lpdiCDParams",
+            "DWORD dwFlags",
+            "LPVOID pvRefData"
+          ],
+          "ret": "HRESULT",
+          "slot": 10
+        }
+      ],
+      "uuid": "bf798031-483a-4da2-aa99-5d64ed369700"
+    },
+    "IDirectInputDevice8A": {
+      "base": "IDirectInputDevice7A",
+      "header": "dinput.h",
+      "slots": [
+        {
+          "name": "QueryInterface",
+          "owner": "IUnknown",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ],
+          "ret": "HRESULT",
+          "slot": 0
+        },
+        {
+          "name": "AddRef",
+          "owner": "IUnknown",
+          "params": [],
+          "ret": "ULONG",
+          "slot": 1
+        },
+        {
+          "name": "Release",
+          "owner": "IUnknown",
+          "params": [],
+          "ret": "ULONG",
+          "slot": 2
+        },
+        {
+          "name": "GetCapabilities",
+          "owner": "IDirectInputDeviceA",
+          "params": [
+            "LPDIDEVCAPS lpDIDevCaps"
+          ],
+          "ret": "HRESULT",
+          "slot": 3
+        },
+        {
+          "name": "EnumObjects",
+          "owner": "IDirectInputDeviceA",
+          "params": [
+            "LPDIENUMDEVICEOBJECTSCALLBACKA lpCallback",
+            "LPVOID pvRef",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 4
+        },
+        {
+          "name": "GetProperty",
+          "owner": "IDirectInputDeviceA",
+          "params": [
+            "REFGUID rguidProp",
+            "LPDIPROPHEADER pdiph"
+          ],
+          "ret": "HRESULT",
+          "slot": 5
+        },
+        {
+          "name": "SetProperty",
+          "owner": "IDirectInputDeviceA",
+          "params": [
+            "REFGUID rguidProp",
+            "LPCDIPROPHEADER pdiph"
+          ],
+          "ret": "HRESULT",
+          "slot": 6
+        },
+        {
+          "name": "Acquire",
+          "owner": "IDirectInputDeviceA",
+          "params": [],
+          "ret": "HRESULT",
+          "slot": 7
+        },
+        {
+          "name": "Unacquire",
+          "owner": "IDirectInputDeviceA",
+          "params": [],
+          "ret": "HRESULT",
+          "slot": 8
+        },
+        {
+          "name": "GetDeviceState",
+          "owner": "IDirectInputDeviceA",
+          "params": [
+            "DWORD cbData",
+            "LPVOID lpvData"
+          ],
+          "ret": "HRESULT",
+          "slot": 9
+        },
+        {
+          "name": "GetDeviceData",
+          "owner": "IDirectInputDeviceA",
+          "params": [
+            "DWORD cbObjectData",
+            "LPDIDEVICEOBJECTDATA rgdod",
+            "LPDWORD pdwInOut",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 10
+        },
+        {
+          "name": "SetDataFormat",
+          "owner": "IDirectInputDeviceA",
+          "params": [
+            "LPCDIDATAFORMAT lpdf"
+          ],
+          "ret": "HRESULT",
+          "slot": 11
+        },
+        {
+          "name": "SetEventNotification",
+          "owner": "IDirectInputDeviceA",
+          "params": [
+            "HANDLE hEvent"
+          ],
+          "ret": "HRESULT",
+          "slot": 12
+        },
+        {
+          "name": "SetCooperativeLevel",
+          "owner": "IDirectInputDeviceA",
+          "params": [
+            "HWND hwnd",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 13
+        },
+        {
+          "name": "GetObjectInfo",
+          "owner": "IDirectInputDeviceA",
+          "params": [
+            "LPDIDEVICEOBJECTINSTANCEA pdidoi",
+            "DWORD dwObj",
+            "DWORD dwHow"
+          ],
+          "ret": "HRESULT",
+          "slot": 14
+        },
+        {
+          "name": "GetDeviceInfo",
+          "owner": "IDirectInputDeviceA",
+          "params": [
+            "LPDIDEVICEINSTANCEA pdidi"
+          ],
+          "ret": "HRESULT",
+          "slot": 15
+        },
+        {
+          "name": "RunControlPanel",
+          "owner": "IDirectInputDeviceA",
+          "params": [
+            "HWND hwndOwner",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 16
+        },
+        {
+          "name": "Initialize",
+          "owner": "IDirectInputDeviceA",
+          "params": [
+            "HINSTANCE hinst",
+            "DWORD dwVersion",
+            "REFGUID rguid"
+          ],
+          "ret": "HRESULT",
+          "slot": 17
+        },
+        {
+          "name": "CreateEffect",
+          "owner": "IDirectInputDevice2A",
+          "params": [
+            "REFGUID rguid",
+            "LPCDIEFFECT lpeff",
+            "LPDIRECTINPUTEFFECT *ppdeff",
+            "LPUNKNOWN punkOuter"
+          ],
+          "ret": "HRESULT",
+          "slot": 18
+        },
+        {
+          "name": "EnumEffects",
+          "owner": "IDirectInputDevice2A",
+          "params": [
+            "LPDIENUMEFFECTSCALLBACKA lpCallback",
+            "LPVOID pvRef",
+            "DWORD dwEffType"
+          ],
+          "ret": "HRESULT",
+          "slot": 19
+        },
+        {
+          "name": "GetEffectInfo",
+          "owner": "IDirectInputDevice2A",
+          "params": [
+            "LPDIEFFECTINFOA pdei",
+            "REFGUID rguid"
+          ],
+          "ret": "HRESULT",
+          "slot": 20
+        },
+        {
+          "name": "GetForceFeedbackState",
+          "owner": "IDirectInputDevice2A",
+          "params": [
+            "LPDWORD pdwOut"
+          ],
+          "ret": "HRESULT",
+          "slot": 21
+        },
+        {
+          "name": "SendForceFeedbackCommand",
+          "owner": "IDirectInputDevice2A",
+          "params": [
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 22
+        },
+        {
+          "name": "EnumCreatedEffectObjects",
+          "owner": "IDirectInputDevice2A",
+          "params": [
+            "LPDIENUMCREATEDEFFECTOBJECTSCALLBACK lpCallback",
+            "LPVOID pvRef",
+            "DWORD fl"
+          ],
+          "ret": "HRESULT",
+          "slot": 23
+        },
+        {
+          "name": "Escape",
+          "owner": "IDirectInputDevice2A",
+          "params": [
+            "LPDIEFFESCAPE pesc"
+          ],
+          "ret": "HRESULT",
+          "slot": 24
+        },
+        {
+          "name": "Poll",
+          "owner": "IDirectInputDevice2A",
+          "params": [],
+          "ret": "HRESULT",
+          "slot": 25
+        },
+        {
+          "name": "SendDeviceData",
+          "owner": "IDirectInputDevice2A",
+          "params": [
+            "DWORD cbObjectData",
+            "LPCDIDEVICEOBJECTDATA rgdod",
+            "LPDWORD pdwInOut",
+            "DWORD fl"
+          ],
+          "ret": "HRESULT",
+          "slot": 26
+        },
+        {
+          "name": "EnumEffectsInFile",
+          "owner": "IDirectInputDevice7A",
+          "params": [
+            "LPCSTR lpszFileName",
+            "LPDIENUMEFFECTSINFILECALLBACK pec",
+            "LPVOID pvRef",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 27
+        },
+        {
+          "name": "WriteEffectToFile",
+          "owner": "IDirectInputDevice7A",
+          "params": [
+            "LPCSTR lpszFileName",
+            "DWORD dwEntries",
+            "LPDIFILEEFFECT rgDiFileEft",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 28
+        },
+        {
+          "name": "BuildActionMap",
+          "owner": "IDirectInputDevice8A",
+          "params": [
+            "LPDIACTIONFORMATA lpdiaf",
+            "LPCSTR lpszUserName",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 29
+        },
+        {
+          "name": "SetActionMap",
+          "owner": "IDirectInputDevice8A",
+          "params": [
+            "LPDIACTIONFORMATA lpdiaf",
+            "LPCSTR lpszUserName",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 30
+        },
+        {
+          "name": "GetImageInfo",
+          "owner": "IDirectInputDevice8A",
+          "params": [
+            "LPDIDEVICEIMAGEINFOHEADERA lpdiDevImageInfoHeader"
+          ],
+          "ret": "HRESULT",
+          "slot": 31
+        }
+      ],
+      "uuid": "54d41080-dc15-4833-a41b-748f73a38179"
+    },
+    "IDirectInputDevice8W": {
+      "base": "IDirectInputDevice7W",
+      "header": "dinput.h",
+      "slots": [
+        {
+          "name": "QueryInterface",
+          "owner": "IUnknown",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ],
+          "ret": "HRESULT",
+          "slot": 0
+        },
+        {
+          "name": "AddRef",
+          "owner": "IUnknown",
+          "params": [],
+          "ret": "ULONG",
+          "slot": 1
+        },
+        {
+          "name": "Release",
+          "owner": "IUnknown",
+          "params": [],
+          "ret": "ULONG",
+          "slot": 2
+        },
+        {
+          "name": "GetCapabilities",
+          "owner": "IDirectInputDeviceW",
+          "params": [
+            "LPDIDEVCAPS lpDIDevCaps"
+          ],
+          "ret": "HRESULT",
+          "slot": 3
+        },
+        {
+          "name": "EnumObjects",
+          "owner": "IDirectInputDeviceW",
+          "params": [
+            "LPDIENUMDEVICEOBJECTSCALLBACKW lpCallback",
+            "LPVOID pvRef",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 4
+        },
+        {
+          "name": "GetProperty",
+          "owner": "IDirectInputDeviceW",
+          "params": [
+            "REFGUID rguidProp",
+            "LPDIPROPHEADER pdiph"
+          ],
+          "ret": "HRESULT",
+          "slot": 5
+        },
+        {
+          "name": "SetProperty",
+          "owner": "IDirectInputDeviceW",
+          "params": [
+            "REFGUID rguidProp",
+            "LPCDIPROPHEADER pdiph"
+          ],
+          "ret": "HRESULT",
+          "slot": 6
+        },
+        {
+          "name": "Acquire",
+          "owner": "IDirectInputDeviceW",
+          "params": [],
+          "ret": "HRESULT",
+          "slot": 7
+        },
+        {
+          "name": "Unacquire",
+          "owner": "IDirectInputDeviceW",
+          "params": [],
+          "ret": "HRESULT",
+          "slot": 8
+        },
+        {
+          "name": "GetDeviceState",
+          "owner": "IDirectInputDeviceW",
+          "params": [
+            "DWORD cbData",
+            "LPVOID lpvData"
+          ],
+          "ret": "HRESULT",
+          "slot": 9
+        },
+        {
+          "name": "GetDeviceData",
+          "owner": "IDirectInputDeviceW",
+          "params": [
+            "DWORD cbObjectData",
+            "LPDIDEVICEOBJECTDATA rgdod",
+            "LPDWORD pdwInOut",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 10
+        },
+        {
+          "name": "SetDataFormat",
+          "owner": "IDirectInputDeviceW",
+          "params": [
+            "LPCDIDATAFORMAT lpdf"
+          ],
+          "ret": "HRESULT",
+          "slot": 11
+        },
+        {
+          "name": "SetEventNotification",
+          "owner": "IDirectInputDeviceW",
+          "params": [
+            "HANDLE hEvent"
+          ],
+          "ret": "HRESULT",
+          "slot": 12
+        },
+        {
+          "name": "SetCooperativeLevel",
+          "owner": "IDirectInputDeviceW",
+          "params": [
+            "HWND hwnd",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 13
+        },
+        {
+          "name": "GetObjectInfo",
+          "owner": "IDirectInputDeviceW",
+          "params": [
+            "LPDIDEVICEOBJECTINSTANCEW pdidoi",
+            "DWORD dwObj",
+            "DWORD dwHow"
+          ],
+          "ret": "HRESULT",
+          "slot": 14
+        },
+        {
+          "name": "GetDeviceInfo",
+          "owner": "IDirectInputDeviceW",
+          "params": [
+            "LPDIDEVICEINSTANCEW pdidi"
+          ],
+          "ret": "HRESULT",
+          "slot": 15
+        },
+        {
+          "name": "RunControlPanel",
+          "owner": "IDirectInputDeviceW",
+          "params": [
+            "HWND hwndOwner",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 16
+        },
+        {
+          "name": "Initialize",
+          "owner": "IDirectInputDeviceW",
+          "params": [
+            "HINSTANCE hinst",
+            "DWORD dwVersion",
+            "REFGUID rguid"
+          ],
+          "ret": "HRESULT",
+          "slot": 17
+        },
+        {
+          "name": "CreateEffect",
+          "owner": "IDirectInputDevice2W",
+          "params": [
+            "REFGUID rguid",
+            "LPCDIEFFECT lpeff",
+            "LPDIRECTINPUTEFFECT *ppdeff",
+            "LPUNKNOWN punkOuter"
+          ],
+          "ret": "HRESULT",
+          "slot": 18
+        },
+        {
+          "name": "EnumEffects",
+          "owner": "IDirectInputDevice2W",
+          "params": [
+            "LPDIENUMEFFECTSCALLBACKW lpCallback",
+            "LPVOID pvRef",
+            "DWORD dwEffType"
+          ],
+          "ret": "HRESULT",
+          "slot": 19
+        },
+        {
+          "name": "GetEffectInfo",
+          "owner": "IDirectInputDevice2W",
+          "params": [
+            "LPDIEFFECTINFOW pdei",
+            "REFGUID rguid"
+          ],
+          "ret": "HRESULT",
+          "slot": 20
+        },
+        {
+          "name": "GetForceFeedbackState",
+          "owner": "IDirectInputDevice2W",
+          "params": [
+            "LPDWORD pdwOut"
+          ],
+          "ret": "HRESULT",
+          "slot": 21
+        },
+        {
+          "name": "SendForceFeedbackCommand",
+          "owner": "IDirectInputDevice2W",
+          "params": [
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 22
+        },
+        {
+          "name": "EnumCreatedEffectObjects",
+          "owner": "IDirectInputDevice2W",
+          "params": [
+            "LPDIENUMCREATEDEFFECTOBJECTSCALLBACK lpCallback",
+            "LPVOID pvRef",
+            "DWORD fl"
+          ],
+          "ret": "HRESULT",
+          "slot": 23
+        },
+        {
+          "name": "Escape",
+          "owner": "IDirectInputDevice2W",
+          "params": [
+            "LPDIEFFESCAPE pesc"
+          ],
+          "ret": "HRESULT",
+          "slot": 24
+        },
+        {
+          "name": "Poll",
+          "owner": "IDirectInputDevice2W",
+          "params": [],
+          "ret": "HRESULT",
+          "slot": 25
+        },
+        {
+          "name": "SendDeviceData",
+          "owner": "IDirectInputDevice2W",
+          "params": [
+            "DWORD cbObjectData",
+            "LPCDIDEVICEOBJECTDATA rgdod",
+            "LPDWORD pdwInOut",
+            "DWORD fl"
+          ],
+          "ret": "HRESULT",
+          "slot": 26
+        },
+        {
+          "name": "EnumEffectsInFile",
+          "owner": "IDirectInputDevice7W",
+          "params": [
+            "LPCWSTR lpszFileName",
+            "LPDIENUMEFFECTSINFILECALLBACK pec",
+            "LPVOID pvRef",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 27
+        },
+        {
+          "name": "WriteEffectToFile",
+          "owner": "IDirectInputDevice7W",
+          "params": [
+            "LPCWSTR lpszFileName",
+            "DWORD dwEntries",
+            "LPDIFILEEFFECT rgDiFileEft",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 28
+        },
+        {
+          "name": "BuildActionMap",
+          "owner": "IDirectInputDevice8W",
+          "params": [
+            "LPDIACTIONFORMATW lpdiaf",
+            "LPCWSTR lpszUserName",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 29
+        },
+        {
+          "name": "SetActionMap",
+          "owner": "IDirectInputDevice8W",
+          "params": [
+            "LPDIACTIONFORMATW lpdiaf",
+            "LPCWSTR lpszUserName",
+            "DWORD dwFlags"
+          ],
+          "ret": "HRESULT",
+          "slot": 30
+        },
+        {
+          "name": "GetImageInfo",
+          "owner": "IDirectInputDevice8W",
+          "params": [
+            "LPDIDEVICEIMAGEINFOHEADERW lpdiDevImageInfoHeader"
+          ],
+          "ret": "HRESULT",
+          "slot": 31
+        }
+      ],
+      "uuid": "54d41081-dc15-4833-a41b-748f73a38179"
+    },
+    "IDirectInputEffect": {
+      "base": "IUnknown",
+      "header": "dinput.h",
+      "slots": [
+        {
+          "name": "QueryInterface",
+          "owner": "IUnknown",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ],
+          "ret": "HRESULT",
+          "slot": 0
+        },
+        {
+          "name": "AddRef",
+          "owner": "IUnknown",
+          "params": [],
+          "ret": "ULONG",
+          "slot": 1
+        },
+        {
+          "name": "Release",
+          "owner": "IUnknown",
+          "params": [],
+          "ret": "ULONG",
+          "slot": 2
+        },
+        {
+          "name": "Initialize",
+          "owner": "IDirectInputEffect",
+          "params": [
+            "HINSTANCE",
+            "DWORD",
+            "REFGUID"
+          ],
+          "ret": "HRESULT",
+          "slot": 3
+        },
+        {
+          "name": "GetEffectGuid",
+          "owner": "IDirectInputEffect",
+          "params": [
+            "LPGUID"
+          ],
+          "ret": "HRESULT",
+          "slot": 4
+        },
+        {
+          "name": "GetParameters",
+          "owner": "IDirectInputEffect",
+          "params": [
+            "LPDIEFFECT",
+            "DWORD"
+          ],
+          "ret": "HRESULT",
+          "slot": 5
+        },
+        {
+          "name": "SetParameters",
+          "owner": "IDirectInputEffect",
+          "params": [
+            "LPCDIEFFECT",
+            "DWORD"
+          ],
+          "ret": "HRESULT",
+          "slot": 6
+        },
+        {
+          "name": "Start",
+          "owner": "IDirectInputEffect",
+          "params": [
+            "DWORD",
+            "DWORD"
+          ],
+          "ret": "HRESULT",
+          "slot": 7
+        },
+        {
+          "name": "Stop",
+          "owner": "IDirectInputEffect",
+          "params": [],
+          "ret": "HRESULT",
+          "slot": 8
+        },
+        {
+          "name": "GetEffectStatus",
+          "owner": "IDirectInputEffect",
+          "params": [
+            "LPDWORD"
+          ],
+          "ret": "HRESULT",
+          "slot": 9
+        },
+        {
+          "name": "Download",
+          "owner": "IDirectInputEffect",
+          "params": [],
+          "ret": "HRESULT",
+          "slot": 10
+        },
+        {
+          "name": "Unload",
+          "owner": "IDirectInputEffect",
+          "params": [],
+          "ret": "HRESULT",
+          "slot": 11
+        },
+        {
+          "name": "Escape",
+          "owner": "IDirectInputEffect",
+          "params": [
+            "LPDIEFFESCAPE"
+          ],
+          "ret": "HRESULT",
+          "slot": 12
+        }
+      ],
+      "uuid": "e7e1f7c0-88d2-11d0-9ad0-00a0c9a06e35"
+    },
+    "IUnknown": {
+      "base": null,
+      "header": "(builtin)",
+      "slots": [
+        {
+          "name": "QueryInterface",
+          "owner": "IUnknown",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ],
+          "ret": "HRESULT",
+          "slot": 0
+        },
+        {
+          "name": "AddRef",
+          "owner": "IUnknown",
+          "params": [],
+          "ret": "ULONG",
+          "slot": 1
+        },
+        {
+          "name": "Release",
+          "owner": "IUnknown",
+          "params": [],
+          "ret": "ULONG",
+          "slot": 2
+        }
+      ],
+      "uuid": "00000000-0000-0000-c000-000000000046"
+    }
+  },
+  "surface": "wine-dinput8"
+}

@@ -1,0 +1,21 @@
+# AMD64 thunk export spec -- xapofx1_5.dll.
+#
+# From the 2026-08-17 corpus pass.  BOTH Boltgun and Styx: Master of Shadows
+# import this module STATICALLY and it had no guest thunk, so the loader
+# refused the native ppc64 module (c000007b) and each whole image failed to
+# load (c0000135) before one guest instruction ran.  Measured: both import
+# exactly one export, CreateFX (ordinal 0).
+#
+# CreateFX is the module's ONLY export and it is refused: Wine implements it
+# (dlls/xaudio2_7/xapofx.c) but include/xapofx.h declares only the CLSIDs it
+# uses, never the function.  So this thunk currently emits a PE with no
+# exports -- which is the whole point of adding the file anyway: the module
+# LOADS, both images get past loader_init, and CreateFX binds a named sentinel
+# that faults by name IF either title ever calls it.  Neither has yet.
+#
+# Promoting it needs either a declaration in a Wine header or the documented
+# .spec-location downgrade, and the project's rule is that a downgrade is
+# earned by a measured call, not by anticipation -- so it stays a hole until
+# a run names it.
+DLL xapofx1_5.dll
+FROM-SPEC auto

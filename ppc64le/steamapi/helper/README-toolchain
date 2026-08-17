@@ -1,0 +1,210 @@
+steamhelper toolchain notes
+===========================
+
+What this is
+------------
+An x86-64 Linux executable, cross-compiled on ppc64le (op4k), run under FEX
+via binfmt_misc.  Its job is to dlopen the real Valve
+~/.steam/sdk64/steamclient.so -- which our native ppc64le Wine cannot load --
+and serve Proton's flat params-struct calls to the guest steamclient64.dll
+over a loopback socket.  See ../check-steam-bridge.sh for the boundary it sits
+on, and steamhelper.c for what it does with a frame.
+
+Everything below was measured on op4k on 2026-08-17.  Nothing is guessed.
+
+
+Host inventory
+--------------
+    $ uname -m
+    ppc64le
+    $ clang --version
+    clang version 22.1.8
+    Target: powerpc64le-unknown-linux-gnu
+    $ clang -print-targets | grep x86-64
+        x86-64      - 64-bit X86: EM64T and AMD64
+    $ ld.lld --version
+    LLD 22.1.8 (compatible with GNU linkers)
+    $ ld --version | head -1
+    GNU ld (GNU Binutils) 2.46.1
+
+The clang install is already a cross compiler -- LLVM ships every backend in
+the one binary.  Only the linker and the sysroot need arranging.
+
+Sysroot: the FEX rootfs, unpacked as a plain directory tree at
+~/.local/share/fex-emu/RootFS/ArchLinux (there is also an ArchLinux.sqsh, but
+the extracted tree is what we point --sysroot at).  Verified present:
+
+    usr/include/stdio.h            usr/include/dlfcn.h
+    usr/lib/crt1.o  Scrt1.o  crti.o  crtn.o
+    usr/lib/libc.so  libc.so.6  libdl.so.2  libm.so.6  libpthread.so.0
+    lib64/ld-linux-x86-64.so.2
+
+usr/lib/libc.so is a GNU ld script with absolute GROUP( /usr/lib/... ) paths.
+LLD applies the sysroot prefix to absolute paths in linker scripts that were
+themselves found under the sysroot, so this resolves with no extra flags.
+
+
+The working command line
+------------------------
+    SYSROOT=$HOME/.local/share/fex-emu/RootFS/ArchLinux
+
+    clang -target x86_64-linux-gnu --sysroot="$SYSROOT" -fuse-ld=lld \
+          -std=c99 -D_GNU_SOURCE -O2 -Wall -Wextra \
+          steamhelper.c -o steamhelper -ldl
+
+That is exactly what build-helper.sh runs.  Result:
+
+    $ file steamhelper
+    steamhelper: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV),
+    dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2,
+    for GNU/Linux 4.4.0, BuildID[sha1]=..., not stripped
+    $ ls -l steamhelper
+    -rwxr-xr-x 1 daedalao daedalao 12568 ... steamhelper
+
+The /lib64/ld-linux-x86-64.so.2 interpreter path is resolved by FEX inside its
+own rootfs, not against the ppc64le host filesystem, so the binary needs no
+rpath, no -Wl,-dynamic-linker, and no launcher wrapper.
+
+-ldl is a no-op on this glibc (dlopen/dlsym live in libc now).  It is kept
+because it costs nothing and keeps the link working against older sysroots.
+
+
+What did NOT work
+-----------------
+1. Default linker.  Dropping -fuse-ld=lld drives the host /usr/bin/ld, which
+   is a ppc-only binutils build:
+
+       /usr/bin/ld: unrecognised emulation mode: elf_x86_64
+       Supported emulations: elf64lppc elf32lppc elf32lppclinux elf64ppc
+                             elf32ppc elf32ppclinux elf32lppcsim elf32ppcsim
+
+   There is no x86 emulation in it at all, so -fuse-ld=lld is mandatory.
+   LLD infers x86-64 from the input objects; no -m flag needed.
+
+2. No --sysroot.  clang falls back to the host ppc64le /usr/include and then
+   multilib-probes for a 32-bit stub header:
+
+       In file included from /usr/include/stdio.h:28:
+       /usr/include/gnu/stubs.h:8:11: fatal error: 'gnu/stubs-32.h' file not found
+
+3. -static.  Builds clean, and a static hello-world does run under FEX, so it
+   looks like the simpler option.  It is not.  glibc cannot dlopen from a
+   fully static image -- there is no dynamic symbol table for the loaded
+   library's own glibc references to bind against.  Measured with this exact
+   source:
+
+       $ clang -target x86_64-linux-gnu --sysroot=$SYSROOT -fuse-ld=lld \
+               -std=c99 -D_GNU_SOURCE -O2 -static steamhelper.c -o hstatic -ldl
+       (no diagnostics)
+       $ ./hstatic --probe
+       helper: uname machine = x86_64
+       helper: pointer size = 8
+       helper: steamclient = /home/daedalao/.steam/sdk64/steamclient.so
+       Segmentation fault (core dumped)          -> exit 139, inside dlopen
+
+   It does not even fail politely.  Dynamic linking against the rootfs loader
+   is the correct and simpler answer.
+
+
+Running it
+----------
+x86-64 ELF is registered with binfmt_misc:
+
+    /proc/sys/fs/binfmt_misc/FEX-x86_64
+      enabled
+      interpreter /home/daedalao/projects/fex-emu-ppc64le/src/build-smc/Bin/FEX
+      flags: POCF
+
+so the helper is exec'd like any other program -- no `FEX ./steamhelper`
+prefix.  This matters: it means native ppc64le Wine can posix_spawn the helper
+directly.
+
+    ./steamhelper --probe
+    ./steamhelper --serve [--port N] [-v]
+
+STEAMCLIENT_SO overrides the library path; otherwise it is
+$HOME/.steam/sdk64/steamclient.so resolved at runtime.
+
+--probe exits 0 only if all seven exports resolved, 1 otherwise (also 1 if
+dlopen itself failed).  It dlsyms and never calls, so it cannot disturb a
+running Steam client.
+
+--serve binds 127.0.0.1 (loopback only), prints its port on stdout as
+"helper: listening on 127.0.0.1:<port>" and flushes, then accepts clients until
+killed.  --port 0, the default, asks the kernel for a free one: whoever starts
+the helper reads that line and puts the address in the game's
+STEAM_BRIDGE_ADDR.  ppc64le/steamtool/proton does exactly that.
+
+An earlier revision of this file documented an --echo mode.  That was the
+transport spike and is gone; --serve replaced it.
+
+
+Measured probe transcript
+-------------------------
+    $ ./steamhelper --probe
+    helper: uname machine = x86_64
+    helper: pointer size = 8
+    helper: steamclient = /home/daedalao/.steam/sdk64/steamclient.so
+    helper: dlopen ok, handle = 0x39a80680060
+    export CreateInterface = 0x3fff4122e020
+    export Steam_BGetCallback = 0x3fff405afd60
+    export Steam_GetAPICallResult = 0x3fff405afde0
+    export Steam_FreeLastCallback = 0x3fff405afce0
+    export Steam_ReleaseThreadLocalMemory = 0x3fff405af3b0
+    export Steam_IsKnownInterface = 0x3fff40238ca0
+    export Steam_NotifyMissingInterface = 0x3fff40238d00
+    exit 0
+
+All seven exports present in the shipping steamclient.so.  --probe only
+dlsyms -- CreateInterface is deliberately NOT called, because it can try to
+connect to or spawn the Steam client, and a gate layer must not be able to
+disturb one.
+
+
+Startup cost (matters for the real design)
+------------------------------------------
+    FEX startup only (usage path, no dlopen)   real 0.104s
+    full --probe (FEX + dlopen of 46MB .so)    real 0.567s  user 0.502s
+    --probe again, warm page cache             real 0.562s  user 0.498s
+
+The ~460ms dlopen cost does not shrink on a warm run and is almost entirely
+user time: it is FEX JIT-translating steamclient.so's init path, not disk I/O.
+
+=> The helper is a long-lived daemon, started once per launch by
+   ppc64le/steamtool/proton and stopped when the game exits.  Spawning it per
+   Steamworks call would cost half a second every time.
+
+
+Round-trip cost (measured through the whole chain)
+--------------------------------------------------
+2000 calls of the marshaller self-test, guest steamclient64.dll -> ws2_32 ->
+native Wine -> loopback -> helper -> back, timed inside the guest with
+GetTickCount:
+
+    bridge: repeat_count=2000
+    bridge: repeat_ms=1016
+
+    => 0.5 ms per Steamworks call.
+
+That is the number the design has to be judged on: a game polling
+Steam_BGetCallback a few times per frame at 60fps spends a few percent of a
+16ms budget in the bridge.  It is usable, and it is the obvious thing to
+attack first if it ever is not (batching the callback poll, or a shared-memory
+ring instead of a socket).
+
+
+Other findings relevant to a real helper
+----------------------------------------
+- FEX handles AF_UNIX SOCK_STREAM correctly: socket/bind/listen/accept and
+  bidirectional transfer all work between a FEX-run x86-64 process and a
+  native ppc64le peer.  A 100003-byte frame round-tripped byte-for-byte, so
+  partial read/write across the emulation boundary is handled properly (the
+  loops in steamhelper.c are still required -- a single read() does not return
+  the whole frame).
+- uname() reports x86_64 inside FEX, so guest code that sniffs the machine
+  type is satisfied.
+- dlopen of the 46MB library works and is not memory-pathological.
+- Symbol addresses land around 0x3fff4..., i.e. FEX maps the guest library
+  high in the address space.  Any pointer we hand back to ppc64le Wine must be
+  treated as an opaque 64-bit token belonging to the helper's address space --
+  never dereferenced on the Wine side.

@@ -1,0 +1,19 @@
+# Upstream DXVK checkout -- not ours. Recreate with ./bootstrap.sh, which pins
+# the commit and applies dxvk-patches/.
+src/
+
+# Meson build trees -- regenerable, and they bake in absolute paths
+build-native/
+build-*/
+
+# Compiled probes and their scratch
+probes/build/
+*.o
+*.so
+*.so.*
+*.a
+*.exe
+*.log
+
+__pycache__/
+*.pyc

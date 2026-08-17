@@ -1486,6 +1486,7 @@ enable_srvsvc
 enable_sspicli
 enable_stdole2_tlb
 enable_stdole32_tlb
+enable_steamclient64
 enable_sti
 enable_strmdll
 enable_svrapi
@@ -23322,6 +23323,7 @@ wine_fn_config_makefile dlls/srvsvc enable_srvsvc
 wine_fn_config_makefile dlls/sspicli enable_sspicli
 wine_fn_config_makefile dlls/stdole2.tlb enable_stdole2_tlb
 wine_fn_config_makefile dlls/stdole32.tlb enable_stdole32_tlb
+wine_fn_config_makefile dlls/steamclient64 enable_steamclient64
 wine_fn_config_makefile dlls/sti enable_sti
 wine_fn_config_makefile dlls/sti/tests enable_tests
 wine_fn_config_makefile dlls/storage.dll16 enable_win16
@@ -23905,6 +23907,25 @@ dlls/d3d12/libvkd3d-proton-d3d12.so: tools/widl/widl dummy
 all: dlls/d3d12/libvkd3d-proton-d3d12.so
 clean::
 	rm -rf ppc64le/vkd3d-build dlls/d3d12/libvkd3d-proton-d3d12.so"
+
+
+as_fn_append wine_rules "
+dlls/d3d11/libdxvk_d3d11.so: dummy
+	@${wine_srcdir}ppc64le/dxvk/build-for-wine.sh \$(CURDIR)/ppc64le/dxvk-build
+	@rm -f dlls/d3d11/libdxvk_dxgi.so && ln -s ../../ppc64le/dxvk-build/src/dxgi/libdxvk_dxgi.so dlls/d3d11/libdxvk_dxgi.so
+	@rm -f dlls/d3d11/libdxvk_d3d10core.so && ln -s ../../ppc64le/dxvk-build/src/d3d10/libdxvk_d3d10core.so dlls/d3d11/libdxvk_d3d10core.so
+	@rm -f \$@ && ln -s ../../ppc64le/dxvk-build/src/d3d11/libdxvk_d3d11.so \$@
+all: dlls/d3d11/libdxvk_d3d11.so
+clean::
+	rm -rf ppc64le/dxvk-build dlls/d3d11/libdxvk_dxgi.so dlls/d3d11/libdxvk_d3d11.so dlls/d3d11/libdxvk_d3d10core.so"
+
+
+as_fn_append wine_rules "
+dlls/d3d9/libdxvk_d3d9.so: dlls/d3d11/libdxvk_d3d11.so
+	@rm -f \$@ && ln -s ../../ppc64le/dxvk-build/src/d3d9/libdxvk_d3d9.so \$@
+all: dlls/d3d9/libdxvk_d3d9.so
+clean::
+	rm -f dlls/d3d9/libdxvk_d3d9.so"
 
 
 EXTERNAL_SUBDIRS="libs/capstone libs/c++ libs/c++abi libs/faudio libs/ffmpeg libs/fluidsynth libs/gsm libs/icucommon libs/icui18n libs/jpeg libs/jxr libs/lcms2 libs/ldap libs/mpg123 libs/musl libs/png libs/sqlite3 libs/symcrypt libs/tiff libs/unwind libs/vkd3d libs/xml2 libs/xslt libs/zlib libs/compiler-rt"

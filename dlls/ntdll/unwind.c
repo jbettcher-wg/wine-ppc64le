@@ -1821,8 +1821,50 @@ BOOLEAN CDECL RtlAddFunctionTable( RUNTIME_FUNCTION *table, DWORD count, ULONG_P
 
 /***********************************************************************
  * x86-64 support
+ *
+ * Compiled on x86-64 hosts as the native unwinder, and on PowerPC64 hosts as
+ * the GUEST's unwinder -- the x86-64 images an emulated guest process runs are
+ * the only PE modules on this port that carry .pdata/.xdata at all, and their
+ * exceptions must be dispatched frame by frame against an AMD64_CONTEXT while
+ * the cpu underneath is ppc64.
+ *
+ * This is Wine's own methodology rather than a second implementation.  ARM64EC
+ * already needs one ntdll to unwind two instruction sets, and it does it by
+ * compiling the OTHER architecture's block under suffixed names and dispatching
+ * on the pc (see RtlVirtualUnwind2_arm64 in the ARM64 block above, and the
+ * RtlIsEcCode() branches below).  Everything here is arch-neutral C over the
+ * CONTEXT fields and little-endian .xdata bytes -- ppc64le is little-endian and
+ * allocates bitfields from the LSB exactly as x86-64 does, so the UNWIND_INFO
+ * and opcode bitfields land on the same bits -- so the only thing that has to
+ * change is which types the names CONTEXT/RUNTIME_FUNCTION mean.  The alias
+ * block below says so, and is #undef'd at the end of the section.
+ *
+ * Two functions are deliberately NOT built on ppc64:
+ *
+ *   __C_specific_handler, because on this port a scope table belongs to guest
+ *   code, and its filter and __finally funclets have to be entered THROUGH THE
+ *   EMULATOR rather than called.  The guest form lives beside the callback
+ *   primitive it needs, in signal_ppc64.c.
+ *
+ *   RtlAddFunctionTable, because the ppc64 block above already exports it for
+ *   the native machine.  A guest calling it is served by a thunk override.
  */
-#ifdef __x86_64__
+#if defined(__x86_64__) || defined(__powerpc64__)
+
+#ifdef __powerpc64__
+/* the guest's shapes, and private names: on this host the exported
+ * RtlVirtualUnwind/RtlLookupFunctionEntry are the ppc64 ones, defined above */
+#define CONTEXT                       AMD64_CONTEXT
+#define RUNTIME_FUNCTION              IMAGE_AMD64_RUNTIME_FUNCTION_ENTRY
+#define PRUNTIME_FUNCTION             IMAGE_AMD64_RUNTIME_FUNCTION_ENTRY *
+#define KNONVOLATILE_CONTEXT_POINTERS KNONVOLATILE_CONTEXT_POINTERS_AMD64
+#define RtlVirtualUnwind2             RtlVirtualUnwind2_amd64
+#define RtlVirtualUnwind              RtlVirtualUnwind_amd64
+#define RtlLookupFunctionEntry        RtlLookupFunctionEntry_amd64
+/* an x86-64 UNWIND_INFO flag, so winnt.h declares it only for an x86-64 host;
+ * chained unwind info is a property of the DATA being read, not of the cpu */
+#define UNW_FLAG_CHAININFO            4
+#endif
 
 union handler_data
 {
@@ -2392,6 +2434,7 @@ PEXCEPTION_ROUTINE WINAPI RtlVirtualUnwind( ULONG type, ULONG64 base, ULONG64 pc
 }
 
 
+#ifndef __powerpc64__
 /*******************************************************************
  *		__C_specific_handler (NTDLL.@)
  */
@@ -2467,6 +2510,7 @@ EXCEPTION_DISPOSITION WINAPI __C_specific_handler( EXCEPTION_RECORD *rec, void *
     }
     return ExceptionContinueSearch;
 }
+#endif  /* !__powerpc64__ */
 
 
 /**********************************************************************
@@ -2484,10 +2528,20 @@ PRUNTIME_FUNCTION WINAPI RtlLookupFunctionEntry( ULONG_PTR pc, ULONG_PTR *base,
         return (RUNTIME_FUNCTION *)RtlLookupFunctionEntry_arm64( pc, base, table );
 #endif
 
-    if ((func = RtlLookupFunctionTable( pc, base, &size )))
+    /* RtlLookupFunctionTable() is machine-neutral -- it hands back whatever
+     * IMAGE_DIRECTORY_ENTRY_EXCEPTION of the module containing pc points at --
+     * so on ppc64 the cast is the whole of the arch dependency: an x86-64 image
+     * has an x86-64 exception directory, and a ppc64 "PE" is an ELF shared
+     * object with none at all. */
+    if ((func = (RUNTIME_FUNCTION *)RtlLookupFunctionTable( pc, base, &size )))
         return find_function_info( pc, *base, func, size / sizeof(*func));
 
-    if ((func = lookup_dynamic_function_table( pc, &dynbase, &size )))
+    /* The dynamic tables are one shared list, with no per-entry record of which
+     * machine's format an entry is in.  On ppc64 that ambiguity does not arise:
+     * there is no PE unwind-info encoding for this architecture, so the native
+     * RtlLookupFunctionEntry() above never consults the list and nothing native
+     * has a reason to add to it -- every entry in it came from a guest. */
+    if ((func = (RUNTIME_FUNCTION *)lookup_dynamic_function_table( pc, &dynbase, &size )))
     {
         RUNTIME_FUNCTION *ret = find_function_info( pc, dynbase, func, size );
         if (ret) *base = dynbase;
@@ -2499,6 +2553,7 @@ PRUNTIME_FUNCTION WINAPI RtlLookupFunctionEntry( ULONG_PTR pc, ULONG_PTR *base,
 }
 
 
+#ifndef __powerpc64__
 /**********************************************************************
  *              RtlAddFunctionTable   (NTDLL.@)
  */
@@ -2511,8 +2566,20 @@ BOOLEAN CDECL RtlAddFunctionTable( RUNTIME_FUNCTION *table, DWORD count, ULONG_P
 
     return !RtlAddGrowableFunctionTable( &ret, table, count, 0, base, end );
 }
+#endif  /* !__powerpc64__ */
 
-#endif  /* __x86_64__ */
+#ifdef __powerpc64__
+#undef CONTEXT
+#undef RUNTIME_FUNCTION
+#undef PRUNTIME_FUNCTION
+#undef KNONVOLATILE_CONTEXT_POINTERS
+#undef RtlVirtualUnwind2
+#undef RtlVirtualUnwind
+#undef RtlLookupFunctionEntry
+#undef UNW_FLAG_CHAININFO
+#endif
+
+#endif  /* __x86_64__ || __powerpc64__ */
 
 
 /***********************************************************************

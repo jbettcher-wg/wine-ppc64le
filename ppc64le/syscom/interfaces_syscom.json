@@ -78,6 +78,9 @@
     "ACTIVATE_FLAGS",
     "ACTIVATIONTYPE",
     "ADVF",
+    "AMBISONICS_CHANNEL_ORDERING",
+    "AMBISONICS_NORMALIZATION",
+    "AMBISONICS_TYPE",
     "AMPROPERTY_PIN",
     "AMTunerEventType",
     "AMTunerModeType",
@@ -91,6 +94,10 @@
     "AM_STREAM_INFO_FLAGS",
     "APTTYPE",
     "APTTYPEQUALIFIER",
+    "AUDCLNT_SHAREMODE",
+    "AUDCLNT_STREAMOPTIONS",
+    "AUDIO_STREAM_CATEGORY",
+    "AudioSessionState",
     "BIND_FLAGS",
     "CALLCONV",
     "CALLTYPE",
@@ -137,8 +144,11 @@
     "DVD_TIMECODE_FLAGS",
     "DVD_TITLE_APPMODE",
     "DVD_VIDEO_COMPRESSION",
+    "EDataFlow",
     "EOLE_AUTHENTICATION_CAPABILITIES",
+    "ERole",
     "EXTCONN",
+    "EndpointFormFactor",
     "FILTER_STATE",
     "FUNCFLAGS",
     "FUNCKIND",
@@ -191,9 +201,28 @@
     "VMR_ASPECT_RATIO_MODE",
     "VideoProcAmpFlags",
     "VideoProcAmpProperty",
-    "XFORMCOORDS"
+    "XAUDIO2_DEVICE_ROLE",
+    "XAUDIO2_FILTER_TYPE",
+    "XAUDIO2_PROCESSOR",
+    "XAUDIO2_WINDOWS_PROCESSOR_SPECIFIER",
+    "XFORMCOORDS",
+    "_AUDCLNT_BUFFERFLAGS",
+    "_AUDCLNT_SHAREMODE",
+    "_AUDCLNT_STREAMOPTIONS",
+    "_AUDIO_STREAM_CATEGORY",
+    "_AudioSessionState",
+    "_EDataFlow",
+    "_ERole",
+    "_EndpointFormFactor"
   ],
   "unresolved_params": {},
+  "synthetic_iid_interfaces": [
+    "IXAudio2EngineCallback",
+    "IXAudio2MasteringVoice",
+    "IXAudio2SourceVoice",
+    "IXAudio2SubmixVoice",
+    "IXAudio2Voice"
+  ],
   "interfaces": {
     "IActivationFactory": {
       "uuid": "00000035-0000-0000-c000-000000000046",
@@ -291,6 +320,199 @@
           "name": "Release",
           "ret": "ULONG",
           "params": []
+        }
+      ]
+    },
+    "IAudioClient": {
+      "uuid": "1cb9ad4c-dbfa-4c32-b178-c2f568a703b2",
+      "base": "IUnknown",
+      "header": "audioclient.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IAudioClient",
+          "name": "Initialize",
+          "ret": "HRESULT",
+          "params": [
+            "AUDCLNT_SHAREMODE ShareMode",
+            "DWORD StreamFlags",
+            "REFERENCE_TIME hnsBufferDuration",
+            "REFERENCE_TIME hnsPeriodicity",
+            "const WAVEFORMATEX *pFormat",
+            "LPCGUID AudioSessionGuid"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IAudioClient",
+          "name": "GetBufferSize",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 *pNumBufferFrames"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IAudioClient",
+          "name": "GetStreamLatency",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME *phnsLatency"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IAudioClient",
+          "name": "GetCurrentPadding",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 *pNumPaddingFrames"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IAudioClient",
+          "name": "IsFormatSupported",
+          "ret": "HRESULT",
+          "params": [
+            "AUDCLNT_SHAREMODE ShareMode",
+            "const WAVEFORMATEX *pFormat",
+            "WAVEFORMATEX **ppClosestMatch"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IAudioClient",
+          "name": "GetMixFormat",
+          "ret": "HRESULT",
+          "params": [
+            "WAVEFORMATEX **ppDeviceFormat"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IAudioClient",
+          "name": "GetDevicePeriod",
+          "ret": "HRESULT",
+          "params": [
+            "REFERENCE_TIME *phnsDefaultDevicePeriod",
+            "REFERENCE_TIME *phnsMinimumDevicePeriod"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IAudioClient",
+          "name": "Start",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 11,
+          "owner": "IAudioClient",
+          "name": "Stop",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 12,
+          "owner": "IAudioClient",
+          "name": "Reset",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 13,
+          "owner": "IAudioClient",
+          "name": "SetEventHandle",
+          "ret": "HRESULT",
+          "params": [
+            "HANDLE eventHandle"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IAudioClient",
+          "name": "GetService",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppv"
+          ]
+        }
+      ]
+    },
+    "IAudioRenderClient": {
+      "uuid": "f294acfc-3146-4483-a7bf-addca7c260e2",
+      "base": "IUnknown",
+      "header": "audioclient.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IAudioRenderClient",
+          "name": "GetBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 NumFramesRequested",
+            "BYTE **ppData"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IAudioRenderClient",
+          "name": "ReleaseBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 NumFramesWritten",
+            "DWORD dwFlags"
+          ]
         }
       ]
     },
@@ -4790,6 +5012,288 @@
         }
       ]
     },
+    "IMMDevice": {
+      "uuid": "d666063f-1587-4e43-81f1-b948e807363f",
+      "base": "IUnknown",
+      "header": "mmdeviceapi.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IMMDevice",
+          "name": "Activate",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID iid",
+            "DWORD dwClsCtx",
+            "PROPVARIANT *pActivationParams",
+            "void **ppv"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IMMDevice",
+          "name": "OpenPropertyStore",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD stgmAccess",
+            "IPropertyStore **ppProperties"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IMMDevice",
+          "name": "GetId",
+          "ret": "HRESULT",
+          "params": [
+            "LPWSTR *ppstrId"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IMMDevice",
+          "name": "GetState",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *pdwState"
+          ]
+        }
+      ]
+    },
+    "IMMDeviceCollection": {
+      "uuid": "0bd7a1be-7a1a-44db-8397-cc5392387b5e",
+      "base": "IUnknown",
+      "header": "mmdeviceapi.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IMMDeviceCollection",
+          "name": "GetCount",
+          "ret": "HRESULT",
+          "params": [
+            "UINT *pcDevices"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IMMDeviceCollection",
+          "name": "Item",
+          "ret": "HRESULT",
+          "params": [
+            "UINT nDevice",
+            "IMMDevice **ppdevice"
+          ]
+        }
+      ]
+    },
+    "IMMDeviceEnumerator": {
+      "uuid": "a95664d2-9614-4f35-a746-de8db63617e6",
+      "base": "IUnknown",
+      "header": "mmdeviceapi.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IMMDeviceEnumerator",
+          "name": "EnumAudioEndpoints",
+          "ret": "HRESULT",
+          "params": [
+            "EDataFlow dataFlow",
+            "DWORD dwStateMask",
+            "IMMDeviceCollection **ppDevices"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IMMDeviceEnumerator",
+          "name": "GetDefaultAudioEndpoint",
+          "ret": "HRESULT",
+          "params": [
+            "EDataFlow dataFlow",
+            "ERole role",
+            "IMMDevice **ppEndpoint"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IMMDeviceEnumerator",
+          "name": "GetDevice",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR pwstrId",
+            "IMMDevice **ppDevice"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IMMDeviceEnumerator",
+          "name": "RegisterEndpointNotificationCallback",
+          "ret": "HRESULT",
+          "params": [
+            "IMMNotificationClient *pClient"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IMMDeviceEnumerator",
+          "name": "UnregisterEndpointNotificationCallback",
+          "ret": "HRESULT",
+          "params": [
+            "IMMNotificationClient *pClient"
+          ]
+        }
+      ]
+    },
+    "IMMNotificationClient": {
+      "uuid": "7991eec9-7e89-4d85-8390-6c703cec60c0",
+      "base": "IUnknown",
+      "header": "mmdeviceapi.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IMMNotificationClient",
+          "name": "OnDeviceStateChanged",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR pwstrDeviceId",
+            "DWORD dwNewState"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IMMNotificationClient",
+          "name": "OnDeviceAdded",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR pwstrDeviceId"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IMMNotificationClient",
+          "name": "OnDeviceRemoved",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR pwstrDeviceId"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IMMNotificationClient",
+          "name": "OnDefaultDeviceChanged",
+          "ret": "HRESULT",
+          "params": [
+            "EDataFlow flow",
+            "ERole role",
+            "LPCWSTR pwstrDeviceId"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IMMNotificationClient",
+          "name": "OnPropertyValueChanged",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR pwstrDeviceId",
+            "const PROPERTYKEY key"
+          ]
+        }
+      ]
+    },
     "IMalloc": {
       "uuid": "00000002-0000-0000-c000-000000000046",
       "base": "IUnknown",
@@ -6775,6 +7279,1091 @@
           "params": []
         }
       ]
+    },
+    "IXAudio2": {
+      "uuid": "8bcf1f58-9fe7-4583-8ac6-e2adc465c8bb",
+      "base": "IUnknown",
+      "header": "xaudio_classes.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IXAudio2",
+          "name": "GetDeviceCount",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 *count"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IXAudio2",
+          "name": "GetDeviceDetails",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 index",
+            "XAUDIO2_DEVICE_DETAILS *details"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IXAudio2",
+          "name": "Initialize",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 flags",
+            "XAUDIO2_PROCESSOR processor"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IXAudio2",
+          "name": "RegisterForCallbacks",
+          "ret": "HRESULT",
+          "params": [
+            "IXAudio2EngineCallback *pCallback"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IXAudio2",
+          "name": "UnregisterForCallbacks",
+          "ret": "void",
+          "params": [
+            "IXAudio2EngineCallback *pCallback"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IXAudio2",
+          "name": "CreateSourceVoice",
+          "ret": "HRESULT",
+          "params": [
+            "IXAudio2SourceVoice **ppSourceVoice",
+            "const WAVEFORMATEX *pSourceFormat",
+            "UINT32 Flags",
+            "float MaxFrequencyRatio",
+            "IXAudio2VoiceCallback *pCallback",
+            "const XAUDIO2_VOICE_SENDS *pSendList",
+            "const XAUDIO2_EFFECT_CHAIN *pEffectChain"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IXAudio2",
+          "name": "CreateSubmixVoice",
+          "ret": "HRESULT",
+          "params": [
+            "IXAudio2SubmixVoice **ppSubmixVoice",
+            "UINT32 InputChannels",
+            "UINT32 InputSampleRate",
+            "UINT32 Flags",
+            "UINT32 ProcessingStage",
+            "const XAUDIO2_VOICE_SENDS *pSendList",
+            "const XAUDIO2_EFFECT_CHAIN *pEffectChain"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IXAudio2",
+          "name": "CreateMasteringVoice",
+          "ret": "HRESULT",
+          "params": [
+            "IXAudio2MasteringVoice **ppMasteringVoice",
+            "UINT32 InputChannels",
+            "UINT32 InputSampleRate",
+            "UINT32 Flags",
+            "UINT32 index",
+            "const XAUDIO2_EFFECT_CHAIN *pEffectChain"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IXAudio2",
+          "name": "StartEngine",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 12,
+          "owner": "IXAudio2",
+          "name": "StopEngine",
+          "ret": "void",
+          "params": []
+        },
+        {
+          "slot": 13,
+          "owner": "IXAudio2",
+          "name": "CommitChanges",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IXAudio2",
+          "name": "GetPerformanceData",
+          "ret": "void",
+          "params": [
+            "XAUDIO2_PERFORMANCE_DATA *pPerfData"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IXAudio2",
+          "name": "SetDebugConfiguration",
+          "ret": "void",
+          "params": [
+            "const XAUDIO2_DEBUG_CONFIGURATION *pDebugConfiguration",
+            "void *pReserved"
+          ]
+        }
+      ]
+    },
+    "IXAudio2EngineCallback": {
+      "uuid": "e052c39d-ed73-58c6-acd9-760e2c8f7968",
+      "base": "(none)",
+      "header": "xaudio_classes.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IXAudio2EngineCallback",
+          "name": "OnProcessingPassStart",
+          "ret": "void",
+          "params": []
+        },
+        {
+          "slot": 1,
+          "owner": "IXAudio2EngineCallback",
+          "name": "OnProcessingPassEnd",
+          "ret": "void",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IXAudio2EngineCallback",
+          "name": "OnCriticalError",
+          "ret": "void",
+          "params": [
+            "HRESULT Error"
+          ]
+        }
+      ],
+      "synthetic_iid": true
+    },
+    "IXAudio2MasteringVoice": {
+      "uuid": "359298ea-dc9b-572f-82c6-cfd20511f215",
+      "base": "IXAudio2Voice",
+      "header": "xaudio_classes.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IXAudio2Voice",
+          "name": "GetVoiceDetails",
+          "ret": "void",
+          "params": [
+            "XAUDIO2_VOICE_DETAILS *pVoiceDetails"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IXAudio2Voice",
+          "name": "SetOutputVoices",
+          "ret": "HRESULT",
+          "params": [
+            "const XAUDIO2_VOICE_SENDS *pSendList"
+          ]
+        },
+        {
+          "slot": 2,
+          "owner": "IXAudio2Voice",
+          "name": "SetEffectChain",
+          "ret": "HRESULT",
+          "params": [
+            "const XAUDIO2_EFFECT_CHAIN *pEffectChain"
+          ]
+        },
+        {
+          "slot": 3,
+          "owner": "IXAudio2Voice",
+          "name": "EnableEffect",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 EffectIndex",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IXAudio2Voice",
+          "name": "DisableEffect",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 EffectIndex",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IXAudio2Voice",
+          "name": "GetEffectState",
+          "ret": "void",
+          "params": [
+            "UINT32 EffectIndex",
+            "BOOL *pEnabled"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IXAudio2Voice",
+          "name": "SetEffectParameters",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 EffectIndex",
+            "const void *pParameters",
+            "UINT32 ParametersByteSize",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IXAudio2Voice",
+          "name": "GetEffectParameters",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 EffectIndex",
+            "void *pParameters",
+            "UINT32 ParametersByteSize"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IXAudio2Voice",
+          "name": "SetFilterParameters",
+          "ret": "HRESULT",
+          "params": [
+            "const XAUDIO2_FILTER_PARAMETERS *pParameters",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IXAudio2Voice",
+          "name": "GetFilterParameters",
+          "ret": "void",
+          "params": [
+            "XAUDIO2_FILTER_PARAMETERS *pParameters"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IXAudio2Voice",
+          "name": "SetOutputFilterParameters",
+          "ret": "HRESULT",
+          "params": [
+            "IXAudio2Voice *pDestinationVoice",
+            "const XAUDIO2_FILTER_PARAMETERS *pParameters",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IXAudio2Voice",
+          "name": "GetOutputFilterParameters",
+          "ret": "void",
+          "params": [
+            "IXAudio2Voice *pDestinationVoice",
+            "XAUDIO2_FILTER_PARAMETERS *pParameters"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IXAudio2Voice",
+          "name": "SetVolume",
+          "ret": "HRESULT",
+          "params": [
+            "float Volume",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IXAudio2Voice",
+          "name": "GetVolume",
+          "ret": "void",
+          "params": [
+            "float *pVolume"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IXAudio2Voice",
+          "name": "SetChannelVolumes",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 Channels",
+            "const float *pVolumes",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IXAudio2Voice",
+          "name": "GetChannelVolumes",
+          "ret": "void",
+          "params": [
+            "UINT32 Channels",
+            "float *pVolumes"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IXAudio2Voice",
+          "name": "SetOutputMatrix",
+          "ret": "HRESULT",
+          "params": [
+            "IXAudio2Voice *pDestinationVoice",
+            "UINT32 SourceChannels",
+            "UINT32 DestinationChannels",
+            "const float *pLevelMatrix",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IXAudio2Voice",
+          "name": "GetOutputMatrix",
+          "ret": "void",
+          "params": [
+            "IXAudio2Voice *pDestinationVoice",
+            "UINT32 SourceChannels",
+            "UINT32 DestinationChannels",
+            "float *pLevelMatrix"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IXAudio2Voice",
+          "name": "DestroyVoice",
+          "ret": "void",
+          "params": []
+        }
+      ],
+      "synthetic_iid": true
+    },
+    "IXAudio2SourceVoice": {
+      "uuid": "e8116f61-bcd1-5163-8e67-f6844b28f37e",
+      "base": "IXAudio2Voice",
+      "header": "xaudio_classes.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IXAudio2Voice",
+          "name": "GetVoiceDetails",
+          "ret": "void",
+          "params": [
+            "XAUDIO2_VOICE_DETAILS *pVoiceDetails"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IXAudio2Voice",
+          "name": "SetOutputVoices",
+          "ret": "HRESULT",
+          "params": [
+            "const XAUDIO2_VOICE_SENDS *pSendList"
+          ]
+        },
+        {
+          "slot": 2,
+          "owner": "IXAudio2Voice",
+          "name": "SetEffectChain",
+          "ret": "HRESULT",
+          "params": [
+            "const XAUDIO2_EFFECT_CHAIN *pEffectChain"
+          ]
+        },
+        {
+          "slot": 3,
+          "owner": "IXAudio2Voice",
+          "name": "EnableEffect",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 EffectIndex",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IXAudio2Voice",
+          "name": "DisableEffect",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 EffectIndex",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IXAudio2Voice",
+          "name": "GetEffectState",
+          "ret": "void",
+          "params": [
+            "UINT32 EffectIndex",
+            "BOOL *pEnabled"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IXAudio2Voice",
+          "name": "SetEffectParameters",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 EffectIndex",
+            "const void *pParameters",
+            "UINT32 ParametersByteSize",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IXAudio2Voice",
+          "name": "GetEffectParameters",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 EffectIndex",
+            "void *pParameters",
+            "UINT32 ParametersByteSize"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IXAudio2Voice",
+          "name": "SetFilterParameters",
+          "ret": "HRESULT",
+          "params": [
+            "const XAUDIO2_FILTER_PARAMETERS *pParameters",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IXAudio2Voice",
+          "name": "GetFilterParameters",
+          "ret": "void",
+          "params": [
+            "XAUDIO2_FILTER_PARAMETERS *pParameters"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IXAudio2Voice",
+          "name": "SetOutputFilterParameters",
+          "ret": "HRESULT",
+          "params": [
+            "IXAudio2Voice *pDestinationVoice",
+            "const XAUDIO2_FILTER_PARAMETERS *pParameters",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IXAudio2Voice",
+          "name": "GetOutputFilterParameters",
+          "ret": "void",
+          "params": [
+            "IXAudio2Voice *pDestinationVoice",
+            "XAUDIO2_FILTER_PARAMETERS *pParameters"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IXAudio2Voice",
+          "name": "SetVolume",
+          "ret": "HRESULT",
+          "params": [
+            "float Volume",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IXAudio2Voice",
+          "name": "GetVolume",
+          "ret": "void",
+          "params": [
+            "float *pVolume"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IXAudio2Voice",
+          "name": "SetChannelVolumes",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 Channels",
+            "const float *pVolumes",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IXAudio2Voice",
+          "name": "GetChannelVolumes",
+          "ret": "void",
+          "params": [
+            "UINT32 Channels",
+            "float *pVolumes"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IXAudio2Voice",
+          "name": "SetOutputMatrix",
+          "ret": "HRESULT",
+          "params": [
+            "IXAudio2Voice *pDestinationVoice",
+            "UINT32 SourceChannels",
+            "UINT32 DestinationChannels",
+            "const float *pLevelMatrix",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IXAudio2Voice",
+          "name": "GetOutputMatrix",
+          "ret": "void",
+          "params": [
+            "IXAudio2Voice *pDestinationVoice",
+            "UINT32 SourceChannels",
+            "UINT32 DestinationChannels",
+            "float *pLevelMatrix"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IXAudio2Voice",
+          "name": "DestroyVoice",
+          "ret": "void",
+          "params": []
+        },
+        {
+          "slot": 19,
+          "owner": "IXAudio2SourceVoice",
+          "name": "Start",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 Flags",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "IXAudio2SourceVoice",
+          "name": "Stop",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 Flags",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 21,
+          "owner": "IXAudio2SourceVoice",
+          "name": "SubmitSourceBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "const XAUDIO2_BUFFER *pBuffer",
+            "const XAUDIO2_BUFFER_WMA *pBufferWMA"
+          ]
+        },
+        {
+          "slot": 22,
+          "owner": "IXAudio2SourceVoice",
+          "name": "FlushSourceBuffers",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 23,
+          "owner": "IXAudio2SourceVoice",
+          "name": "Discontinuity",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 24,
+          "owner": "IXAudio2SourceVoice",
+          "name": "ExitLoop",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 25,
+          "owner": "IXAudio2SourceVoice",
+          "name": "GetState",
+          "ret": "void",
+          "params": [
+            "XAUDIO2_VOICE_STATE *pVoiceState"
+          ]
+        },
+        {
+          "slot": 26,
+          "owner": "IXAudio2SourceVoice",
+          "name": "SetFrequencyRatio",
+          "ret": "HRESULT",
+          "params": [
+            "float Ratio",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 27,
+          "owner": "IXAudio2SourceVoice",
+          "name": "GetFrequencyRatio",
+          "ret": "void",
+          "params": [
+            "float *pRatio"
+          ]
+        },
+        {
+          "slot": 28,
+          "owner": "IXAudio2SourceVoice",
+          "name": "SetSourceSampleRate",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 NewSourceSampleRate"
+          ]
+        }
+      ],
+      "synthetic_iid": true
+    },
+    "IXAudio2SubmixVoice": {
+      "uuid": "735f90fc-f8c2-5c07-9cb0-67d06fe82827",
+      "base": "IXAudio2Voice",
+      "header": "xaudio_classes.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IXAudio2Voice",
+          "name": "GetVoiceDetails",
+          "ret": "void",
+          "params": [
+            "XAUDIO2_VOICE_DETAILS *pVoiceDetails"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IXAudio2Voice",
+          "name": "SetOutputVoices",
+          "ret": "HRESULT",
+          "params": [
+            "const XAUDIO2_VOICE_SENDS *pSendList"
+          ]
+        },
+        {
+          "slot": 2,
+          "owner": "IXAudio2Voice",
+          "name": "SetEffectChain",
+          "ret": "HRESULT",
+          "params": [
+            "const XAUDIO2_EFFECT_CHAIN *pEffectChain"
+          ]
+        },
+        {
+          "slot": 3,
+          "owner": "IXAudio2Voice",
+          "name": "EnableEffect",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 EffectIndex",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IXAudio2Voice",
+          "name": "DisableEffect",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 EffectIndex",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IXAudio2Voice",
+          "name": "GetEffectState",
+          "ret": "void",
+          "params": [
+            "UINT32 EffectIndex",
+            "BOOL *pEnabled"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IXAudio2Voice",
+          "name": "SetEffectParameters",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 EffectIndex",
+            "const void *pParameters",
+            "UINT32 ParametersByteSize",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IXAudio2Voice",
+          "name": "GetEffectParameters",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 EffectIndex",
+            "void *pParameters",
+            "UINT32 ParametersByteSize"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IXAudio2Voice",
+          "name": "SetFilterParameters",
+          "ret": "HRESULT",
+          "params": [
+            "const XAUDIO2_FILTER_PARAMETERS *pParameters",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IXAudio2Voice",
+          "name": "GetFilterParameters",
+          "ret": "void",
+          "params": [
+            "XAUDIO2_FILTER_PARAMETERS *pParameters"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IXAudio2Voice",
+          "name": "SetOutputFilterParameters",
+          "ret": "HRESULT",
+          "params": [
+            "IXAudio2Voice *pDestinationVoice",
+            "const XAUDIO2_FILTER_PARAMETERS *pParameters",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IXAudio2Voice",
+          "name": "GetOutputFilterParameters",
+          "ret": "void",
+          "params": [
+            "IXAudio2Voice *pDestinationVoice",
+            "XAUDIO2_FILTER_PARAMETERS *pParameters"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IXAudio2Voice",
+          "name": "SetVolume",
+          "ret": "HRESULT",
+          "params": [
+            "float Volume",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IXAudio2Voice",
+          "name": "GetVolume",
+          "ret": "void",
+          "params": [
+            "float *pVolume"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IXAudio2Voice",
+          "name": "SetChannelVolumes",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 Channels",
+            "const float *pVolumes",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IXAudio2Voice",
+          "name": "GetChannelVolumes",
+          "ret": "void",
+          "params": [
+            "UINT32 Channels",
+            "float *pVolumes"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IXAudio2Voice",
+          "name": "SetOutputMatrix",
+          "ret": "HRESULT",
+          "params": [
+            "IXAudio2Voice *pDestinationVoice",
+            "UINT32 SourceChannels",
+            "UINT32 DestinationChannels",
+            "const float *pLevelMatrix",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IXAudio2Voice",
+          "name": "GetOutputMatrix",
+          "ret": "void",
+          "params": [
+            "IXAudio2Voice *pDestinationVoice",
+            "UINT32 SourceChannels",
+            "UINT32 DestinationChannels",
+            "float *pLevelMatrix"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IXAudio2Voice",
+          "name": "DestroyVoice",
+          "ret": "void",
+          "params": []
+        }
+      ],
+      "synthetic_iid": true
+    },
+    "IXAudio2Voice": {
+      "uuid": "76c75fa9-5832-597c-96ae-8730ae5fab3d",
+      "base": "(none)",
+      "header": "xaudio_classes.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IXAudio2Voice",
+          "name": "GetVoiceDetails",
+          "ret": "void",
+          "params": [
+            "XAUDIO2_VOICE_DETAILS *pVoiceDetails"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IXAudio2Voice",
+          "name": "SetOutputVoices",
+          "ret": "HRESULT",
+          "params": [
+            "const XAUDIO2_VOICE_SENDS *pSendList"
+          ]
+        },
+        {
+          "slot": 2,
+          "owner": "IXAudio2Voice",
+          "name": "SetEffectChain",
+          "ret": "HRESULT",
+          "params": [
+            "const XAUDIO2_EFFECT_CHAIN *pEffectChain"
+          ]
+        },
+        {
+          "slot": 3,
+          "owner": "IXAudio2Voice",
+          "name": "EnableEffect",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 EffectIndex",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IXAudio2Voice",
+          "name": "DisableEffect",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 EffectIndex",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IXAudio2Voice",
+          "name": "GetEffectState",
+          "ret": "void",
+          "params": [
+            "UINT32 EffectIndex",
+            "BOOL *pEnabled"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IXAudio2Voice",
+          "name": "SetEffectParameters",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 EffectIndex",
+            "const void *pParameters",
+            "UINT32 ParametersByteSize",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IXAudio2Voice",
+          "name": "GetEffectParameters",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 EffectIndex",
+            "void *pParameters",
+            "UINT32 ParametersByteSize"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IXAudio2Voice",
+          "name": "SetFilterParameters",
+          "ret": "HRESULT",
+          "params": [
+            "const XAUDIO2_FILTER_PARAMETERS *pParameters",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IXAudio2Voice",
+          "name": "GetFilterParameters",
+          "ret": "void",
+          "params": [
+            "XAUDIO2_FILTER_PARAMETERS *pParameters"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IXAudio2Voice",
+          "name": "SetOutputFilterParameters",
+          "ret": "HRESULT",
+          "params": [
+            "IXAudio2Voice *pDestinationVoice",
+            "const XAUDIO2_FILTER_PARAMETERS *pParameters",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IXAudio2Voice",
+          "name": "GetOutputFilterParameters",
+          "ret": "void",
+          "params": [
+            "IXAudio2Voice *pDestinationVoice",
+            "XAUDIO2_FILTER_PARAMETERS *pParameters"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IXAudio2Voice",
+          "name": "SetVolume",
+          "ret": "HRESULT",
+          "params": [
+            "float Volume",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IXAudio2Voice",
+          "name": "GetVolume",
+          "ret": "void",
+          "params": [
+            "float *pVolume"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IXAudio2Voice",
+          "name": "SetChannelVolumes",
+          "ret": "HRESULT",
+          "params": [
+            "UINT32 Channels",
+            "const float *pVolumes",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IXAudio2Voice",
+          "name": "GetChannelVolumes",
+          "ret": "void",
+          "params": [
+            "UINT32 Channels",
+            "float *pVolumes"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IXAudio2Voice",
+          "name": "SetOutputMatrix",
+          "ret": "HRESULT",
+          "params": [
+            "IXAudio2Voice *pDestinationVoice",
+            "UINT32 SourceChannels",
+            "UINT32 DestinationChannels",
+            "const float *pLevelMatrix",
+            "UINT32 OperationSet"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IXAudio2Voice",
+          "name": "GetOutputMatrix",
+          "ret": "void",
+          "params": [
+            "IXAudio2Voice *pDestinationVoice",
+            "UINT32 SourceChannels",
+            "UINT32 DestinationChannels",
+            "float *pLevelMatrix"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IXAudio2Voice",
+          "name": "DestroyVoice",
+          "ret": "void",
+          "params": []
+        }
+      ],
+      "synthetic_iid": true
     }
   }
 }

@@ -6,6 +6,7 @@ DELAYIMPORTS = cryptui imagehlp
 VER_PRODUCTVERSION = 6,1,7601,23769
 
 SOURCES = \
+	wintrust.thunks \
 	asn.c \
 	crypt.c \
 	register.c \

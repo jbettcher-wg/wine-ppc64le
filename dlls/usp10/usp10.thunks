@@ -1,0 +1,49 @@
+# AMD64 thunk export spec -- usp10.dll.
+#
+# From the 2026-08-17 everyday-DLL pass.  Uniscribe is how a Windows program
+# lays out a run of text it did not write itself -- every game menu that shows
+# a player name, every launcher that renders a changelog -- and this module had
+# NO guest thunk at all: the loader found the native ppc64 builtin, correctly
+# refused to splice it into a guest call, and the import reported c000007b.
+# The export list is this module's own .spec.
+DLL usp10.dll
+FROM-SPEC auto
+
+# Measured before this line: 0 of 44 eligible exports emitted, all 44 refused
+# as "no declaration found in Wine headers".  usp10.h is not in the global
+# probe (wine_sig.PROBE_SRC) because nothing else needs it.  With it, 36 of 44
+# are emitted -- the complete Script* surface a caller uses: ScriptItemize,
+# ScriptShape, ScriptPlace, ScriptTextOut, ScriptBreak, ScriptCPtoX/ScriptXtoCP,
+# ScriptGetCMap, ScriptGetFontProperties, the ScriptString* convenience layer
+# and the OpenType variants (ScriptItemizeOpenType, ScriptShapeOpenType,
+# ScriptGetFontFeatureTags/LanguageTags/ScriptTags).
+PROBE-EXTRA   usp10.h
+
+# --------------------------------------------------------------- the ceiling
+# Eight refusals, by name, and all eight are honest:
+#
+#   ScriptPlaceOpenType   "18 arguments, descriptor field holds at most 16"
+#       -- the widest entry point in Uniscribe.  The thunk descriptor carries
+#       an argument count in a fixed-width field and the host marshaller reads
+#       that many slots; 18 does not fit and cannot be made to without changing
+#       the descriptor format for every module.  Its non-OpenType sibling
+#       ScriptPlace (10 arguments) IS served, and that is the one that lays out
+#       text -- ScriptPlaceOpenType only adds feature-range control.
+#
+#   LpkPresent, ScriptGetFontAlternateGlyphs, ScriptPositionSingleGlyph,
+#   ScriptSubstituteSingleGlyph, UspAllocCache, UspAllocTemp, UspFreeMem
+#       "no declaration found in Wine headers" -- private entry points Wine
+#       ships in the .spec and declares nowhere.  LpkPresent is the LPK
+#       detection hook GDI calls into usp10 with; the Usp* three are usp10's
+#       own scratch allocator, called by usp10; the two glyph ones are
+#       undocumented even on Windows.  Nothing outside this module has ever
+#       imported one, and asserting an argument count for them here would be a
+#       promise nobody can check.
+#
+# All eight are absent from the export table and bind to a distinct named
+# sentinel, so a guest that imports one dies at 0xdead00nn with the symbol in
+# the loader's WARN.
+#
+# NO CALLBACK CROSSES THIS BOUNDARY: Uniscribe is a pure in/out API over
+# caller-supplied arrays and an opaque SCRIPT_CACHE, and the only pointer
+# native code retains is that cache, which is usp10's own allocation.

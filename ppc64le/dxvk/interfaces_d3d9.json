@@ -1,0 +1,5573 @@
+{
+  "surface": "d3d9",
+  "integer_types": [
+    "BOOL",
+    "BYTE",
+    "D3D10_ASYNC_GETDATA_FLAG",
+    "D3D10_BIND_FLAG",
+    "D3D10_BLEND",
+    "D3D10_BLEND_OP",
+    "D3D10_CBUFFER_TYPE",
+    "D3D10_CLEAR_FLAG",
+    "D3D10_COLOR_WRITE_ENABLE",
+    "D3D10_COMPARISON_FUNC",
+    "D3D10_COUNTER",
+    "D3D10_COUNTER_TYPE",
+    "D3D10_CPU_ACCESS_FLAG",
+    "D3D10_CREATE_DEVICE_FLAG",
+    "D3D10_CULL_MODE",
+    "D3D10_DEPTH_WRITE_MASK",
+    "D3D10_DEVICE_STATE_TYPES",
+    "D3D10_DRIVER_TYPE",
+    "D3D10_DSV_DIMENSION",
+    "D3D10_FEATURE_LEVEL1",
+    "D3D10_FILL_MODE",
+    "D3D10_FILTER",
+    "D3D10_FILTER_TYPE",
+    "D3D10_FORMAT_SUPPORT",
+    "D3D10_INCLUDE_TYPE",
+    "D3D10_INPUT_CLASSIFICATION",
+    "D3D10_MAP",
+    "D3D10_MAP_FLAG",
+    "D3D10_MESSAGE_CATEGORY",
+    "D3D10_MESSAGE_ID",
+    "D3D10_MESSAGE_SEVERITY",
+    "D3D10_NAME",
+    "D3D10_PRIMITIVE",
+    "D3D10_PRIMITIVE_TOPOLOGY",
+    "D3D10_QUERY",
+    "D3D10_QUERY_MISC_FLAG",
+    "D3D10_RAISE_FLAG",
+    "D3D10_REGISTER_COMPONENT_TYPE",
+    "D3D10_RESOURCE_DIMENSION",
+    "D3D10_RESOURCE_MISC_FLAG",
+    "D3D10_RESOURCE_RETURN_TYPE",
+    "D3D10_RTV_DIMENSION",
+    "D3D10_SHADER_INPUT_TYPE",
+    "D3D10_SHADER_VARIABLE_CLASS",
+    "D3D10_SHADER_VARIABLE_TYPE",
+    "D3D10_SRV_DIMENSION",
+    "D3D10_SRV_DIMENSION1",
+    "D3D10_STENCIL_OP",
+    "D3D10_TEXTURECUBE_FACE",
+    "D3D10_TEXTURE_ADDRESS_MODE",
+    "D3D10_USAGE",
+    "D3D11_1_CREATE_DEVICE_CONTEXT_STATE_FLAG",
+    "D3D11_ASYNC_GETDATA_FLAG",
+    "D3D11_AUTHENTICATED_CHANNEL_TYPE",
+    "D3D11_AUTHENTICATED_PROCESS_IDENTIFIER_TYPE",
+    "D3D11_BIND_FLAG",
+    "D3D11_BLEND",
+    "D3D11_BLEND_OP",
+    "D3D11_BUFFEREX_SRV_FLAG",
+    "D3D11_BUS_TYPE",
+    "D3D11_CBUFFER_TYPE",
+    "D3D11_CHECK_MULTISAMPLE_QUALITY_LEVELS_FLAG",
+    "D3D11_CLEAR_FLAG",
+    "D3D11_COLOR_WRITE_ENABLE",
+    "D3D11_COMPARISON_FUNC",
+    "D3D11_CONSERVATIVE_RASTERIZATION_MODE",
+    "D3D11_CONSERVATIVE_RASTERIZATION_TIER",
+    "D3D11_CONTENT_PROTECTION_CAPS",
+    "D3D11_CONTEXT_TYPE",
+    "D3D11_COPY_FLAGS",
+    "D3D11_COUNTER",
+    "D3D11_COUNTER_TYPE",
+    "D3D11_CPU_ACCESS_FLAG",
+    "D3D11_CREATE_DEVICE_FLAG",
+    "D3D11_CRYPTO_SESSION_STATUS",
+    "D3D11_CULL_MODE",
+    "D3D11_DEPTH_WRITE_MASK",
+    "D3D11_DEVICE_CONTEXT_TYPE",
+    "D3D11_DSV_DIMENSION",
+    "D3D11_DSV_FLAG",
+    "D3D11_FEATURE",
+    "D3D11_FENCE_FLAG",
+    "D3D11_FILL_MODE",
+    "D3D11_FILTER",
+    "D3D11_FILTER_TYPE",
+    "D3D11_FORMAT_SUPPORT",
+    "D3D11_FORMAT_SUPPORT2",
+    "D3D11_INPUT_CLASSIFICATION",
+    "D3D11_LOGIC_OP",
+    "D3D11_MAP",
+    "D3D11_MAP_FLAG",
+    "D3D11_MESSAGE_CATEGORY",
+    "D3D11_MESSAGE_ID",
+    "D3D11_MESSAGE_SEVERITY",
+    "D3D11_PRIMITIVE",
+    "D3D11_PRIMITIVE_TOPOLOGY",
+    "D3D11_QUERY",
+    "D3D11_QUERY_MISC_FLAG",
+    "D3D11_RAISE_FLAG",
+    "D3D11_RESOURCE_DIMENSION",
+    "D3D11_RESOURCE_MISC_FLAG",
+    "D3D11_RESOURCE_RETURN_TYPE",
+    "D3D11_RLDO_FLAGS",
+    "D3D11_RTV_DIMENSION",
+    "D3D11_SHADER_CACHE_SUPPORT_FLAGS",
+    "D3D11_SHADER_MIN_PRECISION_SUPPORT",
+    "D3D11_SHARED_RESOURCE_TIER",
+    "D3D11_SRV_DIMENSION",
+    "D3D11_STANDARD_MULTISAMPLE_QUALITY_LEVELS",
+    "D3D11_STENCIL_OP",
+    "D3D11_TESSELLATOR_DOMAIN",
+    "D3D11_TESSELLATOR_OUTPUT_PRIMITIVE",
+    "D3D11_TESSELLATOR_PARTITIONING",
+    "D3D11_TEXTURE_ADDRESS_MODE",
+    "D3D11_TEXTURE_LAYOUT",
+    "D3D11_TILED_RESOURCES_TIER",
+    "D3D11_TILE_COPY_FLAG",
+    "D3D11_TILE_MAPPING_FLAG",
+    "D3D11_TILE_RANGE_FLAG",
+    "D3D11_UAV_DIMENSION",
+    "D3D11_UAV_FLAG",
+    "D3D11_USAGE",
+    "D3D11_VDOV_DIMENSION",
+    "D3D11_VIDEO_DECODER_BUFFER_TYPE",
+    "D3D11_VIDEO_DECODER_CAPS",
+    "D3D11_VIDEO_FRAME_FORMAT",
+    "D3D11_VIDEO_PROCESSOR_ALPHA_FILL_MODE",
+    "D3D11_VIDEO_PROCESSOR_AUTO_STREAM_CAPS",
+    "D3D11_VIDEO_PROCESSOR_BEHAVIOR_HINTS",
+    "D3D11_VIDEO_PROCESSOR_DEVICE_CAPS",
+    "D3D11_VIDEO_PROCESSOR_FEATURE_CAPS",
+    "D3D11_VIDEO_PROCESSOR_FILTER",
+    "D3D11_VIDEO_PROCESSOR_FILTER_CAPS",
+    "D3D11_VIDEO_PROCESSOR_FORMAT_CAPS",
+    "D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT",
+    "D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS",
+    "D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE",
+    "D3D11_VIDEO_PROCESSOR_OUTPUT_RATE",
+    "D3D11_VIDEO_PROCESSOR_PROCESSOR_CAPS",
+    "D3D11_VIDEO_PROCESSOR_ROTATION",
+    "D3D11_VIDEO_PROCESSOR_STEREO_CAPS",
+    "D3D11_VIDEO_PROCESSOR_STEREO_FLIP_MODE",
+    "D3D11_VIDEO_PROCESSOR_STEREO_FORMAT",
+    "D3D11_VIDEO_USAGE",
+    "D3D11_VPIV_DIMENSION",
+    "D3D11_VPOV_DIMENSION",
+    "D3D12_BLEND",
+    "D3D12_BLEND_OP",
+    "D3D12_BUFFER_SRV_FLAGS",
+    "D3D12_BUFFER_UAV_FLAGS",
+    "D3D12_CLEAR_FLAGS",
+    "D3D12_COLOR_WRITE_ENABLE",
+    "D3D12_COMMAND_LIST_SUPPORT_FLAGS",
+    "D3D12_COMMAND_LIST_TYPE",
+    "D3D12_COMMAND_QUEUE_FLAGS",
+    "D3D12_COMMAND_QUEUE_PRIORITY",
+    "D3D12_COMPARISON_FUNC",
+    "D3D12_CONSERVATIVE_RASTERIZATION_MODE",
+    "D3D12_CONSERVATIVE_RASTERIZATION_TIER",
+    "D3D12_CPU_PAGE_PROPERTY",
+    "D3D12_CROSS_NODE_SHARING_TIER",
+    "D3D12_CULL_MODE",
+    "D3D12_DEPTH_WRITE_MASK",
+    "D3D12_DESCRIPTOR_HEAP_FLAGS",
+    "D3D12_DESCRIPTOR_HEAP_TYPE",
+    "D3D12_DESCRIPTOR_RANGE_FLAGS",
+    "D3D12_DESCRIPTOR_RANGE_TYPE",
+    "D3D12_DSV_DIMENSION",
+    "D3D12_DSV_FLAGS",
+    "D3D12_FEATURE",
+    "D3D12_FENCE_FLAGS",
+    "D3D12_FILL_MODE",
+    "D3D12_FILTER",
+    "D3D12_FILTER_REDUCTION_TYPE",
+    "D3D12_FILTER_TYPE",
+    "D3D12_FORMAT_SUPPORT1",
+    "D3D12_FORMAT_SUPPORT2",
+    "D3D12_GPU_BASED_VALIDATION_SHADER_PATCH_MODE",
+    "D3D12_GPU_VIRTUAL_ADDRESS",
+    "D3D12_HEAP_FLAGS",
+    "D3D12_HEAP_SERIALIZATION_TIER",
+    "D3D12_HEAP_TYPE",
+    "D3D12_INDEX_BUFFER_STRIP_CUT_VALUE",
+    "D3D12_INDIRECT_ARGUMENT_TYPE",
+    "D3D12_INPUT_CLASSIFICATION",
+    "D3D12_LOGIC_OP",
+    "D3D12_MEMORY_POOL",
+    "D3D12_MESSAGE_CATEGORY",
+    "D3D12_MESSAGE_ID",
+    "D3D12_MESSAGE_SEVERITY",
+    "D3D12_MULTIPLE_FENCE_WAIT_FLAGS",
+    "D3D12_MULTISAMPLE_QUALITY_LEVEL_FLAGS",
+    "D3D12_PIPELINE_STATE_FLAGS",
+    "D3D12_PREDICATION_OP",
+    "D3D12_PRIMITIVE_TOPOLOGY",
+    "D3D12_PRIMITIVE_TOPOLOGY_TYPE",
+    "D3D12_PROGRAMMABLE_SAMPLE_POSITIONS_TIER",
+    "D3D12_QUERY_HEAP_TYPE",
+    "D3D12_QUERY_TYPE",
+    "D3D12_RAYTRACING_TIER",
+    "D3D12_RENDER_PASS_TIER",
+    "D3D12_RESIDENCY_PRIORITY",
+    "D3D12_RESOLVE_MODE",
+    "D3D12_RESOURCE_BARRIER_FLAGS",
+    "D3D12_RESOURCE_BARRIER_TYPE",
+    "D3D12_RESOURCE_BINDING_TIER",
+    "D3D12_RESOURCE_DIMENSION",
+    "D3D12_RESOURCE_FLAGS",
+    "D3D12_RESOURCE_HEAP_TIER",
+    "D3D12_RESOURCE_STATES",
+    "D3D12_ROOT_DESCRIPTOR_FLAGS",
+    "D3D12_ROOT_PARAMETER_TYPE",
+    "D3D12_ROOT_SIGNATURE_FLAGS",
+    "D3D12_RTV_DIMENSION",
+    "D3D12_SHADER_CACHE_SUPPORT_FLAGS",
+    "D3D12_SHADER_COMPONENT_MAPPING",
+    "D3D12_SHADER_MIN_PRECISION_SUPPORT",
+    "D3D12_SHADER_VERSION_TYPE",
+    "D3D12_SHADER_VISIBILITY",
+    "D3D12_SHARED_RESOURCE_COMPATIBILITY_TIER",
+    "D3D12_SRV_DIMENSION",
+    "D3D12_STATIC_BORDER_COLOR",
+    "D3D12_STENCIL_OP",
+    "D3D12_TEXTURE_ADDRESS_MODE",
+    "D3D12_TEXTURE_COPY_TYPE",
+    "D3D12_TEXTURE_LAYOUT",
+    "D3D12_TILED_RESOURCES_TIER",
+    "D3D12_TILE_COPY_FLAGS",
+    "D3D12_TILE_MAPPING_FLAGS",
+    "D3D12_TILE_RANGE_FLAGS",
+    "D3D12_UAV_DIMENSION",
+    "D3D12_VIEW_INSTANCING_TIER",
+    "D3D12_WRITEBUFFERIMMEDIATE_MODE",
+    "D3DANTIALIASMODE",
+    "D3DBACKBUFFER_TYPE",
+    "D3DBASISTYPE",
+    "D3DBLEND",
+    "D3DBLENDOP",
+    "D3DCMPFUNC",
+    "D3DCOLOR",
+    "D3DCOLORMODEL",
+    "D3DCOMPILER_STRIP_FLAGS",
+    "D3DCOMPOSERECTSOP",
+    "D3DCUBEMAP_FACES",
+    "D3DCULL",
+    "D3DDEBUGMONITORTOKENS",
+    "D3DDECLMETHOD",
+    "D3DDECLTYPE",
+    "D3DDECLUSAGE",
+    "D3DDEGREETYPE",
+    "D3DDEVTYPE",
+    "D3DDISPLAYROTATION",
+    "D3DFILLMODE",
+    "D3DFIXED",
+    "D3DFOGMODE",
+    "D3DFORMAT",
+    "D3DHAL_DP2OPERATION",
+    "D3DLIGHTSTATETYPE",
+    "D3DLIGHTTYPE",
+    "D3DMATERIALCOLORSOURCE",
+    "D3DMULTISAMPLE_TYPE",
+    "D3DOPCODE",
+    "D3DORDERTYPE",
+    "D3DPATCHEDGESTYLE",
+    "D3DPOOL",
+    "D3DPRIMITIVETYPE",
+    "D3DQUERYTYPE",
+    "D3DRENDERSTATETYPE",
+    "D3DRESOURCETYPE",
+    "D3DRMANIMATIONOPTIONS",
+    "D3DRMGROUPINDEX",
+    "D3DRMINTERPOLATIONOPTIONS",
+    "D3DRMLOADOPTIONS",
+    "D3DRMSAVEOPTIONS",
+    "D3DSAMPLERSTATETYPE",
+    "D3DSAMPLER_TEXTURE_TYPE",
+    "D3DSCANLINEORDERING",
+    "D3DSHADEMODE",
+    "D3DSHADER_ADDRESSMODE_TYPE",
+    "D3DSHADER_COMPARISON",
+    "D3DSHADER_INSTRUCTION_OPCODE_TYPE",
+    "D3DSHADER_MISCTYPE_OFFSETS",
+    "D3DSHADER_PARAM_DSTMOD_TYPE",
+    "D3DSHADER_PARAM_REGISTER_TYPE",
+    "D3DSHADER_PARAM_SRCMOD_TYPE",
+    "D3DSTATEBLOCKTYPE",
+    "D3DSTENCILOP",
+    "D3DSWAPEFFECT",
+    "D3DTEXTUREADDRESS",
+    "D3DTEXTUREBLEND",
+    "D3DTEXTUREFILTER",
+    "D3DTEXTUREFILTERTYPE",
+    "D3DTEXTUREMAGFILTER",
+    "D3DTEXTUREMINFILTER",
+    "D3DTEXTUREMIPFILTER",
+    "D3DTEXTUREOP",
+    "D3DTEXTURESTAGESTATETYPE",
+    "D3DTEXTURETRANSFORMFLAGS",
+    "D3DTRANSFORMSTATETYPE",
+    "D3DVERTEXBLENDFLAGS",
+    "D3DVERTEXTYPE",
+    "D3DVSDE_REGISTER",
+    "D3DVSDT_TYPE",
+    "D3DVSD_TOKENTYPE",
+    "D3DVS_ADDRESSMODE_TYPE",
+    "D3DVS_RASTOUT_OFFSETS",
+    "D3DXCALLBACK_SEARCH_FLAGS",
+    "D3DXCLEANTYPE",
+    "D3DXCOMPRESSION_FLAGS",
+    "D3DXEFFECTDEFAULTTYPE",
+    "D3DXEVENT_TYPE",
+    "D3DXF_FILEFORMAT",
+    "D3DXF_FILELOADOPTIONS",
+    "D3DXF_FILESAVEOPTIONS",
+    "D3DXIMAGE_FILEFORMAT",
+    "D3DXIMT",
+    "D3DXMESHDATATYPE",
+    "D3DXPARAMETER_CLASS",
+    "D3DXPARAMETER_TYPE",
+    "D3DXPATCHMESHTYPE",
+    "D3DXPLAYBACK_TYPE",
+    "D3DXPRIORITY_TYPE",
+    "D3DXSHCOMPRESSQUALITYTYPE",
+    "D3DXSHGPUSIMOPT",
+    "D3DXTANGENT",
+    "D3DXTRANSITION_TYPE",
+    "D3DXUVATLAS",
+    "D3DZBUFFERTYPE",
+    "D3D_BLOB_PART",
+    "D3D_CBUFFER_TYPE",
+    "D3D_DRIVER_TYPE",
+    "D3D_FEATURE_LEVEL",
+    "D3D_INCLUDE_TYPE",
+    "D3D_INTERPOLATION_MODE",
+    "D3D_MIN_PRECISION",
+    "D3D_NAME",
+    "D3D_PARAMETER_FLAGS",
+    "D3D_PRIMITIVE",
+    "D3D_PRIMITIVE_TOPOLOGY",
+    "D3D_REGISTER_COMPONENT_TYPE",
+    "D3D_RESOURCE_RETURN_TYPE",
+    "D3D_ROOT_SIGNATURE_VERSION",
+    "D3D_SHADER_CBUFFER_FLAGS",
+    "D3D_SHADER_INPUT_FLAGS",
+    "D3D_SHADER_INPUT_TYPE",
+    "D3D_SHADER_MODEL",
+    "D3D_SHADER_VARIABLE_CLASS",
+    "D3D_SHADER_VARIABLE_FLAGS",
+    "D3D_SHADER_VARIABLE_TYPE",
+    "D3D_SRV_DIMENSION",
+    "D3D_TESSELLATOR_DOMAIN",
+    "D3D_TESSELLATOR_OUTPUT_PRIMITIVE",
+    "D3D_TESSELLATOR_PARTITIONING",
+    "DWORD",
+    "DXFILEFORMAT",
+    "DXFILELOADOPTIONS",
+    "DXGI_ADAPTER_FLAG",
+    "DXGI_ADAPTER_FLAG3",
+    "DXGI_ALPHA_MODE",
+    "DXGI_COLOR_SPACE_TYPE",
+    "DXGI_COMPUTE_PREEMPTION_GRANULARITY",
+    "DXGI_DEBUG_RLO_FLAGS",
+    "DXGI_FEATURE",
+    "DXGI_FORMAT",
+    "DXGI_FRAME_PRESENTATION_MODE",
+    "DXGI_GPU_PREFERENCE",
+    "DXGI_GRAPHICS_PREEMPTION_GRANULARITY",
+    "DXGI_HARDWARE_COMPOSITION_SUPPORT_FLAGS",
+    "DXGI_HDR_METADATA_TYPE",
+    "DXGI_MEMORY_SEGMENT_GROUP",
+    "DXGI_MODE_ROTATION",
+    "DXGI_MODE_SCALING",
+    "DXGI_MODE_SCANLINE_ORDER",
+    "DXGI_MULTIPLANE_OVERLAY_YCbCr_FLAGS",
+    "DXGI_OFFER_RESOURCE_FLAGS",
+    "DXGI_OFFER_RESOURCE_PRIORITY",
+    "DXGI_OUTDUPL_FLAG",
+    "DXGI_OUTDUPL_POINTER_SHAPE_TYPE",
+    "DXGI_OVERLAY_COLOR_SPACE_SUPPORT_FLAG",
+    "DXGI_OVERLAY_SUPPORT_FLAG",
+    "DXGI_RECLAIM_RESOURCE_RESULTS",
+    "DXGI_RESIDENCY",
+    "DXGI_SCALING",
+    "DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG",
+    "DXGI_SWAP_CHAIN_FLAG",
+    "DXGI_SWAP_EFFECT",
+    "DXGI_USAGE",
+    "DXLISTHANDLE",
+    "DXVA2_NominalRange",
+    "DXVA2_SampleFormat",
+    "DXVA2_SurfaceType",
+    "DXVA2_VideoChromaSubSampling",
+    "DXVA2_VideoLighting",
+    "DXVA2_VideoPrimaries",
+    "DXVA2_VideoTransferFunction",
+    "DXVA2_VideoTransferMatrix",
+    "DXVAHD_ALPHA_FILL_MODE",
+    "DXVAHD_BLT_STATE",
+    "DXVAHD_DEVICE_CAPS",
+    "DXVAHD_DEVICE_TYPE",
+    "DXVAHD_DEVICE_USAGE",
+    "DXVAHD_FEATURE_CAPS",
+    "DXVAHD_FILTER",
+    "DXVAHD_FILTER_CAPS",
+    "DXVAHD_FRAME_FORMAT",
+    "DXVAHD_INPUT_FORMAT_CAPS",
+    "DXVAHD_ITELECINE_CAPS",
+    "DXVAHD_OUTPUT_RATE",
+    "DXVAHD_PROCESSOR_CAPS",
+    "DXVAHD_STREAM_STATE",
+    "DXVAHD_SURFACE_TYPE",
+    "DXVA_NominalRange",
+    "DXVA_VideoChromaSubsampling",
+    "DXVA_VideoLighting",
+    "DXVA_VideoPrimaries",
+    "DXVA_VideoTransferFunction",
+    "DXVA_VideoTransferMatrix",
+    "IDirect3DDevice9",
+    "IDirect3DSurface9",
+    "INT",
+    "INT16",
+    "INT32",
+    "INT64",
+    "INT8",
+    "LONG",
+    "LONG64",
+    "SIZE_T",
+    "SSIZE_T",
+    "UINT",
+    "UINT16",
+    "UINT32",
+    "UINT64",
+    "UINT8",
+    "ULONG",
+    "ULONG64",
+    "WINBOOL",
+    "WORD",
+    "_D3D10_DEVICE_STATE_TYPES",
+    "_D3DANTIALIASMODE",
+    "_D3DBACKBUFFER_TYPE",
+    "_D3DBASISTYPE",
+    "_D3DBLEND",
+    "_D3DBLENDOP",
+    "_D3DCMPFUNC",
+    "_D3DCOMPOSERECTSOP",
+    "_D3DCUBEMAP_FACES",
+    "_D3DCULL",
+    "_D3DDEBUGMONITORTOKENS",
+    "_D3DDECLMETHOD",
+    "_D3DDECLTYPE",
+    "_D3DDECLUSAGE",
+    "_D3DDEGREETYPE",
+    "_D3DDEVTYPE",
+    "_D3DFILLMODE",
+    "_D3DFOGMODE",
+    "_D3DFORMAT",
+    "_D3DHAL_DP2OPERATION",
+    "_D3DLIGHTTYPE",
+    "_D3DMATERIALCOLORSOURCE",
+    "_D3DMULTISAMPLE_TYPE",
+    "_D3DOPCODE",
+    "_D3DORDERTYPE",
+    "_D3DPATCHEDGESTYLE",
+    "_D3DPOOL",
+    "_D3DPRIMITIVETYPE",
+    "_D3DQUERYTYPE",
+    "_D3DRENDERSTATETYPE",
+    "_D3DRESOURCETYPE",
+    "_D3DRMCOLORSOURCE",
+    "_D3DRMCOMBINETYPE",
+    "_D3DRMFILLMODE",
+    "_D3DRMFOGMODE",
+    "_D3DRMFRAMECONSTRAINT",
+    "_D3DRMLIGHTMODE",
+    "_D3DRMLIGHTTYPE",
+    "_D3DRMMATERIALMODE",
+    "_D3DRMPALETTEFLAGS",
+    "_D3DRMPROJECTIONTYPE",
+    "_D3DRMSHADEMODE",
+    "_D3DRMSORTMODE",
+    "_D3DRMTEXTUREQUALITY",
+    "_D3DRMUSERVISUALREASON",
+    "_D3DRMWRAPTYPE",
+    "_D3DRMXOFFORMAT",
+    "_D3DRMZBUFFERMODE",
+    "_D3DSAMPLERSTATETYPE",
+    "_D3DSAMPLER_TEXTURE_TYPE",
+    "_D3DSHADEMODE",
+    "_D3DSHADER_ADDRESSMODE_TYPE",
+    "_D3DSHADER_COMPARISON",
+    "_D3DSHADER_INSTRUCTION_OPCODE_TYPE",
+    "_D3DSHADER_MISCTYPE_OFFSETS",
+    "_D3DSHADER_PARAM_DSTMOD_TYPE",
+    "_D3DSHADER_PARAM_REGISTER_TYPE",
+    "_D3DSHADER_PARAM_SRCMOD_TYPE",
+    "_D3DSTATEBLOCKTYPE",
+    "_D3DSTENCILOP",
+    "_D3DSWAPEFFECT",
+    "_D3DTEXTUREADDRESS",
+    "_D3DTEXTUREFILTERTYPE",
+    "_D3DTEXTUREMAGFILTER",
+    "_D3DTEXTUREMINFILTER",
+    "_D3DTEXTUREMIPFILTER",
+    "_D3DTEXTUREOP",
+    "_D3DTEXTURESTAGESTATETYPE",
+    "_D3DTEXTURETRANSFORMFLAGS",
+    "_D3DTRANSFORMSTATETYPE",
+    "_D3DVERTEXBLENDFLAGS",
+    "_D3DVSDE_REGISTER",
+    "_D3DVSDT_TYPE",
+    "_D3DVSD_TOKENTYPE",
+    "_D3DVS_ADDRESSMODE_TYPE",
+    "_D3DVS_RASTOUT_OFFSETS",
+    "_D3DXCALLBACK_SEARCH_FLAGS",
+    "_D3DXCOMPRESSION_FLAGS",
+    "_D3DXEFFECTDEFAULTTYPE",
+    "_D3DXERR",
+    "_D3DXEVENT_TYPE",
+    "_D3DXIMAGE_FILEFORMAT",
+    "_D3DXIMT",
+    "_D3DXINCLUDE_TYPE",
+    "_D3DXMESH",
+    "_D3DXMESHDATATYPE",
+    "_D3DXMESHOPT",
+    "_D3DXMESHSIMP",
+    "_D3DXPATCHMESH",
+    "_D3DXPATCHMESHTYPE",
+    "_D3DXPLAYBACK_TYPE",
+    "_D3DXPRIORITY_TYPE",
+    "_D3DXREGISTER_SET",
+    "_D3DXSHCOMPRESSQUALITYTYPE",
+    "_D3DXSHGPUSIMOPT",
+    "_D3DXTANGENT",
+    "_D3DXTRANSITION_TYPE",
+    "_D3DXUVATLAS",
+    "_D3DXWELDEPSILONSFLAGS",
+    "_D3DZBUFFERTYPE",
+    "_D3D_INCLUDE_TYPE",
+    "_D3D_INTERPOLATION_MODE",
+    "_D3D_PARAMETER_FLAGS",
+    "_D3D_SHADER_CBUFFER_FLAGS",
+    "_D3D_SHADER_INPUT_FLAGS",
+    "_D3D_SHADER_INPUT_TYPE",
+    "_D3D_SHADER_VARIABLE_CLASS",
+    "_D3D_SHADER_VARIABLE_FLAGS",
+    "_D3D_SHADER_VARIABLE_TYPE",
+    "_DXGI_OFFER_RESOURCE_FLAGS",
+    "_DXGI_OFFER_RESOURCE_PRIORITY",
+    "_DXGI_RECLAIM_RESOURCE_RESULTS",
+    "_DXVA2_NominalRange",
+    "_DXVA2_SampleFormat",
+    "_DXVA2_VideoChromaSubSampling",
+    "_DXVA2_VideoLighting",
+    "_DXVA2_VideoPrimaries",
+    "_DXVA2_VideoTransferFunction",
+    "_DXVA2_VideoTransferMatrix",
+    "_DXVAHD_ALPHA_FILL_MODE",
+    "_DXVAHD_BLT_STATE",
+    "_DXVAHD_DEVICE_CAPS",
+    "_DXVAHD_DEVICE_TYPE",
+    "_DXVAHD_DEVICE_USAGE",
+    "_DXVAHD_FEATURE_CAPS",
+    "_DXVAHD_FILTER",
+    "_DXVAHD_FILTER_CAPS",
+    "_DXVAHD_FRAME_FORMAT",
+    "_DXVAHD_INPUT_FORMAT_CAPS",
+    "_DXVAHD_ITELECINE_CAPS",
+    "_DXVAHD_OUTPUT_RATE",
+    "_DXVAHD_PROCESSOR_CAPS",
+    "_DXVAHD_STREAM_STATE",
+    "_DXVAHD_SURFACE_TYPE",
+    "_DXVA_NominalRange",
+    "_DXVA_VideoChromaSubsampling",
+    "_DXVA_VideoLighting",
+    "_DXVA_VideoPrimaries",
+    "_DXVA_VideoTransferFunction",
+    "_DXVA_VideoTransferMatrix",
+    "_MAX_FVF_DECL_SIZE",
+    "__WIDL_dxva2api_generated_name_0000000C",
+    "char",
+    "int",
+    "long",
+    "short",
+    "unsigned"
+  ],
+  "interfaces": {
+    "IUnknown": {
+      "uuid": "00000000-0000-0000-c000-000000000046",
+      "base": null,
+      "header": "(builtin)",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        }
+      ]
+    },
+    "IDirect3D9": {
+      "uuid": "81bdcbca-64d4-426d-ae8d-ad0147f4275c",
+      "base": "IUnknown",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3D9",
+          "name": "RegisterSoftwareDevice",
+          "ret": "HRESULT",
+          "params": [
+            "void* pInitializeFunction"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3D9",
+          "name": "GetAdapterCount",
+          "ret": "UINT",
+          "params": []
+        },
+        {
+          "slot": 5,
+          "owner": "IDirect3D9",
+          "name": "GetAdapterIdentifier",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Adapter",
+            "DWORD Flags",
+            "D3DADAPTER_IDENTIFIER9* pIdentifier"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirect3D9",
+          "name": "GetAdapterModeCount",
+          "ret": "UINT",
+          "params": [
+            "UINT Adapter",
+            "D3DFORMAT Format"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirect3D9",
+          "name": "EnumAdapterModes",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Adapter",
+            "D3DFORMAT Format",
+            "UINT Mode",
+            "D3DDISPLAYMODE* pMode"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirect3D9",
+          "name": "GetAdapterDisplayMode",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Adapter",
+            "D3DDISPLAYMODE* pMode"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirect3D9",
+          "name": "CheckDeviceType",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iAdapter",
+            "D3DDEVTYPE DevType",
+            "D3DFORMAT DisplayFormat",
+            "D3DFORMAT BackBufferFormat",
+            "WINBOOL bWindowed"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirect3D9",
+          "name": "CheckDeviceFormat",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Adapter",
+            "D3DDEVTYPE DeviceType",
+            "D3DFORMAT AdapterFormat",
+            "DWORD Usage",
+            "D3DRESOURCETYPE RType",
+            "D3DFORMAT CheckFormat"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirect3D9",
+          "name": "CheckDeviceMultiSampleType",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Adapter",
+            "D3DDEVTYPE DeviceType",
+            "D3DFORMAT SurfaceFormat",
+            "WINBOOL Windowed",
+            "D3DMULTISAMPLE_TYPE MultiSampleType",
+            "DWORD* pQualityLevels"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirect3D9",
+          "name": "CheckDepthStencilMatch",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Adapter",
+            "D3DDEVTYPE DeviceType",
+            "D3DFORMAT AdapterFormat",
+            "D3DFORMAT RenderTargetFormat",
+            "D3DFORMAT DepthStencilFormat"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IDirect3D9",
+          "name": "CheckDeviceFormatConversion",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Adapter",
+            "D3DDEVTYPE DeviceType",
+            "D3DFORMAT SourceFormat",
+            "D3DFORMAT TargetFormat"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IDirect3D9",
+          "name": "GetDeviceCaps",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Adapter",
+            "D3DDEVTYPE DeviceType",
+            "D3DCAPS9* pCaps"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirect3D9",
+          "name": "GetAdapterMonitor",
+          "ret": "HMONITOR",
+          "params": [
+            "UINT Adapter"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IDirect3D9",
+          "name": "CreateDevice",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Adapter",
+            "D3DDEVTYPE DeviceType",
+            "HWND hFocusWindow",
+            "DWORD BehaviorFlags",
+            "D3DPRESENT_PARAMETERS* pPresentationParameters",
+            "IDirect3DDevice9** ppReturnedDeviceInterface"
+          ]
+        }
+      ]
+    },
+    "IDirect3DVolume9": {
+      "uuid": "24f416e6-1f67-4aa7-b88e-d33f6f3128a1",
+      "base": "IUnknown",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3DVolume9",
+          "name": "GetDevice",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DDevice9** ppDevice"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3DVolume9",
+          "name": "SetPrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID guid",
+            "const void *data",
+            "DWORD data_size",
+            "DWORD flags"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirect3DVolume9",
+          "name": "GetPrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID refguid",
+            "void* pData",
+            "DWORD* pSizeOfData"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirect3DVolume9",
+          "name": "FreePrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID refguid"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirect3DVolume9",
+          "name": "GetContainer",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void** ppContainer"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirect3DVolume9",
+          "name": "GetDesc",
+          "ret": "HRESULT",
+          "params": [
+            "D3DVOLUME_DESC* pDesc"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirect3DVolume9",
+          "name": "LockBox",
+          "ret": "HRESULT",
+          "params": [
+            "D3DLOCKED_BOX *locked_box",
+            "const D3DBOX *box",
+            "DWORD flags"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirect3DVolume9",
+          "name": "UnlockBox",
+          "ret": "HRESULT",
+          "params": []
+        }
+      ]
+    },
+    "IDirect3DSwapChain9": {
+      "uuid": "794950f2-adfc-458a-905e-10a10b0b503b",
+      "base": "IUnknown",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3DSwapChain9",
+          "name": "Present",
+          "ret": "HRESULT",
+          "params": [
+            "const RECT *src_rect",
+            "const RECT *dst_rect",
+            "HWND dst_window_override",
+            "const RGNDATA *dirty_region",
+            "DWORD flags"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3DSwapChain9",
+          "name": "GetFrontBufferData",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DSurface9 *pDestSurface"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirect3DSwapChain9",
+          "name": "GetBackBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iBackBuffer",
+            "D3DBACKBUFFER_TYPE Type",
+            "IDirect3DSurface9 **ppBackBuffer"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirect3DSwapChain9",
+          "name": "GetRasterStatus",
+          "ret": "HRESULT",
+          "params": [
+            "D3DRASTER_STATUS *pRasterStatus"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirect3DSwapChain9",
+          "name": "GetDisplayMode",
+          "ret": "HRESULT",
+          "params": [
+            "D3DDISPLAYMODE *pMode"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirect3DSwapChain9",
+          "name": "GetDevice",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DDevice9 **ppDevice"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirect3DSwapChain9",
+          "name": "GetPresentParameters",
+          "ret": "HRESULT",
+          "params": [
+            "D3DPRESENT_PARAMETERS *pPresentationParameters"
+          ]
+        }
+      ]
+    },
+    "IDirect3DResource9": {
+      "uuid": "05eec05d-8f7d-4362-b999-d1baf357c704",
+      "base": "IUnknown",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3DResource9",
+          "name": "GetDevice",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DDevice9** ppDevice"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3DResource9",
+          "name": "SetPrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID guid",
+            "const void *data",
+            "DWORD data_size",
+            "DWORD flags"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirect3DResource9",
+          "name": "GetPrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID refguid",
+            "void* pData",
+            "DWORD* pSizeOfData"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirect3DResource9",
+          "name": "FreePrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID refguid"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirect3DResource9",
+          "name": "SetPriority",
+          "ret": "DWORD",
+          "params": [
+            "DWORD PriorityNew"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirect3DResource9",
+          "name": "GetPriority",
+          "ret": "DWORD",
+          "params": []
+        },
+        {
+          "slot": 9,
+          "owner": "IDirect3DResource9",
+          "name": "PreLoad",
+          "ret": "void",
+          "params": []
+        },
+        {
+          "slot": 10,
+          "owner": "IDirect3DResource9",
+          "name": "GetType",
+          "ret": "D3DRESOURCETYPE",
+          "params": []
+        }
+      ]
+    },
+    "IDirect3DSurface9": {
+      "uuid": "0cfbaf3a-9ff6-429a-99b3-a2796af8b89b",
+      "base": "IDirect3DResource9",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3DResource9",
+          "name": "GetDevice",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DDevice9** ppDevice"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3DResource9",
+          "name": "SetPrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID guid",
+            "const void *data",
+            "DWORD data_size",
+            "DWORD flags"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirect3DResource9",
+          "name": "GetPrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID refguid",
+            "void* pData",
+            "DWORD* pSizeOfData"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirect3DResource9",
+          "name": "FreePrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID refguid"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirect3DResource9",
+          "name": "SetPriority",
+          "ret": "DWORD",
+          "params": [
+            "DWORD PriorityNew"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirect3DResource9",
+          "name": "GetPriority",
+          "ret": "DWORD",
+          "params": []
+        },
+        {
+          "slot": 9,
+          "owner": "IDirect3DResource9",
+          "name": "PreLoad",
+          "ret": "void",
+          "params": []
+        },
+        {
+          "slot": 10,
+          "owner": "IDirect3DResource9",
+          "name": "GetType",
+          "ret": "D3DRESOURCETYPE",
+          "params": []
+        },
+        {
+          "slot": 11,
+          "owner": "IDirect3DSurface9",
+          "name": "GetContainer",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void** ppContainer"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirect3DSurface9",
+          "name": "GetDesc",
+          "ret": "HRESULT",
+          "params": [
+            "D3DSURFACE_DESC* pDesc"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IDirect3DSurface9",
+          "name": "LockRect",
+          "ret": "HRESULT",
+          "params": [
+            "D3DLOCKED_RECT *locked_rect",
+            "const RECT *rect",
+            "DWORD flags"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IDirect3DSurface9",
+          "name": "UnlockRect",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 15,
+          "owner": "IDirect3DSurface9",
+          "name": "GetDC",
+          "ret": "HRESULT",
+          "params": [
+            "HDC* phdc"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IDirect3DSurface9",
+          "name": "ReleaseDC",
+          "ret": "HRESULT",
+          "params": [
+            "HDC hdc"
+          ]
+        }
+      ]
+    },
+    "IDirect3DVertexBuffer9": {
+      "uuid": "b64bb1b5-fd70-4df6-bf91-19d0a12455e3",
+      "base": "IDirect3DResource9",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3DResource9",
+          "name": "GetDevice",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DDevice9** ppDevice"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3DResource9",
+          "name": "SetPrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID guid",
+            "const void *data",
+            "DWORD data_size",
+            "DWORD flags"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirect3DResource9",
+          "name": "GetPrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID refguid",
+            "void* pData",
+            "DWORD* pSizeOfData"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirect3DResource9",
+          "name": "FreePrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID refguid"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirect3DResource9",
+          "name": "SetPriority",
+          "ret": "DWORD",
+          "params": [
+            "DWORD PriorityNew"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirect3DResource9",
+          "name": "GetPriority",
+          "ret": "DWORD",
+          "params": []
+        },
+        {
+          "slot": 9,
+          "owner": "IDirect3DResource9",
+          "name": "PreLoad",
+          "ret": "void",
+          "params": []
+        },
+        {
+          "slot": 10,
+          "owner": "IDirect3DResource9",
+          "name": "GetType",
+          "ret": "D3DRESOURCETYPE",
+          "params": []
+        },
+        {
+          "slot": 11,
+          "owner": "IDirect3DVertexBuffer9",
+          "name": "Lock",
+          "ret": "HRESULT",
+          "params": [
+            "UINT OffsetToLock",
+            "UINT SizeToLock",
+            "void** ppbData",
+            "DWORD Flags"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirect3DVertexBuffer9",
+          "name": "Unlock",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 13,
+          "owner": "IDirect3DVertexBuffer9",
+          "name": "GetDesc",
+          "ret": "HRESULT",
+          "params": [
+            "D3DVERTEXBUFFER_DESC* pDesc"
+          ]
+        }
+      ]
+    },
+    "IDirect3DIndexBuffer9": {
+      "uuid": "7c9dd65e-d3f7-4529-acee-785830acde35",
+      "base": "IDirect3DResource9",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3DResource9",
+          "name": "GetDevice",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DDevice9** ppDevice"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3DResource9",
+          "name": "SetPrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID guid",
+            "const void *data",
+            "DWORD data_size",
+            "DWORD flags"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirect3DResource9",
+          "name": "GetPrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID refguid",
+            "void* pData",
+            "DWORD* pSizeOfData"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirect3DResource9",
+          "name": "FreePrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID refguid"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirect3DResource9",
+          "name": "SetPriority",
+          "ret": "DWORD",
+          "params": [
+            "DWORD PriorityNew"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirect3DResource9",
+          "name": "GetPriority",
+          "ret": "DWORD",
+          "params": []
+        },
+        {
+          "slot": 9,
+          "owner": "IDirect3DResource9",
+          "name": "PreLoad",
+          "ret": "void",
+          "params": []
+        },
+        {
+          "slot": 10,
+          "owner": "IDirect3DResource9",
+          "name": "GetType",
+          "ret": "D3DRESOURCETYPE",
+          "params": []
+        },
+        {
+          "slot": 11,
+          "owner": "IDirect3DIndexBuffer9",
+          "name": "Lock",
+          "ret": "HRESULT",
+          "params": [
+            "UINT OffsetToLock",
+            "UINT SizeToLock",
+            "void** ppbData",
+            "DWORD Flags"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirect3DIndexBuffer9",
+          "name": "Unlock",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 13,
+          "owner": "IDirect3DIndexBuffer9",
+          "name": "GetDesc",
+          "ret": "HRESULT",
+          "params": [
+            "D3DINDEXBUFFER_DESC* pDesc"
+          ]
+        }
+      ]
+    },
+    "IDirect3DBaseTexture9": {
+      "uuid": "580ca87e-1d3c-4d54-991d-b7d3e3c298ce",
+      "base": "IDirect3DResource9",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3DResource9",
+          "name": "GetDevice",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DDevice9** ppDevice"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3DResource9",
+          "name": "SetPrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID guid",
+            "const void *data",
+            "DWORD data_size",
+            "DWORD flags"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirect3DResource9",
+          "name": "GetPrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID refguid",
+            "void* pData",
+            "DWORD* pSizeOfData"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirect3DResource9",
+          "name": "FreePrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID refguid"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirect3DResource9",
+          "name": "SetPriority",
+          "ret": "DWORD",
+          "params": [
+            "DWORD PriorityNew"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirect3DResource9",
+          "name": "GetPriority",
+          "ret": "DWORD",
+          "params": []
+        },
+        {
+          "slot": 9,
+          "owner": "IDirect3DResource9",
+          "name": "PreLoad",
+          "ret": "void",
+          "params": []
+        },
+        {
+          "slot": 10,
+          "owner": "IDirect3DResource9",
+          "name": "GetType",
+          "ret": "D3DRESOURCETYPE",
+          "params": []
+        },
+        {
+          "slot": 11,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "SetLOD",
+          "ret": "DWORD",
+          "params": [
+            "DWORD LODNew"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "GetLOD",
+          "ret": "DWORD",
+          "params": []
+        },
+        {
+          "slot": 13,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "GetLevelCount",
+          "ret": "DWORD",
+          "params": []
+        },
+        {
+          "slot": 14,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "SetAutoGenFilterType",
+          "ret": "HRESULT",
+          "params": [
+            "D3DTEXTUREFILTERTYPE FilterType"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "GetAutoGenFilterType",
+          "ret": "D3DTEXTUREFILTERTYPE",
+          "params": []
+        },
+        {
+          "slot": 16,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "GenerateMipSubLevels",
+          "ret": "void",
+          "params": []
+        }
+      ]
+    },
+    "IDirect3DCubeTexture9": {
+      "uuid": "fff32f81-d953-473a-9223-93d652aba93f",
+      "base": "IDirect3DBaseTexture9",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3DResource9",
+          "name": "GetDevice",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DDevice9** ppDevice"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3DResource9",
+          "name": "SetPrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID guid",
+            "const void *data",
+            "DWORD data_size",
+            "DWORD flags"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirect3DResource9",
+          "name": "GetPrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID refguid",
+            "void* pData",
+            "DWORD* pSizeOfData"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirect3DResource9",
+          "name": "FreePrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID refguid"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirect3DResource9",
+          "name": "SetPriority",
+          "ret": "DWORD",
+          "params": [
+            "DWORD PriorityNew"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirect3DResource9",
+          "name": "GetPriority",
+          "ret": "DWORD",
+          "params": []
+        },
+        {
+          "slot": 9,
+          "owner": "IDirect3DResource9",
+          "name": "PreLoad",
+          "ret": "void",
+          "params": []
+        },
+        {
+          "slot": 10,
+          "owner": "IDirect3DResource9",
+          "name": "GetType",
+          "ret": "D3DRESOURCETYPE",
+          "params": []
+        },
+        {
+          "slot": 11,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "SetLOD",
+          "ret": "DWORD",
+          "params": [
+            "DWORD LODNew"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "GetLOD",
+          "ret": "DWORD",
+          "params": []
+        },
+        {
+          "slot": 13,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "GetLevelCount",
+          "ret": "DWORD",
+          "params": []
+        },
+        {
+          "slot": 14,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "SetAutoGenFilterType",
+          "ret": "HRESULT",
+          "params": [
+            "D3DTEXTUREFILTERTYPE FilterType"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "GetAutoGenFilterType",
+          "ret": "D3DTEXTUREFILTERTYPE",
+          "params": []
+        },
+        {
+          "slot": 16,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "GenerateMipSubLevels",
+          "ret": "void",
+          "params": []
+        },
+        {
+          "slot": 17,
+          "owner": "IDirect3DCubeTexture9",
+          "name": "GetLevelDesc",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Level",
+            "D3DSURFACE_DESC* pDesc"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IDirect3DCubeTexture9",
+          "name": "GetCubeMapSurface",
+          "ret": "HRESULT",
+          "params": [
+            "D3DCUBEMAP_FACES FaceType",
+            "UINT Level",
+            "IDirect3DSurface9** ppCubeMapSurface"
+          ]
+        },
+        {
+          "slot": 19,
+          "owner": "IDirect3DCubeTexture9",
+          "name": "LockRect",
+          "ret": "HRESULT",
+          "params": [
+            "D3DCUBEMAP_FACES face",
+            "UINT level",
+            "D3DLOCKED_RECT *locked_rect",
+            "const RECT *rect",
+            "DWORD flags"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "IDirect3DCubeTexture9",
+          "name": "UnlockRect",
+          "ret": "HRESULT",
+          "params": [
+            "D3DCUBEMAP_FACES FaceType",
+            "UINT Level"
+          ]
+        },
+        {
+          "slot": 21,
+          "owner": "IDirect3DCubeTexture9",
+          "name": "AddDirtyRect",
+          "ret": "HRESULT",
+          "params": [
+            "D3DCUBEMAP_FACES face",
+            "const RECT *dirty_rect"
+          ]
+        }
+      ]
+    },
+    "IDirect3DTexture9": {
+      "uuid": "85c31227-3de5-4f00-9b3a-f11ac38c18b5",
+      "base": "IDirect3DBaseTexture9",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3DResource9",
+          "name": "GetDevice",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DDevice9** ppDevice"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3DResource9",
+          "name": "SetPrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID guid",
+            "const void *data",
+            "DWORD data_size",
+            "DWORD flags"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirect3DResource9",
+          "name": "GetPrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID refguid",
+            "void* pData",
+            "DWORD* pSizeOfData"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirect3DResource9",
+          "name": "FreePrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID refguid"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirect3DResource9",
+          "name": "SetPriority",
+          "ret": "DWORD",
+          "params": [
+            "DWORD PriorityNew"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirect3DResource9",
+          "name": "GetPriority",
+          "ret": "DWORD",
+          "params": []
+        },
+        {
+          "slot": 9,
+          "owner": "IDirect3DResource9",
+          "name": "PreLoad",
+          "ret": "void",
+          "params": []
+        },
+        {
+          "slot": 10,
+          "owner": "IDirect3DResource9",
+          "name": "GetType",
+          "ret": "D3DRESOURCETYPE",
+          "params": []
+        },
+        {
+          "slot": 11,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "SetLOD",
+          "ret": "DWORD",
+          "params": [
+            "DWORD LODNew"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "GetLOD",
+          "ret": "DWORD",
+          "params": []
+        },
+        {
+          "slot": 13,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "GetLevelCount",
+          "ret": "DWORD",
+          "params": []
+        },
+        {
+          "slot": 14,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "SetAutoGenFilterType",
+          "ret": "HRESULT",
+          "params": [
+            "D3DTEXTUREFILTERTYPE FilterType"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "GetAutoGenFilterType",
+          "ret": "D3DTEXTUREFILTERTYPE",
+          "params": []
+        },
+        {
+          "slot": 16,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "GenerateMipSubLevels",
+          "ret": "void",
+          "params": []
+        },
+        {
+          "slot": 17,
+          "owner": "IDirect3DTexture9",
+          "name": "GetLevelDesc",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Level",
+            "D3DSURFACE_DESC* pDesc"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IDirect3DTexture9",
+          "name": "GetSurfaceLevel",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Level",
+            "IDirect3DSurface9** ppSurfaceLevel"
+          ]
+        },
+        {
+          "slot": 19,
+          "owner": "IDirect3DTexture9",
+          "name": "LockRect",
+          "ret": "HRESULT",
+          "params": [
+            "UINT level",
+            "D3DLOCKED_RECT *locked_rect",
+            "const RECT *rect",
+            "DWORD flags"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "IDirect3DTexture9",
+          "name": "UnlockRect",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Level"
+          ]
+        },
+        {
+          "slot": 21,
+          "owner": "IDirect3DTexture9",
+          "name": "AddDirtyRect",
+          "ret": "HRESULT",
+          "params": [
+            "const RECT *dirty_rect"
+          ]
+        }
+      ]
+    },
+    "IDirect3DVolumeTexture9": {
+      "uuid": "2518526c-e789-4111-a7b9-47ef328d13e6",
+      "base": "IDirect3DBaseTexture9",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3DResource9",
+          "name": "GetDevice",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DDevice9** ppDevice"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3DResource9",
+          "name": "SetPrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID guid",
+            "const void *data",
+            "DWORD data_size",
+            "DWORD flags"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirect3DResource9",
+          "name": "GetPrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID refguid",
+            "void* pData",
+            "DWORD* pSizeOfData"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirect3DResource9",
+          "name": "FreePrivateData",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID refguid"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirect3DResource9",
+          "name": "SetPriority",
+          "ret": "DWORD",
+          "params": [
+            "DWORD PriorityNew"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirect3DResource9",
+          "name": "GetPriority",
+          "ret": "DWORD",
+          "params": []
+        },
+        {
+          "slot": 9,
+          "owner": "IDirect3DResource9",
+          "name": "PreLoad",
+          "ret": "void",
+          "params": []
+        },
+        {
+          "slot": 10,
+          "owner": "IDirect3DResource9",
+          "name": "GetType",
+          "ret": "D3DRESOURCETYPE",
+          "params": []
+        },
+        {
+          "slot": 11,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "SetLOD",
+          "ret": "DWORD",
+          "params": [
+            "DWORD LODNew"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "GetLOD",
+          "ret": "DWORD",
+          "params": []
+        },
+        {
+          "slot": 13,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "GetLevelCount",
+          "ret": "DWORD",
+          "params": []
+        },
+        {
+          "slot": 14,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "SetAutoGenFilterType",
+          "ret": "HRESULT",
+          "params": [
+            "D3DTEXTUREFILTERTYPE FilterType"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "GetAutoGenFilterType",
+          "ret": "D3DTEXTUREFILTERTYPE",
+          "params": []
+        },
+        {
+          "slot": 16,
+          "owner": "IDirect3DBaseTexture9",
+          "name": "GenerateMipSubLevels",
+          "ret": "void",
+          "params": []
+        },
+        {
+          "slot": 17,
+          "owner": "IDirect3DVolumeTexture9",
+          "name": "GetLevelDesc",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Level",
+            "D3DVOLUME_DESC *pDesc"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IDirect3DVolumeTexture9",
+          "name": "GetVolumeLevel",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Level",
+            "IDirect3DVolume9** ppVolumeLevel"
+          ]
+        },
+        {
+          "slot": 19,
+          "owner": "IDirect3DVolumeTexture9",
+          "name": "LockBox",
+          "ret": "HRESULT",
+          "params": [
+            "UINT level",
+            "D3DLOCKED_BOX *locked_box",
+            "const D3DBOX *box",
+            "DWORD flags"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "IDirect3DVolumeTexture9",
+          "name": "UnlockBox",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Level"
+          ]
+        },
+        {
+          "slot": 21,
+          "owner": "IDirect3DVolumeTexture9",
+          "name": "AddDirtyBox",
+          "ret": "HRESULT",
+          "params": [
+            "const D3DBOX *dirty_box"
+          ]
+        }
+      ]
+    },
+    "IDirect3DVertexDeclaration9": {
+      "uuid": "dd13c59c-36fa-4098-a8fb-c7ed39dc8546",
+      "base": "IUnknown",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3DVertexDeclaration9",
+          "name": "GetDevice",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DDevice9** ppDevice"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3DVertexDeclaration9",
+          "name": "GetDeclaration",
+          "ret": "HRESULT",
+          "params": [
+            "D3DVERTEXELEMENT9*",
+            "UINT* pNumElements"
+          ]
+        }
+      ]
+    },
+    "IDirect3DVertexShader9": {
+      "uuid": "efc5557e-6265-4613-8a94-43857889eb36",
+      "base": "IUnknown",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3DVertexShader9",
+          "name": "GetDevice",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DDevice9** ppDevice"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3DVertexShader9",
+          "name": "GetFunction",
+          "ret": "HRESULT",
+          "params": [
+            "void*",
+            "UINT* pSizeOfData"
+          ]
+        }
+      ]
+    },
+    "IDirect3DPixelShader9": {
+      "uuid": "6d3bdbdc-5b02-4415-b852-ce5e8bccb289",
+      "base": "IUnknown",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3DPixelShader9",
+          "name": "GetDevice",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DDevice9** ppDevice"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3DPixelShader9",
+          "name": "GetFunction",
+          "ret": "HRESULT",
+          "params": [
+            "void*",
+            "UINT* pSizeOfData"
+          ]
+        }
+      ]
+    },
+    "IDirect3DStateBlock9": {
+      "uuid": "b07c4fe5-310d-4ba8-a23c-4f0f206f218b",
+      "base": "IUnknown",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3DStateBlock9",
+          "name": "GetDevice",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DDevice9** ppDevice"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3DStateBlock9",
+          "name": "Capture",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 5,
+          "owner": "IDirect3DStateBlock9",
+          "name": "Apply",
+          "ret": "HRESULT",
+          "params": []
+        }
+      ]
+    },
+    "IDirect3DQuery9": {
+      "uuid": "d9771460-a695-4f26-bbd3-27b840b541cc",
+      "base": "IUnknown",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3DQuery9",
+          "name": "GetDevice",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DDevice9** ppDevice"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3DQuery9",
+          "name": "GetType",
+          "ret": "D3DQUERYTYPE",
+          "params": []
+        },
+        {
+          "slot": 5,
+          "owner": "IDirect3DQuery9",
+          "name": "GetDataSize",
+          "ret": "DWORD",
+          "params": []
+        },
+        {
+          "slot": 6,
+          "owner": "IDirect3DQuery9",
+          "name": "Issue",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwIssueFlags"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirect3DQuery9",
+          "name": "GetData",
+          "ret": "HRESULT",
+          "params": [
+            "void* pData",
+            "DWORD dwSize",
+            "DWORD dwGetDataFlags"
+          ]
+        }
+      ]
+    },
+    "IDirect3DDevice9": {
+      "uuid": "d0223b96-bf7a-43fd-92bd-a43b0d82b9eb",
+      "base": "IUnknown",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3DDevice9",
+          "name": "TestCooperativeLevel",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3DDevice9",
+          "name": "GetAvailableTextureMem",
+          "ret": "UINT",
+          "params": []
+        },
+        {
+          "slot": 5,
+          "owner": "IDirect3DDevice9",
+          "name": "EvictManagedResources",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 6,
+          "owner": "IDirect3DDevice9",
+          "name": "GetDirect3D",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3D9** ppD3D9"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirect3DDevice9",
+          "name": "GetDeviceCaps",
+          "ret": "HRESULT",
+          "params": [
+            "D3DCAPS9* pCaps"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirect3DDevice9",
+          "name": "GetDisplayMode",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iSwapChain",
+            "D3DDISPLAYMODE* pMode"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirect3DDevice9",
+          "name": "GetCreationParameters",
+          "ret": "HRESULT",
+          "params": [
+            "D3DDEVICE_CREATION_PARAMETERS *pParameters"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirect3DDevice9",
+          "name": "SetCursorProperties",
+          "ret": "HRESULT",
+          "params": [
+            "UINT XHotSpot",
+            "UINT YHotSpot",
+            "IDirect3DSurface9* pCursorBitmap"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirect3DDevice9",
+          "name": "SetCursorPosition",
+          "ret": "void",
+          "params": [
+            "int X",
+            "int Y",
+            "DWORD Flags"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirect3DDevice9",
+          "name": "ShowCursor",
+          "ret": "WINBOOL",
+          "params": [
+            "WINBOOL bShow"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateAdditionalSwapChain",
+          "ret": "HRESULT",
+          "params": [
+            "D3DPRESENT_PARAMETERS* pPresentationParameters",
+            "IDirect3DSwapChain9** pSwapChain"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IDirect3DDevice9",
+          "name": "GetSwapChain",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iSwapChain",
+            "IDirect3DSwapChain9** pSwapChain"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirect3DDevice9",
+          "name": "GetNumberOfSwapChains",
+          "ret": "UINT",
+          "params": []
+        },
+        {
+          "slot": 16,
+          "owner": "IDirect3DDevice9",
+          "name": "Reset",
+          "ret": "HRESULT",
+          "params": [
+            "D3DPRESENT_PARAMETERS* pPresentationParameters"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IDirect3DDevice9",
+          "name": "Present",
+          "ret": "HRESULT",
+          "params": [
+            "const RECT *src_rect",
+            "const RECT *dst_rect",
+            "HWND dst_window_override",
+            "const RGNDATA *dirty_region"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IDirect3DDevice9",
+          "name": "GetBackBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iSwapChain",
+            "UINT iBackBuffer",
+            "D3DBACKBUFFER_TYPE Type",
+            "IDirect3DSurface9** ppBackBuffer"
+          ]
+        },
+        {
+          "slot": 19,
+          "owner": "IDirect3DDevice9",
+          "name": "GetRasterStatus",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iSwapChain",
+            "D3DRASTER_STATUS* pRasterStatus"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "IDirect3DDevice9",
+          "name": "SetDialogBoxMode",
+          "ret": "HRESULT",
+          "params": [
+            "WINBOOL bEnableDialogs"
+          ]
+        },
+        {
+          "slot": 21,
+          "owner": "IDirect3DDevice9",
+          "name": "SetGammaRamp",
+          "ret": "void",
+          "params": [
+            "UINT swapchain_idx",
+            "DWORD flags",
+            "const D3DGAMMARAMP *ramp"
+          ]
+        },
+        {
+          "slot": 22,
+          "owner": "IDirect3DDevice9",
+          "name": "GetGammaRamp",
+          "ret": "void",
+          "params": [
+            "UINT iSwapChain",
+            "D3DGAMMARAMP* pRamp"
+          ]
+        },
+        {
+          "slot": 23,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateTexture",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Width",
+            "UINT Height",
+            "UINT Levels",
+            "DWORD Usage",
+            "D3DFORMAT Format",
+            "D3DPOOL Pool",
+            "IDirect3DTexture9** ppTexture",
+            "HANDLE* pSharedHandle"
+          ]
+        },
+        {
+          "slot": 24,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateVolumeTexture",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Width",
+            "UINT Height",
+            "UINT Depth",
+            "UINT Levels",
+            "DWORD Usage",
+            "D3DFORMAT Format",
+            "D3DPOOL Pool",
+            "IDirect3DVolumeTexture9** ppVolumeTexture",
+            "HANDLE* pSharedHandle"
+          ]
+        },
+        {
+          "slot": 25,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateCubeTexture",
+          "ret": "HRESULT",
+          "params": [
+            "UINT EdgeLength",
+            "UINT Levels",
+            "DWORD Usage",
+            "D3DFORMAT Format",
+            "D3DPOOL Pool",
+            "IDirect3DCubeTexture9** ppCubeTexture",
+            "HANDLE* pSharedHandle"
+          ]
+        },
+        {
+          "slot": 26,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateVertexBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Length",
+            "DWORD Usage",
+            "DWORD FVF",
+            "D3DPOOL Pool",
+            "IDirect3DVertexBuffer9** ppVertexBuffer",
+            "HANDLE* pSharedHandle"
+          ]
+        },
+        {
+          "slot": 27,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateIndexBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Length",
+            "DWORD Usage",
+            "D3DFORMAT Format",
+            "D3DPOOL Pool",
+            "IDirect3DIndexBuffer9** ppIndexBuffer",
+            "HANDLE* pSharedHandle"
+          ]
+        },
+        {
+          "slot": 28,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateRenderTarget",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Width",
+            "UINT Height",
+            "D3DFORMAT Format",
+            "D3DMULTISAMPLE_TYPE MultiSample",
+            "DWORD MultisampleQuality",
+            "WINBOOL Lockable",
+            "IDirect3DSurface9** ppSurface",
+            "HANDLE* pSharedHandle"
+          ]
+        },
+        {
+          "slot": 29,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateDepthStencilSurface",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Width",
+            "UINT Height",
+            "D3DFORMAT Format",
+            "D3DMULTISAMPLE_TYPE MultiSample",
+            "DWORD MultisampleQuality",
+            "WINBOOL Discard",
+            "IDirect3DSurface9** ppSurface",
+            "HANDLE* pSharedHandle"
+          ]
+        },
+        {
+          "slot": 30,
+          "owner": "IDirect3DDevice9",
+          "name": "UpdateSurface",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DSurface9 *src_surface",
+            "const RECT *src_rect",
+            "IDirect3DSurface9 *dst_surface",
+            "const POINT *dst_point"
+          ]
+        },
+        {
+          "slot": 31,
+          "owner": "IDirect3DDevice9",
+          "name": "UpdateTexture",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DBaseTexture9* pSourceTexture",
+            "IDirect3DBaseTexture9* pDestinationTexture"
+          ]
+        },
+        {
+          "slot": 32,
+          "owner": "IDirect3DDevice9",
+          "name": "GetRenderTargetData",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DSurface9* pRenderTarget",
+            "IDirect3DSurface9* pDestSurface"
+          ]
+        },
+        {
+          "slot": 33,
+          "owner": "IDirect3DDevice9",
+          "name": "GetFrontBufferData",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iSwapChain",
+            "IDirect3DSurface9* pDestSurface"
+          ]
+        },
+        {
+          "slot": 34,
+          "owner": "IDirect3DDevice9",
+          "name": "StretchRect",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DSurface9 *src_surface",
+            "const RECT *src_rect",
+            "IDirect3DSurface9 *dst_surface",
+            "const RECT *dst_rect",
+            "D3DTEXTUREFILTERTYPE filter"
+          ]
+        },
+        {
+          "slot": 35,
+          "owner": "IDirect3DDevice9",
+          "name": "ColorFill",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DSurface9 *surface",
+            "const RECT *rect",
+            "D3DCOLOR color"
+          ]
+        },
+        {
+          "slot": 36,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateOffscreenPlainSurface",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Width",
+            "UINT Height",
+            "D3DFORMAT Format",
+            "D3DPOOL Pool",
+            "IDirect3DSurface9** ppSurface",
+            "HANDLE* pSharedHandle"
+          ]
+        },
+        {
+          "slot": 37,
+          "owner": "IDirect3DDevice9",
+          "name": "SetRenderTarget",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD RenderTargetIndex",
+            "IDirect3DSurface9* pRenderTarget"
+          ]
+        },
+        {
+          "slot": 38,
+          "owner": "IDirect3DDevice9",
+          "name": "GetRenderTarget",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD RenderTargetIndex",
+            "IDirect3DSurface9** ppRenderTarget"
+          ]
+        },
+        {
+          "slot": 39,
+          "owner": "IDirect3DDevice9",
+          "name": "SetDepthStencilSurface",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DSurface9* pNewZStencil"
+          ]
+        },
+        {
+          "slot": 40,
+          "owner": "IDirect3DDevice9",
+          "name": "GetDepthStencilSurface",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DSurface9** ppZStencilSurface"
+          ]
+        },
+        {
+          "slot": 41,
+          "owner": "IDirect3DDevice9",
+          "name": "BeginScene",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 42,
+          "owner": "IDirect3DDevice9",
+          "name": "EndScene",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 43,
+          "owner": "IDirect3DDevice9",
+          "name": "Clear",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD rect_count",
+            "const D3DRECT *rects",
+            "DWORD flags",
+            "D3DCOLOR color",
+            "float z",
+            "DWORD stencil"
+          ]
+        },
+        {
+          "slot": 44,
+          "owner": "IDirect3DDevice9",
+          "name": "SetTransform",
+          "ret": "HRESULT",
+          "params": [
+            "D3DTRANSFORMSTATETYPE state",
+            "const D3DMATRIX *matrix"
+          ]
+        },
+        {
+          "slot": 45,
+          "owner": "IDirect3DDevice9",
+          "name": "GetTransform",
+          "ret": "HRESULT",
+          "params": [
+            "D3DTRANSFORMSTATETYPE State",
+            "D3DMATRIX* pMatrix"
+          ]
+        },
+        {
+          "slot": 46,
+          "owner": "IDirect3DDevice9",
+          "name": "MultiplyTransform",
+          "ret": "HRESULT",
+          "params": [
+            "D3DTRANSFORMSTATETYPE state",
+            "const D3DMATRIX *matrix"
+          ]
+        },
+        {
+          "slot": 47,
+          "owner": "IDirect3DDevice9",
+          "name": "SetViewport",
+          "ret": "HRESULT",
+          "params": [
+            "const D3DVIEWPORT9 *viewport"
+          ]
+        },
+        {
+          "slot": 48,
+          "owner": "IDirect3DDevice9",
+          "name": "GetViewport",
+          "ret": "HRESULT",
+          "params": [
+            "D3DVIEWPORT9* pViewport"
+          ]
+        },
+        {
+          "slot": 49,
+          "owner": "IDirect3DDevice9",
+          "name": "SetMaterial",
+          "ret": "HRESULT",
+          "params": [
+            "const D3DMATERIAL9 *material"
+          ]
+        },
+        {
+          "slot": 50,
+          "owner": "IDirect3DDevice9",
+          "name": "GetMaterial",
+          "ret": "HRESULT",
+          "params": [
+            "D3DMATERIAL9* pMaterial"
+          ]
+        },
+        {
+          "slot": 51,
+          "owner": "IDirect3DDevice9",
+          "name": "SetLight",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD index",
+            "const D3DLIGHT9 *light"
+          ]
+        },
+        {
+          "slot": 52,
+          "owner": "IDirect3DDevice9",
+          "name": "GetLight",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Index",
+            "D3DLIGHT9*"
+          ]
+        },
+        {
+          "slot": 53,
+          "owner": "IDirect3DDevice9",
+          "name": "LightEnable",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Index",
+            "WINBOOL Enable"
+          ]
+        },
+        {
+          "slot": 54,
+          "owner": "IDirect3DDevice9",
+          "name": "GetLightEnable",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Index",
+            "WINBOOL* pEnable"
+          ]
+        },
+        {
+          "slot": 55,
+          "owner": "IDirect3DDevice9",
+          "name": "SetClipPlane",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD index",
+            "const float *plane"
+          ]
+        },
+        {
+          "slot": 56,
+          "owner": "IDirect3DDevice9",
+          "name": "GetClipPlane",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Index",
+            "float* pPlane"
+          ]
+        },
+        {
+          "slot": 57,
+          "owner": "IDirect3DDevice9",
+          "name": "SetRenderState",
+          "ret": "HRESULT",
+          "params": [
+            "D3DRENDERSTATETYPE State",
+            "DWORD Value"
+          ]
+        },
+        {
+          "slot": 58,
+          "owner": "IDirect3DDevice9",
+          "name": "GetRenderState",
+          "ret": "HRESULT",
+          "params": [
+            "D3DRENDERSTATETYPE State",
+            "DWORD* pValue"
+          ]
+        },
+        {
+          "slot": 59,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateStateBlock",
+          "ret": "HRESULT",
+          "params": [
+            "D3DSTATEBLOCKTYPE Type",
+            "IDirect3DStateBlock9** ppSB"
+          ]
+        },
+        {
+          "slot": 60,
+          "owner": "IDirect3DDevice9",
+          "name": "BeginStateBlock",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 61,
+          "owner": "IDirect3DDevice9",
+          "name": "EndStateBlock",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DStateBlock9** ppSB"
+          ]
+        },
+        {
+          "slot": 62,
+          "owner": "IDirect3DDevice9",
+          "name": "SetClipStatus",
+          "ret": "HRESULT",
+          "params": [
+            "const D3DCLIPSTATUS9 *clip_status"
+          ]
+        },
+        {
+          "slot": 63,
+          "owner": "IDirect3DDevice9",
+          "name": "GetClipStatus",
+          "ret": "HRESULT",
+          "params": [
+            "D3DCLIPSTATUS9* pClipStatus"
+          ]
+        },
+        {
+          "slot": 64,
+          "owner": "IDirect3DDevice9",
+          "name": "GetTexture",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Stage",
+            "IDirect3DBaseTexture9** ppTexture"
+          ]
+        },
+        {
+          "slot": 65,
+          "owner": "IDirect3DDevice9",
+          "name": "SetTexture",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Stage",
+            "IDirect3DBaseTexture9* pTexture"
+          ]
+        },
+        {
+          "slot": 66,
+          "owner": "IDirect3DDevice9",
+          "name": "GetTextureStageState",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Stage",
+            "D3DTEXTURESTAGESTATETYPE Type",
+            "DWORD* pValue"
+          ]
+        },
+        {
+          "slot": 67,
+          "owner": "IDirect3DDevice9",
+          "name": "SetTextureStageState",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Stage",
+            "D3DTEXTURESTAGESTATETYPE Type",
+            "DWORD Value"
+          ]
+        },
+        {
+          "slot": 68,
+          "owner": "IDirect3DDevice9",
+          "name": "GetSamplerState",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Sampler",
+            "D3DSAMPLERSTATETYPE Type",
+            "DWORD* pValue"
+          ]
+        },
+        {
+          "slot": 69,
+          "owner": "IDirect3DDevice9",
+          "name": "SetSamplerState",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Sampler",
+            "D3DSAMPLERSTATETYPE Type",
+            "DWORD Value"
+          ]
+        },
+        {
+          "slot": 70,
+          "owner": "IDirect3DDevice9",
+          "name": "ValidateDevice",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD* pNumPasses"
+          ]
+        },
+        {
+          "slot": 71,
+          "owner": "IDirect3DDevice9",
+          "name": "SetPaletteEntries",
+          "ret": "HRESULT",
+          "params": [
+            "UINT palette_idx",
+            "const PALETTEENTRY *entries"
+          ]
+        },
+        {
+          "slot": 72,
+          "owner": "IDirect3DDevice9",
+          "name": "GetPaletteEntries",
+          "ret": "HRESULT",
+          "params": [
+            "UINT PaletteNumber",
+            "PALETTEENTRY* pEntries"
+          ]
+        },
+        {
+          "slot": 73,
+          "owner": "IDirect3DDevice9",
+          "name": "SetCurrentTexturePalette",
+          "ret": "HRESULT",
+          "params": [
+            "UINT PaletteNumber"
+          ]
+        },
+        {
+          "slot": 74,
+          "owner": "IDirect3DDevice9",
+          "name": "GetCurrentTexturePalette",
+          "ret": "HRESULT",
+          "params": [
+            "UINT *PaletteNumber"
+          ]
+        },
+        {
+          "slot": 75,
+          "owner": "IDirect3DDevice9",
+          "name": "SetScissorRect",
+          "ret": "HRESULT",
+          "params": [
+            "const RECT *rect"
+          ]
+        },
+        {
+          "slot": 76,
+          "owner": "IDirect3DDevice9",
+          "name": "GetScissorRect",
+          "ret": "HRESULT",
+          "params": [
+            "RECT* pRect"
+          ]
+        },
+        {
+          "slot": 77,
+          "owner": "IDirect3DDevice9",
+          "name": "SetSoftwareVertexProcessing",
+          "ret": "HRESULT",
+          "params": [
+            "WINBOOL bSoftware"
+          ]
+        },
+        {
+          "slot": 78,
+          "owner": "IDirect3DDevice9",
+          "name": "GetSoftwareVertexProcessing",
+          "ret": "WINBOOL",
+          "params": []
+        },
+        {
+          "slot": 79,
+          "owner": "IDirect3DDevice9",
+          "name": "SetNPatchMode",
+          "ret": "HRESULT",
+          "params": [
+            "float nSegments"
+          ]
+        },
+        {
+          "slot": 80,
+          "owner": "IDirect3DDevice9",
+          "name": "GetNPatchMode",
+          "ret": "float",
+          "params": []
+        },
+        {
+          "slot": 81,
+          "owner": "IDirect3DDevice9",
+          "name": "DrawPrimitive",
+          "ret": "HRESULT",
+          "params": [
+            "D3DPRIMITIVETYPE PrimitiveType",
+            "UINT StartVertex",
+            "UINT PrimitiveCount"
+          ]
+        },
+        {
+          "slot": 82,
+          "owner": "IDirect3DDevice9",
+          "name": "DrawIndexedPrimitive",
+          "ret": "HRESULT",
+          "params": [
+            "D3DPRIMITIVETYPE",
+            "INT BaseVertexIndex",
+            "UINT MinVertexIndex",
+            "UINT NumVertices",
+            "UINT startIndex",
+            "UINT primCount"
+          ]
+        },
+        {
+          "slot": 83,
+          "owner": "IDirect3DDevice9",
+          "name": "DrawPrimitiveUP",
+          "ret": "HRESULT",
+          "params": [
+            "D3DPRIMITIVETYPE primitive_type",
+            "UINT primitive_count",
+            "const void *data",
+            "UINT stride"
+          ]
+        },
+        {
+          "slot": 84,
+          "owner": "IDirect3DDevice9",
+          "name": "DrawIndexedPrimitiveUP",
+          "ret": "HRESULT",
+          "params": [
+            "D3DPRIMITIVETYPE primitive_type",
+            "UINT min_vertex_idx",
+            "UINT vertex_count",
+            "UINT primitive_count",
+            "const void *index_data",
+            "D3DFORMAT index_format",
+            "const void *data",
+            "UINT stride"
+          ]
+        },
+        {
+          "slot": 85,
+          "owner": "IDirect3DDevice9",
+          "name": "ProcessVertices",
+          "ret": "HRESULT",
+          "params": [
+            "UINT SrcStartIndex",
+            "UINT DestIndex",
+            "UINT VertexCount",
+            "IDirect3DVertexBuffer9* pDestBuffer",
+            "IDirect3DVertexDeclaration9* pVertexDecl",
+            "DWORD Flags"
+          ]
+        },
+        {
+          "slot": 86,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateVertexDeclaration",
+          "ret": "HRESULT",
+          "params": [
+            "const D3DVERTEXELEMENT9 *elements",
+            "IDirect3DVertexDeclaration9 **declaration"
+          ]
+        },
+        {
+          "slot": 87,
+          "owner": "IDirect3DDevice9",
+          "name": "SetVertexDeclaration",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DVertexDeclaration9* pDecl"
+          ]
+        },
+        {
+          "slot": 88,
+          "owner": "IDirect3DDevice9",
+          "name": "GetVertexDeclaration",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DVertexDeclaration9** ppDecl"
+          ]
+        },
+        {
+          "slot": 89,
+          "owner": "IDirect3DDevice9",
+          "name": "SetFVF",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD FVF"
+          ]
+        },
+        {
+          "slot": 90,
+          "owner": "IDirect3DDevice9",
+          "name": "GetFVF",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD* pFVF"
+          ]
+        },
+        {
+          "slot": 91,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateVertexShader",
+          "ret": "HRESULT",
+          "params": [
+            "const DWORD *byte_code",
+            "IDirect3DVertexShader9 **shader"
+          ]
+        },
+        {
+          "slot": 92,
+          "owner": "IDirect3DDevice9",
+          "name": "SetVertexShader",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DVertexShader9* pShader"
+          ]
+        },
+        {
+          "slot": 93,
+          "owner": "IDirect3DDevice9",
+          "name": "GetVertexShader",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DVertexShader9** ppShader"
+          ]
+        },
+        {
+          "slot": 94,
+          "owner": "IDirect3DDevice9",
+          "name": "SetVertexShaderConstantF",
+          "ret": "HRESULT",
+          "params": [
+            "UINT reg_idx",
+            "const float *data",
+            "UINT count"
+          ]
+        },
+        {
+          "slot": 95,
+          "owner": "IDirect3DDevice9",
+          "name": "GetVertexShaderConstantF",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StartRegister",
+            "float* pConstantData",
+            "UINT Vector4fCount"
+          ]
+        },
+        {
+          "slot": 96,
+          "owner": "IDirect3DDevice9",
+          "name": "SetVertexShaderConstantI",
+          "ret": "HRESULT",
+          "params": [
+            "UINT reg_idx",
+            "const int *data",
+            "UINT count"
+          ]
+        },
+        {
+          "slot": 97,
+          "owner": "IDirect3DDevice9",
+          "name": "GetVertexShaderConstantI",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StartRegister",
+            "int* pConstantData",
+            "UINT Vector4iCount"
+          ]
+        },
+        {
+          "slot": 98,
+          "owner": "IDirect3DDevice9",
+          "name": "SetVertexShaderConstantB",
+          "ret": "HRESULT",
+          "params": [
+            "UINT reg_idx",
+            "const WINBOOL *data",
+            "UINT count"
+          ]
+        },
+        {
+          "slot": 99,
+          "owner": "IDirect3DDevice9",
+          "name": "GetVertexShaderConstantB",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StartRegister",
+            "WINBOOL* pConstantData",
+            "UINT BoolCount"
+          ]
+        },
+        {
+          "slot": 100,
+          "owner": "IDirect3DDevice9",
+          "name": "SetStreamSource",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StreamNumber",
+            "IDirect3DVertexBuffer9* pStreamData",
+            "UINT OffsetInBytes",
+            "UINT Stride"
+          ]
+        },
+        {
+          "slot": 101,
+          "owner": "IDirect3DDevice9",
+          "name": "GetStreamSource",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StreamNumber",
+            "IDirect3DVertexBuffer9** ppStreamData",
+            "UINT* OffsetInBytes",
+            "UINT* pStride"
+          ]
+        },
+        {
+          "slot": 102,
+          "owner": "IDirect3DDevice9",
+          "name": "SetStreamSourceFreq",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StreamNumber",
+            "UINT Divider"
+          ]
+        },
+        {
+          "slot": 103,
+          "owner": "IDirect3DDevice9",
+          "name": "GetStreamSourceFreq",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StreamNumber",
+            "UINT* Divider"
+          ]
+        },
+        {
+          "slot": 104,
+          "owner": "IDirect3DDevice9",
+          "name": "SetIndices",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DIndexBuffer9* pIndexData"
+          ]
+        },
+        {
+          "slot": 105,
+          "owner": "IDirect3DDevice9",
+          "name": "GetIndices",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DIndexBuffer9** ppIndexData"
+          ]
+        },
+        {
+          "slot": 106,
+          "owner": "IDirect3DDevice9",
+          "name": "CreatePixelShader",
+          "ret": "HRESULT",
+          "params": [
+            "const DWORD *byte_code",
+            "IDirect3DPixelShader9 **shader"
+          ]
+        },
+        {
+          "slot": 107,
+          "owner": "IDirect3DDevice9",
+          "name": "SetPixelShader",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DPixelShader9* pShader"
+          ]
+        },
+        {
+          "slot": 108,
+          "owner": "IDirect3DDevice9",
+          "name": "GetPixelShader",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DPixelShader9** ppShader"
+          ]
+        },
+        {
+          "slot": 109,
+          "owner": "IDirect3DDevice9",
+          "name": "SetPixelShaderConstantF",
+          "ret": "HRESULT",
+          "params": [
+            "UINT reg_idx",
+            "const float *data",
+            "UINT count"
+          ]
+        },
+        {
+          "slot": 110,
+          "owner": "IDirect3DDevice9",
+          "name": "GetPixelShaderConstantF",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StartRegister",
+            "float* pConstantData",
+            "UINT Vector4fCount"
+          ]
+        },
+        {
+          "slot": 111,
+          "owner": "IDirect3DDevice9",
+          "name": "SetPixelShaderConstantI",
+          "ret": "HRESULT",
+          "params": [
+            "UINT reg_idx",
+            "const int *data",
+            "UINT count"
+          ]
+        },
+        {
+          "slot": 112,
+          "owner": "IDirect3DDevice9",
+          "name": "GetPixelShaderConstantI",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StartRegister",
+            "int* pConstantData",
+            "UINT Vector4iCount"
+          ]
+        },
+        {
+          "slot": 113,
+          "owner": "IDirect3DDevice9",
+          "name": "SetPixelShaderConstantB",
+          "ret": "HRESULT",
+          "params": [
+            "UINT reg_idx",
+            "const WINBOOL *data",
+            "UINT count"
+          ]
+        },
+        {
+          "slot": 114,
+          "owner": "IDirect3DDevice9",
+          "name": "GetPixelShaderConstantB",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StartRegister",
+            "WINBOOL* pConstantData",
+            "UINT BoolCount"
+          ]
+        },
+        {
+          "slot": 115,
+          "owner": "IDirect3DDevice9",
+          "name": "DrawRectPatch",
+          "ret": "HRESULT",
+          "params": [
+            "UINT handle",
+            "const float *segment_count",
+            "const D3DRECTPATCH_INFO *patch_info"
+          ]
+        },
+        {
+          "slot": 116,
+          "owner": "IDirect3DDevice9",
+          "name": "DrawTriPatch",
+          "ret": "HRESULT",
+          "params": [
+            "UINT handle",
+            "const float *segment_count",
+            "const D3DTRIPATCH_INFO *patch_info"
+          ]
+        },
+        {
+          "slot": 117,
+          "owner": "IDirect3DDevice9",
+          "name": "DeletePatch",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Handle"
+          ]
+        },
+        {
+          "slot": 118,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateQuery",
+          "ret": "HRESULT",
+          "params": [
+            "D3DQUERYTYPE Type",
+            "IDirect3DQuery9** ppQuery"
+          ]
+        }
+      ]
+    },
+    "IDirect3D9Ex": {
+      "uuid": "02177241-69fc-400c-8ff1-93a44df6861d",
+      "base": "IDirect3D9",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3D9",
+          "name": "RegisterSoftwareDevice",
+          "ret": "HRESULT",
+          "params": [
+            "void* pInitializeFunction"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3D9",
+          "name": "GetAdapterCount",
+          "ret": "UINT",
+          "params": []
+        },
+        {
+          "slot": 5,
+          "owner": "IDirect3D9",
+          "name": "GetAdapterIdentifier",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Adapter",
+            "DWORD Flags",
+            "D3DADAPTER_IDENTIFIER9* pIdentifier"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirect3D9",
+          "name": "GetAdapterModeCount",
+          "ret": "UINT",
+          "params": [
+            "UINT Adapter",
+            "D3DFORMAT Format"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirect3D9",
+          "name": "EnumAdapterModes",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Adapter",
+            "D3DFORMAT Format",
+            "UINT Mode",
+            "D3DDISPLAYMODE* pMode"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirect3D9",
+          "name": "GetAdapterDisplayMode",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Adapter",
+            "D3DDISPLAYMODE* pMode"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirect3D9",
+          "name": "CheckDeviceType",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iAdapter",
+            "D3DDEVTYPE DevType",
+            "D3DFORMAT DisplayFormat",
+            "D3DFORMAT BackBufferFormat",
+            "WINBOOL bWindowed"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirect3D9",
+          "name": "CheckDeviceFormat",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Adapter",
+            "D3DDEVTYPE DeviceType",
+            "D3DFORMAT AdapterFormat",
+            "DWORD Usage",
+            "D3DRESOURCETYPE RType",
+            "D3DFORMAT CheckFormat"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirect3D9",
+          "name": "CheckDeviceMultiSampleType",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Adapter",
+            "D3DDEVTYPE DeviceType",
+            "D3DFORMAT SurfaceFormat",
+            "WINBOOL Windowed",
+            "D3DMULTISAMPLE_TYPE MultiSampleType",
+            "DWORD* pQualityLevels"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirect3D9",
+          "name": "CheckDepthStencilMatch",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Adapter",
+            "D3DDEVTYPE DeviceType",
+            "D3DFORMAT AdapterFormat",
+            "D3DFORMAT RenderTargetFormat",
+            "D3DFORMAT DepthStencilFormat"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IDirect3D9",
+          "name": "CheckDeviceFormatConversion",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Adapter",
+            "D3DDEVTYPE DeviceType",
+            "D3DFORMAT SourceFormat",
+            "D3DFORMAT TargetFormat"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IDirect3D9",
+          "name": "GetDeviceCaps",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Adapter",
+            "D3DDEVTYPE DeviceType",
+            "D3DCAPS9* pCaps"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirect3D9",
+          "name": "GetAdapterMonitor",
+          "ret": "HMONITOR",
+          "params": [
+            "UINT Adapter"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IDirect3D9",
+          "name": "CreateDevice",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Adapter",
+            "D3DDEVTYPE DeviceType",
+            "HWND hFocusWindow",
+            "DWORD BehaviorFlags",
+            "D3DPRESENT_PARAMETERS* pPresentationParameters",
+            "IDirect3DDevice9** ppReturnedDeviceInterface"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IDirect3D9Ex",
+          "name": "GetAdapterModeCountEx",
+          "ret": "UINT",
+          "params": [
+            "UINT adapter_idx",
+            "const D3DDISPLAYMODEFILTER *filter"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IDirect3D9Ex",
+          "name": "EnumAdapterModesEx",
+          "ret": "HRESULT",
+          "params": [
+            "UINT adapter_idx",
+            "const D3DDISPLAYMODEFILTER *filter",
+            "UINT mode_idx",
+            "D3DDISPLAYMODEEX *mode"
+          ]
+        },
+        {
+          "slot": 19,
+          "owner": "IDirect3D9Ex",
+          "name": "GetAdapterDisplayModeEx",
+          "ret": "HRESULT",
+          "params": [
+            "UINT adapter_idx",
+            "D3DDISPLAYMODEEX *mode",
+            "D3DDISPLAYROTATION *rotation"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "IDirect3D9Ex",
+          "name": "CreateDeviceEx",
+          "ret": "HRESULT",
+          "params": [
+            "UINT adapter_idx",
+            "D3DDEVTYPE device_type",
+            "HWND focus_window",
+            "DWORD flags",
+            "D3DPRESENT_PARAMETERS *parameters",
+            "D3DDISPLAYMODEEX *mode",
+            "IDirect3DDevice9Ex **device"
+          ]
+        },
+        {
+          "slot": 21,
+          "owner": "IDirect3D9Ex",
+          "name": "GetAdapterLUID",
+          "ret": "HRESULT",
+          "params": [
+            "UINT adapter_idx",
+            "LUID *luid"
+          ]
+        }
+      ]
+    },
+    "IDirect3DSwapChain9Ex": {
+      "uuid": "91886caf-1c3d-4d2e-a0ab-3e4c7d8d3303",
+      "base": "IDirect3DSwapChain9",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3DSwapChain9",
+          "name": "Present",
+          "ret": "HRESULT",
+          "params": [
+            "const RECT *src_rect",
+            "const RECT *dst_rect",
+            "HWND dst_window_override",
+            "const RGNDATA *dirty_region",
+            "DWORD flags"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3DSwapChain9",
+          "name": "GetFrontBufferData",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DSurface9 *pDestSurface"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirect3DSwapChain9",
+          "name": "GetBackBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iBackBuffer",
+            "D3DBACKBUFFER_TYPE Type",
+            "IDirect3DSurface9 **ppBackBuffer"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirect3DSwapChain9",
+          "name": "GetRasterStatus",
+          "ret": "HRESULT",
+          "params": [
+            "D3DRASTER_STATUS *pRasterStatus"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirect3DSwapChain9",
+          "name": "GetDisplayMode",
+          "ret": "HRESULT",
+          "params": [
+            "D3DDISPLAYMODE *pMode"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirect3DSwapChain9",
+          "name": "GetDevice",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DDevice9 **ppDevice"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirect3DSwapChain9",
+          "name": "GetPresentParameters",
+          "ret": "HRESULT",
+          "params": [
+            "D3DPRESENT_PARAMETERS *pPresentationParameters"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirect3DSwapChain9Ex",
+          "name": "GetLastPresentCount",
+          "ret": "HRESULT",
+          "params": [
+            "UINT *last_present_count"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirect3DSwapChain9Ex",
+          "name": "GetPresentStats",
+          "ret": "HRESULT",
+          "params": [
+            "D3DPRESENTSTATS *stats"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirect3DSwapChain9Ex",
+          "name": "GetDisplayModeEx",
+          "ret": "HRESULT",
+          "params": [
+            "D3DDISPLAYMODEEX *mode",
+            "D3DDISPLAYROTATION *rotation"
+          ]
+        }
+      ]
+    },
+    "IDirect3DDevice9Ex": {
+      "uuid": "b18b10ce-2649-405a-870f-95f777d4313a",
+      "base": "IDirect3DDevice9",
+      "header": "d3d9.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirect3DDevice9",
+          "name": "TestCooperativeLevel",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 4,
+          "owner": "IDirect3DDevice9",
+          "name": "GetAvailableTextureMem",
+          "ret": "UINT",
+          "params": []
+        },
+        {
+          "slot": 5,
+          "owner": "IDirect3DDevice9",
+          "name": "EvictManagedResources",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 6,
+          "owner": "IDirect3DDevice9",
+          "name": "GetDirect3D",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3D9** ppD3D9"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirect3DDevice9",
+          "name": "GetDeviceCaps",
+          "ret": "HRESULT",
+          "params": [
+            "D3DCAPS9* pCaps"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirect3DDevice9",
+          "name": "GetDisplayMode",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iSwapChain",
+            "D3DDISPLAYMODE* pMode"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirect3DDevice9",
+          "name": "GetCreationParameters",
+          "ret": "HRESULT",
+          "params": [
+            "D3DDEVICE_CREATION_PARAMETERS *pParameters"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirect3DDevice9",
+          "name": "SetCursorProperties",
+          "ret": "HRESULT",
+          "params": [
+            "UINT XHotSpot",
+            "UINT YHotSpot",
+            "IDirect3DSurface9* pCursorBitmap"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirect3DDevice9",
+          "name": "SetCursorPosition",
+          "ret": "void",
+          "params": [
+            "int X",
+            "int Y",
+            "DWORD Flags"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirect3DDevice9",
+          "name": "ShowCursor",
+          "ret": "WINBOOL",
+          "params": [
+            "WINBOOL bShow"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateAdditionalSwapChain",
+          "ret": "HRESULT",
+          "params": [
+            "D3DPRESENT_PARAMETERS* pPresentationParameters",
+            "IDirect3DSwapChain9** pSwapChain"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IDirect3DDevice9",
+          "name": "GetSwapChain",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iSwapChain",
+            "IDirect3DSwapChain9** pSwapChain"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirect3DDevice9",
+          "name": "GetNumberOfSwapChains",
+          "ret": "UINT",
+          "params": []
+        },
+        {
+          "slot": 16,
+          "owner": "IDirect3DDevice9",
+          "name": "Reset",
+          "ret": "HRESULT",
+          "params": [
+            "D3DPRESENT_PARAMETERS* pPresentationParameters"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IDirect3DDevice9",
+          "name": "Present",
+          "ret": "HRESULT",
+          "params": [
+            "const RECT *src_rect",
+            "const RECT *dst_rect",
+            "HWND dst_window_override",
+            "const RGNDATA *dirty_region"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IDirect3DDevice9",
+          "name": "GetBackBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iSwapChain",
+            "UINT iBackBuffer",
+            "D3DBACKBUFFER_TYPE Type",
+            "IDirect3DSurface9** ppBackBuffer"
+          ]
+        },
+        {
+          "slot": 19,
+          "owner": "IDirect3DDevice9",
+          "name": "GetRasterStatus",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iSwapChain",
+            "D3DRASTER_STATUS* pRasterStatus"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "IDirect3DDevice9",
+          "name": "SetDialogBoxMode",
+          "ret": "HRESULT",
+          "params": [
+            "WINBOOL bEnableDialogs"
+          ]
+        },
+        {
+          "slot": 21,
+          "owner": "IDirect3DDevice9",
+          "name": "SetGammaRamp",
+          "ret": "void",
+          "params": [
+            "UINT swapchain_idx",
+            "DWORD flags",
+            "const D3DGAMMARAMP *ramp"
+          ]
+        },
+        {
+          "slot": 22,
+          "owner": "IDirect3DDevice9",
+          "name": "GetGammaRamp",
+          "ret": "void",
+          "params": [
+            "UINT iSwapChain",
+            "D3DGAMMARAMP* pRamp"
+          ]
+        },
+        {
+          "slot": 23,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateTexture",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Width",
+            "UINT Height",
+            "UINT Levels",
+            "DWORD Usage",
+            "D3DFORMAT Format",
+            "D3DPOOL Pool",
+            "IDirect3DTexture9** ppTexture",
+            "HANDLE* pSharedHandle"
+          ]
+        },
+        {
+          "slot": 24,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateVolumeTexture",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Width",
+            "UINT Height",
+            "UINT Depth",
+            "UINT Levels",
+            "DWORD Usage",
+            "D3DFORMAT Format",
+            "D3DPOOL Pool",
+            "IDirect3DVolumeTexture9** ppVolumeTexture",
+            "HANDLE* pSharedHandle"
+          ]
+        },
+        {
+          "slot": 25,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateCubeTexture",
+          "ret": "HRESULT",
+          "params": [
+            "UINT EdgeLength",
+            "UINT Levels",
+            "DWORD Usage",
+            "D3DFORMAT Format",
+            "D3DPOOL Pool",
+            "IDirect3DCubeTexture9** ppCubeTexture",
+            "HANDLE* pSharedHandle"
+          ]
+        },
+        {
+          "slot": 26,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateVertexBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Length",
+            "DWORD Usage",
+            "DWORD FVF",
+            "D3DPOOL Pool",
+            "IDirect3DVertexBuffer9** ppVertexBuffer",
+            "HANDLE* pSharedHandle"
+          ]
+        },
+        {
+          "slot": 27,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateIndexBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Length",
+            "DWORD Usage",
+            "D3DFORMAT Format",
+            "D3DPOOL Pool",
+            "IDirect3DIndexBuffer9** ppIndexBuffer",
+            "HANDLE* pSharedHandle"
+          ]
+        },
+        {
+          "slot": 28,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateRenderTarget",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Width",
+            "UINT Height",
+            "D3DFORMAT Format",
+            "D3DMULTISAMPLE_TYPE MultiSample",
+            "DWORD MultisampleQuality",
+            "WINBOOL Lockable",
+            "IDirect3DSurface9** ppSurface",
+            "HANDLE* pSharedHandle"
+          ]
+        },
+        {
+          "slot": 29,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateDepthStencilSurface",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Width",
+            "UINT Height",
+            "D3DFORMAT Format",
+            "D3DMULTISAMPLE_TYPE MultiSample",
+            "DWORD MultisampleQuality",
+            "WINBOOL Discard",
+            "IDirect3DSurface9** ppSurface",
+            "HANDLE* pSharedHandle"
+          ]
+        },
+        {
+          "slot": 30,
+          "owner": "IDirect3DDevice9",
+          "name": "UpdateSurface",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DSurface9 *src_surface",
+            "const RECT *src_rect",
+            "IDirect3DSurface9 *dst_surface",
+            "const POINT *dst_point"
+          ]
+        },
+        {
+          "slot": 31,
+          "owner": "IDirect3DDevice9",
+          "name": "UpdateTexture",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DBaseTexture9* pSourceTexture",
+            "IDirect3DBaseTexture9* pDestinationTexture"
+          ]
+        },
+        {
+          "slot": 32,
+          "owner": "IDirect3DDevice9",
+          "name": "GetRenderTargetData",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DSurface9* pRenderTarget",
+            "IDirect3DSurface9* pDestSurface"
+          ]
+        },
+        {
+          "slot": 33,
+          "owner": "IDirect3DDevice9",
+          "name": "GetFrontBufferData",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iSwapChain",
+            "IDirect3DSurface9* pDestSurface"
+          ]
+        },
+        {
+          "slot": 34,
+          "owner": "IDirect3DDevice9",
+          "name": "StretchRect",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DSurface9 *src_surface",
+            "const RECT *src_rect",
+            "IDirect3DSurface9 *dst_surface",
+            "const RECT *dst_rect",
+            "D3DTEXTUREFILTERTYPE filter"
+          ]
+        },
+        {
+          "slot": 35,
+          "owner": "IDirect3DDevice9",
+          "name": "ColorFill",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DSurface9 *surface",
+            "const RECT *rect",
+            "D3DCOLOR color"
+          ]
+        },
+        {
+          "slot": 36,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateOffscreenPlainSurface",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Width",
+            "UINT Height",
+            "D3DFORMAT Format",
+            "D3DPOOL Pool",
+            "IDirect3DSurface9** ppSurface",
+            "HANDLE* pSharedHandle"
+          ]
+        },
+        {
+          "slot": 37,
+          "owner": "IDirect3DDevice9",
+          "name": "SetRenderTarget",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD RenderTargetIndex",
+            "IDirect3DSurface9* pRenderTarget"
+          ]
+        },
+        {
+          "slot": 38,
+          "owner": "IDirect3DDevice9",
+          "name": "GetRenderTarget",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD RenderTargetIndex",
+            "IDirect3DSurface9** ppRenderTarget"
+          ]
+        },
+        {
+          "slot": 39,
+          "owner": "IDirect3DDevice9",
+          "name": "SetDepthStencilSurface",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DSurface9* pNewZStencil"
+          ]
+        },
+        {
+          "slot": 40,
+          "owner": "IDirect3DDevice9",
+          "name": "GetDepthStencilSurface",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DSurface9** ppZStencilSurface"
+          ]
+        },
+        {
+          "slot": 41,
+          "owner": "IDirect3DDevice9",
+          "name": "BeginScene",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 42,
+          "owner": "IDirect3DDevice9",
+          "name": "EndScene",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 43,
+          "owner": "IDirect3DDevice9",
+          "name": "Clear",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD rect_count",
+            "const D3DRECT *rects",
+            "DWORD flags",
+            "D3DCOLOR color",
+            "float z",
+            "DWORD stencil"
+          ]
+        },
+        {
+          "slot": 44,
+          "owner": "IDirect3DDevice9",
+          "name": "SetTransform",
+          "ret": "HRESULT",
+          "params": [
+            "D3DTRANSFORMSTATETYPE state",
+            "const D3DMATRIX *matrix"
+          ]
+        },
+        {
+          "slot": 45,
+          "owner": "IDirect3DDevice9",
+          "name": "GetTransform",
+          "ret": "HRESULT",
+          "params": [
+            "D3DTRANSFORMSTATETYPE State",
+            "D3DMATRIX* pMatrix"
+          ]
+        },
+        {
+          "slot": 46,
+          "owner": "IDirect3DDevice9",
+          "name": "MultiplyTransform",
+          "ret": "HRESULT",
+          "params": [
+            "D3DTRANSFORMSTATETYPE state",
+            "const D3DMATRIX *matrix"
+          ]
+        },
+        {
+          "slot": 47,
+          "owner": "IDirect3DDevice9",
+          "name": "SetViewport",
+          "ret": "HRESULT",
+          "params": [
+            "const D3DVIEWPORT9 *viewport"
+          ]
+        },
+        {
+          "slot": 48,
+          "owner": "IDirect3DDevice9",
+          "name": "GetViewport",
+          "ret": "HRESULT",
+          "params": [
+            "D3DVIEWPORT9* pViewport"
+          ]
+        },
+        {
+          "slot": 49,
+          "owner": "IDirect3DDevice9",
+          "name": "SetMaterial",
+          "ret": "HRESULT",
+          "params": [
+            "const D3DMATERIAL9 *material"
+          ]
+        },
+        {
+          "slot": 50,
+          "owner": "IDirect3DDevice9",
+          "name": "GetMaterial",
+          "ret": "HRESULT",
+          "params": [
+            "D3DMATERIAL9* pMaterial"
+          ]
+        },
+        {
+          "slot": 51,
+          "owner": "IDirect3DDevice9",
+          "name": "SetLight",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD index",
+            "const D3DLIGHT9 *light"
+          ]
+        },
+        {
+          "slot": 52,
+          "owner": "IDirect3DDevice9",
+          "name": "GetLight",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Index",
+            "D3DLIGHT9*"
+          ]
+        },
+        {
+          "slot": 53,
+          "owner": "IDirect3DDevice9",
+          "name": "LightEnable",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Index",
+            "WINBOOL Enable"
+          ]
+        },
+        {
+          "slot": 54,
+          "owner": "IDirect3DDevice9",
+          "name": "GetLightEnable",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Index",
+            "WINBOOL* pEnable"
+          ]
+        },
+        {
+          "slot": 55,
+          "owner": "IDirect3DDevice9",
+          "name": "SetClipPlane",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD index",
+            "const float *plane"
+          ]
+        },
+        {
+          "slot": 56,
+          "owner": "IDirect3DDevice9",
+          "name": "GetClipPlane",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Index",
+            "float* pPlane"
+          ]
+        },
+        {
+          "slot": 57,
+          "owner": "IDirect3DDevice9",
+          "name": "SetRenderState",
+          "ret": "HRESULT",
+          "params": [
+            "D3DRENDERSTATETYPE State",
+            "DWORD Value"
+          ]
+        },
+        {
+          "slot": 58,
+          "owner": "IDirect3DDevice9",
+          "name": "GetRenderState",
+          "ret": "HRESULT",
+          "params": [
+            "D3DRENDERSTATETYPE State",
+            "DWORD* pValue"
+          ]
+        },
+        {
+          "slot": 59,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateStateBlock",
+          "ret": "HRESULT",
+          "params": [
+            "D3DSTATEBLOCKTYPE Type",
+            "IDirect3DStateBlock9** ppSB"
+          ]
+        },
+        {
+          "slot": 60,
+          "owner": "IDirect3DDevice9",
+          "name": "BeginStateBlock",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 61,
+          "owner": "IDirect3DDevice9",
+          "name": "EndStateBlock",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DStateBlock9** ppSB"
+          ]
+        },
+        {
+          "slot": 62,
+          "owner": "IDirect3DDevice9",
+          "name": "SetClipStatus",
+          "ret": "HRESULT",
+          "params": [
+            "const D3DCLIPSTATUS9 *clip_status"
+          ]
+        },
+        {
+          "slot": 63,
+          "owner": "IDirect3DDevice9",
+          "name": "GetClipStatus",
+          "ret": "HRESULT",
+          "params": [
+            "D3DCLIPSTATUS9* pClipStatus"
+          ]
+        },
+        {
+          "slot": 64,
+          "owner": "IDirect3DDevice9",
+          "name": "GetTexture",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Stage",
+            "IDirect3DBaseTexture9** ppTexture"
+          ]
+        },
+        {
+          "slot": 65,
+          "owner": "IDirect3DDevice9",
+          "name": "SetTexture",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Stage",
+            "IDirect3DBaseTexture9* pTexture"
+          ]
+        },
+        {
+          "slot": 66,
+          "owner": "IDirect3DDevice9",
+          "name": "GetTextureStageState",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Stage",
+            "D3DTEXTURESTAGESTATETYPE Type",
+            "DWORD* pValue"
+          ]
+        },
+        {
+          "slot": 67,
+          "owner": "IDirect3DDevice9",
+          "name": "SetTextureStageState",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Stage",
+            "D3DTEXTURESTAGESTATETYPE Type",
+            "DWORD Value"
+          ]
+        },
+        {
+          "slot": 68,
+          "owner": "IDirect3DDevice9",
+          "name": "GetSamplerState",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Sampler",
+            "D3DSAMPLERSTATETYPE Type",
+            "DWORD* pValue"
+          ]
+        },
+        {
+          "slot": 69,
+          "owner": "IDirect3DDevice9",
+          "name": "SetSamplerState",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD Sampler",
+            "D3DSAMPLERSTATETYPE Type",
+            "DWORD Value"
+          ]
+        },
+        {
+          "slot": 70,
+          "owner": "IDirect3DDevice9",
+          "name": "ValidateDevice",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD* pNumPasses"
+          ]
+        },
+        {
+          "slot": 71,
+          "owner": "IDirect3DDevice9",
+          "name": "SetPaletteEntries",
+          "ret": "HRESULT",
+          "params": [
+            "UINT palette_idx",
+            "const PALETTEENTRY *entries"
+          ]
+        },
+        {
+          "slot": 72,
+          "owner": "IDirect3DDevice9",
+          "name": "GetPaletteEntries",
+          "ret": "HRESULT",
+          "params": [
+            "UINT PaletteNumber",
+            "PALETTEENTRY* pEntries"
+          ]
+        },
+        {
+          "slot": 73,
+          "owner": "IDirect3DDevice9",
+          "name": "SetCurrentTexturePalette",
+          "ret": "HRESULT",
+          "params": [
+            "UINT PaletteNumber"
+          ]
+        },
+        {
+          "slot": 74,
+          "owner": "IDirect3DDevice9",
+          "name": "GetCurrentTexturePalette",
+          "ret": "HRESULT",
+          "params": [
+            "UINT *PaletteNumber"
+          ]
+        },
+        {
+          "slot": 75,
+          "owner": "IDirect3DDevice9",
+          "name": "SetScissorRect",
+          "ret": "HRESULT",
+          "params": [
+            "const RECT *rect"
+          ]
+        },
+        {
+          "slot": 76,
+          "owner": "IDirect3DDevice9",
+          "name": "GetScissorRect",
+          "ret": "HRESULT",
+          "params": [
+            "RECT* pRect"
+          ]
+        },
+        {
+          "slot": 77,
+          "owner": "IDirect3DDevice9",
+          "name": "SetSoftwareVertexProcessing",
+          "ret": "HRESULT",
+          "params": [
+            "WINBOOL bSoftware"
+          ]
+        },
+        {
+          "slot": 78,
+          "owner": "IDirect3DDevice9",
+          "name": "GetSoftwareVertexProcessing",
+          "ret": "WINBOOL",
+          "params": []
+        },
+        {
+          "slot": 79,
+          "owner": "IDirect3DDevice9",
+          "name": "SetNPatchMode",
+          "ret": "HRESULT",
+          "params": [
+            "float nSegments"
+          ]
+        },
+        {
+          "slot": 80,
+          "owner": "IDirect3DDevice9",
+          "name": "GetNPatchMode",
+          "ret": "float",
+          "params": []
+        },
+        {
+          "slot": 81,
+          "owner": "IDirect3DDevice9",
+          "name": "DrawPrimitive",
+          "ret": "HRESULT",
+          "params": [
+            "D3DPRIMITIVETYPE PrimitiveType",
+            "UINT StartVertex",
+            "UINT PrimitiveCount"
+          ]
+        },
+        {
+          "slot": 82,
+          "owner": "IDirect3DDevice9",
+          "name": "DrawIndexedPrimitive",
+          "ret": "HRESULT",
+          "params": [
+            "D3DPRIMITIVETYPE",
+            "INT BaseVertexIndex",
+            "UINT MinVertexIndex",
+            "UINT NumVertices",
+            "UINT startIndex",
+            "UINT primCount"
+          ]
+        },
+        {
+          "slot": 83,
+          "owner": "IDirect3DDevice9",
+          "name": "DrawPrimitiveUP",
+          "ret": "HRESULT",
+          "params": [
+            "D3DPRIMITIVETYPE primitive_type",
+            "UINT primitive_count",
+            "const void *data",
+            "UINT stride"
+          ]
+        },
+        {
+          "slot": 84,
+          "owner": "IDirect3DDevice9",
+          "name": "DrawIndexedPrimitiveUP",
+          "ret": "HRESULT",
+          "params": [
+            "D3DPRIMITIVETYPE primitive_type",
+            "UINT min_vertex_idx",
+            "UINT vertex_count",
+            "UINT primitive_count",
+            "const void *index_data",
+            "D3DFORMAT index_format",
+            "const void *data",
+            "UINT stride"
+          ]
+        },
+        {
+          "slot": 85,
+          "owner": "IDirect3DDevice9",
+          "name": "ProcessVertices",
+          "ret": "HRESULT",
+          "params": [
+            "UINT SrcStartIndex",
+            "UINT DestIndex",
+            "UINT VertexCount",
+            "IDirect3DVertexBuffer9* pDestBuffer",
+            "IDirect3DVertexDeclaration9* pVertexDecl",
+            "DWORD Flags"
+          ]
+        },
+        {
+          "slot": 86,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateVertexDeclaration",
+          "ret": "HRESULT",
+          "params": [
+            "const D3DVERTEXELEMENT9 *elements",
+            "IDirect3DVertexDeclaration9 **declaration"
+          ]
+        },
+        {
+          "slot": 87,
+          "owner": "IDirect3DDevice9",
+          "name": "SetVertexDeclaration",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DVertexDeclaration9* pDecl"
+          ]
+        },
+        {
+          "slot": 88,
+          "owner": "IDirect3DDevice9",
+          "name": "GetVertexDeclaration",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DVertexDeclaration9** ppDecl"
+          ]
+        },
+        {
+          "slot": 89,
+          "owner": "IDirect3DDevice9",
+          "name": "SetFVF",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD FVF"
+          ]
+        },
+        {
+          "slot": 90,
+          "owner": "IDirect3DDevice9",
+          "name": "GetFVF",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD* pFVF"
+          ]
+        },
+        {
+          "slot": 91,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateVertexShader",
+          "ret": "HRESULT",
+          "params": [
+            "const DWORD *byte_code",
+            "IDirect3DVertexShader9 **shader"
+          ]
+        },
+        {
+          "slot": 92,
+          "owner": "IDirect3DDevice9",
+          "name": "SetVertexShader",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DVertexShader9* pShader"
+          ]
+        },
+        {
+          "slot": 93,
+          "owner": "IDirect3DDevice9",
+          "name": "GetVertexShader",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DVertexShader9** ppShader"
+          ]
+        },
+        {
+          "slot": 94,
+          "owner": "IDirect3DDevice9",
+          "name": "SetVertexShaderConstantF",
+          "ret": "HRESULT",
+          "params": [
+            "UINT reg_idx",
+            "const float *data",
+            "UINT count"
+          ]
+        },
+        {
+          "slot": 95,
+          "owner": "IDirect3DDevice9",
+          "name": "GetVertexShaderConstantF",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StartRegister",
+            "float* pConstantData",
+            "UINT Vector4fCount"
+          ]
+        },
+        {
+          "slot": 96,
+          "owner": "IDirect3DDevice9",
+          "name": "SetVertexShaderConstantI",
+          "ret": "HRESULT",
+          "params": [
+            "UINT reg_idx",
+            "const int *data",
+            "UINT count"
+          ]
+        },
+        {
+          "slot": 97,
+          "owner": "IDirect3DDevice9",
+          "name": "GetVertexShaderConstantI",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StartRegister",
+            "int* pConstantData",
+            "UINT Vector4iCount"
+          ]
+        },
+        {
+          "slot": 98,
+          "owner": "IDirect3DDevice9",
+          "name": "SetVertexShaderConstantB",
+          "ret": "HRESULT",
+          "params": [
+            "UINT reg_idx",
+            "const WINBOOL *data",
+            "UINT count"
+          ]
+        },
+        {
+          "slot": 99,
+          "owner": "IDirect3DDevice9",
+          "name": "GetVertexShaderConstantB",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StartRegister",
+            "WINBOOL* pConstantData",
+            "UINT BoolCount"
+          ]
+        },
+        {
+          "slot": 100,
+          "owner": "IDirect3DDevice9",
+          "name": "SetStreamSource",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StreamNumber",
+            "IDirect3DVertexBuffer9* pStreamData",
+            "UINT OffsetInBytes",
+            "UINT Stride"
+          ]
+        },
+        {
+          "slot": 101,
+          "owner": "IDirect3DDevice9",
+          "name": "GetStreamSource",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StreamNumber",
+            "IDirect3DVertexBuffer9** ppStreamData",
+            "UINT* OffsetInBytes",
+            "UINT* pStride"
+          ]
+        },
+        {
+          "slot": 102,
+          "owner": "IDirect3DDevice9",
+          "name": "SetStreamSourceFreq",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StreamNumber",
+            "UINT Divider"
+          ]
+        },
+        {
+          "slot": 103,
+          "owner": "IDirect3DDevice9",
+          "name": "GetStreamSourceFreq",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StreamNumber",
+            "UINT* Divider"
+          ]
+        },
+        {
+          "slot": 104,
+          "owner": "IDirect3DDevice9",
+          "name": "SetIndices",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DIndexBuffer9* pIndexData"
+          ]
+        },
+        {
+          "slot": 105,
+          "owner": "IDirect3DDevice9",
+          "name": "GetIndices",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DIndexBuffer9** ppIndexData"
+          ]
+        },
+        {
+          "slot": 106,
+          "owner": "IDirect3DDevice9",
+          "name": "CreatePixelShader",
+          "ret": "HRESULT",
+          "params": [
+            "const DWORD *byte_code",
+            "IDirect3DPixelShader9 **shader"
+          ]
+        },
+        {
+          "slot": 107,
+          "owner": "IDirect3DDevice9",
+          "name": "SetPixelShader",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DPixelShader9* pShader"
+          ]
+        },
+        {
+          "slot": 108,
+          "owner": "IDirect3DDevice9",
+          "name": "GetPixelShader",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DPixelShader9** ppShader"
+          ]
+        },
+        {
+          "slot": 109,
+          "owner": "IDirect3DDevice9",
+          "name": "SetPixelShaderConstantF",
+          "ret": "HRESULT",
+          "params": [
+            "UINT reg_idx",
+            "const float *data",
+            "UINT count"
+          ]
+        },
+        {
+          "slot": 110,
+          "owner": "IDirect3DDevice9",
+          "name": "GetPixelShaderConstantF",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StartRegister",
+            "float* pConstantData",
+            "UINT Vector4fCount"
+          ]
+        },
+        {
+          "slot": 111,
+          "owner": "IDirect3DDevice9",
+          "name": "SetPixelShaderConstantI",
+          "ret": "HRESULT",
+          "params": [
+            "UINT reg_idx",
+            "const int *data",
+            "UINT count"
+          ]
+        },
+        {
+          "slot": 112,
+          "owner": "IDirect3DDevice9",
+          "name": "GetPixelShaderConstantI",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StartRegister",
+            "int* pConstantData",
+            "UINT Vector4iCount"
+          ]
+        },
+        {
+          "slot": 113,
+          "owner": "IDirect3DDevice9",
+          "name": "SetPixelShaderConstantB",
+          "ret": "HRESULT",
+          "params": [
+            "UINT reg_idx",
+            "const WINBOOL *data",
+            "UINT count"
+          ]
+        },
+        {
+          "slot": 114,
+          "owner": "IDirect3DDevice9",
+          "name": "GetPixelShaderConstantB",
+          "ret": "HRESULT",
+          "params": [
+            "UINT StartRegister",
+            "WINBOOL* pConstantData",
+            "UINT BoolCount"
+          ]
+        },
+        {
+          "slot": 115,
+          "owner": "IDirect3DDevice9",
+          "name": "DrawRectPatch",
+          "ret": "HRESULT",
+          "params": [
+            "UINT handle",
+            "const float *segment_count",
+            "const D3DRECTPATCH_INFO *patch_info"
+          ]
+        },
+        {
+          "slot": 116,
+          "owner": "IDirect3DDevice9",
+          "name": "DrawTriPatch",
+          "ret": "HRESULT",
+          "params": [
+            "UINT handle",
+            "const float *segment_count",
+            "const D3DTRIPATCH_INFO *patch_info"
+          ]
+        },
+        {
+          "slot": 117,
+          "owner": "IDirect3DDevice9",
+          "name": "DeletePatch",
+          "ret": "HRESULT",
+          "params": [
+            "UINT Handle"
+          ]
+        },
+        {
+          "slot": 118,
+          "owner": "IDirect3DDevice9",
+          "name": "CreateQuery",
+          "ret": "HRESULT",
+          "params": [
+            "D3DQUERYTYPE Type",
+            "IDirect3DQuery9** ppQuery"
+          ]
+        },
+        {
+          "slot": 119,
+          "owner": "IDirect3DDevice9Ex",
+          "name": "SetConvolutionMonoKernel",
+          "ret": "HRESULT",
+          "params": [
+            "UINT width",
+            "UINT height",
+            "float *rows",
+            "float *columns"
+          ]
+        },
+        {
+          "slot": 120,
+          "owner": "IDirect3DDevice9Ex",
+          "name": "ComposeRects",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DSurface9 *src_surface",
+            "IDirect3DSurface9 *dst_surface",
+            "IDirect3DVertexBuffer9 *src_descs",
+            "UINT rect_count",
+            "IDirect3DVertexBuffer9 *dst_descs",
+            "D3DCOMPOSERECTSOP operation",
+            "INT offset_x",
+            "INT offset_y"
+          ]
+        },
+        {
+          "slot": 121,
+          "owner": "IDirect3DDevice9Ex",
+          "name": "PresentEx",
+          "ret": "HRESULT",
+          "params": [
+            "const RECT *src_rect",
+            "const RECT *dst_rect",
+            "HWND dst_window_override",
+            "const RGNDATA *dirty_region",
+            "DWORD flags"
+          ]
+        },
+        {
+          "slot": 122,
+          "owner": "IDirect3DDevice9Ex",
+          "name": "GetGPUThreadPriority",
+          "ret": "HRESULT",
+          "params": [
+            "INT *priority"
+          ]
+        },
+        {
+          "slot": 123,
+          "owner": "IDirect3DDevice9Ex",
+          "name": "SetGPUThreadPriority",
+          "ret": "HRESULT",
+          "params": [
+            "INT priority"
+          ]
+        },
+        {
+          "slot": 124,
+          "owner": "IDirect3DDevice9Ex",
+          "name": "WaitForVBlank",
+          "ret": "HRESULT",
+          "params": [
+            "UINT swapchain_idx"
+          ]
+        },
+        {
+          "slot": 125,
+          "owner": "IDirect3DDevice9Ex",
+          "name": "CheckResourceResidency",
+          "ret": "HRESULT",
+          "params": [
+            "IDirect3DResource9 **resources",
+            "UINT32 resource_count"
+          ]
+        },
+        {
+          "slot": 126,
+          "owner": "IDirect3DDevice9Ex",
+          "name": "SetMaximumFrameLatency",
+          "ret": "HRESULT",
+          "params": [
+            "UINT max_latency"
+          ]
+        },
+        {
+          "slot": 127,
+          "owner": "IDirect3DDevice9Ex",
+          "name": "GetMaximumFrameLatency",
+          "ret": "HRESULT",
+          "params": [
+            "UINT *max_latency"
+          ]
+        },
+        {
+          "slot": 128,
+          "owner": "IDirect3DDevice9Ex",
+          "name": "CheckDeviceState",
+          "ret": "HRESULT",
+          "params": [
+            "HWND dst_window"
+          ]
+        },
+        {
+          "slot": 129,
+          "owner": "IDirect3DDevice9Ex",
+          "name": "CreateRenderTargetEx",
+          "ret": "HRESULT",
+          "params": [
+            "UINT width",
+            "UINT height",
+            "D3DFORMAT format",
+            "D3DMULTISAMPLE_TYPE multisample_type",
+            "DWORD multisample_quality",
+            "WINBOOL lockable",
+            "IDirect3DSurface9 **surface",
+            "HANDLE *shared_handle",
+            "DWORD usage"
+          ]
+        },
+        {
+          "slot": 130,
+          "owner": "IDirect3DDevice9Ex",
+          "name": "CreateOffscreenPlainSurfaceEx",
+          "ret": "HRESULT",
+          "params": [
+            "UINT width",
+            "UINT Height",
+            "D3DFORMAT format",
+            "D3DPOOL pool",
+            "IDirect3DSurface9 **surface",
+            "HANDLE *shared_handle",
+            "DWORD usage"
+          ]
+        },
+        {
+          "slot": 131,
+          "owner": "IDirect3DDevice9Ex",
+          "name": "CreateDepthStencilSurfaceEx",
+          "ret": "HRESULT",
+          "params": [
+            "UINT width",
+            "UINT height",
+            "D3DFORMAT format",
+            "D3DMULTISAMPLE_TYPE multisample_type",
+            "DWORD multisample_quality",
+            "WINBOOL discard",
+            "IDirect3DSurface9 **surface",
+            "HANDLE *shared_handle",
+            "DWORD usage"
+          ]
+        },
+        {
+          "slot": 132,
+          "owner": "IDirect3DDevice9Ex",
+          "name": "ResetEx",
+          "ret": "HRESULT",
+          "params": [
+            "D3DPRESENT_PARAMETERS *parameters",
+            "D3DDISPLAYMODEEX *mode"
+          ]
+        },
+        {
+          "slot": 133,
+          "owner": "IDirect3DDevice9Ex",
+          "name": "GetDisplayModeEx",
+          "ret": "HRESULT",
+          "params": [
+            "UINT swapchain_idx",
+            "D3DDISPLAYMODEEX *mode",
+            "D3DDISPLAYROTATION *rotation"
+          ]
+        }
+      ]
+    }
+  }
+}

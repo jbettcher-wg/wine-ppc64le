@@ -1,0 +1,13 @@
+# AMD64 thunk export spec -- xinput1_3.dll.
+#
+# From the 2026-08-17 Skyrim Special Edition triage, and the same finding as
+# the 2026-08-15 one that added dxgi's and d3d11's: SkyrimSE.exe imports this
+# module, Wine provides it as a NATIVE ppc64 builtin, and the loader correctly
+# refuses to splice that into a guest call -- reported as c000007b, four times
+# over, before the process reaches a single graphics call.  Nothing here is
+# hand-written: the export list comes from this module's own .spec.
+DLL xinput1_3.dll
+FROM-SPEC auto
+
+# Same as xinput1_4's: every export refused for want of a declaration.
+PROBE-EXTRA   xinput.h

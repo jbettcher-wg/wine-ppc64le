@@ -1,0 +1,15 @@
+# AMD64 thunk export spec -- mscoree.dll.
+#
+# From the 2026-08-17 corpus pass.  Styx: Master of Shadows imports this
+# module STATICALLY -- one export, _CorExeMain -- and it had no guest thunk,
+# so the loader refused the native ppc64 module (c000007b) and the whole image
+# failed to load (c0000135).  A native UE3 game importing the CLR entry point
+# is an artefact of its build, not a sign it runs managed code; what matters
+# here is only that the import must BIND for the image to start.
+#
+# 2 of 48 eligible exports are emitted.  _CorExeMain is not one of them: no
+# Wine header declares it, so it keeps its ordinal as a named sentinel and a
+# guest that CALLS it faults by name.  Styx does not call it -- the import
+# exists because the linker put it there.
+DLL mscoree.dll
+FROM-SPEC auto

@@ -12,3 +12,21 @@
 @ stdcall -private DllGetClassObject(ptr ptr ptr)
 @ stdcall -private DllRegisterServer()
 @ stdcall -private DllUnregisterServer()
+
+# The x86-64 guest boundary (dlls/dsound/guestcom.c).  Private entry points,
+# never imported by an application:
+#   __wine_com_dispatch   the single entry ntdll's trap dispatcher calls when
+#                         a guest calls a method on a DirectSound proxy
+#   __wine_com_refuse     what a GUEST-REFUSE flat export resolves to
+#   __wine_guest_<Name>   what the guest reaches instead of <Name>, via
+#                         spec2thunk's GUEST-IMPL redirect; it wraps the
+#                         interface pointers <Name> wrote.  <Name> itself is
+#                         untouched, because a NATIVE ppc64 caller handed a
+#                         proxy would execute the guest's x86-64 trap stubs.
+@ stdcall -private __wine_com_dispatch(long long ptr)
+@ stdcall -private __wine_com_refuse()
+@ stdcall -private __wine_guest_DirectSoundCreate(ptr ptr ptr)
+@ stdcall -private __wine_guest_DirectSoundCreate8(ptr ptr ptr)
+@ stdcall -private __wine_guest_DirectSoundCaptureCreate(ptr ptr ptr)
+@ stdcall -private __wine_guest_DirectSoundCaptureCreate8(ptr ptr ptr)
+@ stdcall -private __wine_guest_DirectSoundFullDuplexCreate(ptr ptr ptr ptr long long ptr ptr ptr ptr)

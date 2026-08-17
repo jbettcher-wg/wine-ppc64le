@@ -1,0 +1,29 @@
+# AMD64 thunk export spec -- uiautomationcore.dll.
+#
+# From the 2026-08-17 corpus pass.  Boltgun imports this module STATICALLY and
+# it had no guest thunk, so the loader refused the native ppc64 module
+# (c000007b) and the whole image failed to load (c0000135).  Measured: the
+# exe's import table names UiaRaiseAutomationEvent (ordinal 90),
+# UiaRaiseAutomationPropertyChangedEvent (91), UiaClientsAreListening (58),
+# UiaReturnRawElementProvider (98) and UiaHostProviderFromHwnd (76) -- the
+# accessibility surface Slate registers whether or not a screen reader is
+# running.
+DLL uiautomationcore.dll
+FROM-SPEC auto
+
+# Neither header is in the oracle's default translation unit, and
+# uiautomationcoreapi.h does not compile on its own: it names PROPERTYID,
+# which is typedef'd in the widl-generated uiautomationcore.h.  So that one is
+# appended FIRST -- PROBE-EXTRA lines are emitted in the order written.
+# Without them 35 of 37 exports were refused; with them, 34 of 37 are emitted,
+# including four of Boltgun's five.
+#
+# The fifth is refused for a REAL reason and not an oracle gap:
+# UiaRaiseAutomationPropertyChangedEvent takes two VARIANTs BY VALUE, and a
+# VARIANT is 16 bytes -- wider than one 64-bit slot, which is the one shape
+# this descriptor cannot express.  It keeps ordinal 91 as a named sentinel, so
+# a guest that calls it faults by name rather than silently on half an
+# argument.  (DllRegisterServer/DllUnregisterServer are the other two, and no
+# Wine header declares them.)
+PROBE-EXTRA   uiautomationcore.h
+PROBE-EXTRA   uiautomationcoreapi.h

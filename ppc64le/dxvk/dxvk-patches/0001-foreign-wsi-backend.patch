@@ -1,0 +1,1353 @@
+diff --git a/meson.build b/meson.build
+index 032e75e..f5ee136 100644
+--- a/meson.build
++++ b/meson.build
+@@ -161,6 +161,12 @@ else
+   if lib_glfw.found()
+     compiler_args += ['-DDXVK_WSI_GLFW']
+   endif
++  # Foreign-window / headless WSI: no toolkit, no link-time dependency.
++  # X11 mode needs Xlib's header at compile time only; libX11 is dlopened.
++  compiler_args += ['-DDXVK_WSI_FOREIGN']
++  if cpp.has_header('X11/Xlib.h')
++    compiler_args += ['-DDXVK_WSI_FOREIGN_X11']
++  endif
+   if (not lib_sdl3.found() and not lib_sdl2.found() and not lib_glfw.found())
+     error('SDL3, SDL2, or GLFW are required to build dxvk-native')
+   endif
+diff --git a/src/wsi/foreign/wsi_monitor_foreign.cpp b/src/wsi/foreign/wsi_monitor_foreign.cpp
+new file mode 100644
+index 0000000..a9b7de4
+--- /dev/null
++++ b/src/wsi/foreign/wsi_monitor_foreign.cpp
+@@ -0,0 +1,117 @@
++#if defined(DXVK_WSI_FOREIGN)
++
++#include "wsi_platform_foreign.h"
++
++#include "../../util/util_string.h"
++
++#include <sstream>
++#include <cstring>
++
++namespace dxvk::wsi {
++
++  /* One synthetic monitor. Real multi-head enumeration would need XRandR
++   * (X11 mode) or is meaningless (headless); a single output is enough for
++   * DXGI factory/adapter enumeration to succeed, which is all any of the
++   * D3D11 paths need before a swapchain exists. */
++  static constexpr uintptr_t kMonitorId = 1;
++
++
++  HMONITOR ForeignWsiDriver::getDefaultMonitor() {
++    return enumMonitors(0);
++  }
++
++
++  HMONITOR ForeignWsiDriver::enumMonitors(uint32_t index) {
++    return index == 0
++      ? reinterpret_cast<HMONITOR>(kMonitorId)
++      : nullptr;
++  }
++
++
++  HMONITOR ForeignWsiDriver::enumMonitors(const LUID *adapterLUID[], uint32_t numLUIDs, uint32_t index) {
++    return enumMonitors(index);
++  }
++
++
++  bool ForeignWsiDriver::getDisplayName(
++          HMONITOR hMonitor,
++          WCHAR    (&Name)[32]) {
++    if (hMonitor != reinterpret_cast<HMONITOR>(kMonitorId))
++      return false;
++
++    const std::wstring name = LR"(\\.\DISPLAY1)";
++    std::memset(Name, 0, sizeof(Name));
++    name.copy(Name, name.length(), 0);
++    return true;
++  }
++
++
++  bool ForeignWsiDriver::getDesktopCoordinates(
++          HMONITOR hMonitor,
++          RECT*    pRect) {
++    if (hMonitor != reinterpret_cast<HMONITOR>(kMonitorId))
++      return false;
++
++    uint32_t w = m_screenW;
++    uint32_t h = m_screenH;
++
++#if defined(DXVK_WSI_FOREIGN_X11)
++    if (m_useX11)
++      x11::screenSize(&w, &h);
++#endif
++
++    pRect->left   = 0;
++    pRect->top    = 0;
++    pRect->right  = LONG(w);
++    pRect->bottom = LONG(h);
++    return true;
++  }
++
++
++  bool ForeignWsiDriver::getDisplayMode(
++          HMONITOR hMonitor,
++          uint32_t modeNumber,
++          WsiMode* pMode) {
++    if (modeNumber != 0)
++      return false;
++
++    return getCurrentDisplayMode(hMonitor, pMode);
++  }
++
++
++  bool ForeignWsiDriver::getCurrentDisplayMode(
++          HMONITOR hMonitor,
++          WsiMode* pMode) {
++    if (hMonitor != reinterpret_cast<HMONITOR>(kMonitorId))
++      return false;
++
++    RECT rect = { };
++    if (!getDesktopCoordinates(hMonitor, &rect))
++      return false;
++
++    pMode->width                  = uint32_t(rect.right - rect.left);
++    pMode->height                 = uint32_t(rect.bottom - rect.top);
++    pMode->refreshRate.numerator   = m_screenR;
++    pMode->refreshRate.denominator = 1;
++    pMode->bitsPerPixel            = 32;
++    pMode->interlaced              = false;
++    return true;
++  }
++
++
++  bool ForeignWsiDriver::getDesktopDisplayMode(
++          HMONITOR hMonitor,
++          WsiMode* pMode) {
++    return getCurrentDisplayMode(hMonitor, pMode);
++  }
++
++
++  WsiEdidData ForeignWsiDriver::getMonitorEdid(HMONITOR hMonitor) {
++    /* No EDID. dxgi_output.cpp tolerates this: parseColorimetryInfo returns
++     * nullopt and NormalizeDisplayMetadata fills in SDR defaults. */
++    return WsiEdidData();
++  }
++
++}
++
++#endif
+diff --git a/src/wsi/foreign/wsi_platform_foreign.cpp b/src/wsi/foreign/wsi_platform_foreign.cpp
+new file mode 100644
+index 0000000..4e4114d
+--- /dev/null
++++ b/src/wsi/foreign/wsi_platform_foreign.cpp
+@@ -0,0 +1,118 @@
++#if defined(DXVK_WSI_FOREIGN)
++
++#include "wsi_platform_foreign.h"
++
++#include "../../util/util_env.h"
++#include "../../util/util_error.h"
++#include "../../util/util_string.h"
++#include "../../util/log/log.h"
++
++#if defined(DXVK_WSI_FOREIGN_X11)
++#include "wsi_x11_foreign.h"
++#endif
++
++#include <cstdio>
++
++namespace dxvk::wsi {
++
++  ForeignWsiDriver::ForeignWsiDriver(bool useX11)
++  : m_useX11(useX11) {
++    readScreenOverride();
++
++#if defined(DXVK_WSI_FOREIGN_X11)
++    if (m_useX11) {
++      if (!x11::init())
++        throw DxvkError("Foreign WSI: could not open an X11 display.");
++
++      uint32_t w = 0, h = 0;
++      if (x11::screenSize(&w, &h) && w && h) {
++        m_screenW = w;
++        m_screenH = h;
++      }
++
++      Logger::info(str::format("Foreign WSI: X11 mode, screen ",
++        m_screenW, "x", m_screenH));
++    } else
++#endif
++    {
++      Logger::info(str::format("Foreign WSI: headless mode, virtual screen ",
++        m_screenW, "x", m_screenH, "@", m_screenR));
++    }
++  }
++
++
++  ForeignWsiDriver::~ForeignWsiDriver() {
++#if defined(DXVK_WSI_FOREIGN_X11)
++    if (m_useX11)
++      x11::shutdown();
++#endif
++  }
++
++
++  void ForeignWsiDriver::readScreenOverride() {
++    std::string s = dxvk::env::getEnvVar("DXVK_WSI_FOREIGN_SCREEN");
++    if (s.empty())
++      return;
++
++    unsigned w = 0, h = 0, r = 0;
++    int n = std::sscanf(s.c_str(), "%ux%u@%u", &w, &h, &r);
++
++    if (n >= 2 && w && h) {
++      m_screenW = w;
++      m_screenH = h;
++    }
++    if (n >= 3 && r)
++      m_screenR = r;
++  }
++
++
++  std::vector<const char *> ForeignWsiDriver::getInstanceExtensions() {
++#if defined(DXVK_WSI_FOREIGN_X11)
++    if (m_useX11)
++      return { VK_KHR_SURFACE_EXTENSION_NAME, x11::surfaceExtensionName() };
++#endif
++    /* Headless. DXVK enables VK_KHR_surface itself when the loader offers it
++     * (dxvk_instance.h khrSurface), so returning nothing here costs nothing
++     * and asks for no platform surface extension we cannot use. */
++    return { };
++  }
++
++
++  static bool createHeadlessWsiDriver(WsiDriver **driver) {
++    try {
++      *driver = new ForeignWsiDriver(false);
++    } catch (const DxvkError& e) {
++      Logger::err(str::format("Foreign WSI: ", e.message()));
++      return false;
++    }
++    return true;
++  }
++
++
++  WsiBootstrap HeadlessWSI = {
++    "Headless",
++    createHeadlessWsiDriver
++  };
++
++
++#if defined(DXVK_WSI_FOREIGN_X11)
++  static bool createX11ForeignWsiDriver(WsiDriver **driver) {
++    try {
++      *driver = new ForeignWsiDriver(true);
++    } catch (const DxvkError& e) {
++      Logger::err(str::format("Foreign WSI: ", e.message()));
++      return false;
++    }
++    return true;
++  }
++
++
++  WsiBootstrap X11ForeignWSI = {
++    "X11Foreign",
++    createX11ForeignWsiDriver
++  };
++#endif
++
++}
++
++#endif
+diff --git a/src/wsi/foreign/wsi_platform_foreign.h b/src/wsi/foreign/wsi_platform_foreign.h
+new file mode 100644
+index 0000000..53a6fdc
+--- /dev/null
++++ b/src/wsi/foreign/wsi_platform_foreign.h
+@@ -0,0 +1,163 @@
++#pragma once
++
++#if defined(DXVK_WSI_FOREIGN)
++
++#include "../wsi_platform.h"
++
++#include "../../util/util_win32_compat.h"
++
++#if defined(DXVK_WSI_FOREIGN_X11)
++#include "wsi_x11_foreign.h"
++#endif
++
++#include <cstdint>
++#include <mutex>
++
++namespace dxvk::wsi {
++
++  /**
++   * \brief Foreign-window / headless WSI driver
++   *
++   * Unlike the SDL2/SDL3/GLFW backends, this driver never creates a window.
++   * It exists for two cases:
++   *
++   *  - Headless: no surface at all. getInstanceExtensions() returns nothing,
++   *    createSurface() fails cleanly. Everything that does not need a
++   *    swapchain still works. This makes the D3D11 test suite runnable over
++   *    SSH with no display.
++   *
++   *  - X11 foreign: the HWND handed to DXVK is not a window DXVK owns, it is
++   *    a raw X11 window ID (XID) belonging to somebody else -- in the thunk
++   *    case, to the emulated guest's Wine. The driver opens its own X11
++   *    connection to the same server and builds a VkSurfaceKHR from the XID.
++   *    X11 resource IDs are server-side, so a second connection may name a
++   *    window created on the first one.
++   *
++   * HWND encoding for the X11 mode is the XID, zero-extended. HWND is
++   * void*-sized on both x86-64 and ppc64le, an XID is 32 bits, so the value
++   * survives a boundary crossing as a plain integer.
++   */
++  class ForeignWsiDriver : public WsiDriver {
++
++  public:
++
++    ForeignWsiDriver(bool useX11);
++
++    ~ForeignWsiDriver();
++
++    // Platform
++    std::vector<const char *> getInstanceExtensions() override;
++
++    // Monitor
++    HMONITOR getDefaultMonitor() override;
++
++    HMONITOR enumMonitors(uint32_t index) override;
++
++    HMONITOR enumMonitors(const LUID *adapterLUID[], uint32_t numLUIDs, uint32_t index) override;
++
++    bool getDisplayName(
++            HMONITOR         hMonitor,
++            WCHAR            (&Name)[32]) override;
++
++    bool getDesktopCoordinates(
++            HMONITOR         hMonitor,
++            RECT*            pRect) override;
++
++    bool getDisplayMode(
++            HMONITOR         hMonitor,
++            uint32_t         modeNumber,
++            WsiMode*         pMode) override;
++
++    bool getCurrentDisplayMode(
++            HMONITOR         hMonitor,
++            WsiMode*         pMode) override;
++
++    bool getDesktopDisplayMode(
++            HMONITOR         hMonitor,
++            WsiMode*         pMode) override;
++
++    WsiEdidData getMonitorEdid(HMONITOR hMonitor) override;
++
++    // Window
++    void getWindowSize(
++            HWND      hWindow,
++            uint32_t* pWidth,
++            uint32_t* pHeight) override;
++
++    void resizeWindow(
++            HWND             hWindow,
++            DxvkWindowState* pState,
++            uint32_t         width,
++            uint32_t         height) override;
++
++    void saveWindowState(
++            HWND             hWindow,
++            DxvkWindowState* pState,
++            bool             saveStyle) override;
++
++    void restoreWindowState(
++            HWND             hWindow,
++            DxvkWindowState* pState,
++            bool             restoreCoordinates) override;
++
++    bool setWindowMode(
++            HMONITOR         hMonitor,
++            HWND             hWindow,
++            DxvkWindowState* pState,
++      const WsiMode&         mode) override;
++
++    bool enterFullscreenMode(
++            HMONITOR         hMonitor,
++            HWND             hWindow,
++            DxvkWindowState* pState,
++            bool             modeSwitch) override;
++
++    bool leaveFullscreenMode(
++            HWND             hWindow,
++            DxvkWindowState* pState) override;
++
++    bool restoreDisplayMode() override;
++
++    HMONITOR getWindowMonitor(HWND hWindow) override;
++
++    bool isWindow(HWND hWindow) override;
++
++    bool isDisplayLost() override;
++
++    bool isMinimized(HWND hWindow) override;
++
++    bool isOccluded(HWND hWindow) override;
++
++    void updateFullscreenWindow(
++            HMONITOR hMonitor,
++            HWND     hWindow,
++            bool     forceTopmost) override;
++
++    VkResult createSurface(
++            HWND                      hWindow,
++            PFN_vkGetInstanceProcAddr pfnVkGetInstanceProcAddr,
++            VkInstance                instance,
++            VkSurfaceKHR*             pSurface) override;
++
++  private:
++
++    bool     m_useX11 = false;
++
++    /* Fallback screen geometry, used in headless mode and if the X11
++     * connection cannot be established. Overridable through
++     * DXVK_WSI_FOREIGN_SCREEN="WxH@R". */
++    uint32_t m_screenW = 1920;
++    uint32_t m_screenH = 1080;
++    uint32_t m_screenR = 60;
++
++    void readScreenOverride();
++
++    static uint64_t toXid(HWND hWindow) {
++      return uint64_t(reinterpret_cast<uintptr_t>(hWindow));
++    }
++
++  };
++
++}
++
++#endif
+diff --git a/src/wsi/foreign/wsi_window_foreign.cpp b/src/wsi/foreign/wsi_window_foreign.cpp
+new file mode 100644
+index 0000000..db27f51
+--- /dev/null
++++ b/src/wsi/foreign/wsi_window_foreign.cpp
+@@ -0,0 +1,164 @@
++#if defined(DXVK_WSI_FOREIGN)
++
++#include "wsi_platform_foreign.h"
++
++#include "../../util/util_string.h"
++#include "../../util/log/log.h"
++
++#include <atomic>
++
++namespace dxvk::wsi {
++
++  void ForeignWsiDriver::getWindowSize(
++          HWND      hWindow,
++          uint32_t* pWidth,
++          uint32_t* pHeight) {
++    uint32_t w = m_screenW;
++    uint32_t h = m_screenH;
++
++#if defined(DXVK_WSI_FOREIGN_X11)
++    if (m_useX11)
++      x11::getGeometry(toXid(hWindow), &w, &h);
++#endif
++
++    if (pWidth)  *pWidth  = w;
++    if (pHeight) *pHeight = h;
++  }
++
++
++  /* The window belongs to somebody else. Every method below that would move,
++   * resize, restack or restyle it is deliberately a no-op that reports
++   * success: the owner of the window decides its geometry, and DXVK's
++   * swapchain follows through VkSurfaceCapabilitiesKHR::currentExtent
++   * (dxvk_presenter.cpp pickImageExtent). Reporting failure instead would
++   * make DXGI treat fullscreen transitions as errors. */
++
++  void ForeignWsiDriver::resizeWindow(
++          HWND             hWindow,
++          DxvkWindowState* pState,
++          uint32_t         width,
++          uint32_t         height) {
++    static std::atomic<bool> s_warned = { false };
++    if (!s_warned.exchange(true))
++      Logger::warn("Foreign WSI: resizeWindow ignored, window is not ours");
++  }
++
++
++  void ForeignWsiDriver::saveWindowState(
++          HWND             hWindow,
++          DxvkWindowState* pState,
++          bool             saveStyle) {
++  }
++
++
++  void ForeignWsiDriver::restoreWindowState(
++          HWND             hWindow,
++          DxvkWindowState* pState,
++          bool             restoreCoordinates) {
++  }
++
++
++  bool ForeignWsiDriver::setWindowMode(
++          HMONITOR         hMonitor,
++          HWND             hWindow,
++          DxvkWindowState* pState,
++    const WsiMode&         mode) {
++    return true;
++  }
++
++
++  bool ForeignWsiDriver::enterFullscreenMode(
++          HMONITOR         hMonitor,
++          HWND             hWindow,
++          DxvkWindowState* pState,
++          bool             modeSwitch) {
++    return true;
++  }
++
++
++  bool ForeignWsiDriver::leaveFullscreenMode(
++          HWND             hWindow,
++          DxvkWindowState* pState) {
++    return true;
++  }
++
++
++  bool ForeignWsiDriver::restoreDisplayMode() {
++    return true;
++  }
++
++
++  void ForeignWsiDriver::updateFullscreenWindow(
++          HMONITOR hMonitor,
++          HWND     hWindow,
++          bool     forceTopmost) {
++  }
++
++
++  HMONITOR ForeignWsiDriver::getWindowMonitor(HWND hWindow) {
++    return getDefaultMonitor();
++  }
++
++
++  bool ForeignWsiDriver::isWindow(HWND hWindow) {
++#if defined(DXVK_WSI_FOREIGN_X11)
++    if (m_useX11)
++      return x11::isWindow(toXid(hWindow));
++#endif
++    return hWindow != nullptr;
++  }
++
++
++  bool ForeignWsiDriver::isDisplayLost() {
++#if defined(DXVK_WSI_FOREIGN_X11)
++    if (m_useX11)
++      return x11::isConnectionLost();
++#endif
++    /* The headless variant of this backend has no display server to lose. */
++    return false;
++  }
++
++
++  bool ForeignWsiDriver::isMinimized(HWND hWindow) {
++    /* Deliberately always false. An unmapped X11 window is not necessarily
++     * minimized -- it may simply not have been mapped yet -- and DXVK already
++     * degrades correctly without this hint: a minimized window reports a 0x0
++     * currentExtent, createSwapChain returns VK_NOT_READY
++     * (dxvk_presenter.cpp:606) and Present yields DXGI_STATUS_OCCLUDED. */
++    return false;
++  }
++
++
++  bool ForeignWsiDriver::isOccluded(HWND hWindow) {
++    return false;
++  }
++
++
++  VkResult ForeignWsiDriver::createSurface(
++          HWND                      hWindow,
++          PFN_vkGetInstanceProcAddr pfnVkGetInstanceProcAddr,
++          VkInstance                instance,
++          VkSurfaceKHR*             pSurface) {
++#if defined(DXVK_WSI_FOREIGN_X11)
++    if (m_useX11) {
++      /* Logged here as well as refused inside x11::createSurface, because this
++       * is the layer with access to DXVK's logger and a silent
++       * VK_ERROR_INITIALIZATION_FAILED would be indistinguishable from a
++       * missing extension. The refusal itself is x11::createSurface's, so it
++       * also covers the surface-lost recreation path. */
++      if (x11::isRootWindow(toXid(hWindow))) {
++        Logger::err(str::format(
++          "Foreign WSI: refusing to present to XID 0x", std::hex, toXid(hWindow), std::dec,
++          " -- it is the X root window, not a window belonging to the caller's HWND"));
++      }
++
++      return x11::createSurface(toXid(hWindow), pfnVkGetInstanceProcAddr, instance, pSurface);
++    }
++#endif
++    Logger::warn("Foreign WSI: headless driver cannot create a surface");
++    return VK_ERROR_INITIALIZATION_FAILED;
++  }
++
++}
++
++#endif
+diff --git a/src/wsi/foreign/wsi_x11_foreign.cpp b/src/wsi/foreign/wsi_x11_foreign.cpp
+new file mode 100644
+index 0000000..677f10a
+--- /dev/null
++++ b/src/wsi/foreign/wsi_x11_foreign.cpp
+@@ -0,0 +1,522 @@
++#if defined(DXVK_WSI_FOREIGN_X11)
++
++/* Pulls in X11/Xlib.h via vulkan.h. Nothing from DXVK's Win32 shim may be
++ * included here -- see wsi_x11_foreign.h for why. */
++#define VK_USE_PLATFORM_XLIB_KHR 1
++#include <vulkan/vulkan.h>
++
++#include "wsi_x11_foreign.h"
++
++#include <dlfcn.h>
++#include <errno.h>
++#include <sys/socket.h>
++/* execinfo.h is a glibc extension; musl has no backtrace(). The diagnostic
++ * below is optional, so compile it out rather than making the backend
++ * unbuildable on a libc that lacks it. */
++#if defined(__GLIBC__)
++#  include <execinfo.h>
++#  define DXVK_WSI_FOREIGN_HAVE_BACKTRACE 1
++#endif
++#include <atomic>
++#include <cstdlib>
++#include <cstdio>
++#include <mutex>
++
++namespace dxvk::wsi::x11 {
++
++  namespace {
++
++    using PFN_XOpenDisplay         = Display* (*)(const char*);
++    using PFN_XCloseDisplay        = int       (*)(Display*);
++    using PFN_XSync               = int       (*)(Display*, int);
++    using PFN_XInitThreads         = int       (*)(void);
++    using PFN_XErrorHandlerFn      = int       (*)(Display*, XErrorEvent*);
++    using PFN_XSetErrorHandler     = PFN_XErrorHandlerFn (*)(PFN_XErrorHandlerFn);
++    using PFN_XGetGeometry         = int       (*)(Display*, Drawable, Window*, int*, int*,
++                                                   unsigned int*, unsigned int*, unsigned int*, unsigned int*);
++    using PFN_XGetWindowAttributes = int       (*)(Display*, Window, XWindowAttributes*);
++    using PFN_XDefaultScreen       = int       (*)(Display*);
++    using PFN_XDisplayWidth        = int       (*)(Display*, int);
++    using PFN_XDisplayHeight       = int       (*)(Display*, int);
++    using PFN_XScreenCount         = int       (*)(Display*);
++    using PFN_XRootWindow          = Window    (*)(Display*, int);
++    using PFN_XIOErrorHandlerFn    = int       (*)(Display*);
++    using PFN_XSetIOErrorHandler   = PFN_XIOErrorHandlerFn (*)(PFN_XIOErrorHandlerFn);
++    /* libX11 >= 1.7. Resolved with dlsym rather than linked, so an older
++     * libX11 loses only this refinement. */
++    using PFN_XIOErrorExitHandlerFn = void (*)(Display*, void*);
++    using PFN_XSetIOErrorExitHandler = void (*)(Display*, PFN_XIOErrorExitHandlerFn, void*);
++
++    struct X11State {
++      void*     lib      = nullptr;
++      Display*  display  = nullptr;
++      bool      tried    = false;
++      bool      ok       = false;
++
++      PFN_XOpenDisplay          XOpenDisplay         = nullptr;
++      PFN_XCloseDisplay         XCloseDisplay        = nullptr;
++      PFN_XSync                 XSync                = nullptr;
++      PFN_XInitThreads          XInitThreads         = nullptr;
++      PFN_XSetErrorHandler      XSetErrorHandler     = nullptr;
++      PFN_XGetGeometry          XGetGeometry         = nullptr;
++      PFN_XGetWindowAttributes  XGetWindowAttributes = nullptr;
++      PFN_XDefaultScreen        XDefaultScreen       = nullptr;
++      PFN_XDisplayWidth         XDisplayWidth        = nullptr;
++      PFN_XDisplayHeight        XDisplayHeight       = nullptr;
++      PFN_XScreenCount          XScreenCount         = nullptr;
++      PFN_XRootWindow           XRootWindow          = nullptr;
++      PFN_XSetIOErrorHandler    XSetIOErrorHandler   = nullptr;
++      PFN_XSetIOErrorExitHandler XSetIOErrorExitHandler = nullptr;
++    };
++
++    X11State      g_x11;
++    std::mutex    g_mutex;
++
++    PFN_XErrorHandlerFn   g_prevHandler   = nullptr;
++    PFN_XIOErrorHandlerFn g_prevIoHandler = nullptr;
++
++    /* Set from Xlib's IO-error path, which can run on any thread -- including
++     * one already inside this file holding g_mutex, since XSync() and
++     * XGetGeometry() are exactly where the loss is noticed. So it is an
++     * atomic and NOT guarded by g_mutex: taking the lock there would
++     * self-deadlock the process we are trying to keep alive. */
++    std::atomic<bool> g_connectionLost { false };
++
++    /* The Display's socket, cached so that "is the connection still there"
++     * can be asked without taking g_mutex and without entering Xlib -- see
++     * isConnectionLost(). -1 when there is no connection.
++     *
++     * Cleared in shutdown() BEFORE XCloseDisplay, so the window in which a
++     * concurrent reader could poll a descriptor that has been closed and
++     * reused is the same window in which it would already be using a freed
++     * Display*. Nothing may present through a driver that is being
++     * destroyed. */
++    std::atomic<int> g_connectionFd { -1 };
++
++    /* Querying a window we do not own can legitimately race with its
++     * destruction. Xlib's default handler calls exit() on a protocol error,
++     * which would take the whole process down over a BadWindow. Swallow
++     * errors on our own connection; chain anything else. */
++    int errorHandler(Display* dpy, XErrorEvent* ev) {
++      if (dpy == g_x11.display)
++        return 0;
++      if (g_prevHandler)
++        return g_prevHandler(dpy, ev);
++      return 0;
++    }
++
++    /* ---- losing the X connection must not kill the game ------------------
++     *
++     * Xlib distinguishes PROTOCOL errors, which errorHandler above swallows,
++     * from IO errors -- the connection itself going away. An IO error is
++     * fatal by default: _XIOError calls the IO-error handler and, if that
++     * returns, the display's exit handler, whose default is exit(1).
++     *
++     * This was not theoretical. Every attempted present on a server without
++     * DRI3 ended with `X connection to :77 broken (explicit kill or server
++     * shutdown)` and a dead process, because vkQueuePresentKHR drives the
++     * very Display* this file owns and handed to vkCreateXlibSurfaceKHR
++     * [docs/swapchain-and-wine-run.md 2.3, MEASURED]. A game whose compositor
++     * restarts would have died the same way.
++     *
++     * Two handlers, because one is not enough:
++     *
++     *  - XSetIOErrorHandler is process-global and old. Returning from it does
++     *    NOT save the process: _XIOError proceeds to the exit handler
++     *    regardless. What it buys is the diagnosis -- Xlib's default message
++     *    says only that a connection broke, not whose or why -- and a chance
++     *    to mark the backend dead before anything else touches the Display.
++     *    Handlers for OTHER displays are chained, since a caller that
++     *    installed one is entitled to its own policy (and its handler is the
++     *    one that will not return).
++     *
++     *  - XSetIOErrorExitHandler (libX11 >= 1.7) is per-display and is the
++     *    documented way to decline the exit(1): _XIOError calls it INSTEAD of
++     *    _XDefaultIOErrorExit, and returning from it unwinds back into Xlib
++     *    with XlibDisplayIOError set, which every subsequent Xlib entry point
++     *    checks. That is the degradation: calls start failing instead of the
++     *    process disappearing.
++     *
++     * After this point the Display* is unusable but must not be closed
++     * either -- Xlib's own teardown would talk to the dead socket. It is
++     * leaked deliberately; see shutdown(). */
++    void markConnectionLost(const char* how) {
++      if (!g_connectionLost.exchange(true)) {
++        std::fprintf(stderr,
++          "err:   Foreign WSI: the X connection is GONE (%s).\n"
++          "err:   Every further WSI call will fail rather than terminating the "
++          "process. Presentation is over\n"
++          "err:   for this display; the swapchain will report device/surface "
++          "loss.\n", how);
++
++        /* Diagnostic only, off unless asked for. It answers a question that
++         * cannot otherwise be answered from outside: WHICH call noticed the
++         * loss. The original death was reported at vkQueuePresentKHR, i.e.
++         * inside Mesa's WSI driving the very Display* this file owns -- but
++         * DXGI also calls wsi::isWindow (an XGetWindowAttributes round trip)
++         * on every Present, so "the process died during Present()" does not
++         * by itself say which of the two raised the IO error. The stack does.
++         * probes/present_ioerror_check.cpp turns this on.
++         *
++         * backtrace() is async-signal-unsafe in general; this path is already
++         * one where Xlib was about to call exit(), and it runs at most once. */
++#if defined(DXVK_WSI_FOREIGN_HAVE_BACKTRACE)
++        const char* bt = std::getenv("DXVK_WSI_FOREIGN_IOERROR_BACKTRACE");
++
++        if (bt && bt[0] == '1') {
++          void*  frames[32];
++          int    n = ::backtrace(frames, 32);
++          std::fprintf(stderr, "err:   Foreign WSI: IO-error raised from:\n");
++          std::fflush(stderr);
++          ::backtrace_symbols_fd(frames, n, 2);
++        }
++#endif
++      }
++    }
++
++    int ioErrorHandler(Display* dpy) {
++      if (dpy == g_x11.display) {
++        markConnectionLost("Xlib IO error on our own connection");
++        return 0;
++      }
++      if (g_prevIoHandler)
++        return g_prevIoHandler(dpy);
++      return 0;
++    }
++
++    void ioErrorExitHandler(Display* dpy, void* /*data*/) {
++      markConnectionLost("Xlib was about to call exit()");
++      (void)dpy;
++      /* Returning is the entire point. */
++    }
++
++    /* Caller must hold g_mutex. Every entry point below goes through this
++     * rather than testing g_x11.ok directly, so that a lost connection turns
++     * the whole backend into a polite "no" in one place. */
++    bool usableLocked() {
++      return g_x11.ok && !g_connectionLost.load(std::memory_order_relaxed);
++    }
++
++    /* Caller must hold g_mutex. */
++    bool isRootWindowLocked(uint64_t xid) {
++      if (!usableLocked() || !xid)
++        return false;
++
++      int screens = g_x11.XScreenCount(g_x11.display);
++
++      for (int i = 0; i < screens; i++) {
++        if (uint64_t(g_x11.XRootWindow(g_x11.display, i)) == xid)
++          return true;
++      }
++
++      return false;
++    }
++
++    template<typename T>
++    bool resolve(T& fn, const char* name) {
++      fn = reinterpret_cast<T>(dlsym(g_x11.lib, name));
++      return fn != nullptr;
++    }
++
++  }
++
++
++  bool init() {
++    std::lock_guard<std::mutex> lock(g_mutex);
++
++    if (g_x11.tried)
++      return g_x11.ok;
++
++    g_x11.tried = true;
++
++    g_x11.lib = dlopen("libX11.so.6", RTLD_NOW | RTLD_LOCAL);
++    if (!g_x11.lib)
++      return false;
++
++    bool syms = resolve(g_x11.XOpenDisplay,         "XOpenDisplay")
++             && resolve(g_x11.XCloseDisplay,        "XCloseDisplay")
++             && resolve(g_x11.XSync,                "XSync")
++             && resolve(g_x11.XInitThreads,         "XInitThreads")
++             && resolve(g_x11.XSetErrorHandler,     "XSetErrorHandler")
++             && resolve(g_x11.XGetGeometry,         "XGetGeometry")
++             && resolve(g_x11.XGetWindowAttributes, "XGetWindowAttributes")
++             && resolve(g_x11.XDefaultScreen,       "XDefaultScreen")
++             && resolve(g_x11.XDisplayWidth,        "XDisplayWidth")
++             && resolve(g_x11.XDisplayHeight,       "XDisplayHeight")
++             && resolve(g_x11.XScreenCount,         "XScreenCount")
++             && resolve(g_x11.XRootWindow,          "XRootWindow")
++             && resolve(g_x11.XSetIOErrorHandler,   "XSetIOErrorHandler");
++
++    if (!syms)
++      return false;
++
++    /* Optional: libX11 < 1.7 has no per-display exit handler. Not fatal, but
++     * without it a lost connection is still fatal, so say so once. */
++    resolve(g_x11.XSetIOErrorExitHandler, "XSetIOErrorExitHandler");
++
++    g_x11.XInitThreads();
++
++    const char* name = std::getenv("DXVK_WSI_FOREIGN_DISPLAY");
++    g_x11.display = g_x11.XOpenDisplay(name && *name ? name : nullptr);
++
++    if (!g_x11.display)
++      return false;
++
++    g_connectionLost.store(false, std::memory_order_relaxed);
++    /* ConnectionNumber() is a macro reading Display::fd -- no Xlib call, and
++     * the value is stable for the life of the Display. Published after the
++     * lost-flag is cleared so a reader never sees a live fd paired with a
++     * stale "lost" verdict. */
++    g_connectionFd.store(ConnectionNumber(g_x11.display), std::memory_order_release);
++    g_prevHandler = g_x11.XSetErrorHandler(&errorHandler);
++
++    /* DXVK_WSI_FOREIGN_NO_IOERROR_HANDLER exists so the fix can be falsified:
++     * probes/x11_ioerror_check.cpp runs the identical binary with and without
++     * it and the run without the handlers MUST die. Nothing else should ever
++     * set it. */
++    const char* noIo = std::getenv("DXVK_WSI_FOREIGN_NO_IOERROR_HANDLER");
++
++    if (noIo && noIo[0] == '1') {
++      std::fprintf(stderr,
++        "warn:  Foreign WSI: IO-error handlers DISABLED by "
++        "DXVK_WSI_FOREIGN_NO_IOERROR_HANDLER. Losing the X\n"
++        "warn:  connection will terminate this process. This is a test knob.\n");
++    } else {
++      g_prevIoHandler = g_x11.XSetIOErrorHandler(&ioErrorHandler);
++
++      if (g_x11.XSetIOErrorExitHandler) {
++        g_x11.XSetIOErrorExitHandler(g_x11.display, &ioErrorExitHandler, nullptr);
++      } else {
++        std::fprintf(stderr,
++          "warn:  Foreign WSI: this libX11 has no XSetIOErrorExitHandler "
++          "(needs 1.7+). Losing the X\n"
++          "warn:  connection will still terminate the process.\n");
++      }
++    }
++
++    g_x11.ok = true;
++    return true;
++  }
++
++
++  void shutdown() {
++    std::lock_guard<std::mutex> lock(g_mutex);
++
++    if (g_x11.display) {
++      /* Retract the fd before anything can close it. */
++      g_connectionFd.store(-1, std::memory_order_release);
++
++      g_x11.XSetErrorHandler(g_prevHandler);
++      if (g_x11.XSetIOErrorHandler)
++        g_x11.XSetIOErrorHandler(g_prevIoHandler);
++
++      /* Do NOT close a display whose connection is already gone. XCloseDisplay
++       * writes the close-down request to the socket and then frees the
++       * Display, and on a dead fd the first of those re-enters _XIOError from
++       * inside our own teardown. Leaking it is the cheaper mistake: the fd is
++       * already dead and the process is on its way out. */
++      if (!g_connectionLost.load(std::memory_order_relaxed))
++        g_x11.XCloseDisplay(g_x11.display);
++
++      g_x11.display = nullptr;
++    }
++
++    g_x11.ok = false;
++
++    /* Clear the "already attempted" latch as well. Without this, a process
++     * that creates a device, destroys it, and creates another -- which is what
++     * a game doing a feature-level probe does, and what root_guard_check.cpp
++     * does -- gets "could not open an X11 display" on the second attempt,
++     * because wsi::quit() destroyed the driver (wsi_platform.cpp:59-68) and
++     * init() then short-circuited on the stale latch. Safe because
++     * wsi_platform.cpp refcounts, so at most one ForeignWsiDriver is alive at
++     * a time and shutdown() only runs when the last one goes away. */
++    g_x11.tried = false;
++  }
++
++
++  bool getGeometry(uint64_t xid, uint32_t* pWidth, uint32_t* pHeight) {
++    std::lock_guard<std::mutex> lock(g_mutex);
++
++    if (!usableLocked() || !xid)
++      return false;
++
++    Window root = 0;
++    int x = 0, y = 0;
++    unsigned int w = 0, h = 0, bw = 0, depth = 0;
++
++    if (!g_x11.XGetGeometry(g_x11.display, Drawable(xid), &root,
++                            &x, &y, &w, &h, &bw, &depth))
++      return false;
++
++    if (pWidth)  *pWidth  = w;
++    if (pHeight) *pHeight = h;
++    return true;
++  }
++
++
++  bool isWindow(uint64_t xid) {
++    std::lock_guard<std::mutex> lock(g_mutex);
++
++    if (!usableLocked() || !xid)
++      return false;
++
++    XWindowAttributes attr = { };
++    return g_x11.XGetWindowAttributes(g_x11.display, Window(xid), &attr) != 0;
++  }
++
++
++  /* Deliberately takes no lock. It is read from DXGI's present path on every
++   * Present, and the flag it reads is the same atomic that Xlib's IO-error
++   * handler sets from whichever thread noticed the loss -- see the comment on
++   * g_connectionLost for why that handler must not touch g_mutex. Reading it
++   * lock-free here keeps the "is the connection dead" question answerable even
++   * while another thread is blocked inside a doomed round trip holding
++   * g_mutex, which is precisely when it is asked.
++   *
++   * ---- why the flag alone is not enough ---------------------------------
++   *
++   * DXVK builds libdxvk_dxgi.so and libdxvk_d3d11.so as separate shared
++   * objects that each statically link libwsi.a and export only their public
++   * D3D/DXGI entry points [MEASURED: `nm -D --defined-only` lists 5 and 4
++   * symbols respectively]. So this file exists TWICE in a D3D11 process, with
++   * two X11States, two Display*s -- two actual connections to the same server
++   * -- and two independent g_connectionLost flags. Xlib's IO-error handler
++   * fires only for the connection whose socket was actually read, so DXGI's
++   * copy learns of the death from its own isWindow() round trip while D3D11's
++   * copy, whose Display* is only ever driven by Mesa's WSI (which returns
++   * VK_ERROR_SURFACE_LOST_KHR rather than raising an Xlib IO error --
++   * docs/present-proof-radv.md §7), never hears about it at all.
++   *
++   * That was not a theory: D3D11Device::GetDeviceRemovedReason returned S_OK
++   * while DxgiSwapChain::PresentBase was returning DXGI_ERROR_DEVICE_REMOVED
++   * for the same event [MEASURED, and the reason the check below exists].
++   *
++   * So do not wait to be told. Both connections are to the same server and
++   * die together, and a dead stream socket is directly observable: a
++   * non-destructive MSG_PEEK read returns 0 at EOF. It costs one non-blocking
++   * syscall on a path that already performs a full X round trip, it consumes
++   * nothing (MSG_PEEK leaves the data for Xlib), and it is safe to issue
++   * while another thread is inside Xlib on the same fd. */
++  bool isConnectionLost() {
++    if (g_connectionLost.load(std::memory_order_acquire))
++      return true;
++
++    int fd = g_connectionFd.load(std::memory_order_acquire);
++
++    if (fd < 0)
++      return false;
++
++    char probe = 0;
++    ssize_t n = ::recv(fd, &probe, 1, MSG_PEEK | MSG_DONTWAIT);
++
++    /* n > 0: the server has sent us something we have not read yet -- alive.
++     * n == 0: orderly EOF, the server is gone.
++     * n < 0 with EAGAIN/EWOULDBLOCK: nothing pending, alive.
++     * n < 0 otherwise (ECONNRESET, EBADF, ENOTCONN): gone. EINTR is retried
++     * by treating it as alive; the next Present asks again a moment later. */
++    if (n > 0)
++      return false;
++
++    if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))
++      return false;
++
++    markConnectionLost(n == 0
++      ? "the X socket reached EOF"
++      : "the X socket is unreadable");
++    return true;
++  }
++
++
++  bool isViewable(uint64_t xid) {
++    std::lock_guard<std::mutex> lock(g_mutex);
++
++    if (!usableLocked() || !xid)
++      return false;
++
++    XWindowAttributes attr = { };
++    if (!g_x11.XGetWindowAttributes(g_x11.display, Window(xid), &attr))
++      return false;
++
++    return attr.map_state == IsViewable;
++  }
++
++
++  bool isRootWindow(uint64_t xid) {
++    std::lock_guard<std::mutex> lock(g_mutex);
++    return isRootWindowLocked(xid);
++  }
++
++
++  bool screenSize(uint32_t* pWidth, uint32_t* pHeight) {
++    std::lock_guard<std::mutex> lock(g_mutex);
++
++    if (!usableLocked())
++      return false;
++
++    int screen = g_x11.XDefaultScreen(g_x11.display);
++
++    if (pWidth)  *pWidth  = uint32_t(g_x11.XDisplayWidth (g_x11.display, screen));
++    if (pHeight) *pHeight = uint32_t(g_x11.XDisplayHeight(g_x11.display, screen));
++    return true;
++  }
++
++
++  const char* surfaceExtensionName() {
++    return VK_KHR_XLIB_SURFACE_EXTENSION_NAME;
++  }
++
++
++  VkResult createSurface(
++          uint64_t                  xid,
++          PFN_vkGetInstanceProcAddr pfnVkGetInstanceProcAddr,
++          VkInstance                instance,
++          VkSurfaceKHR*             pSurface) {
++    std::lock_guard<std::mutex> lock(g_mutex);
++
++    if (!usableLocked())
++      return VK_ERROR_INITIALIZATION_FAILED;
++
++    if (!xid)
++      return VK_ERROR_SURFACE_LOST_KHR;
++
++    /* The guard. Refusing here rather than in the caller is deliberate: this
++     * is the single choke point through which every XID that would become a
++     * VkSurfaceKHR must pass, including the surface-lost recreation path
++     * (dxvk_presenter.cpp:531-540). See isRootWindow() in the header for why
++     * a live, non-zero, rc=1 XID can still be the root window. */
++    if (isRootWindowLocked(xid)) {
++      std::fprintf(stderr,
++        "err:   Foreign WSI: REFUSING to create a surface on XID 0x%llx -- it is "
++        "the X root window.\n"
++        "err:   Presenting to it would paint the whole desktop. The HWND that "
++        "produced it has no X window of its own\n"
++        "err:   (message-only, foreign, or the desktop window); winex11.drv's "
++        "GET_DRAWABLE escape returns the DC's\n"
++        "err:   default drawable in that case, which is root_window.\n",
++        static_cast<unsigned long long>(xid));
++      return VK_ERROR_INITIALIZATION_FAILED;
++    }
++
++    auto pfnCreate = reinterpret_cast<PFN_vkCreateXlibSurfaceKHR>(
++      pfnVkGetInstanceProcAddr(instance, "vkCreateXlibSurfaceKHR"));
++
++    if (!pfnCreate)
++      return VK_ERROR_FEATURE_NOT_PRESENT;
++
++    /* The XID may have been created on somebody else's connection and may
++     * still be sitting in their output buffer. They are responsible for
++     * flushing before handing it over; sync ours so that our view of the
++     * server is at least current. */
++    g_x11.XSync(g_x11.display, 0);
++
++    VkXlibSurfaceCreateInfoKHR info = { VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR };
++    info.dpy    = g_x11.display;
++    info.window = Window(xid);
++
++    return pfnCreate(instance, &info, nullptr, pSurface);
++  }
++
++}
++
++#endif
+diff --git a/src/wsi/foreign/wsi_x11_foreign.h b/src/wsi/foreign/wsi_x11_foreign.h
+new file mode 100644
+index 0000000..891c06f
+--- /dev/null
++++ b/src/wsi/foreign/wsi_x11_foreign.h
+@@ -0,0 +1,70 @@
++#pragma once
++
++#if defined(DXVK_WSI_FOREIGN_X11)
++
++/* Deliberately does NOT include Xlib or DXVK's Win32 shim. Xlib defines
++ * None, Success, Bool, True and False as macros; the shim defines a Win32
++ * world. Keeping them in separate translation units is cheaper than fighting
++ * the collisions. Only plain integers and Vulkan handles cross this header. */
++
++#include <vulkan/vulkan.h>
++
++#include <cstdint>
++
++namespace dxvk::wsi::x11 {
++
++  /** Opens our own connection to $DISPLAY. Idempotent, returns false if
++   *  there is no X server or libX11 cannot be loaded. */
++  bool init();
++
++  void shutdown();
++
++  /** Geometry of a window we do not own. False if the XID is invalid. */
++  bool getGeometry(uint64_t xid, uint32_t* pWidth, uint32_t* pHeight);
++
++  /** Does this XID name a window on the server? */
++  bool isWindow(uint64_t xid);
++
++  /** Has our connection to the X server died?
++   *
++   *  Distinct from isWindow() returning false, which is the ordinary and
++   *  recoverable case of a window having been destroyed. This one is
++   *  terminal: the socket is gone, no XID can ever be presented to again,
++   *  and every entry point in this backend has already turned into a
++   *  polite "no" via usableLocked(). DXGI needs to be able to tell the two
++   *  apart, because only this one justifies reporting device loss to the
++   *  application. Set exactly once, from Xlib's IO-error path. */
++  bool isConnectionLost();
++
++  /** IsViewable, i.e. mapped and all ancestors mapped. */
++  bool isViewable(uint64_t xid);
++
++  /** Is this XID the root window of any screen on our connection?
++   *
++   *  This is a safety guard, not a convenience. Wine's
++   *  X11DRV_GET_DRAWABLE escape returns rc=1 and a perfectly live XID for a
++   *  message-only window, a foreign HWND, or the desktop window -- and that
++   *  XID is the ROOT WINDOW, because X11DRV_CreateDC initialises every display
++   *  DC with physDev->drawable = root_window (winex11.drv/init.c:99-102) and
++   *  X11DRV_GetDC returns early without issuing SET_DRAWABLE when the HWND has
++   *  no X window ("don't create a GC for foreign windows",
++   *  winex11.drv/window.c:3069-3070). Building a VkSurfaceKHR on that XID
++   *  paints the user's entire desktop. */
++  bool isRootWindow(uint64_t xid);
++
++  /** Size of the default screen. */
++  bool screenSize(uint32_t* pWidth, uint32_t* pHeight);
++
++  /** VK_KHR_XLIB_SURFACE_EXTENSION_NAME, from the one TU that has the
++   *  platform define set, so the string is never hand-typed. */
++  const char* surfaceExtensionName();
++
++  VkResult createSurface(
++          uint64_t                  xid,
++          PFN_vkGetInstanceProcAddr pfnVkGetInstanceProcAddr,
++          VkInstance                instance,
++          VkSurfaceKHR*             pSurface);
++
++}
++
++#endif
+diff --git a/src/wsi/meson.build b/src/wsi/meson.build
+index 1d88e2c..26495e8 100644
+--- a/src/wsi/meson.build
++++ b/src/wsi/meson.build
+@@ -10,6 +10,10 @@ wsi_src = [
+   'sdl2/wsi_monitor_sdl2.cpp',
+   'sdl2/wsi_platform_sdl2.cpp',
+   'sdl2/wsi_window_sdl2.cpp',
++  'foreign/wsi_monitor_foreign.cpp',
++  'foreign/wsi_platform_foreign.cpp',
++  'foreign/wsi_window_foreign.cpp',
++  'foreign/wsi_x11_foreign.cpp',
+   'glfw/wsi_monitor_glfw.cpp',
+   'glfw/wsi_platform_glfw.cpp',
+   'glfw/wsi_window_glfw.cpp',
+diff --git a/src/wsi/wsi_platform.cpp b/src/wsi/wsi_platform.cpp
+index 08f456e..8ee949e 100644
+--- a/src/wsi/wsi_platform.cpp
++++ b/src/wsi/wsi_platform.cpp
+@@ -3,6 +3,9 @@
+ #include "wsi_window.h"
+ #include "../util/util_env.h"
+ #include "../util/util_error.h"
++#include "../util/util_likely.h"
++
++#include <cstdio>
+ 
+ namespace dxvk::wsi {
+   static WsiDriver* s_driver = nullptr;
+@@ -12,6 +15,12 @@ namespace dxvk::wsi {
+ #if defined(DXVK_WSI_WIN32)
+     &Win32WSI,
+ #endif
++#if defined(DXVK_WSI_FOREIGN)
++    &HeadlessWSI,
++#endif
++#if defined(DXVK_WSI_FOREIGN_X11)
++    &X11ForeignWSI,
++#endif
+ #if defined(DXVK_WSI_SDL3)
+     &Sdl3WSI,
+ #endif
+@@ -129,6 +138,45 @@ namespace dxvk::wsi {
+     return s_driver->isWindow(hWindow);
+   }
+ 
++  bool isDisplayLost() {
++    /* DXVK_NO_DISPLAY_LOST_REPORTING=1 exists so the fix can be falsified: the
++     * identical binary then behaves as it did before, returning S_OK from
++     * Present forever on a dead connection, and the probe that must catch that
++     * has to catch it. Same role as DXVK_WSI_FOREIGN_NO_IOERROR_HANDLER in
++     * src/wsi/foreign/wsi_x11_foreign.cpp. Nothing else should ever set it. */
++    static const bool s_disabled =
++      dxvk::env::getEnvVar("DXVK_NO_DISPLAY_LOST_REPORTING") == "1";
++
++    if (s_disabled)
++      return false;
++
++    /* Callable before init() and after quit(): DXGI's present path may run
++     * while the device is being torn down, and "we have no WSI driver" is not
++     * the same statement as "the display died". */
++    bool lost = s_driver && s_driver->isDisplayLost();
++
++    /* DXVK_DEBUG_DISPLAY_LOST=1 prints the address of this translation unit's
++     * own s_driver. That is the only way to see, from outside, that
++     * libdxvk_dxgi.so and libdxvk_d3d11.so each carry a private copy of this
++     * file with a private WsiDriver and a private X connection -- which is
++     * why DxgiSwapChain and D3D11Device once disagreed about whether the
++     * display was gone. Reported on transitions only, since the present loop
++     * calls this millions of times. */
++    static const bool s_debug =
++      dxvk::env::getEnvVar("DXVK_DEBUG_DISPLAY_LOST") == "1";
++    static bool s_reported = false;
++    static bool s_lastValue = false;
++
++    if (unlikely(s_debug) && (!s_reported || lost != s_lastValue)) {
++      s_reported = true;
++      s_lastValue = lost;
++      std::fprintf(stderr, "wsi[s_driver@%p]: driver=%p isDisplayLost=%d\n",
++        static_cast<void*>(&s_driver), static_cast<void*>(s_driver), int(lost));
++    }
++
++    return lost;
++  }
++
+   bool isMinimized(HWND hWindow) {
+     return s_driver->isMinimized(hWindow);
+   }
+diff --git a/src/wsi/wsi_platform.h b/src/wsi/wsi_platform.h
+index f1fae3f..0e6b235 100644
+--- a/src/wsi/wsi_platform.h
++++ b/src/wsi/wsi_platform.h
+@@ -90,6 +90,17 @@ namespace dxvk::wsi {
+ 
+     virtual bool isWindow(HWND hWindow) = 0;
+ 
++    /**
++     * \brief Whether the connection to the display server has been lost
++     *
++     * Terminal and process-wide, as opposed to isWindow() returning false
++     * for a window that merely went away. Backends that cannot lose a
++     * connection -- Win32, SDL, GLFW -- inherit the default and never
++     * report loss, so the behaviour of every existing driver is unchanged.
++     * Not pure virtual for that reason.
++     */
++    virtual bool isDisplayLost() { return false; }
++
+     virtual bool isMinimized(HWND hWindow) = 0;
+ 
+     virtual bool isOccluded(HWND hWindow) = 0;
+@@ -114,6 +125,12 @@ namespace dxvk::wsi {
+ #if defined(DXVK_WSI_WIN32)
+   extern WsiBootstrap Win32WSI;
+ #endif
++#if defined(DXVK_WSI_FOREIGN)
++  extern WsiBootstrap HeadlessWSI;
++#endif
++#if defined(DXVK_WSI_FOREIGN_X11)
++  extern WsiBootstrap X11ForeignWSI;
++#endif
+ #if defined(DXVK_WSI_SDL3)
+   extern WsiBootstrap Sdl3WSI;
+ #endif
+diff --git a/src/wsi/wsi_window.h b/src/wsi/wsi_window.h
+index 085a437..55d8254 100644
+--- a/src/wsi/wsi_window.h
++++ b/src/wsi/wsi_window.h
+@@ -147,6 +147,18 @@ namespace dxvk::wsi {
+     */
+   bool isWindow(HWND hWindow);
+ 
++  /**
++    * \brief Has the connection to the display server been lost?
++    *
++    * Terminal and process-wide. Nothing can be presented after this
++    * becomes true, so callers should report device loss rather than
++    * silently succeeding. Always false on backends that own their own
++    * window system (Win32) or that cannot observe a connection loss.
++    *
++    * \returns Whether the display connection is gone for good
++    */
++  bool isDisplayLost();
++
+   /**
+     * \brief Is window minimized?
+     *

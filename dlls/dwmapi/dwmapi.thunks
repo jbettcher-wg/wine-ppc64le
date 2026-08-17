@@ -1,0 +1,18 @@
+# AMD64 thunk export spec -- dwmapi.dll.
+#
+# From the 2026-08-17 corpus pass.  Boltgun imports this module STATICALLY and
+# it had no guest thunk, so the loader refused the native ppc64 module
+# (c000007b) and the whole image failed to load (c0000135).  Measured: the
+# exe's import table names DwmIsCompositionEnabled (ordinal 18), DwmFlush (9),
+# DwmGetCompositionTimingInfo (11) and DwmSetWindowAttribute (27) -- the shape
+# every UE4 title asks about the compositor before it opens a swapchain.
+DLL dwmapi.dll
+FROM-SPEC auto
+
+# dwmapi.h is not in the oracle's default translation unit (nothing else needs
+# it), and without it EVERY one of the 24 exports was refused as "no
+# declaration found in Wine headers" -- a module with no exports, which loads
+# and binds every import of it to a sentinel.  Appended here exactly as
+# dbghelp appends dbghelp.h.  With it: 24 of 24 emitted, including all four
+# above.
+PROBE-EXTRA   dwmapi.h

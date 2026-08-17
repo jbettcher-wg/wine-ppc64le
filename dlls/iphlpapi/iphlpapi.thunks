@@ -6,3 +6,13 @@
 # .spec like every other one.
 DLL iphlpapi.dll
 FROM-SPEC auto
+
+# Every one of its 116 eligible exports was refused as "no declaration in any
+# Wine header", so what was emitted was a real PE with NO exports: it loads,
+# and every import of it binds to a missing-import sentinel.  Measured on a
+# LIVE Steam launch of DOOM (2026-08-17): the game got past SteamAPI_Init for
+# the first time, enumerated its network adapters, and called 0xdead001d --
+# the sentinel the loader handed it for iphlpapi.dll.GetAdaptersInfo -- from
+# DOOMx64vk.exe+0x32a7c2.  iphlpapi.h is not in the global probe (nothing else
+# needs it), so it is appended here exactly as dbghelp appends dbghelp.h.
+PROBE-EXTRA   iphlpapi.h

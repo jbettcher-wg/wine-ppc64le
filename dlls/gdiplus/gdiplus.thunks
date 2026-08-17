@@ -6,3 +6,13 @@
 # .spec like every other one.
 DLL gdiplus.dll
 FROM-SPEC auto
+
+# All 618 eligible exports were refused as "no declaration in any Wine
+# header", so the module emitted had none: it loads and every import of it
+# binds to a sentinel.  DOOM imports 22 of them (GdiplusStartup, GdipAlloc,
+# GdipCreateFromHDC and the image surface around them).  gdiplus.h is the
+# right header rather than gdiplusflat.h: the flat header is a fragment that
+# names GpStatus, REAL and every Gp* handle without declaring any of them,
+# and gdiplus.h is what pulls those in ahead of it on the C path.  With it,
+# 597 of the 618 resolve.
+PROBE-EXTRA   gdiplus.h

@@ -6,12 +6,14 @@ DELAYIMPORTS = evr urlmon user32
 EXTRADLLFLAGS = -Wb,--prefer-native
 
 SOURCES = \
+	mf.thunks \
 	clock.c \
 	copier.c \
 	evr.c \
 	main.c \
 	mf.idl \
 	mf.rc \
+	mfcom.c \
 	quality.c \
 	sac.c \
 	samplegrabber.c \

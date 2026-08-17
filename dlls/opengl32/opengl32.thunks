@@ -1,0 +1,63 @@
+# AMD64 thunk export spec -- opengl32.dll.
+#
+# Read dlls/kernel32/kernel32.thunks for the trap ABI banner and
+# dlls/vulkan-1/vulkan-1.thunks for the shape a whole-API module takes.  What
+# is different here is that OPENGL32 IS THE ONE MODULE WHOSE GUEST SURFACE IS
+# BIGGER THAN ITS EXPORT TABLE, and that difference is the entire design:
+#
+#   * Microsoft's opengl32.dll exports GL 1.1 and wgl* and nothing else, and
+#     has since 1996.  Wine's opengl32.spec says the same 361 names, correctly.
+#     Everything a modern game draws with is vended at RUNTIME by
+#     wglGetProcAddress and appears in no export table on any Windows machine.
+#     DOOM (2016)'s GL build carries a GLEW-style loader that asks for 2,497
+#     names that way; 2,278 of them are ones Wine can answer.
+#
+#   * A guest calling wglGetProcAddress must receive a GUEST-CALLABLE stub, so
+#     a stub for each of those names has to EXIST.  Hence FROM-SPEC names
+#     opengl32-guest.spec rather than opengl32.spec: the .spec's 361 lines
+#     copied verbatim (same names, same ordinals) plus one line per row of
+#     extension_registry[] in thunks.c -- the table Wine's own
+#     wglGetProcAddress answers from, so the guest surface is exactly what the
+#     native module can serve and not one name more.  Both parts are
+#     GENERATED, by ppc64le/opengl/gen-guest-surface.py, from wgl.h and
+#     thunks.c; ppc64le/opengl/check-gl-smoke.sh fails if either output has
+#     drifted from its inputs.
+#
+#   * ntdll resolves a trapping stub by looking its name up in the NATIVE
+#     namesake's export table, and 2,753 of these names are not in it.  So
+#     native opengl32 grows ONE private export, __wine_gl_entry_point (see
+#     dlls/opengl32/wgl.c), which answers the same registry by name with no
+#     context and no extension gating, and signal_ppc64.c's thunk_resolvers[]
+#     names this module as the one that needs it.  The precedent is d3d12's
+#     __wine_com_dispatch: one private entry point in the native module rather
+#     than 2,753 exports nobody else wants.
+#
+#   * WHICH names the guest may actually have is still decided per call, by
+#     the native wglGetProcAddress, inside signal_ppc64.c's
+#     emu_wglGetProcAddress: it asks the native module first and only vends a
+#     stub for a name the CURRENT context really offers.  A name Wine does not
+#     know, or an extension this driver does not have, or an entry point the
+#     oracle refused, all come back NULL -- once per name, loudly, by name.
+#     NULL from wglGetProcAddress is an answer every GL loader already checks
+#     for; a native ppc64 pointer is a crash none of them can diagnose.
+
+DLL       opengl32.dll
+FROM-SPEC opengl32-guest.spec
+
+# The native module's private resolver entry point, kept out of the guest
+# export list entirely: it is called by ntdll ON THE NATIVE MODULE, and a guest
+# has no use for it and no business finding it.
+EXCLUDE   __wine_gl_entry_point
+
+# The 2,753 extension entry points are declared in Wine's headers only as
+# PFN_* function-pointer typedefs, which the oracle -- reading FunctionDecls
+# out of clang's AST -- cannot see.  opengl32_guest_ext.h restates each typedef
+# as the declaration it implies, generated from the same wgl.h; wine/wgl.h
+# itself carries the GL 1.1 prototypes and every GL type both files need.
+PROBE-EXTRA wine/wgl.h
+PROBE-EXTRA opengl32_guest_ext.h
+# ...and six of the module's OWN .spec exports that Wine declares in no header
+# either -- wglSwapBuffers and wglSetPixelFormat among them, without which a
+# guest can neither choose a format nor present.  Hand-written; see the header.
+PROBE-EXTRA opengl32_guest_wgl.h
+INCLUDE-DIR .

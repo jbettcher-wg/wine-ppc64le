@@ -1,0 +1,60 @@
+# AMD64 thunk export spec -- wintrust.dll.
+#
+# From the 2026-08-17 everyday-DLL pass.  Anti-cheat shims, installers and
+# anything that checks its own Authenticode signature import WinVerifyTrust;
+# this module had NO guest thunk at all, so the loader found the native ppc64
+# builtin, correctly refused to splice it into a guest call, and the import
+# reported c000007b.  The export list is this module's own .spec.
+DLL wintrust.dll
+FROM-SPEC auto
+
+# Measured before these lines: 1 of 89 eligible exports emitted (WinVerifyTrust
+# itself was the one, because softpub's typedefs happen to reach through
+# wincrypt.h), 88 refused as "no declaration found in Wine headers".  Four
+# headers carry this module's surface and none is in the global probe:
+#
+#   wintrust.h   WinVerifyTrust/WinVerifyTrustEx, WintrustAddActionID and the
+#                provider-registration set, WTHelperProvDataFromStateData
+#   softpub.h    the WINTRUST_ACTION_GENERIC_* action GUIDs and the
+#                CRYPT_PROVIDER_* structures the callers actually pass
+#   mssip.h      CryptSIPLoad/CryptSIPRetrieveSubjectGuid and the subject
+#                interface package registration
+#   mscat.h      the whole CryptCATAdmin*/CryptCAT* catalogue family -- 27
+#                exports on its own, and the half a driver installer uses
+#
+# With all four: 45 of 89 emitted, 44 refused.
+PROBE-EXTRA   wintrust.h
+PROBE-EXTRA   softpub.h
+PROBE-EXTRA   mssip.h
+PROBE-EXTRA   mscat.h
+
+# --------------------------------------------------------------- the ceiling
+# The 44 that stay refused are every one "no declaration found in Wine
+# headers", and they are two populations, neither of which a guest imports:
+#
+#   * the PROVIDER ENTRY POINTS -- SoftpubInitialize, SoftpubLoadSignature,
+#     SoftpubCheckCert, SoftpubAuthenticode, SoftpubCleanup, HTTPSCertificate-
+#     Trust, DriverInitializePolicy, GenericChainCertificateTrust and their
+#     kin.  These are not an API: they are the function table WinVerifyTrust
+#     looks up in the registry and calls INTERNALLY, one step per verification
+#     stage, all inside this module.  A guest never names one, and each takes
+#     a CRYPT_PROVIDER_DATA* whose body is a graph of provider-owned pointers
+#     that would have to be walked, not marshalled.  Absent and named is the
+#     correct answer, not a gap.
+#
+#   * the ASN.1 encoder/decoder pairs (WVTAsn1SpcLinkEncode/Decode and eleven
+#     more).  Wine ships them in the .spec for crypt32's encoder registry to
+#     find by name; they take the CryptEncodeObject callback shape and are
+#     declared in no header on either side of the boundary.
+#
+# WHAT IS SERVED, which is the half that matters: WinVerifyTrust and
+# WinVerifyTrustEx, the WintrustAddActionID/WintrustRemoveActionID/
+# WintrustAddDefaultForUsage registration set, WTHelperProvDataFromStateData,
+# CryptSIPLoad/CryptSIPRetrieveSubjectGuid/CryptSIPAddProvider, and the
+# CryptCATAdmin*/CryptCAT* catalogue family.
+#
+# NO CALLBACK CROSSES THIS BOUNDARY.  The provider callbacks wintrust calls are
+# resolved by wintrust itself out of the registry and are always NATIVE ppc64
+# code in this same module; the guest supplies GUIDs and file handles, never a
+# function pointer.  That is why there is no EXCLUDE block here and why there
+# is one in dlls/wininet/wininet.thunks.

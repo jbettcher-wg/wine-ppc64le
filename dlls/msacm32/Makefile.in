@@ -3,6 +3,7 @@ IMPORTLIB = msacm32
 IMPORTS   = winmm user32 advapi32
 
 SOURCES = \
+	msacm32.thunks \
 	driver.c \
 	filter.c \
 	format.c \

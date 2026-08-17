@@ -38,6 +38,8 @@ Honest, and in progress.
 | Guest threads, callbacks, TLS, SEH | **work** — see below |
 | D3D12 → native vkd3d-proton | **works**, including **pixels on screen** |
 | `vulkan-1` guest thunks | **252 exports, 0 refused** |
+| System COM for guests | **works** — `ppc64le/syscom/check-com-smoke.sh`, 21/21, native and guest byte-identical |
+| The Steam client for guests | **reaches it** — `ppc64le/steamapi/check-steam-bridge.sh`; a guest gets a real `ISteamClient` and the real client library answers |
 | **A commercial game** | **no** — see "Where real games stop" |
 
 `ntdll` cannot be a PE and never will be: its TEB lives in an initial-exec
@@ -98,7 +100,26 @@ a `qsort` comparator or a progress callback — is intercepted at *registration*
 rather than at invocation, because a native caller holding a function pointer
 cannot classify it but the thunk that received it knows exactly what it is.
 Callbacks needing distinct identities get a trampoline from a pool allocated
-outside any guest image, so nothing mistakes a trampoline for guest code.
+outside any guest image, so nothing mistakes a trampoline for guest code. A
+callback whose pointer is carried *inside a struct* — a `WNDPROC` in a
+`WNDCLASS` — needs the registration to know the struct's shape rather than an
+argument's position, and a callback that returns more than 32 bits — a
+`WNDPROC` again, returning `LRESULT` — needs the trampoline's return width to
+be a property of the slot rather than of the pool.
+
+The gate for that direction is `ppc64le/seh/check-guest-callbacks.sh`: one
+guest process that registers window classes both ways, creates message-only
+windows (`HWND_MESSAGE`, so it is headless), proves its own `WNDPROC` ran as
+guest code for `WM_NCCREATE` and `WM_CREATE`, round-trips two `LRESULT`s with
+bits above 31 set, swaps the procedure with `SetWindowLongPtrW` and calls both
+forms of `CallWindowProcW` — 21 value-checking steps, a byte-exact transcript,
+and a layer that requires the port's own `+seh` trace to show three trampolines,
+all three tagged 64-bit return. The same process then asks `CreateThread` for a
+16 MiB reserved stack, reads its own TEB from inside the thread, and recurses
+past 12 MiB to prove the reserve is not just a number, with a `dwStackSize=0`
+thread beside it as the control. `--sabotage` runs both of the port's levers:
+`WINEEMUNOCBWRAP=1` (raw guest pointers to native code) and
+`WINEEMUNOSTACKSIZE=1` (guest stacks sized from the image again).
 
 Guest **exceptions** dispatch: a fault inside guest code is caught by Wine's own
 handler, reconstructed as an `EXCEPTION_RECORD` carrying the guest RIP, and
@@ -116,7 +137,9 @@ tree's `make`.
 ### Where real games stop
 
 **No commercial game runs yet.** Two were pointed at the port, and both got far
-enough to be useful rather than far enough to play.
+enough to be useful rather than far enough to play — though one of them now
+stops for a reason that belongs to the game and its launcher rather than to
+this port, which is a different kind of "not yet".
 
 Getting there closed a run of gaps that were structural rather than per-title,
 and each is worth naming because each will recur:
@@ -139,7 +162,104 @@ and each is worth naming because each will recur:
 * `LoadLibraryEx` was not intercepted, so a guest got a native `HMODULE` and
   then `NULL` from every `GetProcAddress` on it;
 * apisets were not resolved on the runtime `LoadLibrary` path, so every probe
-  for an `api-ms-win-*` set answered `NULL`.
+  for an `api-ms-win-*` set answered `NULL`;
+* the TEB describes **one** stack, and a thread running guest code has two —
+  the native ppc64 one Wine gave it and the guest stack the run loop
+  allocates. Guest `__chkstk`, which MSVC puts in front of every function
+  with a frame bigger than a page, loads `gs:[0x10]` and touches a byte per
+  page from there down to the new RSP; with the *native* bounds in the TEB
+  its very first probe landed on the *native* stack's guard page. That is the
+  `STATUS_STACK_OVERFLOW` this file used to record as Steam's DRM declining
+  to run. The TEB now describes whichever machine is executing — the guest
+  stack strictly inside a run, the native stack in every trap out of one —
+  which incidentally lets the guest stack **grow**, since Wine's own fault
+  handler decides whether a guard-page hit is a stack from those same fields.
+  The size is per **thread**, which is not the same as per image. The run loop
+  asked for a fixed 8 MiB, which matched no PE at all; then for zero, the way
+  every other thread stack in Wine asks for the main image's
+  `SizeOfStackReserve`; and now for the size of the stack *this thread* was
+  created with. A guest `CreateThread(..., dwStackSize, ...)` is an ordinary
+  thunk call into native `kernel32`, so `STACK_SIZE_PARAM_IS_A_RESERVATION`,
+  the image defaults, the one-megabyte floor and the granularity rounding have
+  all already been applied — to the thread's *native* stack, where the result
+  is readable as a pair of addresses in its own TEB. Mirroring that is the
+  whole plumbing, and it keeps the arithmetic in the one place that owns it.
+  Measured on DOOM: its main thread gets 2097152 bytes, which is its
+  `0x200000`, and the worker it prints `Starting stack size in KB: 8388608`
+  about gets 8388608 in the same run. (An earlier revision of this file read
+  that line as the port being caught out here. It is not: 8388608 is the
+  `dwStackSize` DOOM passes to `CreateThread`, printed from its own
+  configuration — a separate gap, and now a closed one.) `WINEEMUNOSTACKSIZE=1`
+  puts the image back in charge, which is what the gate has to go red against;
+* a callback-taking API missing from the interception table is a `bctrl` into
+  x86-64 bytes. Interception is at *registration*, so each API is a row, and
+  the rows follow what the corpus actually registers rather than API
+  taxonomy: DOOM handing a `FONTENUMPROC` to `EnumFontFamiliesA` was one, and
+  native `gdi32` called it once per font family. The next one could not be a
+  row at all. A `WNDPROC` arrives *inside* a `WNDCLASS`, so there is no
+  argument position to name it, and DOOM's window procedure reached `user32`'s
+  callback dispatcher as a raw guest pointer, was `bctrl`'d into with
+  `WM_NCCREATE`, and the `c000001d` that produced was **swallowed** by that
+  dispatcher ("ignoring exception c000001d") — leaving a window that would
+  never receive a message, and no error at all. Registration interception is
+  now struct-aware: `RegisterClass(Ex)A/W` copies the struct and swaps the one
+  field, `SetWindowLongPtrA/W(GWLP_WNDPROC)` swaps the value, and
+  `CallWindowProcA/W` swaps its first argument — which has to accept all three
+  things a guest can legitimately have there: one of our own trampolines, a raw
+  guest procedure it never registered, and a `win32u` **winproc handle**
+  (`0xffff00nn`), which is not a code pointer at all and which the general
+  wrapper would have run as one. A `WNDPROC` also forced the trampoline pool's
+  return width to become a per-slot property: it returns `LRESULT`, and the
+  pool sign-extended every result from 32 bits — correct for the comparators
+  and enumeration callbacks it carried until now, silently wrong for a message
+  result carrying a pointer or a handle. Measured on DOOM: `RegisterClassA`,
+  then `SetWindowLongPtrA(GWLP_WNDPROC)` — it subclasses its own window — then
+  `CallWindowProcA` chaining to the *native* procedure it replaced, which
+  passes through untouched.
+* **an import does not have to carry a name.** A descriptor may name an
+  *ordinal*, and then the number is the whole request. `tools/spec2thunk` wrote
+  a `.def` listing names only and let `lld-link` number the table `1..N` in
+  **name** order, which is not what a single one of these modules publishes —
+  so every module that pins ordinals (`gdiplus`, `shlwapi`, `oleaut32`,
+  `user32`, `ws2_32`, `wsock32`, `winspool.drv`, `uxtheme`, `gdi32`, `xinput`,
+  `winmm`, `shell32`, `msimg32`, `d3d12`) published the wrong ones to guests
+  and nobody could tell, because there was no name in the failure to go on.
+  Steam's own `d3ddriverquery64.exe` imports `d3d12.dll` ordinal **101** and
+  nothing else — where Microsoft's `d3d12.dll` has always exported
+  `D3D12CreateDevice` — bound `0xdead0001`, and died calling it. Ordinals are
+  now carried from each module's own `.spec` or `.def` into the thunk's export
+  table, numbered exactly the way `tools/winebuild/parser.c`'s
+  `assign_ordinals()` numbers the real module (base = the lowest *explicit*
+  ordinal, not 1; entries this machine does not export consume nothing;
+  everything the generator refuses keeps its number as a **hole**, so a guest
+  importing one still gets a named sentinel rather than an unrelated
+  function). Replicating that rule was checked against the export tables of
+  every module this tree builds: 41,512 named exports, zero disagreements.
+  `ppc64le/vkd3d/check-ordinal-imports.sh` is the gate — a guest that imports
+  `d3d12` ordinal 101 and requires the pointer to be the *same address*
+  `GetProcAddress("D3D12CreateDevice")` returns;
+* **a C runtime destroys its per-thread state through an FLS callback**, and
+  every MSVC toolchain does it, so this is not per-title either. `FlsAlloc` was
+  not in the registration-interception table, so the raw guest pointer went
+  into the native FLS slot and native `ntdll` `bctrl`'d into it at process
+  exit. `d3ddriverquery64.exe` printed its whole answer and *then* died
+  `c000001d` at `0x140002FEC`, which is the middle of an instruction because
+  the first two words of UCRT's `__acrt_freefls` happen to decode as valid
+  ppc64 and the third does not;
+* **a crash reporter that faults while reporting must not restart the
+  report.** DOOM's does. On a live Steam launch it called a missing-import
+  sentinel, its own top-level filter faulted trying to describe it, and that
+  fault was another unhandled guest exception on the same thread — which began
+  the whole unhandled report again, ~4.8 KiB of native stack deeper each time,
+  804,000 log lines, until the thread's 8 MiB was gone and it spun at 0%
+  holding a critical section a second thread was blocked on. The process
+  **hung**, and a hang names nothing. One unhandled guest exception is now
+  reported per thread: a second one arriving while the first is still being
+  reported names both and terminates, and a re-raise entered with less than
+  64 KiB of native stack left terminates rather than faulting inside the fault
+  handler. The marker is a stack address, not a counter, because a native
+  `__EXCEPT_ALL` above the frame can swallow the exception and unwind straight
+  past it — there is no epilogue to balance a counter in.
 
 Rather than translate the MSVC C++ ABI, **Microsoft's own `msvcp140.dll` is
 loaded as an x86-64 guest module** and runs under the emulator — which only
@@ -151,15 +271,268 @@ Where the two stop today:
   own code, then dereferences a global that its one writer never set. Not a
   thunk, sentinel or ABI problem.
 * **DOOM (2016, Vulkan build)** — every import resolves, including all 252
-  `vulkan-1` exports, and it dies in `steam_api64.dll` with `STATUS_STACK_OVERFLOW`.
-  That is Steam's DRM shim with no Steam client to talk to, so it is not
-  obviously a porting failure at all.
+  `vulkan-1` exports. The `STATUS_STACK_OVERFLOW` in `steam_api64.dll` this
+  file used to record, and excused as Steam's DRM shim with no client to talk
+  to, was **the port's own bug**: the guest `__chkstk` above, probing the
+  native stack's guard page. It was never Steam. It now **runs its whole
+  engine startup and stops on its own error path**: launched outside Steam,
+  `SteamAPI_Init()` cannot find a running client, and DOOM does what it does on
+  Windows — prints `[S_API FAIL] SteamAPI_Init() failed`, then `FATAL ERROR:
+  Steam failed to initialize`, and throws a C++ exception at its own top-level
+  `catch`. That `catch` is a *consolidating* unwind, and it now works (see
+  below), so the throw is **caught**, the error path runs to its end, and the
+  process stops on the `int3` DOOM's own fatal-error handler executes. The
+  whole run is nine lines of log and exit 3. Until that landed, the refusal
+  turned the throw into an unhandled exception and DOOM's crash handler looped
+  1730 times on `FATAL ERROR: Filesystem call made without initialization`
+  before overflowing its stack. **The frontier is now Steam.** Nothing between
+  the entry point and `SteamAPI_Init` belongs to this port any more — the two
+  swallowed `c000001d`s that used to sit just before it were the window
+  procedure, and they are gone too. Launched **from Steam** on 2026-08-17 it
+  went past that line for the first time: the guest bound a real
+  `ISteamClient017` through `dlls/steamclient64` and the client answered, with
+  only the three callback-taking methods refused by name. What it died on next
+  was one more missing import — `iphlpapi.GetAdaptersInfo`, reached as
+  `0xdead001d` from `DOOMx64vk.exe+0x32a7c2`, because that whole module's
+  exports had been refused for want of a header in the signature oracle's
+  translation unit and the thunk emitted had none at all. Auditing the binary's
+  entire import table against the built thunks rather than waiting for the next
+  one found 94 imports in that state across nine modules; adding the headers
+  they are declared in leaves **two**, both genuinely unrepresentable and both
+  named: `SetConsoleScreenBufferSize` takes a `COORD` and `AlphaBlend` a
+  `BLENDFUNCTION`, by value.
 
-**Known gaps.** System COM is not finished: `CoCreateInstance` still hands a
-guest a native vtable, so ole32-dependent tests reach `main` and stop there.
-Table-based `.pdata` exception dispatch is not implemented (no corpus binary
-needs it yet, but real-world binaries will). D3D11 on this path, swapchain
-resize and fullscreen, and the Wayland driver leg are all unbuilt.
+  What stood between the two was the thread-naming idiom, and it is worth
+  keeping the diagnosis because the fix generalises. Naming a thread on
+  Windows means raising `0x406D1388` inside a `__try/__except` that swallows
+  it, and the `__except` never ran: the language handler in DOOM's `.xdata` is
+  the copy of `__C_specific_handler` its **static** MSVC runtime linked into
+  its own `.text` (`DOOMx64vk.exe+0x1eab2c8`, reading
+  `DispatcherContext->HandlerData` as a scope table — it is one, byte for byte
+  a different one), not the guest `ntdll`'s, which is the only
+  `__C_specific_handler` this port can *prove* is one. `steam_api64.dll` names
+  `__GSHandlerCheck` the same way. Nothing in a PE says which of
+  `__C_specific_handler`, `__GSHandlerCheck` and `__CxxFrameHandler3/4` a
+  handler RVA is, and they take incompatible handler data, so accepting one on
+  resemblance would mean running an arbitrary address as a filter funclet. The
+  port used to refuse, and the game died on an exception Windows discards. It
+  now enters the handler **as guest code** instead, which needs no
+  identification at all, and serves the cross-boundary `RtlUnwindEx` that such
+  a handler calls — see the dispatch section below. Two further stops fell in
+  the same run and neither was SEH: the `dbghelp.dll` guest thunk had **no
+  exports at all** (every one of its 140 refused as "no declaration in any Wine
+  header", so DOOM's crash-reporter setup called `0xdead0017`, the sentinel the
+  loader hands a missing import — one `PROBE-EXTRA dbghelp.h` line), and every
+  `GetSystemInfo` was answering `PROCESSOR_ARCHITECTURE_PPC64` to a program
+  made entirely of x86-64. No `vulkan-1` entry point is reached yet: the game
+  stops before it gets that far, on Steam rather than on graphics.
+
+**System COM** now crosses. `CoCreateInstance` hands a guest a **proxy** whose
+vtable is the guest thunk module's own trap-stub array, so a guest calling a
+COM method traps into `combase` and reaches Wine's real implementation, with
+interface pointers translated in both directions at the boundary. The gate is
+`ppc64le/syscom/check-com-smoke.sh`: one source built twice, run as a native
+ppc64 PE and as an x86-64 guest, 21 checked steps across `IMoniker`,
+`IClassFactory` and `IStream`, byte-identical output — and red under
+`WINEEMUNOCOMWRAP=1`, which is the same run with the wrapping turned off.
+
+**Table-based `.pdata` exception dispatch** now works, which is how a
+`__try/__except` in any MSVC-compiled x86-64 binary is actually found: nothing
+is registered at runtime, so dispatch means walking the guest's exception
+directory, virtually unwinding an `AMD64_CONTEXT` frame by frame and asking
+each frame's language handler. The unwinder is not new code — Wine already
+compiles one architecture's unwinder under suffixed names to serve ARM64EC, and
+`unwind.c`'s x86-64 block is now built on ppc64 the same way, against the
+guest's `CONTEXT` shape. What is new is the boundary.
+
+**A frame's language handler is entered as guest code.** That is the only
+answer that scales, because the question "which handler is this" cannot be
+asked of a PE: an image linked against the static MSVC runtime carries its own
+`__C_specific_handler`, its own `__GSHandlerCheck` and its own
+`__CxxFrameHandler*` in `.text`, and the `.xdata` names those. So the walk
+builds a `DISPATCHER_CONTEXT_AMD64` — `ControlPc`, `ImageBase`,
+`FunctionEntry`, `EstablisherFrame`, `TargetIp`, `ContextRecord`,
+`LanguageHandler`, `HandlerData`, `ScopeIndex`, `HistoryTable`, all of it in
+memory the guest can read, because on this port guest memory *is* host memory
+— and calls `handler(rec, EstablisherFrame, ctx, dispatch)` through the same
+nested-run primitive that already ran TLS callbacks and `DllMain`, honouring
+the disposition it returns. The guest `ntdll`'s own `__C_specific_handler` is
+still recognised by **address identity** and served natively, with only its
+filter and `__finally` **funclets** entered as guest code; both paths are
+handed the same `DISPATCHER_CONTEXT` built in the same place, so they cannot
+drift apart structurally.
+
+**`RtlUnwindEx` crosses the boundary**, which is what such a handler does the
+moment its `__except` accepts. It cannot jump — the frames it would abandon
+include the *native* frames of the emulator run that is running the handler —
+so the request is recorded and the handler's run is **ended**, and the frame
+walk that entered the handler performs the unwind against the faulting stack,
+running every guest `__finally` in between as guest code. Guest code that calls
+`RtlUnwindEx` while not inside such a handler is unwinding inside its own run
+and is served in place. Either way, resuming at the target is a context write
+rather than a stack switch: the unwound `AMD64_CONTEXT` gets `Rip` = TargetIp
+and `Rax` = the unwind's return value, and the emulator continues from it.
+
+**A C++ `catch` is a consolidating unwind**, and it crosses too. MSVC does not
+unwind to a jump target for `catch`: `__CxxFrameHandler` calls `RtlUnwindEx`
+with a record whose code is `STATUS_UNWIND_CONSOLIDATE` and whose
+`ExceptionInformation[0]` is a *consolidation routine*. The unwind itself is
+ordinary — every `__finally` between the throw and the catching frame runs,
+which is where destructors live — but the resume is not: the routine is called
+once the stack is unwound and the address it **returns** is where execution
+continues, TargetIp being ignored. Here that routine is entered as guest code
+like every other funclet, and the *whole record* reaches it: Wine's own
+`__CxxFrameHandler` fills eleven `ExceptionInformation` slots and a real
+`__CxxCallCatchBlock` reads six of them, so a port that carried slot 0 and
+dropped the rest would run a catch block against a frame it invented. It runs
+on the nested run's own guest stack rather than on the unwound one, which is
+sound for exactly the reason the filter and `__finally` funclets are: a funclet
+addresses its parent's locals through the establisher frame it is *handed* —
+slot 1 — never through the stack it happens to be running on. The cost is named
+in the source rather than left to be found: a `throw` that must escape the catch
+block searches only as far as that nested run's entry frame. A consolidating
+unwind that names **no** routine is still refused, by name; that one has no
+right answer, and resuming at the TargetIp it was handed is the plausible wrong
+one.
+
+There are two gates, deliberately separate so that each has one owner for its
+red state. `ppc64le/seh/check-seh-smoke.sh` covers the identity fast path: 14
+value-checking steps over exception codes, `ExceptionInformation`, faulting
+addresses, `__finally` call counts and ordering, and a two-frame unwind, plus a
+layer that proves the built probe really carries `.pdata` and that its handler
+binds to guest code and not to ppc64. `ppc64le/seh/check-seh-handlers.sh` covers
+the guest-entered path, on a probe whose `.pdata` provably names a **private**
+language handler — a hand-written `.seh_proc` with a `.seh_handler` directive,
+because every `__try` clang compiles names `__C_specific_handler` and no flag
+changes that. 26 value-checking steps, a byte-exact transcript, and a layer that
+re-runs at `+seh` and requires the port's own trace to name the same handler
+address the image's `.xdata` names, as many times as the probe counted. Steps 21
+to 25 are the consolidating unwind, hand-built to the eleven-slot shape Wine's
+own `__CxxFrameHandler` produces and checked field by field by the routine it
+was built for — including that the resume came from the routine's return value
+and not from the TargetIp, which the probe's frame can prove because it has two
+landing pads, and driven down **both** of the port's unwind roads: a handler
+asking for the unwind (deferred to the frame walk) and ordinary guest code
+asking for it (served in place from the trap context). That lane is hand-built
+because it cannot be compiled: clang
+`-target x86_64-windows-gnu` gives C++ `try/catch` the `__gxx_personality_seh0`
+personality — libstdc++'s, not MSVC's, and it does not use
+`STATUS_UNWIND_CONSOLIDATE` at all — and linking one into the probe's `-nostdlib`
+image fails on `__cxa_allocate_exception`, `__cxa_throw` and
+`__cxa_begin_catch`; `-target x86_64-windows-msvc` emits `__CxxFrameHandler3`
+and `_CxxThrowException`, neither of which this tree's guest `msvcrt` thunk
+exports. Both measured with the toolchain the gate runs on.
+
+**Known gaps.** System COM is not *finished*: the roster covers 58 interfaces
+and 652 slots, but a guest-implemented object passed back into Wine still
+needs reverse proxies, and most interface-bearing flat exports are refused
+loudly rather than wrapped (105 of `oleaut32`'s 106, for one).
+Exception dispatch runs any language handler now, and refuses what is left by
+name rather than guessing: **collided unwinds** — an exception raised while an
+unwind is already in progress, a handler that starts a second unwind from
+inside the first, or one that returns `ExceptionCollidedUnwind` — an exit
+unwind, which names no frame to resume in, and a consolidating unwind that
+names no consolidation routine. Each terminates with its own message naming the
+frame and the handler. A guest exception that must be caught
+**below a nested run** — raised inside a guest callback that native code
+invoked — is a second, untested limit: the frame walk ends at that run's entry
+frame, and the record is re-raised natively where no guest handler can see it.
+D3D11 on this path, swapchain resize and fullscreen, and the Wayland driver leg
+are all unbuilt.
+
+**No debugger can be pointed at a guest.** `winedbg` cannot attach to a process
+running a guest image, so the one tool that would print a backtrace for a guest
+crash is the one tool that cannot be aimed at one. Attaching means injecting a
+thread that starts at `DbgUiRemoteBreakin`, and this port's `RtlUserThreadStart`
+classifies every thread start before running it: a guest entry point goes to the
+run loop, a native one is called directly, and an address that is in **no loaded
+image** is refused rather than guessed at — `thread start 0x3FFF... is in no
+loaded image; refusing to run it either way`. The injected breakin routine lands
+in exactly that third case, because it lives in the ELF `ntdll` rather than in
+any PE the loader has a record of, so the attach dies at the door and takes the
+debugging session with it. Nothing in this file was diagnosed with a debugger
+for that reason; every crash here was read off the port's own `+seh` trace, a
+disassembler and the exception record's `ExceptionAddress`, which is also why
+the loader hands out a **distinct** `0xdead0000+n` per unresolved import instead
+of one shared `0xdeadbeef` — post mortem, the faulting address is the only name
+the symbol has left. It is a gap in the tooling, not in the port: a guest is
+debuggable in principle, and until it is, `AeDebug` is a hazard rather than a
+help. Every gate here runs with `WINEDLLOVERRIDES=winedbg.exe=d`, because a red
+state that starts a debugger that then never attaches is a **hang**, which is
+the one thing a gate must never be.
+
+### Steam
+
+**A guest now reaches the real Steam client.** `dlls/steamclient64` vendors
+Proton's `lsteamclient` and splits it across the ISA boundary rather than
+reimplementing it, because Proton has already done the hard part: every one of
+the ~6500 Steamworks methods across the version matrix is reduced to a flat
+params-struct call over a single `WINE_UNIX_CALL`. That boundary is kept and
+stretched across a **process**.
+
+The half a game touches is compiled **for x86-64**, unlike every other
+guest-facing module here. That is deliberate and it is the whole design
+decision. A COM vtable can be served by `libs/winecom`'s trap stubs because it
+is a closed shape — three `IUnknown` slots, `HRESULT` returns, an argument
+classification small enough to write down per slot. A Steamworks vtable is
+not: no `IUnknown`, no IID, no `HRESULT`, and signatures with `float` and
+`double` returns, `CSteamID` passed and returned by value, 136-byte
+`SteamNetworkingIdentity` arguments that MS-x64 passes by hidden reference, and
+hidden-sret returns. Serving those through a dispatcher that can only marshal
+integers into `RAX` would mean generating a per-slot MS-x64 marshal descriptor
+for every one of them — which is exactly the code a C compiler emits when it
+compiles Proton's own PE-side wrappers, because those wrappers **are** the
+marshaller. So they are compiled for the machine the game is running on, and
+the game-to-`steamclient64.dll` boundary stays x86-64 calling x86-64, as it is
+on Windows and under Proton. All 46 PE-side sources compile for
+`x86_64-windows-gnu` against this tree's headers; the DLL is ordinary build
+output.
+
+The other half runs as an **x86-64 Linux** helper under FEX, because
+`~/.steam/sdk64/steamclient.so` is an x86-64 SysV ELF that native ppc64le Wine
+cannot load and that the embedded emulator — which runs x86-64 *Windows* code —
+cannot host either. It is Proton's unix side unmodified: 219 translation
+units, compiled for `x86_64-linux-gnu` against this tree's Wine headers with
+zero errors, plus the eleven ntdll entry points a Wine unixlib gets for free
+and a standalone program does not.
+
+What is new is the marshalling, and it is generated rather than written:
+`tools/steamrpc/gen-steamrpc` reads Proton's own params structs and classifies
+every pointer field by its C type and, where the type is not enough, by the
+next field's name — the same `count/len/size/num` idiom Proton's generator
+asserts on. It emits **C**, so every length is a `sizeof` and every offset an
+`offsetof` evaluated by the compiler that also compiles the structs; the
+generator never needs to know a layout. **6234 of 6556 methods are bridged and
+322 are refused by name** — callback function pointers, game-implemented
+callback interfaces, pointer graphs the params struct does not describe, and
+three types the SDK only forward-declares. A wrong length here would be a
+silent memory bug in someone else's game, so the classifier fails closed.
+
+The helper knows nothing about Steamworks: each frame carries its own pointer
+map, so adding an interface version needs no change to it at all.
+
+The gate is `ppc64le/steamapi/check-steam-bridge.sh`. Its second layer is the
+one worth naming: a synthetic call exercising every parameter class — in-string,
+out buffer with an explicit length, fixed struct by pointer, sized caller
+buffer, opaque handle, in-place scalars — with values checked on **both** ends,
+including that the caller's own pointers come back unchanged rather than
+holding helper addresses. It needs no Steam client, which is the point: a
+length or direction that is off by one is invisible in a "did it connect" test.
+Measured cost of a round trip: **0.5 ms**, over 2000 calls.
+
+With no client running, the chain produces the answer a Linux game gets —
+`CreateSteamPipe` returns 0 — and with no helper at all, `CreateInterface`
+returns NULL, which is what lets `steam_api` print its own `SteamAPI_Init()
+failed` instead of crashing. Both are asserted, and so is the negative control.
+
+**Not done.** No Steam client has been running on this machine while any of
+this was built, so the layer that needs one — appid 480, Spacewar — has been
+written and never executed. The callback path (`Steam_BGetCallback`) is
+plumbed and untested for the same reason. DOS/unix path translation inside the
+helper is refused by name rather than answered, because the helper has no Wine
+prefix. And `steam_api64.dll` reads an absolute path out of the registry, which
+the guest loader refuses outright, so the prefix's `SteamClientDll64` is a bare
+name — that refusal wants relaxing before a real game can be pointed at this.
 
 ## The interesting part: r2 across unwound frames
 

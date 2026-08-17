@@ -1105,6 +1105,8 @@
 @ stub _initptd
 @ cdecl _initterm(ptr ptr)
 @ cdecl _initterm_e(ptr ptr)
+@ cdecl -arch=ppc64 __wine_guest__initterm(ptr ptr) ntdll.__wine_guest__initterm
+@ cdecl -arch=ppc64 __wine_guest__initterm_e(ptr ptr) ntdll.__wine_guest__initterm_e
 @ stub -arch=i386 _inp(long)
 @ stub -arch=i386 _inpd(long)
 @ stub -arch=i386 _inpw(long)

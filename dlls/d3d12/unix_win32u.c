@@ -13,6 +13,14 @@
  * hooks run from the unixlib Present slot, not from inside vkd3d
  * (presentation-design.md §4, division of labour).
  *
+ * THERE IS ONE COPY OF THIS FILE AND TWO UNIXLIBS COMPILE IT.  dlls/d3d11's
+ * and dlls/d3d9's unixlibs present through the same seam for DXVK and include
+ * this source directly (each of their unix_win32u.c is that one line and its
+ * reasons); the three .so files each get their own copy of these four symbols,
+ * which is what they want, and there is still only one place where the win32u
+ * ABI is spelled.  The only thing that varies is the debug channel, because a
+ * d3d11 process filtering +d3d11 should see these traces.
+ *
  * Copyright 2026 the ppc64le port authors
  *
  * This library is free software; you can redistribute it and/or
@@ -41,7 +49,17 @@
 #include "wine/vulkan_driver.h"
 #include "wine/debug.h"
 
+/* Spelled out rather than macro-pasted: WINE_DEFAULT_DEBUG_CHANNEL stringifies
+ * its argument to name the channel, so a macro passed to it would produce a
+ * channel literally called HWNDSURF_CHANNEL that no WINEDEBUG spelling could
+ * ever switch on. */
+#if defined(HWNDSURF_CHANNEL_D3D11)
+WINE_DEFAULT_DEBUG_CHANNEL(d3d11);
+#elif defined(HWNDSURF_CHANNEL_D3D9)
+WINE_DEFAULT_DEBUG_CHANNEL(d3d9);
+#else
 WINE_DEFAULT_DEBUG_CHANNEL(d3d12);
+#endif
 
 static const struct hwnd_surface_funcs *hwnd_funcs;
 static PFN_vkGetInstanceProcAddr system_gipa;
@@ -88,8 +106,18 @@ static void hwndsurf_init_once( void )
     }
 }
 
-/* Returns VkResult as int; surface out as UINT64. */
-int hwndsurf_create( UINT64 hwnd, void *vk_instance, UINT64 *surface, void **cookie )
+/* Returns VkResult as int; surface out as UINT64.
+ *
+ * `gipa` is the vkGetInstanceProcAddr the CALLER's instance was created
+ * through, and win32u resolves vkCreate{Xlib,Wayland}SurfaceKHR from it.
+ * Passing NULL asks for the system loader's, resolved here from
+ * SONAME_LIBVULKAN -- which is what vkd3d wants, because its instance came
+ * from that loader and it has no gipa of its own to hand over.  DXVK does have
+ * one and passes it, so its surface is created through exactly the dispatch
+ * chain its VkInstance was built with; guessing there would work right up
+ * until somebody put a layer in front of it. */
+int hwndsurf_create_gipa( UINT64 hwnd, void *vk_instance, void *gipa,
+                          UINT64 *surface, void **cookie )
 {
     VkSurfaceKHR host_surface = 0;
     VkResult res;
@@ -98,11 +126,18 @@ int hwndsurf_create( UINT64 hwnd, void *vk_instance, UINT64 *surface, void **coo
     if (!hwnd_funcs) return VK_ERROR_INITIALIZATION_FAILED;
 
     res = hwnd_funcs->surface_create( (HWND)(ULONG_PTR)hwnd, (VkInstance)vk_instance,
-                                      system_gipa, &host_surface, cookie );
+                                      gipa ? (PFN_vkGetInstanceProcAddr)gipa : system_gipa,
+                                      &host_surface, cookie );
     *surface = (UINT64)host_surface;
-    TRACE( "hwnd %p instance %p -> res %d surface 0x%s\n", (void *)(ULONG_PTR)hwnd,
-           vk_instance, res, wine_dbgstr_longlong( host_surface ) );
+    TRACE( "hwnd %p instance %p gipa %p -> res %d surface 0x%s\n",
+           (void *)(ULONG_PTR)hwnd, vk_instance, gipa, res,
+           wine_dbgstr_longlong( host_surface ) );
     return res;
+}
+
+int hwndsurf_create( UINT64 hwnd, void *vk_instance, UINT64 *surface, void **cookie )
+{
+    return hwndsurf_create_gipa( hwnd, vk_instance, NULL, surface, cookie );
 }
 
 void hwndsurf_update( void *cookie )

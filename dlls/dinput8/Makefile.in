@@ -1,6 +1,6 @@
 MODULE    = dinput8.dll
 IMPORTLIB = dinput8
-IMPORTS   = dinput8 cfgmgr32 dxguid uuid comctl32 ole32 user32 advapi32 hid
+IMPORTS   = dinput8 cfgmgr32 dxguid uuid comctl32 ole32 user32 advapi32 hid winecom
 EXTRADEFS = -DDIRECTINPUT_VERSION=0x0800
 PARENTSRC = ../dinput
 
@@ -9,6 +9,7 @@ VER_PRODUCTVERSION      = 5,1,2600,881
 
 SOURCES = \
 	dinput8.thunks \
+	guestcom.c \
 	ansi.c \
 	config.c \
 	data_formats.c \

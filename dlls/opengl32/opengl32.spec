@@ -359,3 +359,10 @@
 @ stdcall wglUseFontBitmapsW(long long long long)
 @ stdcall wglUseFontOutlinesA(long long long long float float long ptr)
 @ stdcall wglUseFontOutlinesW(long long long long float float long ptr)
+
+# Not an OpenGL entry point and not on any Windows machine: the single private
+# entry ntdll's guest trap dispatcher resolves an extension stub through, since
+# no opengl32 anywhere exports the 2,753 names wglGetProcAddress vends.  Last
+# in the file so every real export keeps the ordinal it has always had.  See
+# __wine_gl_entry_point in wgl.c and dlls/opengl32/opengl32.thunks.
+@ stdcall __wine_gl_entry_point(str)

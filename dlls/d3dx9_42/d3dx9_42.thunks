@@ -1,0 +1,86 @@
+# AMD64 thunk export spec -- d3dx9_42.dll.
+#
+# From the 2026-08-17 Skyrim Special Edition triage, and the same finding as
+# the 2026-08-15 one that added dxgi's and d3d11's: SkyrimSE.exe imports this
+# module, Wine provides it as a NATIVE ppc64 builtin, and the loader correctly
+# refuses to splice that into a guest call -- reported as c000007b, four times
+# over, before the process reaches a single graphics call.  Nothing here is
+# hand-written: the export list comes from this module's own .spec.
+DLL d3dx9_42.dll
+FROM-SPEC auto
+
+# THE MODULE LOADED AND EXPORTED ONE THING.  Measured before this line existed:
+# 0 of 266 eligible exports emitted, 266 refused as "no declaration found in
+# Wine headers".  d3dx9.h is not in the global probe (wine_sig.PROBE_SRC)
+# because nothing else needs it, and it is the umbrella that pulls in
+# d3dx9math.h, d3dx9core.h, d3dx9tex.h, d3dx9shader.h, d3dx9mesh.h,
+# d3dx9anim.h, d3dx9shape.h, d3dx9effect.h and d3dx9xof.h -- that is, the
+# entire helper library, which is a header-declared surface with no widl
+# involvement at all.  One line takes it to 264 of 266.
+#
+# WHAT THAT BUYS.  The whole flat D3DX* math library (D3DXMatrix*, D3DXVec*,
+# D3DXQuaternion*, D3DXPlane*, D3DXColor*, the SH lighting set), the texture
+# and surface loaders (D3DXCreateTextureFromFile*, D3DXLoadSurfaceFromMemory,
+# D3DXSaveTextureToFile*, D3DXFilterTexture, ...), the shader compiler
+# forwards, the mesh and .x-file entry points and the sprite/font/line/effect
+# CREATORS.  Every one of these is pointer-in/pointer-out by construction --
+# D3DX math writes through an out-pointer and returns it -- which is why the
+# floating-point ceiling this port has (arguments must fit XMM0-3) bites only
+# once, below.
+#
+# This surface does NOT need the d3d9 lane to land first.  A D3DX entry point
+# that takes or vends an IDirect3DDevice9 passes the pointer through, and
+# whether that pointer is a guest proxy or a native object is decided in
+# d3d9's own lane, by whatever winecom instance vends it there.  Nothing here
+# has to know.
+PROBE-EXTRA   d3dx9.h
+
+# --------------------------------------------------------------------------
+# THE TWO REFUSALS, BY NAME.  Both are shape, not laziness, and both are
+# reported by the generator with these exact texts:
+#
+#   D3DXSHEvalHemisphereLight
+#       "int128 argument (wider than one 64-bit slot) (d3dx9_42.spec:256)"
+#       -- the .spec's own argument list says int128.  The descriptor carries
+#       one 64-bit slot per argument and the host marshaller reads the guest's
+#       integer register file; a 128-bit argument has no slot to arrive in.
+#
+#   D3DXComputeTangentFrameEx
+#       "floating-point argument 11 is past XMM3, which MS-x64 passes on the
+#       stack" -- the host reads its floating-point arguments out of the
+#       guest's XMM registers (marshal_thunk_args_fp in ntdll), and MS-x64 has
+#       only XMM0-3 for arguments.  The twelfth argument is on the guest stack,
+#       where nothing on this side looks.
+#
+# Both are absent from the export table and bind to a distinct named sentinel,
+# so a guest that calls one dies at 0xdead00nn with the symbol in the WARN --
+# never a silently wrong tangent frame.
+#
+# --------------------------------------------------------------------------
+# THE INTERFACE HALF, AND WHY IT IS NOT REFUSED HERE.  About sixty of the 264
+# vend a COM object -- D3DXCreateTextureFromFile* an IDirect3DTexture9,
+# D3DXCreateBuffer an ID3DXBuffer, D3DXCreateEffect an ID3DXEffect,
+# D3DXCreateSprite/Font/Line/Mesh their own -- and this module publishes no
+# COM roster, so what reaches the guest is a NATIVE vtable.  A guest method
+# call through one executes ppc64 bytes as x86-64: exactly the defect
+# hangover-ppc64le/docs/system-com-design.md exists for.
+#
+# It is not reachable today, and the reason is worth writing down rather than
+# assuming.  Every one of those entry points needs a live IDirect3DDevice9 as
+# its first argument, and a guest has no way to obtain one: dlls/d3d9 has no
+# .thunks file at all, so d3d9.dll.Direct3DCreate9 binds a missing-import
+# sentinel and the guest dies there, naming the symbol, before it ever holds a
+# device.  The hazard therefore opens on exactly the day d3d9's guest lane
+# lands -- which is the graphics lane's, not this one's -- and closes the same
+# way d3d11's did: one COM-JSON roster naming the D3D9 and D3DX9 interfaces,
+# one winecom instance, and this file gaining a COM-JSON line.  Serving the
+# flat half now costs that lane nothing and unblocks every caller that only
+# wants the math.
+#
+# ID3DXEffect is the one to expect trouble from when that day comes, and it is
+# named here so the next pass starts from a list rather than a crash: 87 slots
+# over a surface of D3DXHANDLEs, by-value D3DXVECTOR4/D3DXCOLOR and
+# D3DXMATRIX pointers, plus an ID3DXEffectStateManager the APPLICATION
+# implements -- a guest-implemented object handed to native code, which is the
+# reverse-proxy direction winecom does not have yet (design §6, step 5).  That
+# one is a refusal by construction, not by effort.

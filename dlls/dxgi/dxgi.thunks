@@ -1,11 +1,38 @@
-# AMD64 thunk export spec -- dxgi.dll.
+# AMD64 thunk export spec for the guest dxgi.dll -- COM mode.
 #
-# Added from the 2026-08-15 first-real-game triage: with the application's own
-# shipped DLLs now loadable (find_dll_file() searches the load path for the
-# guest's machine instead of refusing it outright), what stopped
-# quake2ex_steam.exe was Wine builtins with no guest thunk -- each reported as
-# c000007b, the loader correctly refusing to splice a native ppc64 module into
-# a guest call.  Nothing here is hand-written: the export list comes from this
-# module's own .spec.
-DLL dxgi.dll
+# Same roster as dlls/d3d11/d3d11.thunks and dlls/d3d10core/d3d10core.thunks,
+# from the same one file, for the reason spelled out there: the native
+# d3d11.dll holds the ONLY winecom instance for this surface (libs/winecom
+# state is per-linkee), so a proxy minted through dxgi must be understood by
+# d3d11.  Native dxgi.dll forwards both its flat exports and
+# __wine_com_dispatch into d3d11 through dlls/dxgi/dxgi.spec.
+#
+# This module's Wine implementation over wined3d is replaced by DXVK's dxgi,
+# which is the real DXGI -- unlike vkd3d-proton, which implements only the
+# handful of DXGI interfaces it consumes itself.
+
+DLL       dxgi.dll
 FROM-SPEC auto
+COM-JSON  ../../ppc64le/dxvk/interfaces_dxvk.json
+
+GUEST-IMPL CreateDXGIFactory       __wine_guest_CreateDXGIFactory
+GUEST-IMPL CreateDXGIFactory1      __wine_guest_CreateDXGIFactory1
+GUEST-IMPL CreateDXGIFactory2      __wine_guest_CreateDXGIFactory2
+GUEST-IMPL DXGIGetDebugInterface1  __wine_guest_DXGIGetDebugInterface1
+GUEST-IMPL DXGID3D10CreateDevice   __wine_guest_DXGID3D10CreateDevice
+
+# Nine of these modules' exports are private entry points Wine ships in a
+# .spec and declares in no header, so the clang oracle would refuse them and
+# the guest module would simply not have them -- for d3d10core, that is EVERY
+# export.  This header declares them with their real interface types, so the
+# oracle can type them AND the audit below can see what they carry.
+PROBE-EXTRA dxvk_flat_surface.h
+INCLUDE-DIR ../../ppc64le/dxvk
+
+# Internal names, kept out of the guest export list; see dlls/d3d11/d3d11.thunks.
+EXCLUDE __wine_com_dispatch
+EXCLUDE __wine_guest_CreateDXGIFactory
+EXCLUDE __wine_guest_CreateDXGIFactory1
+EXCLUDE __wine_guest_CreateDXGIFactory2
+EXCLUDE __wine_guest_DXGIGetDebugInterface1
+EXCLUDE __wine_guest_DXGID3D10CreateDevice

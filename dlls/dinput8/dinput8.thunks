@@ -1,13 +1,162 @@
-# AMD64 thunk export spec -- dinput8.dll.
+# AMD64 thunk export spec for the guest dinput8.dll -- COM mode.
 #
-# From the 2026-08-15 second-game pass: DOOM's Vulkan build imports these and
-# every one reported c000007b -- the loader found the native ppc64 module and
-# correctly refused to splice it into a guest call, because no guest thunk
-# existed.  Same class of gap as the first game, same one-line fix, which is
-# the point: nothing here is per-title.
+# Read dlls/kernel32/kernel32.thunks for the trap ABI banner,
+# dlls/combase/combase.thunks for the system-COM mode this file follows, and
+# dlls/d3d11/d3d11.thunks for the first module that combined FROM-SPEC with
+# COM-JSON.
 #
-# vulkan-1 is the one that matters for that binary.  It renders through
-# vulkan-1 -> winevulkan -> RADV with no D3D anywhere in the path, so this is
-# the shortest route from a real game's draw calls to this machine's GPU.
-DLL dinput8.dll
+# WHY THIS MODULE NEEDED MORE THAN A FLAT SURFACE.  The flat surface is one
+# useful export.  Everything DirectInput actually does is behind the interface
+# DirectInput8Create hands back:
+#
+#     DirectInput8Create( ..., IID_IDirectInput8A, (void **)&di, NULL );
+#     IDirectInput8_CreateDevice( di, &GUID_SysKeyboard, &dev, NULL );
+#     IDirectInputDevice8_SetDataFormat( dev, &c_dfDIKeyboard );
+#     IDirectInputDevice8_SetCooperativeLevel( dev, hwnd, ... );
+#     IDirectInputDevice8_Acquire( dev );
+#     IDirectInputDevice8_GetDeviceState( dev, 256, keys );   /* every frame */
+#
+# Before this file, the first of those six lines worked and the second was an
+# x86-64 `call [rax+0x18]` into ppc64 bytes: DirectInput8Create wrote a NATIVE
+# vtable into the guest's `di`.  That is the defect
+# hangover-ppc64le/docs/system-com-design.md exists for, and it is reached by
+# every game that reads a key, which is most of them.
+
+DLL       dinput8.dll
 FROM-SPEC auto
+COM-JSON  ../../ppc64le/shell/interfaces_dinput.json
+
+# DirectInput8Create is declared in dinput.h, which the global probe
+# (wine_sig.PROBE_SRC) does not include.
+PROBE-EXTRA   dinput.h
+
+# --------------------------------------------------------------- the roster
+# ppc64le/shell/interfaces_dinput.json is generated from WINE's OWN
+# include/dinput.h by ppc64le/shell/gen_dinput_surface.py, which emits the
+# marshal tables (dlls/dinput8/dinput8_marshal.h) from the same run -- one
+# roster, two consumers, so the guest's stub arrays and the native module's
+# argument classes cannot drift by a slot.  libs/winecom cross-checks every
+# IID and slot count at attach as the last line of defence, and
+# ppc64le/shell/check-shell-smoke.sh runs the generator's --check mode so a
+# stale checked-in file is a gate failure rather than a runtime mystery.
+#
+# Wine's header is the right source here, unlike the DXVK lane where the
+# roster comes from vendored headers: the implementation on the other side of
+# this boundary IS Wine's dinput8, compiled for ppc64 from these very
+# declarations.  dinput.h uses DECLARE_INTERFACE_ and restates every inherited
+# method inside each derived interface's block, so the block IS the flattened
+# vtable and slot order is read rather than computed.
+#
+# Six interfaces, 102 slots: IDirectInput8A/W (11 each),
+# IDirectInputDevice8A/W (32 each), IDirectInputEffect (13), IUnknown (3,
+# served by the runtime itself).  70 slots marshalled, 8 hand-written, 6
+# refused with a named reason, 18 IUnknown -- the same tally the generated
+# dlls/dinput8/dinput8_marshal.h prints at the foot of its own table.
+
+# ------------------------------------------------ the flat-surface audit
+# With FROM-SPEC + COM-JSON, spec2thunk FAILS the build unless every flat
+# export whose signature carries an interface pointer is classified.  This
+# module has two.
+#
+# GUEST-IMPL points the guest's DirectInput8Create at the wrapper in the
+# native module (dlls/dinput8/guestcom.c), which calls the real export and
+# then puts the returned IDirectInput8A/W through winecom_wrap_out_iface --
+# the single fail-closed choke point: a roster hit becomes a guest proxy, a
+# miss is RELEASED and answered E_NOINTERFACE rather than handed over raw.
+# The plain DirectInput8Create export is untouched and still serves native
+# ppc64 callers, which matters because a native caller handed a proxy would
+# execute the guest's x86-64 trap stubs as ppc64 -- the same defect in the
+# other direction.
+GUEST-IMPL   DirectInput8Create  __wine_guest_DirectInput8Create
+
+# DllGetClassObject vends an IClassFactory for the DirectInput8 coclass as a
+# raw void**, and this module has no wrapper for that path.  Refused loudly
+# (E_NOTIMPL through __wine_com_refuse) rather than passed: nothing is lost,
+# because a guest reaching the coclass through CoCreateInstance is already
+# served by combase's syscom lane, which classifies and wraps that call
+# (dlls/combase/combase.thunks).  It is `-private` in the .spec, so no
+# ordinary import names it at all.
+GUEST-REFUSE DllGetClassObject
+
+# Internal names, kept out of the guest export list entirely.  The guest never
+# imports them: __wine_com_dispatch is called by ntdll's COM trap dispatcher
+# on the NATIVE module, and the other two are the audit's redirect targets.
+EXCLUDE __wine_com_dispatch
+EXCLUDE __wine_guest_DirectInput8Create
+EXCLUDE __wine_com_refuse
+
+# ------------------------------------------------------------- the refusals
+# EIGHT OF THE FOURTEEN ARE SERVED NOW, and the six that are not are a
+# different class from the eight.  What the whole fourteen have in common is a
+# guest callback arriving through a COM vtable slot; what splits them is what
+# that callback is HANDED.
+#
+# SERVED -- the callback receives plain data plus the caller's own pvRef, and a
+# trampoline carries its arguments through untranslated, which is exactly right
+# here because both sides compile DIDEVICEINSTANCE from this same header and
+# guest memory IS host memory:
+#
+#   IDirectInput8A/W::EnumDevices             LPDIENUMDEVICESCALLBACK{A,W}
+#   IDirectInputDevice8A/W::EnumObjects       LPDIENUMDEVICEOBJECTSCALLBACK{A,W}
+#   IDirectInputDevice8A/W::EnumEffects       LPDIENUMEFFECTSCALLBACK{A,W}
+#   IDirectInputDevice8A/W::EnumEffectsInFile LPDIENUMEFFECTSCALLBACK{A,W}
+#
+# REFUSED -- the callback receives an INTERFACE POINTER, so a trampoline would
+# hand the guest a native ppc64 vtable and move the fault one frame later
+# rather than remove it:
+#
+#   IDirectInput8A/W::EnumDevicesBySemantics  gets an LPDIRECTINPUTDEVICE8
+#   IDirectInput8A/W::ConfigureDevices        gets an array of devices in a
+#                                             struct (DICONFIGUREDEVICESPARAMS)
+#   IDirectInputDevice8A/W::EnumCreatedEffectObjects  gets an
+#                                             LPDIRECTINPUTEFFECT
+#
+# Each of those three needs a per-callback shim that wraps ITS OWN argument as
+# a guest proxy first -- winecom_wrap_out_iface, from inside a native frame the
+# guest never entered -- which is the reverse machinery in libs/winecom and a
+# hand slot of its own, not a table entry.  THE CONNECTION IS FILED: when
+# libs/winecom's reverse lane can mint a proxy for an interface pointer handed
+# OUT to a guest callback, these three are three more hand slots in
+# dlls/dinput8/guestcom.c and nothing else changes.  Nothing in the corpus has
+# asked for one.
+#
+# HOW THE EIGHT ARE SERVED, since the mechanism is the point.  The port's
+# callback-registration interception -- `struct thunk_override` in
+# dlls/ntdll/signal_ppc64.c -- is keyed by (guest MODULE, flat EXPORT NAME,
+# argument-position mask) and consulted by the FLAT trap path.  A COM method
+# call traps inside a vtable stub array and is routed by RIP arithmetic to
+# __wine_com_dispatch on the native module: it never passes an export table, so
+# there is no name to key a row on.  libs/winecom's argument classes
+# (WINECOM_CA_* in include/wine/winecom.h) have no callback class either.  The
+# escape hatch is WINECOM_F_HAND -- a hand-written slot that reads its own
+# arguments out of the trap CONTEXT -- and that IS the right place for this;
+# what it needs is a way to build a trampoline, which is what ntdll now exports:
+#
+#   dlls/ntdll/ntdll.spec:
+#       @ cdecl -arch=ppc64 __wine_guest_wrap_callback(ptr long)
+#
+# dlls/dinput8/guestcom.c RESOLVES it with LdrGetProcedureAddress rather than
+# linking against it -- the resolve_gl_entry_point precedent in
+# dlls/opengl32/wgl.c -- so a tree without the export refuses loudly by name
+# instead of failing to load.  Two hand slots serve all eight, because the
+# eight are two shapes: (this, DWORD, callback, LPVOID, DWORD) for EnumDevices
+# and EnumEffectsInFile, (this, callback, LPVOID, DWORD) for EnumObjects and
+# EnumEffects.  Every DIENUMCALLBACK returns BOOL, so all eight take the PLAIN
+# trampoline and not the wide one, and every one of them takes two arguments,
+# comfortably inside the FOUR the trampoline carries -- which is the ceiling
+# that stops dlls/comctl32's SetWindowSubclass and dlls/wininet's
+# InternetSetStatusCallback dead; see those files.
+#
+# The same one export also serves dlls/comdlg32's sixteen dialog hooks and
+# dlls/comctl32's property sheets and DPA comparators.
+#
+# WHAT A GAME GETS BACK: gamepad and joystick DISCOVERY.  EnumDevices is how a
+# title finds a controller, and a title that only ever supported controllers
+# through DirectInput used to find none.  Keyboard and mouse never needed it --
+# CreateDevice takes GUID_SysKeyboard and GUID_SysMouse directly -- and modern
+# controllers reach games through XInput (dlls/xinput1_3, dlls/xinput1_4),
+# which is flat and has no callbacks.
+#
+# Each of the six that remain answers E_NOTIMPL and prints a FIXME ONCE naming
+# the interface, the method, the iface/slot pair and the reason
+# (winecom.c:refuse_once).  None of them is a silent wrong answer.

@@ -1,20 +1,31 @@
+# The native ppc64le D3D9 lane: this module is DXVK's d3d9 behind a COM thunk,
+# the same shape as dlls/d3d11 and dlls/d3d12.  See dlls/d3d9/main.c.
+#
+# Wine's own wined3d-backed implementation (buffer.c, d3d9_main.c, device.c,
+# directx.c, query.c, shader.c, stateblock.c, surface.c, swapchain.c,
+# texture.c, vertexdeclaration.c, volume.c) is deliberately LEFT IN THE TREE
+# and dropped from SOURCES rather than deleted: it is upstream Wine's,
+# unmodified, and keeping it unbuilt makes this lane a reversible change to one
+# file instead of a 350,000-line deletion to review.  Nothing links it.
+#
+# win32u is imported by the PE side, not linked by the unixlib -- see
+# dlls/d3d11/Makefile.in for both halves of that.  EXTRAINCL and UNIX_CFLAGS
+# carry the same path for the two different things makedep uses them for; that
+# file explains which is which and what each one alone gets wrong.
 MODULE    = d3d9.dll
+UNIXLIB   = d3d9.so
 IMPORTLIB = d3d9
-IMPORTS   = dxguid uuid wined3d
+IMPORTS   = winecom win32u
+UNIX_LIBS = $(PTHREAD_LIBS)
 
 VER_FILEDESCRIPTION_STR = "Wine Direct3D"
-VER_PRODUCTVERSION      = 5,3,1,904
+VER_PRODUCTVERSION      = 5,3,0,900
 
 SOURCES = \
-	buffer.c \
-	d3d9_main.c \
-	device.c \
-	directx.c \
-	query.c \
-	shader.c \
-	stateblock.c \
-	surface.c \
-	swapchain.c \
-	texture.c \
-	vertexdeclaration.c \
-	volume.c
+	d3d9.thunks \
+	main.c \
+	unix.c \
+	unix_win32u.c
+
+EXTRAINCL   = -I$(srcdir)/../../ppc64le/dxvk
+UNIX_CFLAGS = -I$(srcdir)/../../ppc64le/dxvk

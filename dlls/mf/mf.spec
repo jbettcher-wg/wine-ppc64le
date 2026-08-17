@@ -84,3 +84,39 @@
 @ stdcall MFShutdownObject(ptr)
 @ stdcall MFTranscodeGetAudioOutputAvailableTypes(ptr long ptr ptr)
 @ stub MergePropertyStore
+
+# Media Foundation for x86-64 guests (ppc64le/mf/README.md).  The ONE winecom
+# instance for this surface lives in mfplat.dll, so the dispatcher forwards
+# there; the wrappers are dlls/mf/mfcom.c.
+@ stdcall __wine_com_dispatch(long long ptr) mfplat.__wine_com_dispatch
+@ stdcall __wine_guest_MFCreateSourceResolver(ptr) mfplat.__wine_guest_MFCreateSourceResolver
+@ stdcall __wine_guest_DllGetClassObject(ptr ptr ptr)
+@ stdcall __wine_guest_MFCreateAudioRendererActivate(ptr)
+@ stdcall __wine_guest_MFCreatePresentationClock(ptr)
+@ stdcall __wine_guest_MFCreateSampleCopierMFT(ptr)
+@ stdcall __wine_guest_MFCreateSimpleTypeHandler(ptr)
+@ stdcall __wine_guest_MFCreateStandardQualityManager(ptr)
+@ stdcall __wine_guest_MFCreateTopoLoader(ptr)
+@ stdcall __wine_guest_MFCreateTopology(ptr)
+@ stdcall __wine_guest_MFCreateTopologyNode(long ptr)
+@ stdcall __wine_guest_MFCreateVideoRendererActivate(long ptr)
+@ stdcall __wine_guest_MFCreateSequencerSource(ptr ptr)
+@ stdcall __wine_guest_MFCreateMediaSession(ptr ptr)
+@ stdcall __wine_guest_MFCreateAudioRenderer(ptr ptr)
+@ stdcall __wine_guest_MFCreateDeviceSource(ptr ptr)
+@ stdcall __wine_guest_MFCreateMP3MediaSink(ptr ptr)
+@ stdcall __wine_guest_MFCreateAC3MediaSink(ptr ptr ptr)
+@ stdcall __wine_guest_MFCreateADTSMediaSink(ptr ptr ptr)
+@ stdcall __wine_guest_MFCreate3GPMediaSink(ptr ptr ptr ptr)
+@ stdcall __wine_guest_MFCreateFMPEG4MediaSink(ptr ptr ptr ptr)
+@ stdcall __wine_guest_MFCreateMPEG4MediaSink(ptr ptr ptr ptr)
+@ stdcall __wine_guest_MFGetTopoNodeCurrentType(ptr long long ptr)
+@ stdcall __wine_guest_MFTranscodeGetAudioOutputAvailableTypes(ptr long ptr ptr)
+@ stdcall __wine_guest_MFEnumDeviceSources(ptr ptr ptr)
+@ stdcall __wine_guest_MFGetService(ptr ptr ptr ptr)
+@ stdcall __wine_guest_MFRequireProtectedEnvironment(ptr)
+@ stdcall __wine_guest_MFShutdownObject(ptr)
+@ stdcall __wine_guest_MFCreateSampleGrabberSinkActivate(ptr ptr ptr)
+@ stdcall __wine_guest_MFGetSupportedMimeTypes(ptr)
+@ stdcall __wine_guest_MFGetSupportedSchemes(ptr)
+@ stdcall __wine_guest_MFCreateSequencerSegmentOffset(long int64 ptr)

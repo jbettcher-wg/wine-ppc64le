@@ -1,0 +1,17 @@
+# AMD64 thunk export spec -- x3daudio1_7.dll.
+#
+# From the 2026-08-17 Skyrim Special Edition triage, and the same finding as
+# the 2026-08-15 one that added dxgi's and d3d11's: SkyrimSE.exe imports this
+# module, Wine provides it as a NATIVE ppc64 builtin, and the loader correctly
+# refuses to splice that into a guest call -- reported as c000007b, four times
+# over, before the process reaches a single graphics call.  Nothing here is
+# hand-written: the export list comes from this module's own .spec.
+DLL x3daudio1_7.dll
+FROM-SPEC auto
+
+# Without this the module has NO exports at all: x3daudio.h is not in the
+# oracle's default translation unit, so both of this module's entry points were
+# refused for having no declaration and every guest import of them bound to a
+# 0xdead0000 sentinel.  X3DAudioInitialize's second argument is a by-value
+# float, which the flat thunk path has carried since cd4ea32c93d.
+PROBE-EXTRA x3daudio.h

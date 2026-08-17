@@ -193,6 +193,14 @@ static void fill_system_info( SYSTEM_INFO *si, const SYSTEM_BASIC_INFORMATION *b
     case PROCESSOR_ARCHITECTURE_ARM64:
         si->dwProcessorType = 0;
         break;
+    case PROCESSOR_ARCHITECTURE_PPC64:
+        /* Wine's own architecture extension, which this switch did not know
+         * about: every GetSystemInfo on the ppc64 port printed the FIXME
+         * below, which is not a gap but noise that hides real ones.  There is
+         * no PROCESSOR_ type for 64-bit PowerPC -- the four PROCESSOR_PPC_60x
+         * values are the 32-bit NT ones -- so zero, as ARM64 reports. */
+        si->dwProcessorType = 0;
+        break;
     default:
         FIXME( "Unknown processor architecture %x\n", cpu_info->ProcessorArchitecture );
         si->dwProcessorType = 0;

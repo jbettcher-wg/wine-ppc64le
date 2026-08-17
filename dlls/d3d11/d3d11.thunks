@@ -1,11 +1,87 @@
-# AMD64 thunk export spec -- d3d11.dll.
+# AMD64 thunk export spec for the guest d3d11.dll -- COM mode.
 #
-# Added from the 2026-08-15 first-real-game triage: with the application's own
-# shipped DLLs now loadable (find_dll_file() searches the load path for the
-# guest's machine instead of refusing it outright), what stopped
-# quake2ex_steam.exe was Wine builtins with no guest thunk -- each reported as
-# c000007b, the loader correctly refusing to splice a native ppc64 module into
-# a guest call.  Nothing here is hand-written: the export list comes from this
-# module's own .spec.
-DLL d3d11.dll
+# Read dlls/kernel32/kernel32.thunks for the trap ABI banner and
+# dlls/d3d12/d3d12.thunks for the first COM-mode module.  What is different
+# here is that the guest surface stays this module's OWN .spec while the COM
+# roster comes from DXVK's headers, and that is deliberate:
+#
+#   * FROM-SPEC, not FROM-DEF.  DXVK's d3d11.def names four exports; Wine's
+#     d3d11.spec names those plus the D3DKMT* forwards into gdi32, and a guest
+#     that imports one of those has been able to resolve it since
+#     bd8c284a963.  Narrowing the guest's export surface to DXVK's .def would
+#     regress that for no gain -- the native namesake still exports every name
+#     here, because this module's .spec IS the surface it implements.
+#
+#   * COM-JSON is ppc64le/dxvk/interfaces_dxvk.json, the SAME file
+#     dlls/dxgi/dxgi.thunks and dlls/d3d10core/d3d10core.thunks name.  All
+#     three guest modules therefore publish an identical roster, which is what
+#     lets one winecom instance in the native d3d11.dll serve proxies whose
+#     vtables came from any of them.  libs/winecom cross-checks every IID and
+#     slot count of every loaded one at attach.
+#
+#   * The roster is generated from DXVK's own vendored MinGW/widl headers
+#     (ppc64le/dxvk/src/include/native/directx) by
+#     ppc64le/dxvk/gen_interfaces.py -- the declarations libdxvk_d3d11.so was
+#     compiled from, so its vtable layout IS theirs.  The oracle below still
+#     reads WINE's headers, because what it is checking is the FLAT export
+#     signatures, and those are Wine's .spec's.
+#
+# THE FLAT-SURFACE AUDIT.  With FROM-SPEC + COM-JSON, spec2thunk fails the
+# build unless every flat export whose signature carries an interface pointer
+# is classified.  Each GUEST-IMPL below points the guest's export at a
+# __wine_guest_* wrapper in the native namesake, which translates the
+# interface pointers; the plain-named export stays for native ppc64 callers
+# and refuses loudly, because a native caller handed a proxy would execute
+# the guest's x86-64 trap stubs as ppc64.  dlls/d3d11/main.c says the same
+# thing at more length.
+#
+# ppc64le/dxvk/src is the bootstrap checkout (gitignored; ppc64le/dxvk/
+# bootstrap.sh reconstructs it, and the Wine build runs that itself).
+
+DLL       d3d11.dll
 FROM-SPEC auto
+COM-JSON  ../../ppc64le/dxvk/interfaces_dxvk.json
+
+GUEST-IMPL D3D11CreateDevice              __wine_guest_D3D11CreateDevice
+GUEST-IMPL D3D11CreateDeviceAndSwapChain  __wine_guest_D3D11CreateDeviceAndSwapChain
+GUEST-IMPL D3D11CoreCreateDevice          __wine_guest_D3D11CoreCreateDevice
+GUEST-IMPL D3D11On12CreateDevice          __wine_guest_D3D11On12CreateDevice
+
+# Nine of these modules' exports are private entry points Wine ships in a
+# .spec and declares in no header, so the clang oracle would refuse them and
+# the guest module would simply not have them -- for d3d10core, that is EVERY
+# export.  This header declares them with their real interface types, so the
+# oracle can type them AND the audit below can see what they carry.
+PROBE-EXTRA dxvk_flat_surface.h
+INCLUDE-DIR ../../ppc64le/dxvk
+
+# Internal names, kept out of the guest export list entirely.  The guest never
+# imports them: __wine_com_dispatch is called by ntdll's trap dispatcher on
+# the NATIVE module, __wine_guest_* are the GUEST-IMPL targets (native
+# symbols, named above), and __wine_dxvk_* are the aliases dxgi.dll and
+# d3d10core.dll forward their own plain names to.
+EXCLUDE __wine_com_dispatch
+EXCLUDE __wine_guest_D3D11CreateDevice
+EXCLUDE __wine_guest_D3D11CreateDeviceAndSwapChain
+EXCLUDE __wine_guest_D3D11CoreCreateDevice
+EXCLUDE __wine_guest_D3D11On12CreateDevice
+EXCLUDE __wine_guest_CreateDXGIFactory
+EXCLUDE __wine_guest_CreateDXGIFactory1
+EXCLUDE __wine_guest_CreateDXGIFactory2
+EXCLUDE __wine_guest_DXGIGetDebugInterface1
+EXCLUDE __wine_guest_DXGID3D10CreateDevice
+EXCLUDE __wine_guest_D3D10CoreCreateDevice
+EXCLUDE __wine_guest_D3D10CreateDevice
+EXCLUDE __wine_guest_D3D10CreateDeviceAndSwapChain
+EXCLUDE __wine_dxvk_CreateDXGIFactory
+EXCLUDE __wine_dxvk_CreateDXGIFactory1
+EXCLUDE __wine_dxvk_CreateDXGIFactory2
+EXCLUDE __wine_dxvk_DXGIGetDebugInterface1
+EXCLUDE __wine_dxvk_DXGIDeclareAdapterRemovalSupport
+EXCLUDE __wine_dxvk_DXGID3D10CreateDevice
+EXCLUDE __wine_dxvk_DXGID3D10RegisterLayers
+EXCLUDE __wine_dxvk_D3D10CoreCreateDevice
+EXCLUDE __wine_dxvk_D3D10CoreGetVersion
+EXCLUDE __wine_dxvk_D3D10CoreRegisterLayers
+EXCLUDE __wine_dxvk_D3D10CreateDevice
+EXCLUDE __wine_dxvk_D3D10CreateDeviceAndSwapChain

@@ -6,3 +6,8 @@
 # .spec like every other one.
 DLL oleacc.dll
 FROM-SPEC auto
+
+# All 17 eligible exports were refused as "no declaration in any Wine header".
+# DOOM imports three (LresultFromObject, AccessibleObjectFromWindow,
+# CreateStdAccessibleObject); with the header in the probe, 14 of 17 resolve.
+PROBE-EXTRA   oleacc.h

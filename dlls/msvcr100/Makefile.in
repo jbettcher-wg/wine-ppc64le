@@ -9,6 +9,7 @@ VER_FILEDESCRIPTION_STR = "Wine CRT library"
 VER_PRODUCTVERSION      = 10,0,30319,0
 
 SOURCES = \
+	msvcr100.thunks \
 	concurrency.c \
 	console.c \
 	cpp.c \

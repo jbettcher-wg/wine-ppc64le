@@ -11,3 +11,10 @@
 # the shortest route from a real game's draw calls to this machine's GPU.
 DLL uxtheme.dll
 FROM-SPEC auto
+
+# All 72 eligible exports were refused as "no declaration in any Wine header"
+# and the module emitted had none at all -- see dbghelp.thunks for what that
+# costs a guest.  DOOM imports twelve of them (OpenThemeData, DrawThemeText,
+# GetThemePartSize and friends); with the header in the oracle's translation
+# unit, 70 of the 72 resolve.
+PROBE-EXTRA   uxtheme.h

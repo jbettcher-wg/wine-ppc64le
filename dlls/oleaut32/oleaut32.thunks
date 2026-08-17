@@ -17,6 +17,31 @@ FROM-SPEC auto
 # (spec2thunk) FAILS if any is left to pass through silently.
 COM-JSON  ../../ppc64le/syscom/interfaces_syscom.json
 
+# ---------------------------------------------------------------------------
+# The 2026-08-17 DOOM triage: the six ordinals MICROSOFT'S mfc140u.dll imports
+# ---------------------------------------------------------------------------
+# DOOM (2016) loads Razer's CChromaEditorLibrary.dll, which pulls in
+# Microsoft's real mfc140u.dll.  mfc140u imports OLEAUT32 BY ORDINAL and
+# carries no names at all -- 113 and 417..421 -- and the guest loader reported
+# each as "No implementation for OLEAUT32.dll.<n>" and bound a sentinel.
+#
+# The ordinals themselves were never wrong: assign_ordinals() already pins each
+# export at the number oleaut32.spec gives it, so 417 IS OleCreatePropertyFrame
+# here exactly as it is in Microsoft's module.  They were HOLES because the
+# exports behind them were oracle-refused, and a hole is what the loader read.
+# Five of the six are the OLE control surface, declared in include/olectl.h,
+# which nothing already in the oracle's translation unit pulls in -- the same
+# tooling gap, not an ABI fact.  One PROBE-EXTRA closes all five.
+PROBE-EXTRA   olectl.h        # ordinals 417..421 + the rest of the Ole* control surface
+
+# Ordinal 113 (VarBstrFromCy) STAYS A HOLE.  It takes CY by value; CY is a
+# union of two 32-bit halves and a LONGLONG, so it is an 8-byte aggregate, and
+# this generator classifies aggregates as unrepresentable rather than modelling
+# the ABI rule that would in fact pass it in one register.  Right by
+# coincidence is not right.  Nothing on mfc140u's load path calls it (measured
+# -- the module initialises and its exports run); a guest that formats a
+# currency through it gets the named sentinel instead of a wrong answer.
+
 # audited pass-throughs: the interface-bearing type is inert here
 GUEST-PASS   VariantInit                      writes VT_EMPTY and reads no interface pointer
 
@@ -42,6 +67,21 @@ GUEST-REFUSE LPSAFEARRAY_UserUnmarshal
 GUEST-REFUSE LoadRegTypeLib
 GUEST-REFUSE LoadTypeLib
 GUEST-REFUSE LoadTypeLibEx
+
+# The OLE control surface reached via ordinals 417..421 (see the PROBE-EXTRA
+# note above).  Every one of these hands back a native interface pointer --
+# IPicture, IFont, IUnknown -- through an out slot, so a pass-through would put
+# host ppc64 vtables in guest-visible memory and the guest's first method call
+# would execute them as x86-64.  Refused loudly, which is what the ordinal
+# needed: the ORDINAL is now filled and the import binds, instead of the guest
+# reading a hole and getting a sentinel it cannot name.
+GUEST-REFUSE OleCreateFontIndirect
+GUEST-REFUSE OleCreatePictureIndirect
+GUEST-REFUSE OleCreatePropertyFrame
+GUEST-REFUSE OleLoadPicture
+GUEST-REFUSE OleLoadPictureEx
+GUEST-REFUSE OleLoadPicturePath
+GUEST-REFUSE OleSavePictureFile
 GUEST-REFUSE RegisterActiveObject
 GUEST-REFUSE RegisterTypeLib
 GUEST-REFUSE RegisterTypeLibForUser

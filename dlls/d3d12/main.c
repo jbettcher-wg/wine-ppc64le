@@ -80,9 +80,9 @@ static UINT64 unix_vtbl_call( void *host, UINT slot, UINT argc, UINT64 *args )
 
 static const WCHAR *const d3d12_guest_modules[] = { L"d3d12.dll" };
 
-static UINT64 hand_resource_barrier( void *host, UINT slot, const AMD64_CONTEXT *ctx );
-static UINT64 hand_create_compute_pso( void *host, UINT slot, const AMD64_CONTEXT *ctx );
-static UINT64 hand_create_swapchain_for_hwnd( void *host, UINT slot, const AMD64_CONTEXT *ctx );
+static UINT64 hand_resource_barrier( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static UINT64 hand_create_compute_pso( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static UINT64 hand_create_swapchain_for_hwnd( void *host, UINT slot, AMD64_CONTEXT *ctx );
 
 static const winecom_hand_fn d3d12_hand_funcs[] =
 {
@@ -155,7 +155,7 @@ NTSTATUS WINAPI __wine_com_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
  * D3D12_RESOURCE_BARRIER *barriers ): the barrier structs carry
  * ID3D12Resource* members (directly and through unions), so the array is
  * copied shallowly and the resource pointers unwrapped in the copy. */
-static UINT64 hand_resource_barrier( void *host, UINT slot, const AMD64_CONTEXT *ctx )
+static UINT64 hand_resource_barrier( void *host, UINT slot, AMD64_CONTEXT *ctx )
 {
     UINT n = (UINT)read_arg( ctx, 1 );
     const D3D12_RESOURCE_BARRIER *src = (const void *)(ULONG_PTR)read_arg( ctx, 2 );
@@ -200,7 +200,7 @@ static UINT64 hand_resource_barrier( void *host, UINT slot, const AMD64_CONTEXT 
 /* ID3D12Device::CreateComputePipelineState( const
  * D3D12_COMPUTE_PIPELINE_STATE_DESC *desc, REFIID riid, void **ppv ):
  * the desc carries ID3D12RootSignature *pRootSignature. */
-static UINT64 hand_create_compute_pso( void *host, UINT slot, const AMD64_CONTEXT *ctx )
+static UINT64 hand_create_compute_pso( void *host, UINT slot, AMD64_CONTEXT *ctx )
 {
     const D3D12_COMPUTE_PIPELINE_STATE_DESC *src = (const void *)(ULONG_PTR)read_arg( ctx, 1 );
     const GUID *riid = (const GUID *)(ULONG_PTR)read_arg( ctx, 2 );
@@ -239,7 +239,7 @@ static UINT64 hand_create_compute_pso( void *host, UINT slot, const AMD64_CONTEX
  * IDXGISwapChain1** carries no REFIID, so the wrap type is fixed here; the
  * device (an ID3D12CommandQueue proxy) unwraps going in.  The host factory
  * is the unixlib's own present factory (unix_present.c). */
-static UINT64 hand_create_swapchain_for_hwnd( void *host, UINT slot, const AMD64_CONTEXT *ctx )
+static UINT64 hand_create_swapchain_for_hwnd( void *host, UINT slot, AMD64_CONTEXT *ctx )
 {
     void *device_proxy = (void *)(ULONG_PTR)read_arg( ctx, 1 );
     void *restrict_proxy = (void *)(ULONG_PTR)read_arg( ctx, 5 );

@@ -1,3 +1,12 @@
+# The native ppc64le D3D10 front end.
+#
+# WINE'S OWN SOURCES STAY BUILT HERE, unlike dlls/d3d11 and dlls/d3d9 where the
+# native lane replaces them outright.  DXVK ships no d3d10.dll at all -- it
+# removed the module and kept d3d10core -- so there is nothing to replace this
+# with.  What the lane does instead is redirect the two device-creation exports
+# into d3d11.dll (see d3d10.spec) and refuse or exclude the rest at the GUEST
+# boundary (see d3d10.thunks), leaving Wine's implementation in place for a
+# native ppc64 PE caller, which is the only caller that can safely have it.
 MODULE    = d3d10.dll
 IMPORTLIB = d3d10
 IMPORTS   = uuid d3d10core d3dcompiler_39 dxgi wined3d
@@ -10,6 +19,7 @@ VER_PRODUCTVERSION      = 6,0,6000,16386
 
 SOURCES = \
 	blob.c \
+	d3d10.thunks \
 	d3d10_main.c \
 	effect.c \
 	reflection.c \

@@ -1,0 +1,134 @@
+# AMD64 thunk export spec for the guest mfplat.dll -- COM mode.
+#
+# Read dlls/kernel32/kernel32.thunks for the trap ABI banner and
+# dlls/combase/combase.thunks for the first system-COM module.  mfplat is the
+# same shape as combase and for the same reason: Wine's own implementation is
+# correct and stays untouched, and the only thing wrong at the boundary is
+# interface POINTERS, which dlls/mfplat/mfcom.c wraps.
+#
+# THIS MODULE HOLDS THE ONE winecom INSTANCE for the whole Media Foundation
+# surface.  libs/winecom's state is per-linkee, and mfplat.dll is the module
+# mf.dll and mfreadwrite.dll both import, so the runtime lives here and the
+# siblings reach it through a spec forward of __wine_com_dispatch and the
+# exported __wine_com_* helpers -- exactly as ole32/oleaut32 reach combase's.
+#
+# COM-JSON is ppc64le/mf/interfaces_mf.json, the SAME file dlls/mf/mf.thunks
+# and dlls/mfreadwrite/mfreadwrite.thunks name.  All three guest modules
+# therefore publish an identical roster, which is what lets one instance in
+# native mfplat.dll serve proxies whose vtables came from any of them;
+# libs/winecom cross-checks every IID and slot count of every loaded one at
+# attach.
+#
+# THE FLAT-SURFACE AUDIT.  With FROM-SPEC + COM-JSON, spec2thunk fails the
+# build unless every flat export whose signature carries an interface pointer
+# is classified.  All 67 of mfplat's are GUEST-IMPL rather than GUEST-REFUSE,
+# including the ones that only refuse: the shared __wine_com_refuse stub
+# cannot name the export that trapped, and on this surface the refusals ARE
+# the interesting part of the answer -- "MFPutWorkItem hands MF an
+# IMFAsyncCallback to call back" is a bug report, "E_NOTIMPL" is not.
+DLL mfplat.dll
+FROM-SPEC auto
+
+# PROBE-EXTRA, not PROBE-INCLUDE: this module's surface IS declared in Wine's
+# headers, they are simply not in the oracle's default translation unit (which
+# stops at the Win32/CRT/D3D set).  Without these, 110 of mfplat's 120
+# eligible exports came back "no declaration found in Wine headers" -- a
+# tooling gap being reported as an ABI fact, which is the one thing the oracle
+# must never do.
+PROBE-EXTRA mfapi.h
+PROBE-EXTRA mfidl.h
+PROBE-EXTRA mfreadwrite.h
+PROBE-EXTRA mftransform.h
+PROBE-EXTRA mferror.h
+# The reverse-proxy mechanism gate's hook, declared in a header of the
+# port's own rather than in one of Wine's: the oracle needs a
+# declaration to derive the signature from, and no Wine header has any
+# business declaring a test hook.  It uses the MF types, so it is last.
+PROBE-EXTRA wine/winecom_selftest.h
+
+COM-JSON  ../../ppc64le/mf/interfaces_mf.json
+
+# --- vending: the wrapper hands back a proxy, never a native vtable ---
+GUEST-IMPL   MFCreateAttributes                    __wine_guest_MFCreateAttributes
+GUEST-IMPL   MFCreateMediaType                     __wine_guest_MFCreateMediaType
+GUEST-IMPL   MFCreateSample                        __wine_guest_MFCreateSample
+GUEST-IMPL   MFCreateMemoryBuffer                  __wine_guest_MFCreateMemoryBuffer
+GUEST-IMPL   MFCreateAlignedMemoryBuffer           __wine_guest_MFCreateAlignedMemoryBuffer
+GUEST-IMPL   MFCreate2DMediaBuffer                 __wine_guest_MFCreate2DMediaBuffer
+GUEST-IMPL   MFCreateCollection                    __wine_guest_MFCreateCollection
+GUEST-IMPL   MFCreateEventQueue                    __wine_guest_MFCreateEventQueue
+GUEST-IMPL   MFCreateSourceResolver                __wine_guest_MFCreateSourceResolver
+GUEST-IMPL   MFCreateFile                          __wine_guest_MFCreateFile
+GUEST-IMPL   MFCreateTempFile                      __wine_guest_MFCreateTempFile
+GUEST-IMPL   MFCreateSystemTimeSource              __wine_guest_MFCreateSystemTimeSource
+GUEST-IMPL   MFCreateTrackedSample                 __wine_guest_MFCreateTrackedSample
+GUEST-IMPL   MFCreateAudioMediaType                __wine_guest_MFCreateAudioMediaType
+GUEST-IMPL   MFCreateVideoMediaType                __wine_guest_MFCreateVideoMediaType
+GUEST-IMPL   MFCreateVideoMediaTypeFromSubtype     __wine_guest_MFCreateVideoMediaTypeFromSubtype
+GUEST-IMPL   MFCreateTransformActivate             __wine_guest_MFCreateTransformActivate
+GUEST-IMPL   MFGetPluginControl                    __wine_guest_MFGetPluginControl
+GUEST-IMPL   MFCreateVideoSampleAllocatorEx        __wine_guest_MFCreateVideoSampleAllocatorEx
+
+# --- translate-in: a guest-held proxy travelling back into native MF ---
+GUEST-IMPL   MFCreateMediaBufferFromMediaType      __wine_guest_MFCreateMediaBufferFromMediaType
+GUEST-IMPL   MFWrapMediaType                       __wine_guest_MFWrapMediaType
+GUEST-IMPL   MFUnwrapMediaType                     __wine_guest_MFUnwrapMediaType
+GUEST-IMPL   MFCreateStreamDescriptor              __wine_guest_MFCreateStreamDescriptor
+GUEST-IMPL   MFCreatePresentationDescriptor        __wine_guest_MFCreatePresentationDescriptor
+GUEST-IMPL   MFCompareFullToPartialMediaType       __wine_guest_MFCompareFullToPartialMediaType
+GUEST-IMPL   MFCreateMFVideoFormatFromMFMediaType  __wine_guest_MFCreateMFVideoFormatFromMFMediaType
+GUEST-IMPL   MFCreateWaveFormatExFromMFMediaType   __wine_guest_MFCreateWaveFormatExFromMFMediaType
+GUEST-IMPL   MFInitMediaTypeFromWaveFormatEx       __wine_guest_MFInitMediaTypeFromWaveFormatEx
+GUEST-IMPL   MFInitMediaTypeFromMFVideoFormat      __wine_guest_MFInitMediaTypeFromMFVideoFormat
+GUEST-IMPL   MFInitMediaTypeFromAMMediaType        __wine_guest_MFInitMediaTypeFromAMMediaType
+GUEST-IMPL   MFInitMediaTypeFromVideoInfoHeader    __wine_guest_MFInitMediaTypeFromVideoInfoHeader
+GUEST-IMPL   MFInitMediaTypeFromVideoInfoHeader2   __wine_guest_MFInitMediaTypeFromVideoInfoHeader2
+GUEST-IMPL   MFInitMediaTypeFromMPEG1VideoInfo     __wine_guest_MFInitMediaTypeFromMPEG1VideoInfo
+GUEST-IMPL   MFInitMediaTypeFromMPEG2VideoInfo     __wine_guest_MFInitMediaTypeFromMPEG2VideoInfo
+GUEST-IMPL   MFGetAttributesAsBlob                 __wine_guest_MFGetAttributesAsBlob
+GUEST-IMPL   MFGetAttributesAsBlobSize             __wine_guest_MFGetAttributesAsBlobSize
+GUEST-IMPL   MFInitAttributesFromBlob              __wine_guest_MFInitAttributesFromBlob
+GUEST-IMPL   MFRegisterLocalByteStreamHandler      __wine_guest_MFRegisterLocalByteStreamHandler
+GUEST-IMPL   MFRegisterLocalSchemeHandler          __wine_guest_MFRegisterLocalSchemeHandler
+
+# --- the reverse-proxy gap: MF would CALL BACK an object the guest wrote.
+# Every one of these names IMFAsyncCallback or IMFAsyncResult in its FIXME,
+# which is the handoff list for the reverse-proxy work in one grep.
+GUEST-IMPL   MFCreateAsyncResult                   __wine_guest_MFCreateAsyncResult
+GUEST-IMPL   MFInvokeCallback                      __wine_guest_MFInvokeCallback
+GUEST-IMPL   MFPutWorkItem                         __wine_guest_MFPutWorkItem
+GUEST-IMPL   MFPutWorkItem2                        __wine_guest_MFPutWorkItem2
+GUEST-IMPL   MFPutWorkItemEx                       __wine_guest_MFPutWorkItemEx
+GUEST-IMPL   MFPutWorkItemEx2                      __wine_guest_MFPutWorkItemEx2
+GUEST-IMPL   MFPutWaitingWorkItem                  __wine_guest_MFPutWaitingWorkItem
+GUEST-IMPL   MFScheduleWorkItem                    __wine_guest_MFScheduleWorkItem
+GUEST-IMPL   MFScheduleWorkItemEx                  __wine_guest_MFScheduleWorkItemEx
+GUEST-IMPL   MFBeginCreateFile                     __wine_guest_MFBeginCreateFile
+GUEST-IMPL   MFEndCreateFile                       __wine_guest_MFEndCreateFile
+GUEST-IMPL   MFBeginRegisterWorkQueueWithMMCSS     __wine_guest_MFBeginRegisterWorkQueueWithMMCSS
+GUEST-IMPL   MFBeginRegisterWorkQueueWithMMCSSEx   __wine_guest_MFBeginRegisterWorkQueueWithMMCSSEx
+GUEST-IMPL   MFEndRegisterWorkQueueWithMMCSS       __wine_guest_MFEndRegisterWorkQueueWithMMCSS
+GUEST-IMPL   MFBeginUnregisterWorkQueueWithMMCSS   __wine_guest_MFBeginUnregisterWorkQueueWithMMCSS
+GUEST-IMPL   MFEndUnregisterWorkQueueWithMMCSS     __wine_guest_MFEndUnregisterWorkQueueWithMMCSS
+GUEST-IMPL   MFCancelCreateFile                    __wine_guest_MFCancelCreateFile
+GUEST-IMPL   MFAddPeriodicCallback                 __wine_guest_MFAddPeriodicCallback
+
+# --- the cross-surface gap: the interface belongs to ANOTHER winecom
+# instance (combase's IStream, d3d11's ID3D11Texture2D), and libs/winecom
+# state is per-linkee.  Refused with the owning surface named.
+GUEST-IMPL   MFCreateMFByteStreamOnStream          __wine_guest_MFCreateMFByteStreamOnStream
+GUEST-IMPL   MFCreateMFByteStreamOnStreamEx        __wine_guest_MFCreateMFByteStreamOnStreamEx
+GUEST-IMPL   MFSerializeAttributesToStream         __wine_guest_MFSerializeAttributesToStream
+GUEST-IMPL   MFDeserializeAttributesFromStream     __wine_guest_MFDeserializeAttributesFromStream
+GUEST-IMPL   MFCreateDXGIDeviceManager             __wine_guest_MFCreateDXGIDeviceManager
+GUEST-IMPL   MFLockDXGIDeviceManager               __wine_guest_MFLockDXGIDeviceManager
+GUEST-IMPL   MFCreateDXGISurfaceBuffer             __wine_guest_MFCreateDXGISurfaceBuffer
+GUEST-IMPL   MFCreateDXSurfaceBuffer               __wine_guest_MFCreateDXSurfaceBuffer
+GUEST-IMPL   MFCreateLegacyMediaBufferOnMFMediaBuffer __wine_guest_MFCreateLegacyMediaBufferOnMFMediaBuffer
+
+# --- a PROPVARIANT the caller supplies: served, with the tag audited ---
+GUEST-IMPL   MFCreateMediaEvent                    __wine_guest_MFCreateMediaEvent
+
+# --- the reverse-proxy mechanism gate's hook ---
+GUEST-IMPL   __wine_winecom_reverse_selftest        __wine_guest___wine_winecom_reverse_selftest
+GUEST-IMPL   __wine_winecom_reverse_nest            __wine_guest___wine_winecom_reverse_nest

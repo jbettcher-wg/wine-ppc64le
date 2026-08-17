@@ -19,22 +19,29 @@ registers by position and ELFv2 indexes its by order, so neither side can
 derive that from the arity.
 
 Version 4 added impl_names_rva: the name the
-host resolves in the NATIVE module, which differs from the export name only
-for a true `...` variadic, where it is that function's v-variant (printf ->
-vprintf).  This checker re-derives that pairing the same independent way it
-re-derives everything else -- a regex scan of the header TEXT -- and requires:
+host resolves in the NATIVE module.  For a true `...` variadic that is the
+function's v-variant (printf -> vprintf); otherwise it is the export's own
+name, UNLESS the .thunks file redirected it -- GUEST-IMPL to a named wrapper,
+GUEST-REFUSE to the shared __wine_com_refuse -- which ride this same field.
+This checker re-derives that pairing the same independent way it re-derives
+everything else -- a regex scan of the header TEXT -- and requires:
 
   * descriptor bit 9 set  <=>  Wine's headers declare the export variadic;
   * bits 0..7 == the number of FIXED arguments (the `...` is not counted);
-  * an impl name that is a readable ASCII string, non-empty, and different
-    from the export name exactly when bit 9 is set;
+  * an impl name that is a readable ASCII string, non-empty, and equal to
+    exactly what the export is entitled to: the v-variant when bit 9 is set,
+    the redirect the .thunks file asked for when it asked for one, and the
+    export's own name otherwise;
   * the impl to be declared, NON-variadic, and to take exactly nfixed+1
-    arguments -- va_list is one ordinary pointer parameter.
+    arguments -- va_list is one ordinary pointer parameter;
+  * every redirect TARGET to be a real function export of the module's own
+    .spec, so the guest's call reaches the wrapper instead of faulting.
 
 Prints PASS/FAIL per property; exits nonzero if anything FAILed.
 """
 
 import argparse
+import bisect
 import os
 import re
 import struct
@@ -54,6 +61,10 @@ TRAP_OFF = {'direct': 0, 'trap': 3}
 TRAP_INSN = b'\x0f\x05'
 BUILTIN_SIG = b"Wine builtin DLL\x00"
 SIG_OFF = 0x40
+# The one native symbol every GUEST-REFUSE export is redirected to.  Spelled
+# out here rather than imported from the generator, like every other constant
+# in this file: the two sides agreeing is the check.
+COM_REFUSE_IMPL = '__wine_com_refuse'
 
 IMAGE_FILE_RELOCS_STRIPPED = 0x0001
 IMAGE_FILE_DLL = 0x2000
@@ -189,8 +200,57 @@ DECORATORS = {'extern', 'static', 'inline', 'FORCEINLINE', 'const', 'struct',
 # spot, not a missing declaration.  \b on each side so a longer identifier that
 # merely ENDS in a convention name (X__cdecl, MY_CDECL) cannot be split into a
 # bogus return-type / convention pair.
-CONV = (r'\b(?:WINAPI|APIENTRY|WINAPIV|CALLBACK|CDECL'
-        r'|__cdecl|__stdcall|__clrcall|__fastcall)\b')
+#
+# The __RPC_* family is the same omission, found by combase: every RPC
+# user-marshal quadruple widl emits is spelled with it --
+#
+#     unsigned char * __RPC_USER HWND_UserMarshal(ULONG *, unsigned char *, HWND *);
+#
+# and ole32/oleaut32/combase export forty of them (HWND, HGLOBAL, HBITMAP,
+# HMENU, HDC, HICON, HACCEL, HPALETTE, CLIPFORMAT, LPSAFEARRAY, ...), so 11c
+# reported the whole family as undeclared.  All four are `#define ...
+# __stdcall` in include/rpc.h:37-40 -- ordinary convention tokens, listed here
+# by name rather than exempted, so their arity and return type keep being
+# re-derived from the header text like every other export's.
+CONV_TOKENS = ('WINAPI', 'APIENTRY', 'WINAPIV', 'CALLBACK', 'CDECL',
+               '__cdecl', '__stdcall', '__clrcall', '__fastcall',
+               '__RPC_USER', '__RPC_STUB', '__RPC_API', 'RPC_ENTRY')
+CONV = r'\b(?:' + '|'.join(CONV_TOKENS) + r')\b'
+
+# A THIRD declaration mechanism, and the one uxtheme uses for every export it
+# has: a header-private macro that carries the WHOLE declaration prefix --
+# return type and convention together -- so the declaration text contains no
+# convention token at all and no return type either:
+#
+#     include/basetyps.h:31   #define STDAPICALLTYPE  WINAPI
+#     include/basetyps.h:33   #define STDAPI          EXTERN_C HRESULT STDAPICALLTYPE
+#     include/basetyps.h:34   #define STDAPI_(type)   EXTERN_C type STDAPICALLTYPE
+#     include/uxtheme.h:28    #define THEMEAPI        STDAPI
+#     include/uxtheme.h:29    #define THEMEAPI_(type) STDAPI_(type)
+#     include/uxtheme.h:38    THEMEAPI CloseThemeData(HTHEME hTheme);
+#
+# `CloseThemeData` is declared there, plainly, and the scan could not see it:
+# 11c reported all 69 of uxtheme's exports as undeclared the moment that
+# module had any exports to check.  Same blind-spot class as the missing CDECL
+# spelling and the static-inline forwarders above, one level further out.
+#
+# These are found by TRANSITIVE CLOSURE over the headers' own object-like and
+# function-like defines, seeded with CONV_TOKENS: a macro whose body mentions
+# a convention token, or a macro already known to, introduces a declaration.
+# Nothing is hard-coded per module, and nothing is EXPANDED -- the macro is
+# recognised as the prefix and the arity and return type still come from the
+# text after it, exactly as everywhere else.  A `TYPE_(type)` form carries its
+# return type in its own argument, which is why the two forms are kept apart.
+CONV_MACRO_RE = re.compile(
+    r'^[ \t]*#[ \t]*define[ \t]+(?P<name>[A-Za-z_][A-Za-z_0-9]*)'
+    r'(?P<fn>\([^()\n]*\))?[ \t]+(?P<body>[^\n]+)$', re.MULTILINE)
+
+# Tokens that may sit in such a macro's expansion without making it a
+# declaration prefix: linkage and storage noise, never a return type.
+NO_OP_DECORATIONS = frozenset((
+    'EXTERN_C', 'extern', 'C', 'DECLSPEC_IMPORT', 'DECLSPEC_EXPORT',
+    'DECLSPEC_HIDDEN', 'DECLSPEC_NORETURN', 'DECLSPEC_HOTPATCH',
+    '__declspec', 'dllimport', 'dllexport', 'inline', '__inline'))
 
 
 def strip_comments(text):
@@ -385,14 +445,94 @@ class HeaderScan:
                     out[alias] = real
         return out
 
+    def _conv_macros(self):
+        """-> (convention-only, declaration-prefix, declaration-prefix(type))
+        macro names.  See CONV_MACRO_RE for what these are and why.
+
+        The three classes are not interchangeable and telling them apart is the
+        whole job, because they say different things about where the RETURN
+        TYPE is:
+
+          * convention-only -- `#define WINGDIPAPI __stdcall`.  Every token in
+            its expansion is a convention or a no-op decoration, so it behaves
+            exactly like WINAPI: the return type is the text in front of it
+            (`void WINGDIPAPI GdipFree(void*)` returns void, and reading that
+            as non-void is a real, silent descriptor mismatch).
+          * declaration-prefix -- `#define STDAPI EXTERN_C HRESULT
+            STDAPICALLTYPE`, and `#define THEMEAPI STDAPI` after it.  The
+            expansion contains a TYPE, so the return type is INSIDE the macro
+            and there is nothing in front of it to read.
+          * declaration-prefix with the type as its argument --
+            `#define THEMEAPI_(type) STDAPI_(type)`.  The macro's own argument
+            is the return type, which is the only thing that tells
+            `THEMEAPI_(void) SetThemeAppProperties` from its 68 siblings.
+
+        A macro is convention-only until something in its expansion is neither
+        a convention, a decoration, nor another convention-only macro.
+        """
+        if getattr(self, '_conv_cache', None) is not None:
+            return self._conv_cache
+        conv, decl, declfn, bodies = set(), set(), set(), {}
+        for relpath in self.files:
+            try:
+                with open(os.path.join(self.dir, relpath), errors='replace') as fh:
+                    raw = fh.read()
+            except OSError:
+                continue
+            for m in CONV_MACRO_RE.finditer(strip_comments(raw)):
+                bodies.setdefault(m.group('name'),
+                                  (bool(m.group('fn')), set()))[1].update(
+                    re.findall(r'[A-Za-z_][A-Za-z_0-9]*', m.group('body')))
+        base = set(CONV_TOKENS)
+        known = set(base)
+        changed = True
+        while changed:                      # transitive: THEMEAPI -> STDAPI -> WINAPI
+            changed = False
+            for name, (is_fn, toks) in bodies.items():
+                if name in known or not (toks & known):
+                    continue
+                known.add(name)
+                if is_fn or (toks & decl) or (toks - base - conv - NO_OP_DECORATIONS):
+                    (declfn if is_fn else decl).add(name)
+                else:
+                    conv.add(name)
+                changed = True
+        self._conv_cache = (sorted(conv - base), sorted(decl - base),
+                            sorted(declfn - base))
+        return self._conv_cache
+
     def find(self, names):
         """-> {name: [ {file,line,nargs,ret,void,variadic}, ... ]}"""
         alias = self._aliases(names)
         tokens = list(names) + sorted(alias)
         namealt = '|'.join(re.escape(n) for n in tokens)
+        # A convention-only macro IS a convention token (see _conv_macros), so
+        # it belongs in this alternation and not in a pattern of its own: the
+        # return type still comes from the text in front of it.
+        cconv, cdecl, cdeclfn = self._conv_macros()
+        convalt = (r'\b(?:' + '|'.join(list(CONV_TOKENS)
+                                       + [re.escape(n) for n in cconv]) + r')\b')
         pat = re.compile(
-            r'(?P<ret>[A-Za-z_][A-Za-z_0-9 \t\*\(\)]*?)\s*' + CONV +
+            r'(?P<ret>[A-Za-z_][A-Za-z_0-9 \t\*\(\)]*?)\s*' + convalt +
             r'\s+(?P<name>' + namealt + r')\s*\(')
+        # The declaration-PREFIX macros, in their two forms.  `THEMEAPI Foo(...)`
+        # leaves no return type in the text at all, and the empty `ret` reads
+        # as non-void -- which is right: a prefix of this kind carries a fixed
+        # value return (STDAPI's is HRESULT), and one that returned void would
+        # be spelled with the argument form below.  `THEMEAPI_(COLORREF)
+        # Foo(...)` carries its return type in the macro's own argument, so
+        # that argument IS the return type, and reading it is what tells
+        # `THEMEAPI_(void) SetThemeAppProperties` from its 68 siblings.
+        cpats = []
+        if cdecl:
+            cpats.append(re.compile(
+                r'(?P<ret>)\b(?:' + '|'.join(map(re.escape, cdecl)) + r')\b'
+                r'\s+(?P<name>' + namealt + r')\s*\('))
+        if cdeclfn:
+            cpats.append(re.compile(
+                r'\b(?:' + '|'.join(map(re.escape, cdeclfn)) + r')\b'
+                r'[ \t]*\((?P<ret>[^()\n]*)\)'
+                r'\s+(?P<name>' + namealt + r')\s*\('))
         # The CRT headers' second declaration mechanism: a static inline
         # forwarder with NO calling-convention token at all --
         #     static inline time_t time(time_t *t) { return _time64(t); }
@@ -422,10 +562,32 @@ class HeaderScan:
                 continue
             if not any(n in raw for n in tokens):
                 continue
-            text = mask_ucrt(strip_comments(raw), self.ucrt)
+            stripped = strip_comments(raw)
+            text = mask_ucrt(stripped, self.ucrt)
+            # Line numbers of every preprocessor directive, taken BEFORE
+            # mask_ucrt() blanks them -- it preserves line numbering, so these
+            # index `text` just as well.  See `cond` below for what they are
+            # for.
+            directives = sorted(i for i, ln in
+                                enumerate(stripped.split('\n'), 1)
+                                if re.match(r'[ \t]*#', ln))
             seen = set()
-            for m in list(pat.finditer(text)) + list(ipat.finditer(text)):
+            hits_here = list(pat.finditer(text)) + list(ipat.finditer(text))
+            for cp in cpats:
+                hits_here += list(cp.finditer(text))
+            for m in hits_here:
                 if m.start('name') in seen:
+                    continue
+                # A C++ MEMBER FUNCTION is not a DLL export of that name, and
+                # recognising STDMETHODCALLTYPE as a convention (which it is:
+                # `#define STDMETHODCALLTYPE __stdcall`) makes every COM
+                # interface method in the generated headers look like one.
+                # msxml/mshtml/wmp declare `virtual HRESULT STDMETHODCALLTYPE
+                # abort(void) = 0;` and `... remove(VARIANT,VARIANT)`, which
+                # collided with msvcrt's C `abort` and `remove` and reported
+                # them as inconsistently declared.  `virtual` is the token that
+                # says member function, and no C export ever carries it.
+                if re.search(r'\bvirtual\b', m.group('ret')):
                     continue
                 seen.add(m.start('name'))
                 depth, j = 1, m.end()
@@ -441,11 +603,27 @@ class HeaderScan:
                     args = []
                 ret = clean_ret(m.group('ret'))
                 tok = m.group('name')
+                # A PARAMETER LIST WITH A PREPROCESSOR DIRECTIVE IN IT is not
+                # countable by a text scan, and pretending otherwise produces a
+                # confident wrong answer rather than no answer.
+                # include/iphlpapi.h:103 declares GetBestInterfaceEx with its
+                # first parameter spelled two ways inside an #ifdef/#else;
+                # mask_ucrt() leaves both branches visible (its condition is
+                # not about _UCRT), so the two spellings read as two separate
+                # parameters and the scan says three arguments where the
+                # compiler, the .spec and the generator all say two.  The
+                # scanner's whole value is being an INDEPENDENT reading: a
+                # blind spot it announces costs nothing, one it reports as a
+                # mismatch costs the next reader an afternoon.
+                open_line = text[:m.end()].count('\n') + 1
+                close_line = text[:j].count('\n') + 1
+                lo = bisect.bisect_left(directives, open_line)
+                cond = lo < len(directives) and directives[lo] <= close_line
                 found[alias.get(tok, tok)].append(dict(
                     file=fn, line=text[:m.start('name')].count('\n') + 1,
                     nargs=len(args), ret=ret, void=(ret in ('void', 'VOID')),
                     variadic=any(a.strip() == '...' for a in args),
-                    via=(tok if tok in alias else None)))
+                    cond=cond, via=(tok if tok in alias else None)))
         return found
 
 
@@ -892,11 +1070,26 @@ def main():
                  include_dirs=[])
     if args.spec:
         spec_dll, overrides, from_spec, excludes, extra = parse_spec(args.spec)
-        # GUEST-IMPL <Export> <NativeName> rewrites impl_names_rva for a
-        # non-variadic export, so checks 11h/11i have to know what was asked
-        # for rather than assuming the name is always the export's own.
-        guest_impl = {d[1]: d[2] for d in extra.get('guest_directives', [])
-                      if d[0].upper() == 'GUEST-IMPL' and len(d) >= 3}
+        # Both of the flat-surface REDIRECTS ride impl_names_rva, the field a
+        # variadic's v-variant name used to have to itself:
+        #
+        #   GUEST-IMPL   <Export> <NativeName>   -> that native name
+        #   GUEST-REFUSE <Export> [reason]       -> the shared __wine_com_refuse
+        #
+        # so checks 11h/11i have to know what the .thunks file ASKED FOR rather
+        # than assuming an impl name is always the export's own.  GUEST-PASS is
+        # deliberately not collected: an audited pass-through is not redirected
+        # at all, and leaving it out of this map is exactly what makes 11h go
+        # on demanding that its impl name be its own.
+        for d in extra.get('guest_directives', []):
+            kind = d[0].upper()
+            if kind == 'GUEST-IMPL':
+                if len(d) < 3:
+                    raise SystemExit('%s: GUEST-IMPL needs <Export> <NativeName>: %s'
+                                     % (args.spec, ' '.join(d)))
+                guest_impl[d[1]] = d[2]
+            elif kind == 'GUEST-REFUSE':
+                guest_impl[d[1]] = COM_REFUSE_IMPL
 
     def spec_relative(p):
         if os.path.isabs(p) or not args.spec:
@@ -1335,12 +1528,20 @@ def main():
                     '; '.join(bad) if bad else
                     '%d confirmed (return kind NOT checked -- a .spec has none)'
                     % len(by_spec))
-        conflict, mism, locbad, vbad = [], [], [], []
+        conflict, mism, locbad, vbad, condskip = [], [], [], [], []
         for i, e in enumerate(spec_exports):
             n = e['name']
             hs = hits[n]
             if not hs:
                 continue
+            # Declarations this scan cannot count -- see `cond` in HeaderScan.
+            # A name declared BOTH ways keeps the countable declaration; a name
+            # declared only inside a conditional parameter list is announced
+            # and skipped, never guessed at.
+            if not any(not h['cond'] for h in hs):
+                condskip.append('%s (%s:%d)' % (n, hs[0]['file'], hs[0]['line']))
+                continue
+            hs = [h for h in hs if not h['cond']]
             shapes = {(h['nargs'], h['void'], h['variadic']) for h in hs}
             if len(shapes) != 1:
                 conflict.append('%s: %s' % (n, sorted(shapes)))
@@ -1400,8 +1601,8 @@ def main():
                 vbad.append('%s: no impl_names_rva[%d] entry to check' % (n, i))
             elif not variadic:
                 # Non-variadic: the host must resolve the export's own name --
-                # UNLESS the .thunks file redirected it with GUEST-IMPL, which
-                # rides this same impl_names_rva field.  The rule used to be
+                # UNLESS the .thunks file redirected it, with GUEST-IMPL or
+                # GUEST-REFUSE, which ride this same field.  The rule used to be
                 # "a differing impl name implies variadic", and that stopped
                 # being true the moment anything else could rewrite the field:
                 # first the COM flat wrappers, then _initterm.  Police the
@@ -1447,8 +1648,13 @@ def main():
 
         r.check(not conflict, '11d Wine headers self-consistent for each export',
                 '; '.join(conflict) if conflict else 'no conflicting declarations')
+        if condskip:
+            r.note('11e not re-derivable by a text scan (%d): a preprocessor '
+                   'directive inside the parameter list' % len(condskip),
+                   ', '.join(condskip))
         r.check(not mism, '11e descriptor matches Wine headers (regex re-derivation)',
-                '; '.join(mism) if mism else '%d descriptors confirmed' % count)
+                '; '.join(mism) if mism else '%d descriptors confirmed'
+                % (count - len(condskip)))
         r.check(not locbad, '11f spec cites a header:line that really declares it',
                 '; '.join(locbad) if locbad else 'all %d locations confirmed' % count)
         nvar = sum(1 for d in descs if d & DESC_VARIADIC)
@@ -1460,7 +1666,8 @@ def main():
         # Exports whose declaration the scan could not see at all (cited to a
         # .spec) never reach 11h's impl rules above, so police them here: they
         # are non-variadic by construction -- a `@ varargs` .spec line cannot be
-        # described -- and their impl name must be their own.
+        # described -- and their impl name must be their own OR the redirect
+        # the .thunks file asked for.
         vbad = []
         for i, e in enumerate(spec_exports):
             if hits[e['name']]:
@@ -1478,6 +1685,41 @@ def main():
         r.check(not vbad, '11i .spec-cited exports are plain, impl name == export',
                 '; '.join(vbad) if vbad else
                 '%d checked' % len([1 for e in spec_exports if not hits[e['name']]]))
+
+        # ---- 11j: the OTHER end of the redirect.  11h/11i prove the image
+        # carries the impl name the .thunks file asked for; nothing in the
+        # image can show that the native module actually EXPORTS that name,
+        # and a redirect to a symbol that is not there leaves the guest
+        # faulting at its first call instead of reaching the wrapper.  So
+        # re-derive it from the module's own .spec TEXT, with this file's own
+        # reader.  Only redirect targets are looked up -- the ordinary
+        # export == impl case is the .spec line the export came from.
+        if guest_impl:
+            spec_names, err = set(), None
+            if not from_spec:
+                err = 'redirects need a FROM-SPEC module to resolve against'
+            try:
+                with open(from_spec, errors='replace') as fh:
+                    for raw in fh:
+                        m = WineSpecList.LINE_RE.match(raw.split('#', 1)[0])
+                        # A `@ stub` line exports the name too, and resolving a
+                        # redirect to one would answer failure silently -- so
+                        # only real function entries count as a target here.
+                        if m and m.group('type') in WineSpecList.FUNC_TYPES:
+                            spec_names.add(m.group('name'))
+            except (OSError, TypeError) as e:
+                err = err or str(e)
+            wanted = sorted(set(guest_impl.values()))
+            miss = [t for t in wanted if t not in spec_names]
+            r.check(err is None and not miss,
+                    '11j GUEST-IMPL/GUEST-REFUSE targets are exported by the '
+                    "module's own .spec",
+                    err if err else
+                    'not exported by %s: %s' % (os.path.basename(from_spec),
+                                                ', '.join(miss)) if miss else
+                    '%d redirect target(s) confirmed in %s'
+                    % (len(wanted), os.path.basename(from_spec)))
+
         # One info line per export is readable for a hand-written list and is
         # 1100 lines of scrollback for a whole .spec, which buries the PASS/FAIL
         # summary this file exists to print.  Everything above has already been

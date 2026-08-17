@@ -1,0 +1,83 @@
+# AMD64 thunk export spec for the guest dsound.dll -- COM mode.
+#
+# Read dlls/kernel32/kernel32.thunks for the trap ABI banner and
+# dlls/combase/combase.thunks for the first COM-mode module served by a
+# NATIVE Wine implementation rather than a vendored library.  DirectSound is
+# the same arrangement as system COM and not the d3d11 one: the thing on the
+# other side of the boundary is Wine's own dlls/dsound, which reaches the
+# machine through mmdevapi and winealsa/winepulse.  Nothing is reimplemented.
+#
+#   * FROM-SPEC, so the guest's export surface IS this module's own .spec --
+#     the same list the native namesake implements, ordinals and all.
+#
+#   * COM-JSON is ppc64le/audio/interfaces_dsound.json, extracted from Wine's
+#     OWN dsound.h by ppc64le/audio/gen_interfaces.py.  dlls/dsound/
+#     dsound_marshal.h is generated from that same file by
+#     ppc64le/audio/gen_winecom.py, and libs/winecom cross-checks every IID
+#     and slot count of this module against it at attach -- so the two
+#     generators cannot silently disagree about which slot is which.
+#
+# THE FLAT-SURFACE AUDIT.  With FROM-SPEC + COM-JSON, spec2thunk fails the
+# build unless every flat export whose signature carries an interface pointer
+# is classified.  Each GUEST-IMPL below points the guest's export at a
+# __wine_guest_* wrapper in the native namesake, which wraps the interface
+# pointers the real export wrote; the plain-named export stays exactly as it
+# was for native ppc64 callers, who must never be handed a proxy.
+# dlls/dsound/guestcom.c says the same thing at more length.
+#
+# DirectSoundEnumerateA/W and DirectSoundCaptureEnumerateA/W are NOT here,
+# because the audit is about interface pointers and their first argument is a
+# guest FUNCTION pointer -- clang sees no interface-bearing type, so a
+# directive on them would be refused as stale.
+#
+# THEY DO NOT WORK YET, AND THIS IS WHERE THAT IS RECORDED.  The port
+# intercepts a guest callback at REGISTRATION and swaps it for a trampoline,
+# but which argument is a callback is a hand-maintained table in
+# dlls/ntdll/signal_ppc64.c (thunk_overrides) driven by what the corpus
+# actually registers, not a property clang derives -- and dsound has no rows
+# there.  MEASURED 2026-08-17: a guest calling DirectSoundEnumerateA with its
+# own LPDSENUMCALLBACKA reaches native dsound with a raw guest address, which
+# dsound then calls: "Unhandled page fault on execute access to 000000000115FFFC".
+# The fix is four rows in that table and it is handed off as a diff, not
+# papered over here -- a GUEST-IMPL wrapper on this side could only refuse,
+# and it would then shadow the rows that actually serve it.  A guest that uses
+# the documented default device (DirectSoundCreate8(NULL, ...)), which is what
+# the gate does and what most titles do, never touches this path.
+
+DLL       dsound.dll
+FROM-SPEC auto
+COM-JSON  ../../ppc64le/audio/interfaces_dsound.json
+
+# dsound.h is not in the oracle's default translation unit, and without it
+# every DirectSound* export would be refused for having no declaration -- the
+# same one-line fix x3daudio1_7.thunks needs for x3daudio.h.
+PROBE-EXTRA dsound.h
+
+GUEST-IMPL DirectSoundCreate              __wine_guest_DirectSoundCreate
+GUEST-IMPL DirectSoundCreate8             __wine_guest_DirectSoundCreate8
+GUEST-IMPL DirectSoundCaptureCreate       __wine_guest_DirectSoundCaptureCreate
+GUEST-IMPL DirectSoundCaptureCreate8      __wine_guest_DirectSoundCaptureCreate8
+GUEST-IMPL DirectSoundFullDuplexCreate    __wine_guest_DirectSoundFullDuplexCreate
+
+# The class-object route is refused rather than wrapped, and the reason is
+# worth stating because it is a real gap and not a shrug: DllGetClassObject
+# vends an IClassFactory, which belongs to the SYSTEM-COM roster
+# (ppc64le/syscom/interfaces_syscom.json) and not to this one -- and libs/
+# winecom's state is per-linkee, so a factory interned by dsound's instance is
+# not one combase's instance would recognise.  A guest that reaches DirectSound
+# through CoCreateInstance(CLSID_DirectSound8) is therefore refused loudly at
+# the syscom end too, where IDirectSound8 is not in that roster.  Every guest
+# that uses the documented entry point -- DirectSoundCreate8 -- is served.
+GUEST-REFUSE DllGetClassObject
+
+# Internal names, kept out of the guest export list entirely: the guest never
+# imports them.  __wine_com_dispatch is called by ntdll's trap dispatcher on
+# the NATIVE module, __wine_com_refuse is what GUEST-REFUSE resolves to, and
+# the __wine_guest_* are the GUEST-IMPL targets named above.
+EXCLUDE __wine_com_dispatch
+EXCLUDE __wine_com_refuse
+EXCLUDE __wine_guest_DirectSoundCreate
+EXCLUDE __wine_guest_DirectSoundCreate8
+EXCLUDE __wine_guest_DirectSoundCaptureCreate
+EXCLUDE __wine_guest_DirectSoundCaptureCreate8
+EXCLUDE __wine_guest_DirectSoundFullDuplexCreate

@@ -1,0 +1,52 @@
+# AMD64 thunk export spec -- dinput.dll (DirectInput 3/5/7).
+#
+# From the 2026-08-17 everyday-DLL pass, alongside its dinput8 sibling.  This
+# module had NO guest thunk at all: the loader found the native ppc64 builtin,
+# correctly refused to splice it into a guest call, and every import reported
+# c000007b before the process ran an instruction.  The export list is this
+# module's own .spec.
+DLL dinput.dll
+FROM-SPEC auto
+
+# DirectInputCreateA/W/Ex are declared in dinput.h, which the global probe
+# (wine_sig.PROBE_SRC) does not include.  Measured: 2 of 7 before, 5 of 7
+# after; the two that stay refused are DllRegisterServer and
+# DllUnregisterServer, which Wine declares in no header (the same structural
+# refusal every module gets for those two).
+PROBE-EXTRA   dinput.h
+
+# ------------------------------------------------------------ the refusals
+# ALL THREE CREATORS VEND AN INTERFACE, so none of them is a pass-through.
+# This module publishes no COM roster -- dinput8.dll does
+# (ppc64le/shell/interfaces_dinput.json), and dinput8 is what every title
+# still shipping uses.  Extending the roster to the DirectInput 7 lineage is
+# mechanical and the reason it is not done is stated in
+# dlls/dinput/guestthunk.c: twelve more vtables for a caller that does not
+# exist.  If one turns up, that file says exactly what to do.
+#
+# GUEST-IMPL points each GUEST export at a wrapper that answers
+# DIERR_OUTOFMEMORY -- the failure every DirectInputCreate caller already
+# handles -- with the reason in an ERR.  The plain names are untouched and
+# still serve native ppc64 callers.
+GUEST-IMPL DirectInputCreateA   __wine_guest_DirectInputCreateA
+GUEST-IMPL DirectInputCreateW   __wine_guest_DirectInputCreateW
+GUEST-IMPL DirectInputCreateEx  __wine_guest_DirectInputCreateEx
+
+# DllGetClassObject vends an IClassFactory as a raw void**, and there is no
+# wrapper for that path.  Excluded rather than wrapped: it is `-private`, no
+# ordinary import names it, and a guest reaching the DirectInput coclass
+# through CoCreateInstance is already served by combase's syscom lane.  It
+# binds a named sentinel and dies naming the symbol if anything ever calls it
+# directly.
+EXCLUDE DllGetClassObject
+
+# Internal names, kept out of the guest export list entirely: the guest never
+# imports them, they are only the native symbols the redirects resolve to.
+EXCLUDE __wine_guest_DirectInputCreateA
+EXCLUDE __wine_guest_DirectInputCreateW
+EXCLUDE __wine_guest_DirectInputCreateEx
+
+# What is left and served with no gate: DllCanUnloadNow.  That is the honest
+# total for this module, and the point of having it at all is the same as
+# dwrite's -- a guest that merely LISTS dinput.dll in its import table now
+# loads and runs, instead of dying at c000007b having executed nothing.

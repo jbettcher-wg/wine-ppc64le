@@ -1,0 +1,17 @@
+// Deliberately NO "require_tool_appid".
+//
+// That key is what makes Steam wrap a tool in the Steam Linux Runtime
+// (pressure-vessel).  The container it builds is an x86-64 sysroot: it would
+// put an x86-64 /usr in front of every absolute path this tool relies on and
+// strangle the handoff to the native ppc64le Wine.  Leaving the key out is the
+// documented opt-out, and it is the same edit that already runs on this
+// machine -- see proton/GE-Proton11-3/toolmanifest.vdf vs its .orig, and
+// Steam's own compat_log.txt, where the GE-Proton command prefix has no
+// _v2-entry-point in front of it while the stock Proton tools do.
+"manifest"
+{
+  "version" "2"
+  "commandline" "/proton %verb%"
+  "use_sessions" "1"
+  "compatmanager_layer_name" "proton"
+}

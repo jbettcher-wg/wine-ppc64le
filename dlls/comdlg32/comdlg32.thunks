@@ -1,0 +1,133 @@
+# AMD64 thunk export spec -- comdlg32.dll.
+#
+# From the 2026-08-17 everyday-DLL pass.  The common dialogs are what a
+# launcher, an installer and a game's own "where should I put my saves"
+# prompt use, and this module had NO guest thunk at all: the loader found the
+# native ppc64 builtin, correctly refused to splice it into a guest call, and
+# every import reported c000007b before the process ran an instruction.  The
+# export list is this module's own .spec.
+DLL comdlg32.dll
+FROM-SPEC auto
+
+# No PROBE-EXTRA is needed.  commdlg.h is already reachable from the global
+# probe (wine_sig.PROBE_SRC includes shlobj.h, which pulls in commdlg.h along
+# with commctrl.h), and 22 of 24 eligible exports resolve on the first try.
+# Measured: 22 emitted, 2 refused, 4 skipped as `@ stub`.
+
+# ------------------------------------------------------- the callback class
+# EVERY DIALOG IN THIS MODULE CARRIES A HOOK PROCEDURE INSIDE ITS ONE STRUCT
+# ARGUMENT, and that is the callback shape no argument-position mask can name.
+# dlls/ntdll/signal_ppc64.c's override table already handles the WNDPROC
+# registrations a guest makes for its OWN windows (RegisterClass{,Ex}{A,W},
+# SetWindowLongPtr(GWLP_WNDPROC), CallWindowProc{A,W}); it does not and cannot
+# handle this one, and the comment beside its emu_SetWindowLongPtr row says
+# as much about DWLP_DLGPROC.
+#
+# So each of these is redirected to a wrapper in this module
+# (dlls/comdlg32/guestthunk.c) which looks at the caller's OWN enabling flag:
+#
+#   * flag clear -- the case a launcher's directory prompt actually hits --
+#     calls the real export unchanged.  Nothing is wrapped, because there is
+#     no guest pointer to wrap;
+#   * flag set -- SWAPS THE HOOK, in place, for one of ntdll's guest-callback
+#     trampolines (__wine_guest_wrap_callback, resolved by name with
+#     LdrGetProcedureAddress) and calls the real export.  Native comdlg32 then
+#     calls a native function pointer, which re-enters the guest through the
+#     port's own run-entry primitive.
+#
+# The flags checked, one per field: OFN_ENABLEHOOK, CC_ENABLEHOOK,
+# CF_ENABLEHOOK, FR_ENABLEHOOK, PD_ENABLEPRINTHOOK, PD_ENABLESETUPHOOK,
+# PSD_ENABLEPAGESETUPHOOK, PSD_ENABLEPAGEPAINTHOOK.
+#
+# THIS FILE USED TO SAY these sixteen were refused when the flag was set, and
+# that one export in ntdll would lift all of them.  That export exists now
+# (dlls/ntdll/ntdll.spec, __wine_guest_wrap_callback) and this is what it
+# bought.  What is left of the refusal is one honest failure path: an ntdll
+# with no such export, or a trampoline pool that will not mint a stub, still
+# answers CDERR_INITIALIZATION through comdlg32's own CommDlgExtendedError()
+# channel with an ERR naming the dialog and the flag -- rather than letting
+# native comdlg32 bctrl into x86-64 bytes.
+#
+# WHY IN PLACE AND NOT INTO A COPY, which is where this differs from
+# emu_RegisterClass in signal_ppc64.c: these structs are IN/OUT parameters
+# comdlg32 writes back through, comdlg32 hands the hook THE CALLER'S OWN
+# struct pointer as WM_INITDIALOG's lParam, and FindText/ReplaceText are
+# modeless and keep reading lpfnHook out of the caller's FINDREPLACE long
+# after the call returns.  guestthunk.c's banner has the full argument.
+#
+# WIDTH: every hook here returns UINT_PTR and takes the WIDE trampoline,
+# except PageSetupDlg's two, which commdlg.h declares as returning UINT and
+# which therefore take the narrow sign-extended form.
+#
+# dlls/dinput8/dinput8.thunks carries the full version of the trampoline note,
+# including why a COM vtable slot needs the same export.  The same export also
+# serves dlls/comctl32's property-sheet and DPA-comparator entry points; see
+# that file, which also records the ONE callback shape the pool still cannot
+# carry (five or more arguments).
+GUEST-IMPL GetOpenFileNameA  __wine_guest_GetOpenFileNameA
+GUEST-IMPL GetOpenFileNameW  __wine_guest_GetOpenFileNameW
+GUEST-IMPL GetSaveFileNameA  __wine_guest_GetSaveFileNameA
+GUEST-IMPL GetSaveFileNameW  __wine_guest_GetSaveFileNameW
+GUEST-IMPL ChooseColorA      __wine_guest_ChooseColorA
+GUEST-IMPL ChooseColorW      __wine_guest_ChooseColorW
+GUEST-IMPL ChooseFontA       __wine_guest_ChooseFontA
+GUEST-IMPL ChooseFontW       __wine_guest_ChooseFontW
+GUEST-IMPL FindTextA         __wine_guest_FindTextA
+GUEST-IMPL FindTextW         __wine_guest_FindTextW
+GUEST-IMPL ReplaceTextA      __wine_guest_ReplaceTextA
+GUEST-IMPL ReplaceTextW      __wine_guest_ReplaceTextW
+GUEST-IMPL PrintDlgA         __wine_guest_PrintDlgA
+GUEST-IMPL PrintDlgW         __wine_guest_PrintDlgW
+GUEST-IMPL PageSetupDlgA     __wine_guest_PageSetupDlgA
+GUEST-IMPL PageSetupDlgW     __wine_guest_PageSetupDlgW
+
+# PrintDlgEx is refused unconditionally rather than gated on a flag: its
+# PRINTDLGEX carries an IPrintDialogCallback the APPLICATION implements, so
+# what crosses is a guest-implemented interface handed to native code -- the
+# reverse-proxy direction winecom does not have (system-com-design.md §6,
+# step 5).  There is no flag to test.
+GUEST-IMPL PrintDlgExA       __wine_guest_PrintDlgExA
+GUEST-IMPL PrintDlgExW       __wine_guest_PrintDlgExW
+
+# Internal names, kept out of the guest export list entirely: the guest never
+# imports them, they are only the native symbols the redirects resolve to.
+EXCLUDE __wine_guest_GetOpenFileNameA
+EXCLUDE __wine_guest_GetOpenFileNameW
+EXCLUDE __wine_guest_GetSaveFileNameA
+EXCLUDE __wine_guest_GetSaveFileNameW
+EXCLUDE __wine_guest_ChooseColorA
+EXCLUDE __wine_guest_ChooseColorW
+EXCLUDE __wine_guest_ChooseFontA
+EXCLUDE __wine_guest_ChooseFontW
+EXCLUDE __wine_guest_FindTextA
+EXCLUDE __wine_guest_FindTextW
+EXCLUDE __wine_guest_ReplaceTextA
+EXCLUDE __wine_guest_ReplaceTextW
+EXCLUDE __wine_guest_PrintDlgA
+EXCLUDE __wine_guest_PrintDlgW
+EXCLUDE __wine_guest_PageSetupDlgA
+EXCLUDE __wine_guest_PageSetupDlgW
+EXCLUDE __wine_guest_PrintDlgExA
+EXCLUDE __wine_guest_PrintDlgExW
+
+# ---------------------------------------------------------- DllGetClassObject
+# Excluded, not wrapped.  It vends an IClassFactory for comdlg32's
+# FileOpenDialog/FileSaveDialog coclasses, and this module publishes no COM
+# roster, so the guest would get a NATIVE ppc64 vtable.  A guest reaches those
+# coclasses through CoCreateInstance, which combase's syscom lane already
+# classifies and wraps (dlls/combase/combase.thunks GUEST-IMPL
+# CoCreateInstance), so nothing loses a path by this being absent -- it binds a
+# named sentinel and dies naming the symbol if anything ever calls it
+# directly.  DllRegisterServer/DllUnregisterServer are the two the oracle
+# refuses on its own ("no declaration found in Wine headers"), for the same
+# structural reason they are refused in every other module: Wine declares them
+# in no header.
+EXCLUDE DllGetClassObject
+
+# --------------------------------------------------------------- what is left
+# Served with no gate at all, because they carry no callback and no interface:
+# CommDlgExtendedError, GetFileTitleA, GetFileTitleW.
+#
+# Skipped as `@ stub` -- Wine has no implementation, so a guest that imports
+# one binds a named sentinel and dies naming the symbol, which is the honest
+# answer: LoadAlterBitmap, WantArrows, dwLBSubclass, dwOKSubclass.

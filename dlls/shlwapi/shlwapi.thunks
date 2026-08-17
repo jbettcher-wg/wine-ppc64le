@@ -11,3 +11,11 @@
 # the shortest route from a real game's draw calls to this machine's GPU.
 DLL shlwapi.dll
 FROM-SPEC auto
+
+# All 360 eligible exports were refused as "no declaration in any Wine header"
+# -- an empty PE, and a sentinel for every import of it.  DOOM imports seven
+# (PathFileExistsA, PathFindExtensionA, PathRemoveFileSpecW and friends).
+# With shlwapi.h in the oracle's translation unit, 321 of the 360 resolve;
+# what still refuses is genuinely unrepresentable, mostly the ShellMessageBox
+# variadics and AssocCreate's int128 argument.
+PROBE-EXTRA   shlwapi.h

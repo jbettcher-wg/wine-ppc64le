@@ -1,0 +1,16 @@
+# AMD64 thunk export spec -- rpcrt4.dll.
+#
+# From the 2026-08-17 corpus pass.  Styx: Master of Shadows reaches this
+# module through the wxWidgets library it ships -- wxmsw28u_core_vc_custom_64.dll
+# imports it STATICALLY -- and it had no guest thunk, so the loader found the
+# native ppc64 module and correctly refused to splice it into a guest call
+# (c000007b), which fails the whole importing image.  rpcrt4 is not per-title:
+# it is where UuidCreate and the NDR marshalling surface live, and any guest
+# that touches COM or a GUID reaches it eventually.
+#
+# 260 of 317 eligible exports are emitted from this module's own .spec with no
+# extra headers -- rpcdce.h, rpcndr.h and their kin are already in the
+# oracle's default translation unit through windows.h.  The 57 refusals keep
+# their ordinals as named sentinels.
+DLL rpcrt4.dll
+FROM-SPEC auto

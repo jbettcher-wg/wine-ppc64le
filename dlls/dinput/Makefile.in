@@ -7,6 +7,8 @@ VER_FILEDESCRIPTION_STR = "Wine DirectInput"
 VER_PRODUCTVERSION      = 5,1,2600,881
 
 SOURCES = \
+	dinput.thunks \
+	guestthunk.c \
 	ansi.c \
 	config.c \
 	data_formats.c \

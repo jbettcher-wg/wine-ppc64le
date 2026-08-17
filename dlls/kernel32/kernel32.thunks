@@ -135,6 +135,15 @@ WriteFile                 0x0000F11E  5  int   winbase.h:2361
 # move the citation to the header and drop them out of the banner.
 DelayLoadFailureHook      0x0000D1A0  2  int   kernel32.spec:366
 ResolveDelayLoadedAPI     0x0000D1A1  6  int   kernel32.spec:1326
+# The same downgrade, one more export, found by auditing DOOM's whole import
+# graph rather than waiting for the next sentinel: bink2w64.dll -- the Bink
+# video decoder DOOM plays its intro with -- imports GetEnvironmentStrings, and
+# winbase.h:1772 has only `#define GetEnvironmentStrings WINELIB_NAME_AW(...)`.
+# There is no declaration of the unsuffixed name anywhere in Wine's headers, so
+# the oracle refused it; kernel32 exports and implements it all the same
+# (dlls/kernelbase/process.c GetEnvironmentStringsA is what -import reaches).
+# Zero arguments, returns LPCH -- a pointer, so `int` here.
+GetEnvironmentStrings     0x0000D1A2  0  int   kernel32.spec:676
 
 # ---------------------------------------------------------------------------
 # indices 23..29: the kernel32 half of programs/winepath.exe's import table
@@ -181,3 +190,12 @@ GetExitCodeThread         0x0000E71C  2  int   processthreadsapi.h:172
 # Ends the run by protocol rather than letting native ExitThread reach
 # pthread_exit with a live fexbridge_run below it; see emu_ExitThread.
 ExitThread                0x0000E717  1  void  processthreadsapi.h:165
+
+# psapi.h, for the K32-prefixed process-enumeration surface kernel32 exports
+# and no other header declares.  It is declared there under its UNPREFIXED
+# name -- psapi.h's own `#define EnumProcesses K32EnumProcesses` (PSAPI_VERSION
+# 2) renames the declaration, so what clang indexes really is K32EnumProcesses.
+# DOOM imports K32EnumProcesses, K32EnumProcessModules and K32GetModuleBaseNameA;
+# this header serves those and 24 more, and costs nothing else (measured: 1112
+# exports emitted without it, 1139 with, none lost).
+PROBE-EXTRA   psapi.h

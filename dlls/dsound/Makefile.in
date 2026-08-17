@@ -1,12 +1,13 @@
 MODULE    = dsound.dll
 IMPORTLIB = dsound
-IMPORTS   = dxguid uuid winmm ole32 advapi32 user32
+IMPORTS   = dxguid uuid winmm ole32 advapi32 user32 winecom
 
 VER_FILEDESCRIPTION_STR = "Wine DirectSound"
 VER_PRODUCTVERSION      = 5,3,1,904
 VER_OLESELFREGISTER     = 1
 
 SOURCES = \
+	dsound.thunks \
 	buffer.c \
 	capture.c \
 	dsound.c \
@@ -14,6 +15,7 @@ SOURCES = \
 	dsound_convert.c \
 	dsound_main.c \
 	duplex.c \
+	guestcom.c \
 	mixer.c \
 	primary.c \
 	propset.c \

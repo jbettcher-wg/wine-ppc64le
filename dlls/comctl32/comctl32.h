@@ -229,6 +229,13 @@ typedef struct
 
 LRESULT COMCTL32_forward_notify_to_ansi_window(HWND hwnd_notify, NMHDR *hdr, WCHAR **unicode_buffer, DWORD *unicode_buffer_size);
 
+/* The cookie at offset 0 of every HPROPSHEETPAGE CreatePropertySheetPage
+ * hands out.  Shared rather than private to propsheet.c because guestthunk.c
+ * has to make the same distinction PropertySheetA makes -- a phpage[] entry is
+ * either one of these or a raw PROPSHEETPAGE -- and one cookie in two files
+ * would be one too many. */
+#define HPROPSHEETPAGE_MAGIC 0x5A9234E3
+
 /* undocumented functions */
 
 BOOL   WINAPI Free (LPVOID);

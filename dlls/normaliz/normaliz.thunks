@@ -1,0 +1,20 @@
+# AMD64 thunk export spec -- normaliz.dll.
+#
+# From the 2026-08-17 corpus pass.  Boltgun imports this module STATICALLY and
+# it had no guest thunk, so the loader refused the native ppc64 module
+# (c000007b) and the whole image failed to load (c0000135).  Measured: the
+# exe's import table names IdnToAscii (ordinal 0).
+#
+# All 5 exports are declared in winnls.h, which the oracle's default
+# translation unit reaches through windows.h, so all 5 are emitted with no
+# PROBE-EXTRA.
+#
+# One thing to watch on this module and no other in this pass: normaliz is
+# built EXTRADLLFLAGS = -Wb,--data-only, so every entry in its .spec is a
+# FORWARD into kernelbase rather than code of its own.  The guest trap
+# resolves by name against the native module, which is where a forward is
+# resolved anyway -- but that is the first --data-only module to get a thunk,
+# so IdnToAscii returning something wrong rather than faulting is the failure
+# to look for if this one ever misbehaves.
+DLL normaliz.dll
+FROM-SPEC auto

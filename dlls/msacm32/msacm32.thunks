@@ -1,0 +1,17 @@
+# AMD64 thunk export spec -- msacm32.dll.
+#
+# From the 2026-08-17 corpus pass.  Styx: Master of Shadows reaches this
+# module through its own shipped fmodex64.dll, which imports it STATICALLY,
+# and it had no guest thunk -- so the loader found the native ppc64 module and
+# correctly refused to splice it into a guest call (c000007b), which fails the
+# whole importing image.
+DLL msacm32.dll
+FROM-SPEC auto
+
+# Neither header is in the oracle's default translation unit, and msacm.h does
+# not compile on its own: it names PWAVEFILTER, which is typedef'd in
+# mmreg.h.  So that one is appended FIRST -- PROBE-EXTRA lines are emitted in
+# the order written.  Without them the header did not parse at all and every
+# export was refused; with them, 42 of 43 are emitted.
+PROBE-EXTRA   mmreg.h
+PROBE-EXTRA   msacm.h

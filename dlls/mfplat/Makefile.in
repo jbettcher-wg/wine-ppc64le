@@ -1,13 +1,21 @@
+# mfplat.dll holds the ONE winecom instance for the Media Foundation surface
+# (dlls/mfplat/mfcom.c), which is why it -- and not mf.dll or mfreadwrite.dll
+# -- imports winecom: libs/winecom's state is per-linkee, so a second linkee
+# would get a second intern space and its proxies would be strangers to this
+# one's.  The siblings reach this instance through mfplat's __wine_com_*
+# exports.
 MODULE    = mfplat.dll
 IMPORTLIB = mfplat
-IMPORTS   = advapi32 ole32 dmoguids mfuuid propsys rtworkq kernelbase
+IMPORTS   = advapi32 ole32 dmoguids mfuuid propsys rtworkq kernelbase winecom
 DELAYIMPORTS = bcrypt
 
 EXTRADLLFLAGS = -Wb,--prefer-native
 
 SOURCES = \
+	mfplat.thunks \
 	buffer.c \
 	main.c \
 	mediatype.c \
+	mfcom.c \
 	queue.c \
 	sample.c

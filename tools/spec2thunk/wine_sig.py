@@ -159,14 +159,31 @@ RECORD_CLASS = 12       # record_type_class  (struct)
 UNION_CLASS  = 13       # union_type_class
 REAL_CLASS   = 8        # real_type_class  (float, double, long double)
 
-# Floating point IS representable across this ABI pair, but only in the first
-# four argument positions.  MS-x64 has exactly XMM0-XMM3 for arguments and
-# passes a fifth floating-point argument on the STACK; the host reads its FP
-# arguments out of the guest's XMM registers, so it can only see the first
-# four.  A `long double` is refused whatever its position: it is 128-bit on
-# ppc64 and 64-bit on MS-x64, so the value would not survive.  sizeof <= 8 in
-# the probe below is what enforces that.
-MAX_FP_ARG_POS = 4
+# Floating point IS representable across this ABI pair, in the first EIGHT
+# argument positions.
+#
+# The bound is the descriptor's, not the ABI's.  MS-x64 has exactly XMM0-XMM3
+# for arguments and passes a fifth floating-point argument on the STACK, in
+# the same eight-byte slot an integer would have used -- so the host can see
+# it perfectly well, and marshal_thunk_args_fp() in dlls/ntdll/signal_ppc64.c
+# reads position i from XMMi below four and from [Rsp + 8 + 8*i] at or above
+# it.  What stops at eight is THUNK_FP_MASK: the FP descriptor word carries
+# one bit per argument in a byte, and ELFv2's f1-f8 are what
+# call_native_thunk_fp loads.
+#
+# This used to be 4, describing the host side as it then was -- it read every
+# FP argument out of an XMM register, so a fifth one would have come from
+# XMM4, which is not an argument register at all.  That refused glOrtho,
+# glFrustum, glUniform4f, glMultiTexCoord4f and 155 other OpenGL entry points
+# whose fourth-and-later arguments are floats, which is how the gap surfaced.
+# Do not lower it again without lowering the host side with it: a descriptor
+# that promises less than the marshaller does costs nothing, but one that
+# promises more is a wrong number rather than a crash.
+#
+# A `long double` is refused whatever its position: it is 128-bit on ppc64 and
+# 64-bit on MS-x64, so the value would not survive.  sizeof <= 8 in the probe
+# below is what enforces that.
+MAX_FP_ARG_POS = 8
 
 # ---------------------------------------------------------------------------
 # SMALL AGGREGATES PASSED BY VALUE.  ONE GPR IN BOTH ABIS.  NAMED, NOT INFERRED.

@@ -1,0 +1,2059 @@
+{
+  "surface": "wine-dsound",
+  "iface_ptr_aliases": {
+    "IDirectSound3DBuffer8": "IDirectSound3DBuffer",
+    "IDirectSound3DListener8": "IDirectSound3DListener",
+    "IDirectSoundCapture8": "IDirectSoundCapture",
+    "IDirectSoundFullDuplex8": "IDirectSoundFullDuplex",
+    "IDirectSoundNotify8": "IDirectSoundNotify",
+    "LPDIRECTSOUND": "IDirectSound",
+    "LPDIRECTSOUND3DBUFFER": "IDirectSound3DBuffer",
+    "LPDIRECTSOUND3DBUFFER8": "IDirectSound3DBuffer",
+    "LPDIRECTSOUND3DLISTENER": "IDirectSound3DListener",
+    "LPDIRECTSOUND3DLISTENER8": "IDirectSound3DListener",
+    "LPDIRECTSOUND8": "IDirectSound8",
+    "LPDIRECTSOUNDBUFFER": "IDirectSoundBuffer",
+    "LPDIRECTSOUNDBUFFER8": "IDirectSoundBuffer8",
+    "LPDIRECTSOUNDCAPTURE": "IDirectSoundCapture",
+    "LPDIRECTSOUNDCAPTURE8": "IDirectSoundCapture",
+    "LPDIRECTSOUNDCAPTUREBUFFER": "IDirectSoundCaptureBuffer",
+    "LPDIRECTSOUNDCAPTUREBUFFER8": "IDirectSoundCaptureBuffer8",
+    "LPDIRECTSOUNDFULLDUPLEX": "IDirectSoundFullDuplex",
+    "LPDIRECTSOUNDFULLDUPLEX8": "IDirectSoundFullDuplex",
+    "LPDIRECTSOUNDFXI3DL2REVERB": "IDirectSoundFXI3DL2Reverb",
+    "LPDIRECTSOUNDNOTIFY": "IDirectSoundNotify",
+    "LPDIRECTSOUNDNOTIFY8": "IDirectSoundNotify",
+    "LPKSPROPERTYSET": "IKsPropertySet",
+    "LPLPDIRECTSOUND": "IDirectSound",
+    "LPLPDIRECTSOUND3DBUFFER": "IDirectSound3DBuffer",
+    "LPLPDIRECTSOUND3DLISTENER": "IDirectSound3DListener",
+    "LPLPDIRECTSOUND8": "IDirectSound8",
+    "LPLPDIRECTSOUNDBUFFER": "IDirectSoundBuffer",
+    "LPLPDIRECTSOUNDBUFFER8": "IDirectSoundBuffer8",
+    "LPLPDIRECTSOUNDCAPTURE": "IDirectSoundCapture",
+    "LPLPDIRECTSOUNDCAPTURE8": "IDirectSoundCapture",
+    "LPLPDIRECTSOUNDCAPTUREBUFFER": "IDirectSoundCaptureBuffer",
+    "LPLPDIRECTSOUNDCAPTUREBUFFER8": "IDirectSoundCaptureBuffer8",
+    "LPLPDIRECTSOUNDFULLDUPLEX": "IDirectSoundFullDuplex",
+    "LPLPDIRECTSOUNDNOTIFY": "IDirectSoundNotify"
+  },
+  "enums": [],
+  "interfaces": {
+    "IDirectSound": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSound",
+          "name": "CreateSoundBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "LPCDSBUFFERDESC lpcDSBufferDesc",
+            "LPLPDIRECTSOUNDBUFFER lplpDirectSoundBuffer",
+            "IUnknown *pUnkOuter"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSound",
+          "name": "GetCaps",
+          "ret": "HRESULT",
+          "params": [
+            "LPDSCAPS lpDSCaps"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectSound",
+          "name": "DuplicateSoundBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "LPDIRECTSOUNDBUFFER lpDsbOriginal",
+            "LPLPDIRECTSOUNDBUFFER lplpDsbDuplicate"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectSound",
+          "name": "SetCooperativeLevel",
+          "ret": "HRESULT",
+          "params": [
+            "HWND hwnd",
+            "DWORD dwLevel"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectSound",
+          "name": "Compact",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectSound",
+          "name": "GetSpeakerConfig",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD lpdwSpeakerConfig"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectSound",
+          "name": "SetSpeakerConfig",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwSpeakerConfig"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectSound",
+          "name": "Initialize",
+          "ret": "HRESULT",
+          "params": [
+            "LPCGUID lpcGuid"
+          ]
+        }
+      ],
+      "uuid": "279afa83-4981-11ce-a521-0020af0be560"
+    },
+    "IDirectSound3DBuffer": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSound3DBuffer",
+          "name": "GetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "LPDS3DBUFFER lpDs3dBuffer"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSound3DBuffer",
+          "name": "GetConeAngles",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD lpdwInsideConeAngle",
+            "LPDWORD lpdwOutsideConeAngle"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectSound3DBuffer",
+          "name": "GetConeOrientation",
+          "ret": "HRESULT",
+          "params": [
+            "LPD3DVECTOR lpvOrientation"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectSound3DBuffer",
+          "name": "GetConeOutsideVolume",
+          "ret": "HRESULT",
+          "params": [
+            "LPLONG lplConeOutsideVolume"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectSound3DBuffer",
+          "name": "GetMaxDistance",
+          "ret": "HRESULT",
+          "params": [
+            "LPD3DVALUE lpflMaxDistance"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectSound3DBuffer",
+          "name": "GetMinDistance",
+          "ret": "HRESULT",
+          "params": [
+            "LPD3DVALUE lpflMinDistance"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectSound3DBuffer",
+          "name": "GetMode",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD lpwdMode"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectSound3DBuffer",
+          "name": "GetPosition",
+          "ret": "HRESULT",
+          "params": [
+            "LPD3DVECTOR lpvPosition"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirectSound3DBuffer",
+          "name": "GetVelocity",
+          "ret": "HRESULT",
+          "params": [
+            "LPD3DVECTOR lpvVelocity"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirectSound3DBuffer",
+          "name": "SetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "LPCDS3DBUFFER lpcDs3dBuffer",
+            "DWORD dwApply"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IDirectSound3DBuffer",
+          "name": "SetConeAngles",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwInsideConeAngle",
+            "DWORD dwOutsideConeAngle",
+            "DWORD dwApply"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IDirectSound3DBuffer",
+          "name": "SetConeOrientation",
+          "ret": "HRESULT",
+          "params": [
+            "D3DVALUE x",
+            "D3DVALUE y",
+            "D3DVALUE z",
+            "DWORD dwApply"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirectSound3DBuffer",
+          "name": "SetConeOutsideVolume",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lConeOutsideVolume",
+            "DWORD dwApply"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IDirectSound3DBuffer",
+          "name": "SetMaxDistance",
+          "ret": "HRESULT",
+          "params": [
+            "D3DVALUE flMaxDistance",
+            "DWORD dwApply"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IDirectSound3DBuffer",
+          "name": "SetMinDistance",
+          "ret": "HRESULT",
+          "params": [
+            "D3DVALUE flMinDistance",
+            "DWORD dwApply"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IDirectSound3DBuffer",
+          "name": "SetMode",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwMode",
+            "DWORD dwApply"
+          ]
+        },
+        {
+          "slot": 19,
+          "owner": "IDirectSound3DBuffer",
+          "name": "SetPosition",
+          "ret": "HRESULT",
+          "params": [
+            "D3DVALUE x",
+            "D3DVALUE y",
+            "D3DVALUE z",
+            "DWORD dwApply"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "IDirectSound3DBuffer",
+          "name": "SetVelocity",
+          "ret": "HRESULT",
+          "params": [
+            "D3DVALUE x",
+            "D3DVALUE y",
+            "D3DVALUE z",
+            "DWORD dwApply"
+          ]
+        }
+      ],
+      "uuid": "279afa86-4981-11ce-a521-0020af0be560"
+    },
+    "IDirectSound3DListener": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSound3DListener",
+          "name": "GetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "LPDS3DLISTENER lpListener"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSound3DListener",
+          "name": "GetDistanceFactor",
+          "ret": "HRESULT",
+          "params": [
+            "LPD3DVALUE lpflDistanceFactor"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectSound3DListener",
+          "name": "GetDopplerFactor",
+          "ret": "HRESULT",
+          "params": [
+            "LPD3DVALUE lpflDopplerFactor"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectSound3DListener",
+          "name": "GetOrientation",
+          "ret": "HRESULT",
+          "params": [
+            "LPD3DVECTOR lpvOrientFront",
+            "LPD3DVECTOR lpvOrientTop"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectSound3DListener",
+          "name": "GetPosition",
+          "ret": "HRESULT",
+          "params": [
+            "LPD3DVECTOR lpvPosition"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectSound3DListener",
+          "name": "GetRolloffFactor",
+          "ret": "HRESULT",
+          "params": [
+            "LPD3DVALUE lpflRolloffFactor"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectSound3DListener",
+          "name": "GetVelocity",
+          "ret": "HRESULT",
+          "params": [
+            "LPD3DVECTOR lpvVelocity"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectSound3DListener",
+          "name": "SetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "LPCDS3DLISTENER lpcListener",
+            "DWORD dwApply"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirectSound3DListener",
+          "name": "SetDistanceFactor",
+          "ret": "HRESULT",
+          "params": [
+            "D3DVALUE flDistanceFactor",
+            "DWORD dwApply"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirectSound3DListener",
+          "name": "SetDopplerFactor",
+          "ret": "HRESULT",
+          "params": [
+            "D3DVALUE flDopplerFactor",
+            "DWORD dwApply"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IDirectSound3DListener",
+          "name": "SetOrientation",
+          "ret": "HRESULT",
+          "params": [
+            "D3DVALUE xFront",
+            "D3DVALUE yFront",
+            "D3DVALUE zFront",
+            "D3DVALUE xTop",
+            "D3DVALUE yTop",
+            "D3DVALUE zTop",
+            "DWORD dwApply"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IDirectSound3DListener",
+          "name": "SetPosition",
+          "ret": "HRESULT",
+          "params": [
+            "D3DVALUE x",
+            "D3DVALUE y",
+            "D3DVALUE z",
+            "DWORD dwApply"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirectSound3DListener",
+          "name": "SetRolloffFactor",
+          "ret": "HRESULT",
+          "params": [
+            "D3DVALUE flRolloffFactor",
+            "DWORD dwApply"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IDirectSound3DListener",
+          "name": "SetVelocity",
+          "ret": "HRESULT",
+          "params": [
+            "D3DVALUE x",
+            "D3DVALUE y",
+            "D3DVALUE z",
+            "DWORD dwApply"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IDirectSound3DListener",
+          "name": "CommitDeferredSettings",
+          "ret": "HRESULT",
+          "params": []
+        }
+      ],
+      "uuid": "279afa84-4981-11ce-a521-0020af0be560"
+    },
+    "IDirectSound8": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSound8",
+          "name": "CreateSoundBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "LPCDSBUFFERDESC lpcDSBufferDesc",
+            "LPLPDIRECTSOUNDBUFFER lplpDirectSoundBuffer",
+            "IUnknown *pUnkOuter"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSound8",
+          "name": "GetCaps",
+          "ret": "HRESULT",
+          "params": [
+            "LPDSCAPS lpDSCaps"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectSound8",
+          "name": "DuplicateSoundBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "LPDIRECTSOUNDBUFFER lpDsbOriginal",
+            "LPLPDIRECTSOUNDBUFFER lplpDsbDuplicate"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectSound8",
+          "name": "SetCooperativeLevel",
+          "ret": "HRESULT",
+          "params": [
+            "HWND hwnd",
+            "DWORD dwLevel"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectSound8",
+          "name": "Compact",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectSound8",
+          "name": "GetSpeakerConfig",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD lpdwSpeakerConfig"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectSound8",
+          "name": "SetSpeakerConfig",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwSpeakerConfig"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectSound8",
+          "name": "Initialize",
+          "ret": "HRESULT",
+          "params": [
+            "LPCGUID lpcGuid"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirectSound8",
+          "name": "VerifyCertification",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD pdwCertified"
+          ]
+        }
+      ],
+      "uuid": "c50a7e93-f395-4834-9ef6-7fa99de50966"
+    },
+    "IDirectSoundBuffer": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSoundBuffer",
+          "name": "GetCaps",
+          "ret": "HRESULT",
+          "params": [
+            "LPDSBCAPS lpDSBufferCaps"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSoundBuffer",
+          "name": "GetCurrentPosition",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD lpdwCurrentPlayCursor",
+            "LPDWORD lpdwCurrentWriteCursor"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectSoundBuffer",
+          "name": "GetFormat",
+          "ret": "HRESULT",
+          "params": [
+            "LPWAVEFORMATEX lpwfxFormat",
+            "DWORD dwSizeAllocated",
+            "LPDWORD lpdwSizeWritten"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectSoundBuffer",
+          "name": "GetVolume",
+          "ret": "HRESULT",
+          "params": [
+            "LPLONG lplVolume"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectSoundBuffer",
+          "name": "GetPan",
+          "ret": "HRESULT",
+          "params": [
+            "LPLONG lplpan"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectSoundBuffer",
+          "name": "GetFrequency",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD lpdwFrequency"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectSoundBuffer",
+          "name": "GetStatus",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD lpdwStatus"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectSoundBuffer",
+          "name": "Initialize",
+          "ret": "HRESULT",
+          "params": [
+            "LPDIRECTSOUND lpDirectSound",
+            "LPCDSBUFFERDESC lpcDSBufferDesc"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirectSoundBuffer",
+          "name": "Lock",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwOffset",
+            "DWORD dwBytes",
+            "LPVOID *ppvAudioPtr1",
+            "LPDWORD pdwAudioBytes1",
+            "LPVOID *ppvAudioPtr2",
+            "LPDWORD pdwAudioBytes2",
+            "DWORD dwFlags"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirectSoundBuffer",
+          "name": "Play",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwReserved1",
+            "DWORD dwReserved2",
+            "DWORD dwFlags"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IDirectSoundBuffer",
+          "name": "SetCurrentPosition",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwNewPosition"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IDirectSoundBuffer",
+          "name": "SetFormat",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWAVEFORMATEX lpcfxFormat"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirectSoundBuffer",
+          "name": "SetVolume",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lVolume"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IDirectSoundBuffer",
+          "name": "SetPan",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lPan"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IDirectSoundBuffer",
+          "name": "SetFrequency",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwFrequency"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IDirectSoundBuffer",
+          "name": "Stop",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 19,
+          "owner": "IDirectSoundBuffer",
+          "name": "Unlock",
+          "ret": "HRESULT",
+          "params": [
+            "LPVOID pvAudioPtr1",
+            "DWORD dwAudioBytes1",
+            "LPVOID pvAudioPtr2",
+            "DWORD dwAudioPtr2"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "IDirectSoundBuffer",
+          "name": "Restore",
+          "ret": "HRESULT",
+          "params": []
+        }
+      ],
+      "uuid": "279afa85-4981-11ce-a521-0020af0be560"
+    },
+    "IDirectSoundBuffer8": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSoundBuffer8",
+          "name": "GetCaps",
+          "ret": "HRESULT",
+          "params": [
+            "LPDSBCAPS lpDSBufferCaps"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSoundBuffer8",
+          "name": "GetCurrentPosition",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD lpdwCurrentPlayCursor",
+            "LPDWORD lpdwCurrentWriteCursor"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectSoundBuffer8",
+          "name": "GetFormat",
+          "ret": "HRESULT",
+          "params": [
+            "LPWAVEFORMATEX lpwfxFormat",
+            "DWORD dwSizeAllocated",
+            "LPDWORD lpdwSizeWritten"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectSoundBuffer8",
+          "name": "GetVolume",
+          "ret": "HRESULT",
+          "params": [
+            "LPLONG lplVolume"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectSoundBuffer8",
+          "name": "GetPan",
+          "ret": "HRESULT",
+          "params": [
+            "LPLONG lplpan"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectSoundBuffer8",
+          "name": "GetFrequency",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD lpdwFrequency"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectSoundBuffer8",
+          "name": "GetStatus",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD lpdwStatus"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectSoundBuffer8",
+          "name": "Initialize",
+          "ret": "HRESULT",
+          "params": [
+            "LPDIRECTSOUND lpDirectSound",
+            "LPCDSBUFFERDESC lpcDSBufferDesc"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IDirectSoundBuffer8",
+          "name": "Lock",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwOffset",
+            "DWORD dwBytes",
+            "LPVOID *ppvAudioPtr1",
+            "LPDWORD pdwAudioBytes1",
+            "LPVOID *ppvAudioPtr2",
+            "LPDWORD pdwAudioBytes2",
+            "DWORD dwFlags"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirectSoundBuffer8",
+          "name": "Play",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwReserved1",
+            "DWORD dwReserved2",
+            "DWORD dwFlags"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IDirectSoundBuffer8",
+          "name": "SetCurrentPosition",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwNewPosition"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IDirectSoundBuffer8",
+          "name": "SetFormat",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWAVEFORMATEX lpcfxFormat"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IDirectSoundBuffer8",
+          "name": "SetVolume",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lVolume"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IDirectSoundBuffer8",
+          "name": "SetPan",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lPan"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IDirectSoundBuffer8",
+          "name": "SetFrequency",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwFrequency"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IDirectSoundBuffer8",
+          "name": "Stop",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 19,
+          "owner": "IDirectSoundBuffer8",
+          "name": "Unlock",
+          "ret": "HRESULT",
+          "params": [
+            "LPVOID pvAudioPtr1",
+            "DWORD dwAudioBytes1",
+            "LPVOID pvAudioPtr2",
+            "DWORD dwAudioPtr2"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "IDirectSoundBuffer8",
+          "name": "Restore",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 21,
+          "owner": "IDirectSoundBuffer8",
+          "name": "SetFX",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwEffectsCount",
+            "LPDSEFFECTDESC pDSFXDesc",
+            "LPDWORD pdwResultCodes"
+          ]
+        },
+        {
+          "slot": 22,
+          "owner": "IDirectSoundBuffer8",
+          "name": "AcquireResources",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwFlags",
+            "DWORD dwEffectsCount",
+            "LPDWORD pdwResultCodes"
+          ]
+        },
+        {
+          "slot": 23,
+          "owner": "IDirectSoundBuffer8",
+          "name": "GetObjectInPath",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidObject",
+            "DWORD dwIndex",
+            "REFGUID rguidInterface",
+            "LPVOID *ppObject"
+          ]
+        }
+      ],
+      "uuid": "6825a449-7524-4d82-920f-50e36ab3ab1e"
+    },
+    "IDirectSoundCapture": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSoundCapture",
+          "name": "CreateCaptureBuffer",
+          "ret": "HRESULT",
+          "params": [
+            "LPCDSCBUFFERDESC lpcDSCBufferDesc",
+            "LPDIRECTSOUNDCAPTUREBUFFER *lplpDSCaptureBuffer",
+            "LPUNKNOWN pUnk"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSoundCapture",
+          "name": "GetCaps",
+          "ret": "HRESULT",
+          "params": [
+            "LPDSCCAPS lpDSCCaps"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectSoundCapture",
+          "name": "Initialize",
+          "ret": "HRESULT",
+          "params": [
+            "LPCGUID lpcGUID"
+          ]
+        }
+      ],
+      "uuid": "b0210781-89cd-11d0-af08-00a0c925cd16"
+    },
+    "IDirectSoundCaptureBuffer": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSoundCaptureBuffer",
+          "name": "GetCaps",
+          "ret": "HRESULT",
+          "params": [
+            "LPDSCBCAPS lpDSCBCaps"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSoundCaptureBuffer",
+          "name": "GetCurrentPosition",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD lpdwCapturePosition",
+            "LPDWORD lpdwReadPosition"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectSoundCaptureBuffer",
+          "name": "GetFormat",
+          "ret": "HRESULT",
+          "params": [
+            "LPWAVEFORMATEX lpwfxFormat",
+            "DWORD dwSizeAllocated",
+            "LPDWORD lpdwSizeWritten"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectSoundCaptureBuffer",
+          "name": "GetStatus",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD lpdwStatus"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectSoundCaptureBuffer",
+          "name": "Initialize",
+          "ret": "HRESULT",
+          "params": [
+            "LPDIRECTSOUNDCAPTURE lpDSC",
+            "LPCDSCBUFFERDESC lpcDSCBDesc"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectSoundCaptureBuffer",
+          "name": "Lock",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwReadCusor",
+            "DWORD dwReadBytes",
+            "LPVOID *lplpvAudioPtr1",
+            "LPDWORD lpdwAudioBytes1",
+            "LPVOID *lplpvAudioPtr2",
+            "LPDWORD lpdwAudioBytes2",
+            "DWORD dwFlags"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectSoundCaptureBuffer",
+          "name": "Start",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwFlags"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectSoundCaptureBuffer",
+          "name": "Stop",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 11,
+          "owner": "IDirectSoundCaptureBuffer",
+          "name": "Unlock",
+          "ret": "HRESULT",
+          "params": [
+            "LPVOID lpvAudioPtr1",
+            "DWORD dwAudioBytes1",
+            "LPVOID lpvAudioPtr2",
+            "DWORD dwAudioBytes2"
+          ]
+        }
+      ],
+      "uuid": "b0210782-89cd-11d0-af08-00a0c925cd16"
+    },
+    "IDirectSoundCaptureBuffer8": {
+      "base": "IDirectSoundCaptureBuffer",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSoundCaptureBuffer",
+          "name": "GetCaps",
+          "ret": "HRESULT",
+          "params": [
+            "LPDSCBCAPS lpDSCBCaps"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSoundCaptureBuffer",
+          "name": "GetCurrentPosition",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD lpdwCapturePosition",
+            "LPDWORD lpdwReadPosition"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectSoundCaptureBuffer",
+          "name": "GetFormat",
+          "ret": "HRESULT",
+          "params": [
+            "LPWAVEFORMATEX lpwfxFormat",
+            "DWORD dwSizeAllocated",
+            "LPDWORD lpdwSizeWritten"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectSoundCaptureBuffer",
+          "name": "GetStatus",
+          "ret": "HRESULT",
+          "params": [
+            "LPDWORD lpdwStatus"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectSoundCaptureBuffer",
+          "name": "Initialize",
+          "ret": "HRESULT",
+          "params": [
+            "LPDIRECTSOUNDCAPTURE lpDSC",
+            "LPCDSCBUFFERDESC lpcDSCBDesc"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectSoundCaptureBuffer",
+          "name": "Lock",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwReadCusor",
+            "DWORD dwReadBytes",
+            "LPVOID *lplpvAudioPtr1",
+            "LPDWORD lpdwAudioBytes1",
+            "LPVOID *lplpvAudioPtr2",
+            "LPDWORD lpdwAudioBytes2",
+            "DWORD dwFlags"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IDirectSoundCaptureBuffer",
+          "name": "Start",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwFlags"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IDirectSoundCaptureBuffer",
+          "name": "Stop",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 11,
+          "owner": "IDirectSoundCaptureBuffer",
+          "name": "Unlock",
+          "ret": "HRESULT",
+          "params": [
+            "LPVOID lpvAudioPtr1",
+            "DWORD dwAudioBytes1",
+            "LPVOID lpvAudioPtr2",
+            "DWORD dwAudioBytes2"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IDirectSoundCaptureBuffer8",
+          "name": "GetObjectInPath",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rguidObject",
+            "DWORD dwIndex",
+            "REFGUID rguidInterface",
+            "LPVOID *ppObject"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IDirectSoundCaptureBuffer8",
+          "name": "GetFXStatus",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD dwFXCount",
+            "LPDWORD pdwFXStatus"
+          ]
+        }
+      ],
+      "uuid": "00990df4-0dbb-4872-833e-6d303e80aeb6"
+    },
+    "IDirectSoundFXChorus": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID",
+            "void**"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSoundFXChorus",
+          "name": "SetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "const DSFXChorus *chorus"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSoundFXChorus",
+          "name": "GetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "DSFXChorus *chorus"
+          ]
+        }
+      ],
+      "uuid": "880842e3-145f-43e6-a934-a71806e50547"
+    },
+    "IDirectSoundFXCompressor": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID",
+            "void**"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSoundFXCompressor",
+          "name": "SetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "const DSFXCompressor *compressor"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSoundFXCompressor",
+          "name": "GetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "DSFXCompressor *compressor"
+          ]
+        }
+      ],
+      "uuid": "4bbd1154-62f6-4e2c-a15c-d3b6c417f7a0"
+    },
+    "IDirectSoundFXDistortion": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID",
+            "void**"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSoundFXDistortion",
+          "name": "SetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "const DSFXDistortion *distortion"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSoundFXDistortion",
+          "name": "GetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "DSFXDistortion *distortion"
+          ]
+        }
+      ],
+      "uuid": "8ecf4326-455f-4d8b-bda9-8d5d3e9e3e0b"
+    },
+    "IDirectSoundFXEcho": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID",
+            "void**"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSoundFXEcho",
+          "name": "SetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "const DSFXEcho *echo"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSoundFXEcho",
+          "name": "GetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "DSFXEcho *echo"
+          ]
+        }
+      ],
+      "uuid": "8bd28edf-50db-4e92-a2bd-445488d1ed42"
+    },
+    "IDirectSoundFXFlanger": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID",
+            "void**"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSoundFXFlanger",
+          "name": "SetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "const DSFXFlanger *flanger"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSoundFXFlanger",
+          "name": "GetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "DSFXFlanger *flanger"
+          ]
+        }
+      ],
+      "uuid": "903e9878-2c92-4072-9b2c-ea68f5396783"
+    },
+    "IDirectSoundFXGargle": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID",
+            "void**"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSoundFXGargle",
+          "name": "SetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "const DSFXGargle *gargle"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSoundFXGargle",
+          "name": "GetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "DSFXGargle *gargle"
+          ]
+        }
+      ],
+      "uuid": "d616f352-d622-11ce-aac5-0020af0b99a3"
+    },
+    "IDirectSoundFXI3DL2Reverb": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID",
+            "void**"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSoundFXI3DL2Reverb",
+          "name": "SetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "LPCDSFXI3DL2Reverb reverb"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSoundFXI3DL2Reverb",
+          "name": "GetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "LPDSFXI3DL2Reverb reverb"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDirectSoundFXI3DL2Reverb",
+          "name": "SetPreset",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD preset"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDirectSoundFXI3DL2Reverb",
+          "name": "GetPreset",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *preset"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IDirectSoundFXI3DL2Reverb",
+          "name": "SetQuality",
+          "ret": "HRESULT",
+          "params": [
+            "LONG quality"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IDirectSoundFXI3DL2Reverb",
+          "name": "GetQuality",
+          "ret": "HRESULT",
+          "params": [
+            "LONG *quality"
+          ]
+        }
+      ],
+      "uuid": "4b166a6a-0d66-43f3-80e3-ee6280dee1a4"
+    },
+    "IDirectSoundFXParamEq": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID",
+            "void**"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSoundFXParamEq",
+          "name": "SetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "const DSFXParamEq *param"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSoundFXParamEq",
+          "name": "GetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "DSFXParamEq *param"
+          ]
+        }
+      ],
+      "uuid": "c03ca9fe-fe90-4204-8078-82334cd177da"
+    },
+    "IDirectSoundFXWavesReverb": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID",
+            "void**"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSoundFXWavesReverb",
+          "name": "SetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "const DSFXWavesReverb *reverb"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDirectSoundFXWavesReverb",
+          "name": "GetAllParameters",
+          "ret": "HRESULT",
+          "params": [
+            "DSFXWavesReverb *reverb"
+          ]
+        }
+      ],
+      "uuid": "46858c3a-0dc6-45e3-b760-d4eef16cb325"
+    },
+    "IDirectSoundFullDuplex": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSoundFullDuplex",
+          "name": "Initialize",
+          "ret": "HRESULT",
+          "params": [
+            "LPCGUID pCaptureGuid",
+            "LPCGUID pRendererGuid",
+            "LPCDSCBUFFERDESC lpDscBufferDesc",
+            "LPCDSBUFFERDESC lpDsBufferDesc",
+            "HWND hWnd",
+            "DWORD dwLevel",
+            "LPLPDIRECTSOUNDCAPTUREBUFFER8 lplpDirectSoundCaptureBuffer8",
+            "LPLPDIRECTSOUNDBUFFER8 lplpDirectSoundBuffer8"
+          ]
+        }
+      ],
+      "uuid": "edcb4c7a-daab-4216-a42e-6c50596ddc1d"
+    },
+    "IDirectSoundNotify": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDirectSoundNotify",
+          "name": "SetNotificationPositions",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD cPositionNotifies",
+            "LPCDSBPOSITIONNOTIFY lpcPositionNotifies"
+          ]
+        }
+      ],
+      "uuid": "b0210783-89cd-11d0-af08-00a0c925cd16"
+    },
+    "IKsPropertySet": {
+      "base": "IUnknown",
+      "header": "dsound.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IKsPropertySet",
+          "name": "Get",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rgid",
+            "ULONG x1",
+            "LPVOID p1",
+            "ULONG x2",
+            "LPVOID p2",
+            "ULONG x3",
+            "ULONG *px4"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IKsPropertySet",
+          "name": "Set",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rgid",
+            "ULONG x1",
+            "LPVOID p1",
+            "ULONG x2",
+            "LPVOID p2",
+            "ULONG x3"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IKsPropertySet",
+          "name": "QuerySupport",
+          "ret": "HRESULT",
+          "params": [
+            "REFGUID rgid",
+            "ULONG x1",
+            "ULONG *px2"
+          ]
+        }
+      ],
+      "uuid": "31efac30-515c-11d0-a9aa-00aa0061be93"
+    }
+  }
+}

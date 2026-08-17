@@ -1,12 +1,19 @@
 EXTRADEFS = -DXAUDIO2_VER=9
 MODULE    = xaudio2_9.dll
-IMPORTS   = $(FAUDIO_PE_LIBS) advapi32 ole32 user32 uuid
+# An import library upstream does not build, because upstream has nothing
+# that links this module.  ppc64le/audio/check-audio-smoke.sh does: its
+# NATIVE ppc64 leg is an ordinary consumer of XAudio2Create and has to link
+# the same way the guest leg imports.
+IMPORTLIB = xaudio2_9
+IMPORTS   = $(FAUDIO_PE_LIBS) advapi32 ole32 user32 uuid winecom
 EXTRAINCL = $(FAUDIO_PE_CFLAGS)
 PARENTSRC = ../xaudio2_7
 
 VER_PRODUCTVERSION = 10,0,19041,1
 
 SOURCES = \
+	xaudio2_9.thunks \
+	guestcom.c \
 	x3daudio.c \
 	xapo.c \
 	xapofx.c \

@@ -170,6 +170,7 @@ static const char *winegcc;
 static const char *elf2pe;
 static const char *spec2thunk;
 static const char *spec2thunk_sig;
+static const char *guestpe;
 static const char *widl;
 static const char *wrc;
 static const char *wmc;
@@ -3491,6 +3492,122 @@ static void output_source_nls( struct makefile *make, struct incl_file *source, 
 }
 
 
+/* parsed contents of a .thunks file's file-referencing directives -- see
+ * output_source_thunks below.  tools/spec2thunk's parse_spec() (the DLL,
+ * COM-JSON, FROM-DEF, PROBE-INCLUDE, PROBE-EXTRA and INCLUDE-DIR handling)
+ * and its FROM-SPEC/spec_relative() resolution in main() are the authority on
+ * this format; read_thunks_file() mirrors only as much of it as is needed to
+ * compute honest Makefile dependency edges, and is deliberately forgiving of
+ * everything else in the file -- spec2thunk owns validating the DSL itself,
+ * and a directive this function does not know about names either no file at
+ * all (EXCLUDE, GUEST-IMPL, GUEST-REFUSE, GUEST-PASS, a bare export line) or
+ * one whose location is not knowable without doing what the signature oracle
+ * itself does. */
+struct thunks_info
+{
+    const char *dll;                /* DLL <name> -- needed to resolve FROM-SPEC auto */
+    const char *com_json;           /* COM-JSON <path>, .thunks-relative */
+    const char *from_def;           /* FROM-DEF <path>, .thunks-relative */
+    const char *from_spec;          /* FROM-SPEC <arg>: "auto", a path, or NULL if absent */
+    struct strarray probe_includes; /* PROBE-INCLUDE <header>, one per line */
+    struct strarray probe_extra;    /* PROBE-EXTRA <header>, one per line */
+    struct strarray include_dirs;   /* INCLUDE-DIR <dir>, .thunks-relative, file order */
+};
+
+/*******************************************************************
+ *         read_thunks_file
+ *
+ * A .thunks file is never scanned by the normal #include dependency pass --
+ * its extension is absent from parse_functions[], exactly like .guestpe and
+ * .spec -- so this is the only place its content is read.
+ */
+static struct thunks_info read_thunks_file( const char *filename )
+{
+    struct thunks_info info = { NULL, NULL, NULL, NULL,
+                                 empty_strarray, empty_strarray, empty_strarray };
+    FILE *file;
+    char *buffer;
+
+    if (!(file = fopen( filename, "r" ))) fatal_perror( "open %s", filename );
+
+    while ((buffer = get_line( file )))
+    {
+        /* parse_spec() strips a trailing comment anywhere on the line, not
+         * only one that starts it -- e.g. msvcrt.thunks pairs
+         * "PROBE-EXTRA msvcrt.h" with an inline "# _amsg_exit, __dllonexit" */
+        char *comment = strchr( buffer, '#' );
+        char *keyword, *value;
+
+        if (comment) *comment = 0;
+        if (!(keyword = strtok( buffer, " \t" ))) continue;
+        value = strtok( NULL, " \t" );
+        if (!value) continue;  /* malformed; spec2thunk reports it, not us */
+
+        /* parse_spec() compares parts[0].upper(), but every .thunks file in
+         * the tree already spells these in caps, so a literal match is
+         * enough and keeps this parser simple. */
+        if (!strcmp( keyword, "DLL" )) info.dll = xstrdup( value );
+        else if (!strcmp( keyword, "COM-JSON" )) info.com_json = xstrdup( value );
+        else if (!strcmp( keyword, "FROM-DEF" )) info.from_def = xstrdup( value );
+        else if (!strcmp( keyword, "FROM-SPEC" )) info.from_spec = xstrdup( value );
+        else if (!strcmp( keyword, "PROBE-INCLUDE" )) strarray_add( &info.probe_includes, xstrdup( value ));
+        else if (!strcmp( keyword, "PROBE-EXTRA" )) strarray_add( &info.probe_extra, xstrdup( value ));
+        else if (!strcmp( keyword, "INCLUDE-DIR" )) strarray_add( &info.include_dirs, xstrdup( value ));
+        /* anything else: not our concern, see the struct's banner above */
+    }
+    fclose( file );
+    return info;
+}
+
+
+/*******************************************************************
+ *         add_probe_header_dep
+ *
+ * PROBE-INCLUDE/PROBE-EXTRA name a header by search-path lookup, not by a
+ * path relative to the .thunks file -- resolved by clang using -I flags in
+ * the order tools/spec2thunk/wine_sig.py's WineHeaders builds them: this
+ * file's own INCLUDE-DIRs first, then the widl-generated headers, then
+ * Wine's include tree (see the extra_includes/generated_dir/include_dir
+ * ordering there).  Reproducing that whole search here is not attempted --
+ * only the first, project-private segment of it is, and only when the file
+ * actually exists:
+ *
+ *   - a header this module ships itself (dxvk_flat_surface.h,
+ *     opengl32_guest_ext.h, vkd3d_d3d12.h, msvcrt's own private mtdll.h) sits
+ *     under one of THIS .thunks file's own INCLUDE-DIR lines, so it can be
+ *     found the identical way and turned into a real, honest prerequisite;
+ *   - a header spec2thunk resolves out of Wine's own generated or public
+ *     include tree cannot be: enumerating that tree here would mean
+ *     duplicating clang's system search, and a real prerequisite on a path
+ *     this function merely guessed at -- and guessed wrong -- would fail the
+ *     build outright instead of just under-tracking it, which is worse than
+ *     the staleness bug this function exists to close.  Those stay covered
+ *     only by the order-only include/all below, exactly as before this
+ *     change.
+ *
+ * So: found under one of this file's own INCLUDE-DIRs -> real prerequisite.
+ * Not found there -> no prerequisite added, silently; that is the expected
+ * outcome for the large majority of PROBE-INCLUDE/PROBE-EXTRA headers, which
+ * name ordinary Wine headers.
+ */
+static void add_probe_header_dep( const struct makefile *make, struct strarray *deps,
+                                  const struct strarray *include_dirs, const char *header )
+{
+    unsigned int i;
+
+    for (i = 0; i < include_dirs->count; i++)
+    {
+        char *path = concat_paths( src_dir_path( make, include_dirs->str[i] ), header );
+        FILE *f = fopen( path, "r" );
+
+        if (!f) continue;
+        fclose( f );
+        strarray_add( deps, path );
+        return;  /* first INCLUDE-DIR match wins, same as clang's -I order */
+    }
+}
+
+
 /*******************************************************************
  *         output_source_thunks
  *
@@ -3509,11 +3626,29 @@ static void output_source_nls( struct makefile *make, struct incl_file *source, 
  * The export list is source for now.  It should end up derived from the
  * module's own .spec file, at which point these files go away -- nothing here
  * depends on them being hand-written.
+ *
+ * A .thunks file also NAMES other files the thunk is genuinely derived from
+ * -- COM-JSON's interface roster, FROM-DEF's .def, FROM-SPEC's .spec, and
+ * whichever PROBE-INCLUDE/PROBE-EXTRA headers are this module's own (see
+ * add_probe_header_dep above) -- and read_thunks_file() below reads them out
+ * so they become real prerequisites too.  COM-JSON/FROM-DEF/FROM-SPEC are
+ * always added, without checking on disk first: the file names a definite,
+ * singular path, so the honest thing is to always claim the dependency and
+ * let "make" itself refuse loudly ("No rule to make target ...") if the path
+ * turns out wrong, rather than quietly skip the prerequisite and let the
+ * thunk go stale the same way this whole fix is closing.  (Some of these
+ * live in trees provisioned outside the git checkout -- vkd3d-proton's own
+ * d3d12.def, see ppc64le/vkd3d/bootstrap.sh -- so makedep cannot always
+ * verify them up front anyway; that is a property of the source tree's
+ * setup, not a reason to weaken the dependency.)
  */
 static void output_source_thunks( struct makefile *make, struct incl_file *source, const char *obj )
 {
     const char *dir = "x86_64-windows";
     const char *name = strmake( "%s/%s.dll", dir, obj );
+    struct thunks_info info = read_thunks_file( source->filename );
+    struct strarray real_deps = empty_strarray;
+    unsigned int i;
 
     if (make->disabled[0]) return;
 
@@ -3521,13 +3656,165 @@ static void output_source_thunks( struct makefile *make, struct incl_file *sourc
     install_data_file( make, strmake( "%s.dll", obj ), name,
                        strmake( "$(libdir)/wine/%s", dir ), NULL );
 
+    if (info.com_json) strarray_add( &real_deps, src_dir_path( make, info.com_json ));
+    if (info.from_def) strarray_add( &real_deps, src_dir_path( make, info.from_def ));
+    if (info.from_spec)
+    {
+        char *spec_path;
+
+        if (!strcmp( info.from_spec, "auto" ))
+        {
+            /* <dll stem>.spec beside the .thunks file -- see the FROM-SPEC
+             * "auto" handling in spec2thunk's main(). */
+            if (!info.dll) fatal_error( "%s: FROM-SPEC auto needs a DLL line\n", source->filename );
+            spec_path = src_dir_path( make, strmake( "%s.spec", get_base_name( info.dll )));
+        }
+        else spec_path = src_dir_path( make, info.from_spec );
+        strarray_add( &real_deps, spec_path );
+    }
+    for (i = 0; i < info.probe_includes.count; i++)
+        add_probe_header_dep( make, &real_deps, &info.include_dirs, info.probe_includes.str[i] );
+    for (i = 0; i < info.probe_extra.count; i++)
+        add_probe_header_dep( make, &real_deps, &info.include_dirs, info.probe_extra.str[i] );
+
     /* The signature oracle reads the widl-generated headers out of the build
      * tree; without this dependency a fresh -j build races the thunk against
-     * "make include" and spec2thunk fails with "cannot find wtypes.h". */
-    output( "%s: %s %s %s include/wtypes.h\n", obj_dir_path( make, name ),
-            source->filename, spec2thunk, spec2thunk_sig );
+     * "make include" and spec2thunk fails with "cannot find wtypes.h".  One
+     * named header is not enough -- the probe includes shlobj.h, dxgi1_6.h and
+     * more, each of which pulls in further generated headers -- so order on the
+     * whole set.  It is order-only: "include/all" is phony, and a real
+     * prerequisite on it would regenerate every thunk on every make. */
+    output( "%s:", obj_dir_path( make, name ));
+    output_filename( source->filename );
+    output_filename( spec2thunk );
+    output_filename( spec2thunk_sig );
+    output_filenames( real_deps );
+    output( " | include/all\n" );
     output( "\t%s%s --spec %s --body=trap --out $@\n",
             cmd_prefix( "THUNK" ), spec2thunk, source->filename );
+}
+
+
+/* parsed contents of a .guestpe file -- see output_source_guestpe below */
+struct guestpe_info
+{
+    const char *entry;         /* PE entry point symbol */
+    const char *def;           /* module-relative path to the .def file */
+    struct strarray imports;   /* guest thunk DLLs to link against, by base name */
+    struct strarray sources;   /* module-relative .c files, tracked individually */
+    struct strarray globs;     /* module-relative glob patterns, expanded at build time */
+};
+
+/*******************************************************************
+ *         read_guestpe_file
+ *
+ * A .guestpe file is never scanned by the normal #include dependency pass --
+ * its extension is absent from parse_functions[], exactly like .thunks and
+ * .spec -- so this is the only place its content is read.  The format is
+ * documented in dlls/lsteamclient/steamclient64.guestpe itself: six
+ * keywords, one per line, "KEYWORD value", '#' starts a comment.
+ */
+static struct guestpe_info read_guestpe_file( const char *filename )
+{
+    struct guestpe_info info = { NULL, NULL, empty_strarray, empty_strarray, empty_strarray };
+    FILE *file;
+    char *buffer;
+
+    if (!(file = fopen( filename, "r" ))) fatal_perror( "open %s", filename );
+
+    while ((buffer = get_line( file )))
+    {
+        char *p = skip_spaces( buffer );
+        char *keyword, *value, *end;
+
+        if (!*p || *p == '#') continue;
+        keyword = strtok( p, " \t" );
+        value = strtok( NULL, "" );
+        if (value) value = skip_spaces( value );
+        if (!value || !*value) fatal_error( "%s: line has no value for '%s'\n", filename, keyword );
+        end = value + strlen( value );
+        while (end > value && isspace( (unsigned char)end[-1] )) *--end = 0;
+
+        if (!strcmp( keyword, "ENTRY" )) info.entry = xstrdup( value );
+        else if (!strcmp( keyword, "DEF" )) info.def = xstrdup( value );
+        else if (!strcmp( keyword, "IMPORT" )) strarray_add( &info.imports, xstrdup( value ));
+        else if (!strcmp( keyword, "SOURCE" )) strarray_add( &info.sources, xstrdup( value ));
+        else if (!strcmp( keyword, "GLOB" )) strarray_add( &info.globs, xstrdup( value ));
+        else if (!strcmp( keyword, "DLL" )) {}  /* documentary only -- see output_source_guestpe */
+        else fatal_error( "%s: unknown keyword '%s'\n", filename, keyword );
+    }
+    fclose( file );
+
+    if (!info.entry) fatal_error( "%s: no ENTRY line\n", filename );
+    if (!info.def) fatal_error( "%s: no DEF line\n", filename );
+    return info;
+}
+
+
+/*******************************************************************
+ *         output_source_guestpe
+ *
+ * steamclient64.dll is real compiled x86-64 machine code, not a spec2thunk
+ * trap stub -- see dlls/lsteamclient/steamclient_guest.h for why, and
+ * tools/guestpe/guestpe for the tool that does the compiling and linking.
+ * Like output_source_thunks, the actual work happens inside one external
+ * tool invocation; this function's job is purely to get make's DEPENDENCIES
+ * right so that "make -j" orders things correctly and an incremental build
+ * does the right amount of work:
+ *
+ *   - the .guestpe file itself and the driver script, obviously;
+ *   - the .def file;
+ *   - every explicit SOURCE line, so touching e.g. steamrpc.c rebuilds the
+ *     DLL (GLOB-matched sources do NOT get this -- see the GLOB keyword's
+ *     documentation in dlls/lsteamclient/steamclient64.guestpe for why, and
+ *     what it costs);
+ *   - every IMPORT's resolved guest thunk DLL, found the same way
+ *     add_import_libs() finds an ordinary IMPORTS= library, and used both as
+ *     a real prerequisite (relink when kernel32's thunk changes) and as a
+ *     real -j72 ordering constraint (don't link before it exists).
+ */
+static void output_source_guestpe( struct makefile *make, struct incl_file *source, const char *obj )
+{
+    const char *dir = "x86_64-windows";
+    struct guestpe_info info = read_guestpe_file( source->filename );
+    const char *name = strmake( "%s/%s.dll", dir, obj );
+    const char *def_path = src_dir_path( make, info.def );
+    const char *objdir = obj_dir_path( make, strmake( "%s/%s.guestpe-obj", dir, obj ));
+    struct strarray import_args = empty_strarray;
+    unsigned int i;
+
+    if (make->disabled[0]) return;
+
+    strarray_add( &make->all_targets[0], name );
+    install_data_file( make, strmake( "%s.dll", obj ), name,
+                       strmake( "$(libdir)/wine/%s", dir ), NULL );
+
+    output( "%s:", obj_dir_path( make, name ));
+    output_filename( source->filename );
+    output_filename( guestpe );
+    output_filename( def_path );
+    STRARRAY_FOR_EACH( src, &info.sources ) output_filename( src_dir_path( make, src ));
+    for (i = 0; i < info.imports.count; i++)
+    {
+        const char *imp = info.imports.str[i];
+        struct makefile *submake = find_importlib_module( imp );
+        const char *imp_path;
+
+        if (!submake) fatal_error( "%s: IMPORT %s: no dlls/%s guest thunk module\n",
+                                    source->filename, imp, imp );
+        imp_path = obj_dir_path( submake, strmake( "%s/%s.dll", dir, imp ));
+        output_filename( imp_path );
+        strarray_add( &import_args, strmake( "--import=%s=%s", imp, imp_path ));
+    }
+    output( " | include/all\n" );
+
+    output( "\t%s%s --out $@ --entry %s --def %s --topdir %s --moduledir %s --objdir %s",
+            cmd_prefix( "GUESTPE" ), guestpe, info.entry, def_path,
+            root_src_dir_path( "" ), src_dir_path( make, "" ), objdir );
+    STRARRAY_FOR_EACH( src, &info.sources ) output_filename( strmake( "--source=%s", src ));
+    STRARRAY_FOR_EACH( g, &info.globs ) output_filename( strmake( "--glob=%s", g ));
+    output_filenames( import_args );
+    output( "\n" );
 }
 
 
@@ -4000,6 +4287,7 @@ static const struct
     { "x", output_source_x },
     { "spec", output_source_spec },
     { "thunks", output_source_thunks },
+    { "guestpe", output_source_guestpe },
     { "xml", output_source_xml },
     { "winmd", output_source_winmd },
     { "asm", output_source_nasm },
@@ -4879,6 +5167,7 @@ static void output_silent_rules(void)
         "ELF2PE",
         "FLEX",
         "GEN",
+        "GUESTPE",
         "LN",
         "MSG",
         "SAST",
@@ -5268,6 +5557,7 @@ int main( int argc, char *argv[] )
      * so a thunk module built before an edit to it is stale.  Without it in
      * the prerequisites, changing the signature oracle rebuilt nothing. */
     spec2thunk_sig = root_src_dir_path( "tools/spec2thunk/wine_sig.py" );
+    guestpe     = root_src_dir_path( "tools/guestpe/guestpe" );
     widl        = tools_path( "widl" );
     wrc         = tools_path( "wrc" );
     wmc         = tools_path( "wmc" );

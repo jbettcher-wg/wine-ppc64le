@@ -5,6 +5,7 @@ EXTRAINCL = $(FAUDIO_PE_CFLAGS)
 PARENTSRC = ../xaudio2_7
 
 SOURCES = \
+	xapofx1_5.thunks \
 	xapo.c \
 	xapofx.c \
 	xaudio_allocator.c \

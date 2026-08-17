@@ -1,17 +1,14 @@
+# The native ppc64le DXGI lane.  Every export forwards into d3d11.dll, which
+# owns the single winecom instance for this surface -- dlls/dxgi/dxgi.spec
+# explains why there can only be one.
+#
+# Wine's wined3d-backed implementation (adapter.c, device.c, factory.c,
+# output.c, resource.c, swapchain.c, utils.c) is left in the tree and dropped
+# from SOURCES, for the reason dlls/d3d11/Makefile.in gives.
 MODULE    = dxgi.dll
 IMPORTLIB = dxgi
-IMPORTS   = gdi32 dxguid uuid wined3d user32 win32u
-EXTRAINCL = $(VKD3D_PE_CFLAGS)
 
 VER_PRODUCTVERSION = 6,0,6000,16386
 
 SOURCES = \
-	dxgi.thunks \
-	adapter.c \
-	device.c \
-	dxgi_main.c \
-	factory.c \
-	output.c \
-	resource.c \
-	swapchain.c \
-	utils.c
+	dxgi.thunks

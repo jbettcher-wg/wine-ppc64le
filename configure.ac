@@ -3362,6 +3362,7 @@ WINE_CONFIG_MAKEFILE(dlls/srvsvc)
 WINE_CONFIG_MAKEFILE(dlls/sspicli)
 WINE_CONFIG_MAKEFILE(dlls/stdole2.tlb)
 WINE_CONFIG_MAKEFILE(dlls/stdole32.tlb)
+WINE_CONFIG_MAKEFILE(dlls/steamclient64)
 WINE_CONFIG_MAKEFILE(dlls/sti)
 WINE_CONFIG_MAKEFILE(dlls/sti/tests)
 WINE_CONFIG_MAKEFILE(dlls/storage.dll16)
@@ -3985,6 +3986,44 @@ WINE_APPEND_RULE(
 all: dlls/d3d12/libvkd3d-proton-d3d12.so
 clean::
 	rm -rf ppc64le/vkd3d-build dlls/d3d12/libvkd3d-proton-d3d12.so])
+
+dnl Rules for the ppc64le native D3D11 lane: DXVK is part of the build, the
+dnl same arrangement and for the same reasons as the D3D12 lane above.  Three
+dnl libraries rather than one, because DXVK builds d3d11, dxgi and d3d10core
+dnl as separate shared objects with real ELF dependencies between them, and
+dnl all three are symlinked next to the d3d11 unixlib, which dlopens them
+dnl there (dlls/d3d11/unix.c).  It REALPATHS each symlink first: glibc expands
+dnl $ORIGIN from the path an object was loaded by, not from its realpath, so
+dnl loading libdxvk_d3d11.so through the symlink in dlls/d3d11/ would look for
+dnl its dxgi half in dlls/dxgi/ and not find it.  The d3d11 link is made last,
+dnl so a build that failed part-way does not leave a fresh timestamp on the
+dnl target and get skipped next time.  ppc64le/dxvk/build-for-wine.sh holds
+dnl the meson side of the seam.
+
+WINE_APPEND_RULE(
+[dlls/d3d11/libdxvk_d3d11.so: dummy
+	@${wine_srcdir}ppc64le/dxvk/build-for-wine.sh \$(CURDIR)/ppc64le/dxvk-build
+	@rm -f dlls/d3d11/libdxvk_dxgi.so && ln -s ../../ppc64le/dxvk-build/src/dxgi/libdxvk_dxgi.so dlls/d3d11/libdxvk_dxgi.so
+	@rm -f dlls/d3d11/libdxvk_d3d10core.so && ln -s ../../ppc64le/dxvk-build/src/d3d10/libdxvk_d3d10core.so dlls/d3d11/libdxvk_d3d10core.so
+	@rm -f \$[@] && ln -s ../../ppc64le/dxvk-build/src/d3d11/libdxvk_d3d11.so \$[@]
+all: dlls/d3d11/libdxvk_d3d11.so
+clean::
+	rm -rf ppc64le/dxvk-build dlls/d3d11/libdxvk_dxgi.so dlls/d3d11/libdxvk_d3d11.so dlls/d3d11/libdxvk_d3d10core.so])
+
+dnl The D3D9 half of the same lane.  One library, no ELF dependencies between
+dnl it and the others (libdxvk_d3d9.so has no DT_NEEDED on libdxvk_dxgi.so --
+dnl checked with readelf), so it is a plain symlink beside the d3d9 unixlib.
+dnl It depends on the D3D11 target rather than on `dummy` so that
+dnl build-for-wine.sh runs ONCE per build: the same meson build tree produces
+dnl every one of these libraries, and two rules both invoking ninja on it
+dnl would race under make -j.
+
+WINE_APPEND_RULE(
+[dlls/d3d9/libdxvk_d3d9.so: dlls/d3d11/libdxvk_d3d11.so
+	@rm -f \$[@] && ln -s ../../ppc64le/dxvk-build/src/d3d9/libdxvk_d3d9.so \$[@]
+all: dlls/d3d9/libdxvk_d3d9.so
+clean::
+	rm -f dlls/d3d9/libdxvk_d3d9.so])
 
 dnl Misc rules
 
