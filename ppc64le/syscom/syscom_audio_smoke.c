@@ -57,18 +57,25 @@
  *
  * OBSERVATIONS THAT ARE TRUE OF THE PORT AND NOT OF THE API go to stderr as
  * `note:` lines and never enter the diffed transcript, because their answer
- * legitimately differs between the legs.  All four are the REVERSE-PROXY
- * direction -- a guest-implemented COM object, or a struct carrying one, passed
- * INTO native code -- which this port does not do yet:
+ * legitimately differs -- or once differed -- between the legs.  All four are
+ * the REVERSE-PROXY direction: a guest-implemented COM object, or a struct
+ * carrying one, passed INTO native code.
  *
  *   IXAudio2::RegisterForCallbacks, IXAudio2::CreateSourceVoice with a
  *   non-NULL pCallback, IMMDeviceEnumerator::UnregisterEndpointNotification-
  *   Callback, and IMMDevice::OpenPropertyStore (whose IPropertyStore this
  *   roster does not carry, so there is no guest vtable to hand back).
  *
- * All four must answer E_NOTIMPL on the guest leg -- check-syscom-audio.sh
- * requires it -- and the first, second and fourth succeed on the native leg,
- * which is exactly why they cannot be diffed steps.
+ * THREE OF THE FOUR ARE NOW SERVED, and the comment that used to stand here
+ * saying this port "does not do that direction yet" is what libs/winecom's
+ * reverse.c falsified.  The bar for a served one is not "the guest escaped
+ * E_NOTIMPL" but "the guest got the SAME answer the native leg got", which is
+ * what check-syscom-audio.sh section G measures.
+ *
+ * Only IMMDevice::OpenPropertyStore still answers E_NOTIMPL to the guest, and
+ * that one is a SIGNATURE fact rather than a direction one: it vends an
+ * interface this roster does not carry.  It still succeeds on the native leg,
+ * which is exactly why it cannot be a diffed step.
  *
  * A FIFTH note is the OTHER kind of refusal, and it is here because it is the
  * exact line a guest used to get for XAudio2 itself: IMMDevice::Activate for

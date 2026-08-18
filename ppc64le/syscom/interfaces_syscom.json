@@ -221,7 +221,8 @@
     "IXAudio2MasteringVoice",
     "IXAudio2SourceVoice",
     "IXAudio2SubmixVoice",
-    "IXAudio2Voice"
+    "IXAudio2Voice",
+    "IXAudio2VoiceCallback"
   ],
   "interfaces": {
     "IActivationFactory": {
@@ -8361,6 +8362,74 @@
           "name": "DestroyVoice",
           "ret": "void",
           "params": []
+        }
+      ],
+      "synthetic_iid": true
+    },
+    "IXAudio2VoiceCallback": {
+      "uuid": "19dec719-686c-5835-9be0-6a1b6c9a029a",
+      "base": "(none)",
+      "header": "xaudio_classes.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IXAudio2VoiceCallback",
+          "name": "OnVoiceProcessingPassStart",
+          "ret": "void",
+          "params": [
+            "UINT32 BytesRequired"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IXAudio2VoiceCallback",
+          "name": "OnVoiceProcessingPassEnd",
+          "ret": "void",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IXAudio2VoiceCallback",
+          "name": "OnStreamEnd",
+          "ret": "void",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IXAudio2VoiceCallback",
+          "name": "OnBufferStart",
+          "ret": "void",
+          "params": [
+            "void *pBufferContext"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IXAudio2VoiceCallback",
+          "name": "OnBufferEnd",
+          "ret": "void",
+          "params": [
+            "void *pBufferContext"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IXAudio2VoiceCallback",
+          "name": "OnLoopEnd",
+          "ret": "void",
+          "params": [
+            "void *pBufferContext"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IXAudio2VoiceCallback",
+          "name": "OnVoiceError",
+          "ret": "void",
+          "params": [
+            "void *pBuffercontext",
+            "HRESULT Error"
+          ]
         }
       ],
       "synthetic_iid": true

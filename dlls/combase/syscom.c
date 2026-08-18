@@ -340,23 +340,29 @@ static UINT64 hand_create_source_voice( void *host, UINT slot, AMD64_CONTEXT *ct
     const void *cb    = (const void *)(ULONG_PTR)winecom_read_arg( ctx, 5 );
     const void *sends = (const void *)(ULONG_PTR)winecom_read_arg( ctx, 6 );
     const void *chain = (const void *)(ULONG_PTR)winecom_read_arg( ctx, 7 );
+    void *cb_host = NULL;
     HRESULT hr;
 
-    if (cb)
+    /* pCallback is a GUEST-implemented object handed to native code, so it
+     * needs the REVERSE direction: a native vtable, built from this
+     * interface's slot table, whose stubs enter guest code.  This is the same
+     * call dlls/xaudio2_9/guestcom.c makes for the 2.9 shape, against THIS
+     * module's roster and THIS module's winecom instance -- a proxy is
+     * per-linkee, and one minted by the audio module would trap into a
+     * dispatch table combase cannot see.
+     *
+     * The refusal that stood here said the interface was off the roster
+     * because the hand slot had not been rewritten.  It has been now, and it
+     * is rewritten rather than generated for the same reason it always was:
+     * the two struct arguments below have no argument class, so this function
+     * names the callback's interface index itself instead of reading one out
+     * of a generated row. */
+    if (cb && !winecom_to_native( (void *)cb, SYSCOM_IFACE_IXAudio2VoiceCallback,
+                                  &cb_host ))
     {
-        /* The one reverse-direction refusal left on this surface, and it is a
-         * ROSTER gap rather than a mechanism gap: IXAudio2VoiceCallback is not
-         * on the wine-syscom roster, so there is no slot table to build a
-         * native vtable from.  It is not on the roster because THIS slot is
-         * hand-written for the two struct arguments beside it, and a hand slot
-         * has no table row for the generator to write the callback's type
-         * into; serving it means rewriting this function, not extending a
-         * list.  ppc64le/syscom/gen_syscom_audio.py says the same at the
-         * XAUDIO2_IFACES list. */
-        FIXME( "xaudio2: IXAudio2::CreateSourceVoice is refused because its "
-               "IXAudio2VoiceCallback (%p) is a GUEST-implemented object of an "
-               "interface the wine-syscom roster does not carry, so there is no "
-               "slot table to build its reverse proxy from\n", cb );
+        FIXME( "xaudio2: IXAudio2::CreateSourceVoice could not give the "
+               "IXAudio2VoiceCallback at %p a reverse proxy; refusing rather "
+               "than handing the mixer thread an x86-64 vtable\n", cb );
         return (UINT64)(UINT)E_NOTIMPL;
     }
     if (sends)
@@ -368,9 +374,17 @@ static UINT64 hand_create_source_voice( void *host, UINT slot, AMD64_CONTEXT *ct
                  "its XAUDIO2_EFFECT_CHAIN, whose descriptors carry IUnknown "
                  "pointers", chain );
 
+    /* NOTE what is NOT here: a matching winecom_to_native_end.  XAudio2 keeps
+     * pCallback for the voice's whole life and never AddRefs it, because
+     * IXAudio2VoiceCallback is [local] and HAS no AddRef -- slot 1 of that
+     * vtable is OnVoiceProcessingPassEnd, not Release.  libs/winecom's
+     * rev_release() returns early for a [local] interface for exactly that
+     * reason, so the proxy is permanent: there is no borrow to give back, and
+     * giving one back would be the bug.  Freeing it would hand the mixer
+     * thread a dangling native vtable at the next buffer boundary. */
     hr = fn( host, out, (const void *)(ULONG_PTR)winecom_read_arg( ctx, 2 ),
              (UINT32)winecom_read_arg( ctx, 3 ),
-             read_float_arg( ctx, 4 ), NULL, NULL, NULL );
+             read_float_arg( ctx, 4 ), cb_host, NULL, NULL );
     if (SUCCEEDED(hr) && out)
         *out = wrap_voice( *out, SYSCOM_IFACE_IXAudio2SourceVoice );
     return (UINT64)(UINT)hr;

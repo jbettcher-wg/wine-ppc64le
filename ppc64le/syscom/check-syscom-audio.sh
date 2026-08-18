@@ -902,12 +902,17 @@ else
 fi
 
 # ---- G: what is still refused, and what is now SERVED ----------------------
-# E_NOTIMPL is 0x80004001.  These two are still refused to the guest, and each
-# for a reason that is about a SIGNATURE rather than about direction: a struct
-# that reaches an interface pointer through its own members, and an interface
-# this roster does not carry.
-for want in "IXAudio2::CreateSourceVoice with an IXAudio2VoiceCallback -> 0x80004001" \
-            "IMMDevice::OpenPropertyStore -> 0x80004001"; do
+# E_NOTIMPL is 0x80004001.  This one is still refused to the guest, for a
+# reason that is about a SIGNATURE rather than about direction: it vends an
+# interface this roster does not carry.
+#
+# CreateSourceVoice-with-a-callback USED TO BE HERE and has moved down to the
+# served list.  Its refusal was never a signature fact either: it was the
+# roster gap that kept IXAudio2VoiceCallback -- the per-BUFFER sink a 2.7
+# streaming loader waits on -- off the surface, and closing that gap is what
+# lets the slot answer S_OK.  The sends/chain refusals beside it are untouched
+# and are still signature facts, refused in both directions.
+for want in "IMMDevice::OpenPropertyStore -> 0x80004001"; do
     if ! grep -qF "note: $want" "$OUT/guest.err"; then
         bad "the guest did not refuse '$(echo "$want" | sed 's/ -> .*//')' with \
 E_NOTIMPL; it answered '$(grep -F "$(echo "$want" | sed 's/ -> .*//')" \
@@ -916,20 +921,20 @@ E_NOTIMPL; it answered '$(grep -F "$(echo "$want" | sed 's/ -> .*//')" \
 done
 # and the native leg must SUCCEED at both, or the refusals above are measuring
 # an API that fails for everybody
-for want in "IXAudio2::CreateSourceVoice with an IXAudio2VoiceCallback -> 0x00000000" \
-            "IMMDevice::OpenPropertyStore -> 0x00000000"; do
+for want in "IMMDevice::OpenPropertyStore -> 0x00000000"; do
     if ! grep -qF "note: $want" "$OUT/native.err"; then
         bad "the NATIVE leg did not succeed at '$(echo "$want" | sed 's/ -> .*//')', \
 so the guest refusing it proves nothing"
     fi
 done
-# THE TWO THAT ARE NOW SERVED.  Both used to be in the list above.  The bar is
+# THE THREE THAT ARE NOW SERVED.  All used to be in the list above.  The bar is
 # not "the guest did not get E_NOTIMPL" but "the guest got the SAME answer the
 # native leg got", which for the unregister is mmdevapi's own E_NOTFOUND
 # (0x80070490) for a client that was never registered -- reached WITHOUT the
 # pointer being translated, because mmdevapi's contract lets it be an address
 # that is not an object (dlls/combase/syscom.c's notification registry).
 for want in "IXAudio2::RegisterForCallbacks -> 0x00000000" \
+            "IXAudio2::CreateSourceVoice with an IXAudio2VoiceCallback -> 0x00000000" \
             "IMMDeviceEnumerator::UnregisterEndpointNotificationCallback -> 0x80070490"; do
     for leg in guest native; do
         if ! grep -qF "note: $want" "$OUT/$leg.err"; then

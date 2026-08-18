@@ -1,13 +1,13 @@
 /* GENERATED -- do not edit.
  *
- * Marshal tables for the wine-syscom surface (70 interfaces, 805 vtable
+ * Marshal tables for the wine-syscom surface (71 interfaces, 812 vtable
  * slots).  Interface order is sorted by name -- the same order spec2thunk
  * COM mode gives the guest module's stub arrays, and the runtime
  * cross-checks the IIDs at attach so the two cannot silently disagree.
  * Slot/iface types and WINECOM_CA_* classes come from
  * include/wine/winecom.h, which must be included before this file.
  *
- * The 12 audio interfaces -- the XAudio2 2.7 family and the WASAPI device
+ * The 13 audio interfaces -- the XAudio2 2.7 family and the WASAPI device
  * chain -- are generated from interfaces_syscom.json by
  * ppc64le/syscom/gen_syscom_audio.py, which also owns the enum, the
  * interface array and the roster indices in every xaux[] here.  The other
@@ -106,7 +106,8 @@ enum syscom_iface_index
     SYSCOM_IFACE_IXAudio2SourceVoice = 67,
     SYSCOM_IFACE_IXAudio2SubmixVoice = 68,
     SYSCOM_IFACE_IXAudio2Voice = 69,
-    SYSCOM_IFACE_COUNT = 70
+    SYSCOM_IFACE_IXAudio2VoiceCallback = 70,
+    SYSCOM_IFACE_COUNT = 71
 };
 
 #define SYSCOM_HAND_COUNT 9
@@ -1685,6 +1686,17 @@ static const struct winecom_slot slots_IXAudio2Voice[19] =
     { "IXAudio2Voice::DestroyVoice", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
 };
 
+static const struct winecom_slot slots_IXAudio2VoiceCallback[7] =
+{
+    { "IXAudio2VoiceCallback::OnVoiceProcessingPassStart", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IXAudio2VoiceCallback::OnVoiceProcessingPassEnd", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IXAudio2VoiceCallback::OnStreamEnd", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IXAudio2VoiceCallback::OnBufferStart", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IXAudio2VoiceCallback::OnBufferEnd", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IXAudio2VoiceCallback::OnLoopEnd", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IXAudio2VoiceCallback::OnVoiceError", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
+};
+
 static const struct winecom_iface syscom_com_ifaces[SYSCOM_IFACE_COUNT] =
 {
     { "IActivationFactory", {0x00000035,0x0000,0x0000,{0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}},
@@ -1827,6 +1839,8 @@ static const struct winecom_iface syscom_com_ifaces[SYSCOM_IFACE_COUNT] =
       19, slots_IXAudio2SubmixVoice, WINECOM_IF_LOCAL },
     { "IXAudio2Voice", {0x76c75fa9,0x5832,0x597c,{0x96,0xae,0x87,0x30,0xae,0x5f,0xab,0x3d}},
       19, slots_IXAudio2Voice, WINECOM_IF_LOCAL },
+    { "IXAudio2VoiceCallback", {0x19dec719,0x686c,0x5835,{0x9b,0xe0,0x6a,0x1b,0x6c,0x9a,0x02,0x9a}},
+      7, slots_IXAudio2VoiceCallback, WINECOM_IF_LOCAL },
 };
 
 /* Interfaces that are NOT IUnknown-derived: slot 0 is a real method, not
@@ -1905,12 +1919,13 @@ static const unsigned char syscom_iface_local[SYSCOM_IFACE_COUNT] =
     1,  /* IXAudio2SourceVoice */
     1,  /* IXAudio2SubmixVoice */
     1,  /* IXAudio2Voice */
+    1,  /* IXAudio2VoiceCallback */
 };
 
-/* wine-syscom: 70 interface(s), 805 vtable slot(s).
- * The 12 audio row(s) generated here: 111 slot(s) marshalled, 19 hand-written
+/* wine-syscom: 71 interface(s), 812 vtable slot(s).
+ * The 13 audio row(s) generated here: 118 slot(s) marshalled, 19 hand-written
  * (5 of them float-bearing, routed by argument shape), 2 refused with a
- * named reason, 21 IUnknown slot(s) served by the runtime, 5 interface(s)
+ * named reason, 21 IUnknown slot(s) served by the runtime, 6 interface(s)
  * [local] and served by combase's own dispatcher.  The 58 reused row(s):
  * 365 marshalled, 113 refused, 174 IUnknown; 361 of them re-derived from
  * the roster and cross-checked against this file.

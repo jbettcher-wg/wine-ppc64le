@@ -143,21 +143,32 @@ CONTEXT_HEADERS = [os.path.join("include", "audiosessiontypes.h"),
 
 XAUDIO2_IFACES = ["IXAudio2", "IXAudio2Voice", "IXAudio2SourceVoice",
                   "IXAudio2SubmixVoice", "IXAudio2MasteringVoice",
-                  "IXAudio2EngineCallback"]
+                  "IXAudio2EngineCallback", "IXAudio2VoiceCallback"]
 # IXAudio2EngineCallback is here BECAUSE the reverse direction now exists.  It
 # is implemented BY the application and passed INTO XAudio2, which calls it from
 # the mixer thread; libs/winecom/reverse.c builds the native vtable that enters
 # guest code, and it needs this interface's slot table to marshal by.  Same
 # addition, same reason, as ppc64le/audio/interfaces_xaudio2_9.json's.
 #
-# NOT here, and each for a reason rather than an omission:
-#   IXAudio2VoiceCallback is the OTHER application-implemented interface, and
-#     the slot that takes one -- IXAudio2::CreateSourceVoice's pCallback -- is
-#     hand-written here because the same signature also carries an
-#     XAUDIO2_VOICE_SENDS and an XAUDIO2_EFFECT_CHAIN, both of which reach
-#     interface pointers through their own members and are refused in BOTH
-#     directions.  Serving pCallback needs that hand slot rewritten, not this
-#     list extended, so the interface stays off the roster until it is.
+# IXAudio2VoiceCallback is here for the same reason, and its arrival is what
+# lets dlls/combase/syscom.c's hand_create_source_voice stop refusing.  It is
+# the OTHER application-implemented interface: XAudio2 calls it per BUFFER
+# rather than per engine pass, which is how a streaming loader learns that the
+# chunk it queued has been consumed.  A 2.7 application that never gets
+# OnBufferEnd waits forever for a buffer it already owns.
+#
+# The comment that stood here said this interface had to stay off the roster
+# until the hand slot was rewritten, because CreateSourceVoice is hand-written
+# for the XAUDIO2_VOICE_SENDS and XAUDIO2_EFFECT_CHAIN beside pCallback and a
+# hand slot has no table row for a generator to write a callback type into.
+# That was true of the ORDER of the work, not of the roster: the hand slot has
+# now been rewritten to call winecom_to_native() with this interface's index
+# explicitly, exactly as dlls/xaudio2_9/guestcom.c has done since the reverse
+# direction landed, so what it needs from here is the SLOT TABLE and not a
+# generated argument class.  The sends/chain refusals are untouched and stay
+# refused in both directions -- they are a signature fact, not a direction one.
+#
+# NOT here, and for a reason rather than an omission:
 #   IXAudio2Extension is 2.8+ only and absent from the 2.7 header.
 MMDEV_IFACES = ["IMMDeviceEnumerator", "IMMDeviceCollection", "IMMDevice",
                 "IAudioClient", "IAudioRenderClient", "IMMNotificationClient"]
