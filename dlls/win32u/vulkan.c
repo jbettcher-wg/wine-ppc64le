@@ -3155,6 +3155,37 @@ static const struct vulkan_driver_funcs lazydrv_funcs =
     .p_map_device_extensions = lazydrv_map_device_extensions,
 };
 
+/* ONE once-control for vulkan_init_once, at file scope, and it has to be.
+ *
+ * There are two callers -- __wine_get_vulkan_driver, which winevulkan and
+ * win32u's own display-cache enumeration reach, and hwnd_surface_create, which
+ * this port's native graphics lanes reach -- and each of them used to carry a
+ * `static pthread_once_t` of its OWN.  Two once-controls for one initialiser
+ * means the initialiser runs TWICE, and the second run is fatal: it re-executes
+ *
+ *     driver_funcs = &lazydrv_funcs;
+ *
+ * below, while vulkan_driver_load()'s own once-control has already been
+ * consumed by the first run.  Every lazydrv_* entry point is
+ * "vulkan_driver_load(); return driver_funcs->p_same_thing()", so once
+ * driver_funcs points at lazydrv with the load already done, each of them calls
+ * ITSELF.  [MEASURED] 2026-08-18, op4k: a guest that changed the display mode
+ * and then created a D3D11 swapchain died with 5.8 MB of core and a stack made
+ * entirely of lazydrv_map_instance_extensions frames -- SIGSEGV on the stdu
+ * that pushes the frame, which is stack exhaustion, not a bad pointer.
+ *
+ * Either order does it, and both were seen.  A mode change first
+ * (NtUserChangeDisplaySettings updates the display cache, which builds a
+ * Vulkan instance through __wine_get_vulkan_driver) and then a swapchain; or a
+ * swapchain first and then a mode change, which is what IDXGISwapChain::
+ * SetFullscreenState(FALSE) does on its way out through wsi::restoreDisplayMode.
+ * That second order is why this went unseen for so long: nothing in this tree
+ * changed a display mode until ppc64le/dxvk/check-fullscreen-smoke.sh did.
+ *
+ * The fix is the invariant the code always assumed -- vulkan_init_once runs at
+ * most once per process -- restored by giving it one control instead of two. */
+static pthread_once_t vulkan_init_once_control = PTHREAD_ONCE_INIT;
+
 static void vulkan_init_once(void)
 {
     struct vulkan_instance_extensions extensions = {0};
@@ -3235,15 +3266,13 @@ failed:
  */
 const struct vulkan_funcs *__wine_get_vulkan_driver( UINT version )
 {
-    static pthread_once_t init_once = PTHREAD_ONCE_INIT;
-
     if (version != WINE_VULKAN_DRIVER_VERSION)
     {
         ERR( "version mismatch, vulkan wants %u but win32u has %u\n", version, WINE_VULKAN_DRIVER_VERSION );
         return NULL;
     }
 
-    pthread_once( &init_once, vulkan_init_once );
+    pthread_once( &vulkan_init_once_control, vulkan_init_once );
     if (!vulkan_handle) return NULL;
     return &vulkan_funcs;
 }
@@ -3272,7 +3301,6 @@ static VkResult hwnd_surface_create( HWND hwnd, VkInstance client_instance,
                                      PFN_vkGetInstanceProcAddr gipa,
                                      VkSurfaceKHR *ret, void **cookie )
 {
-    static pthread_once_t init_once = PTHREAD_ONCE_INIT;
     struct vulkan_instance *instance;
     struct hwnd_surface *surface;
     VkSurfaceKHR host_surface;
@@ -3282,7 +3310,7 @@ static VkResult hwnd_surface_create( HWND hwnd, VkInstance client_instance,
 
     if (!hwnd || !client_instance || !gipa || !ret || !cookie) return VK_ERROR_INITIALIZATION_FAILED;
 
-    pthread_once( &init_once, vulkan_init_once );
+    pthread_once( &vulkan_init_once_control, vulkan_init_once );
     if (!vulkan_handle)
     {
         ERR( "no system vulkan loader; cannot serve foreign surfaces\n" );
