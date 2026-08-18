@@ -1,0 +1,58 @@
+# AMD64 thunk export spec -- pdh.dll.
+#
+# WHY THIS MODULE, AND WHY IT LOOKED LIKE HEAP CORRUPTION.  DOOM (2016) ends
+# its startup with
+#
+#     FATAL ERROR: Memory corruption before block!
+#
+# and that message is a misdiagnosis by the game, not a report of damaged
+# memory.  Measured, on a frozen process: every live allocation's tail canary
+# was intact under GlobalFlag=0x10 -- ~19,600 of them swept every two seconds
+# for a whole run, zero damaged -- every subheap chain walked cleanly, and all
+# 13,578 of the game's own blocks still validated against their own cookie,
+# right up to the instant the message was printed.  Nothing had been written
+# past the end of anything.
+#
+# What the check actually ran on was a pointer id Tech's allocator never
+# returned.  Patching DOOM's FatalError entry with `jmp rdi` in the live
+# process -- rdi is callee-saved and the free path sets it to rcx-0x10 -- made
+# the emulator print the guest register file at the failure:
+#
+#     RCX=14200D380 ("Memory corruption before block!")
+#     RDI=3FEF6D18ADC0  RSI=3FEF6D18ADD0
+#     R10=0x66 ('f')  R9=0x736C ("ls")  R8=0x8075000500200008
+#
+# The "tag" is the letter 'f', the "offset" is the letters "ls", and the
+# "size" is `08 00 20 00 05 00 75 80` little-endian -- Wine's OWN struct block:
+# block_size 8 (128 bytes), tail_size 32, base_offset 5, type 'u', flags LFH.
+# So rsi pointed at a Wine allocation's data, the sixteen bytes DOOM read as
+# its header were the tail of the neighbouring string ("...false >") plus that
+# block header, and the whole thing is a free through the wrong allocator.
+#
+# The guest stack named the caller: DOOMx64vk.exe+0x19f4d40 allocates 0x58 = 88
+# bytes with operator new, calls LoadLibraryW(L"Pdh.dll"), and binds five
+# entry points -- PdhOpenQueryW, PdhCloseQuery, PdhAddCounterW,
+# PdhGetFormattedCounterValue, PdhCollectQueryData -- the Performance Data
+# Helper it reads CPU counters through.  When the load fails it takes a
+# cleanup path that releases that object through the ENGINE's allocator
+# (Mem_Free, which expects a sixteen-byte id Tech header) rather than through
+# the operator delete that matches operator new.  That mismatch is latent on
+# Windows because the load never fails there.  Here it did: this tree builds
+# dlls/pdh as a native ppc64 module and generated no AMD64 thunk for it, so
+# the guest loader had nothing to resolve and LoadLibraryW answered NULL.
+#
+# So the fix is the same one-line fix avrt, dbghelp and iphlpapi needed, and
+# it is not per-title: any guest that probes for an optional Wine builtin gets
+# NULL where Windows gives it a module, and what it does on that path is its
+# own business.  Nothing here is hand-written -- the export list comes from
+# this module's own .spec.
+DLL pdh.dll
+FROM-SPEC auto
+
+# pdh.h is not in the global probe (nothing else needs it), so it is appended
+# here exactly as dbghelp appends dbghelp.h and iphlpapi appends iphlpapi.h.
+# Without it every eligible export is refused as "no declaration in any Wine
+# header" and the module emitted is a real PE with NO exports -- which loads,
+# and would leave the five GetProcAddress calls answering NULL, i.e. the same
+# cleanup path and the same fatal error one step further along.
+PROBE-EXTRA   pdh.h

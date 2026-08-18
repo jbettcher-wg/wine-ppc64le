@@ -46,7 +46,57 @@ a Windows build, and the fix for all fifteen was one `.thunks` file each.
 | FreeInfantry | 2830720 | **PE32** | refused — no 32-bit guest | unchanged, and correctly so |
 | Styx: Master of Shadows (Win32) | 242640 | **PE32** | refused — no 32-bit guest | unchanged, and correctly so |
 | Styx: Shards of Darkness | — | — | not installed (empty directory, no appmanifest) | — |
-| DOOM (2016) | 379720 | PE32+ | owned by the audio/`winecom` work; not touched here | — |
+| DOOM (2016) | 379720 | PE32+ | reached ~99% of startup, then `FATAL ERROR: Memory corruption before block!` and `rc=5`, every run | **past it** — the message was a misdiagnosis, not damage; see handoff #7 below |
+
+> ### Handoff #7 — DOOM's "memory corruption" was `pdh.dll` not loading
+>
+> **Nothing was corrupt.** Under `GlobalFlag=0x10` Wine paints a 16-byte `0xab`
+> canary after every allocation. Swept from outside a frozen process every two
+> seconds for whole runs: **~19,600 live allocations, zero damaged canaries**,
+> every subheap chain clean, and all **13,578** of the game's own blocks still
+> validating against their own cookie right up to the instant the message
+> printed. An overrun reaching a neighbour has to destroy a canary first, and
+> none was.
+>
+> Patching DOOM's `FatalError` entry to `jmp rdi` in the live process — `rdi` is
+> callee-saved and the free path sets it to `rcx-0x10` — made the emulator print
+> the guest register file at the failure, byte-identical across runs:
+>
+> ```
+> R10=0x66 ('f')   R9=0x736C ("ls")   R8=0x8075000500200008
+> ```
+>
+> The "tag" is the letter `f`, the "offset" is `ls`, and the "size" is
+> `08 00 20 00 05 00 75 80` little-endian — **Wine's own `struct block`** (128
+> bytes, LFH, USED). The sixteen bytes DOOM read as its header were the tail of
+> a neighbouring string plus that block header. It was freeing a pointer its own
+> allocator never returned.
+>
+> `DOOMx64vk.exe+0x19f4d40` allocates 88 bytes with `operator new`, calls
+> `LoadLibraryW(L"Pdh.dll")` and binds five entry points. **The load returned
+> NULL** — this tree built `dlls/pdh` as a native ppc64 module with no AMD64
+> thunk — so the game took a cleanup path that releases that object through the
+> engine's `Mem_Free` rather than the matching `operator delete`. Latent on
+> Windows, where the load never fails.
+>
+> Fixed by `dlls/pdh/pdh.thunks` plus one line of `Makefile.in`. **qconsole
+> 14,272 → 34,495 bytes, fatal lines 1 → 0, three of three runs.**
+>
+> **Stated as a negative:** thunk info version 7 is neither cause nor cure. The
+> fatal error was already absent at `045dc35e10a`, and `WINEEMUNOARGWIDTH=1` did
+> not bring it back.
+>
+> **The new wall**, and it is a different problem: DOOM now reaches weapon
+> loading (`idHands::Init - animweb player/fp_hands ... pistol_9mm`) and stops on
+> `err:seh:call_seh_handlers invalid frame ... Exception frame is not in stack
+> limits` — an SEH registration frame outside the thread's stack bounds,
+> plausibly the guest/native stack duality.
+>
+> **The class, which is the part worth carrying forward:** a module reached only
+> through `LoadLibrary` appears in **no import table**, so
+> `ppc64le/thunks/check-import-chain.sh` is structurally blind to it. That is why
+> this cost weeks of looking at the heap.
+> `ppc64le/thunks/check-optional-module.sh` covers the runtime-probed surface.
 
 Run recipe used throughout, deliberately **without** `SteamAppId` so that no
 account presence is signalled — `steam_api64` failing its init is the expected
