@@ -259,19 +259,29 @@ static UINT64 hand_process_output( void *host, UINT slot, AMD64_CONTEXT *ctx )
     args[4] = winecom_read_arg( ctx, 4 );            /* status */
     hr = (HRESULT)mf_invoke( host, slot, 5, args );
 
+    /* COPIED BACK WHATEVER hr SAYS, and that is not laxness.  ProcessOutput's
+     * most important non-S_OK answer is MF_E_TRANSFORM_STREAM_CHANGE, which
+     * is a FAILED() hresult and an entirely routine one: an H.264 decoder
+     * returns it the moment the stream's format changes, and the caller is
+     * required to read dwStatus to find WHICH stream carries the
+     * MFT_OUTPUT_DATA_BUFFER_FORMAT_CHANGE bit before it can renegotiate the
+     * type.  Gating the write-back on SUCCEEDED() left every one of those
+     * bits behind, so a guest saw the failure code and nothing to act on --
+     * and any sample the transform had already allocated into the array went
+     * unwrapped and unreferenced.  On a hard failure the callee leaves the
+     * entries as it found them, so copying them back writes the same
+     * proxies the guest passed in: winecom_wrap is keyed on the host pointer
+     * and hands back the object already interned for it. */
     if (copy)
     {
         for (i = 0; i < count; i++)
         {
             winecom_to_native_end( borrowed[i] );
-            if (SUCCEEDED(hr))
-            {
-                src[i].dwStatus = copy[i].dwStatus;
-                src[i].pSample = copy[i].pSample
-                    ? winecom_wrap( copy[i].pSample, MF_IFACE_IMFSample ) : NULL;
-                src[i].pEvents = copy[i].pEvents
-                    ? winecom_wrap( copy[i].pEvents, MF_IFACE_IMFCollection ) : NULL;
-            }
+            src[i].dwStatus = copy[i].dwStatus;
+            src[i].pSample = copy[i].pSample
+                ? winecom_wrap( copy[i].pSample, MF_IFACE_IMFSample ) : NULL;
+            src[i].pEvents = copy[i].pEvents
+                ? winecom_wrap( copy[i].pEvents, MF_IFACE_IMFCollection ) : NULL;
         }
         free( borrowed );
         free( copy );
