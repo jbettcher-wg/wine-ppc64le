@@ -369,7 +369,12 @@ static UINT_PTR SHELL_ExecuteW(const WCHAR *lpCmd, WCHAR *env, BOOL shWait,
         retval = ERROR_BAD_FORMAT;
     }
 
-    CloseHandle(token);
+    /* token is NULL for every verb but "runas", and CloseHandle(NULL) is a
+     * call that can only fail -- it sets ERROR_INVALID_HANDLE and so destroys
+     * the error the caller is about to report.  That is literally why a
+     * failed ShellExecuteEx used to raise a box reading "Invalid handle."
+     * rather than naming what actually went wrong. */
+    if (token) CloseHandle(token);
 
     TRACE("returning %Iu\n", retval);
 
@@ -1599,15 +1604,49 @@ static UINT_PTR SHELL_execute_url( LPCWSTR lpFile, LPCWSTR wcmd, LPSHELLEXECUTEI
     return retval;
 }
 
-static void do_error_dialog( UINT_PTR retval, HWND hwnd )
+/* WHAT THIS BOX IS SUPPOSED TO SAY, AND WHY IT DID NOT.
+ *
+ * The error this dialog describes is produced deep inside execfunc, and the
+ * thread's last error has been through every free(), CloseHandle() and
+ * registry call on the way back out before anyone reads it here.  So what the
+ * user was shown was whichever call failed most recently, not the one that
+ * mattered.  Measured on a Steam launch: a guest ShellExecuteEx on a 32-bit
+ * helper failed in CreateProcess with ERROR_BAD_EXE_FORMAT (193),
+ * SHELL_ExecuteW turned that into ERROR_BAD_FORMAT (11), and the box said
+ * "Invalid handle." -- ERROR_INVALID_HANDLE, set by the CloseHandle(NULL)
+ * three lines further down in SHELL_ExecuteW (now fixed there too).  A dialog
+ * naming a handle when nothing was wrong with a handle is worse than no
+ * dialog: it sends whoever reads it looking in the wrong place.
+ *
+ * retval is the value ShellExecute is about to return to its caller, so it
+ * cannot have drifted.  Below SE_ERR_SHARE the SE_ERR_* codes are the Win32
+ * error codes of the same number by construction -- SE_ERR_FNF is
+ * ERROR_FILE_NOT_FOUND, SE_ERR_ACCESSDENIED is ERROR_ACCESS_DENIED -- so
+ * FormatMessage has the right sentence for them.  From SE_ERR_SHARE (26) up
+ * they are ShellExecute's own numbering and collide with unrelated Win32
+ * codes, so those keep describing the last error rather than inventing a
+ * sentence about a disk sector.
+ *
+ * The ERR is not decoration.  Steam runs background pre-steps under the
+ * compat tool with nobody watching a desktop, and on those runs the log is
+ * the only place the reason can appear at all. */
+static void do_error_dialog( UINT_PTR retval, HWND hwnd, const WCHAR *file )
 {
     WCHAR msg[2048];
-    int error_code=GetLastError();
+    DWORD last_error = GetLastError();
+    DWORD described = 0;
 
     if (retval == SE_ERR_NOASSOC)
         LoadStringW(shell32_hInstance, IDS_SHLEXEC_NOASSOC, msg, ARRAY_SIZE(msg));
     else
-        FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM, NULL, error_code, 0, msg, ARRAY_SIZE(msg), NULL);
+    {
+        described = (retval && retval < SE_ERR_SHARE) ? retval : last_error;
+        if (!FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM, NULL, described, 0, msg, ARRAY_SIZE(msg), NULL))
+            msg[0] = 0;
+    }
+
+    ERR("cannot execute %s: %s (ShellExecute returned %Iu, described %lu, last error %lu)\n",
+        debugstr_w(file), debugstr_w(msg), retval, described, last_error);
 
     MessageBoxW(hwnd, msg, NULL, MB_ICONERROR);
 }
@@ -1792,7 +1831,7 @@ static BOOL SHELL_execute( LPSHELLEXECUTEINFOW sei, SHELL_ExecuteW32 execfunc )
         retval = SHELL_execute_class( wszApplicationName, &sei_tmp, sei,
                                       execfunc );
         if (retval <= 32 && !(sei_tmp.fMask & SEE_MASK_FLAG_NO_UI))
-            do_error_dialog(retval, sei_tmp.hwnd);
+            do_error_dialog(retval, sei_tmp.hwnd, sei_tmp.lpFile);
         free(wszApplicationName);
         if (wszParameters != parametersBuffer)
             free(wszParameters);
@@ -1965,7 +2004,7 @@ end:
     sei->hInstApp = (HINSTANCE)(retval > 32 ? 33 : retval);
 
     if (retval <= 32 && !(sei_tmp.fMask & SEE_MASK_FLAG_NO_UI))
-        do_error_dialog(retval, sei_tmp.hwnd);
+        do_error_dialog(retval, sei_tmp.hwnd, sei_tmp.lpFile);
     return retval > 32;
 }
 
