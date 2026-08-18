@@ -1,0 +1,27 @@
+# AMD64 thunk export spec -- cfgmgr32.dll.
+#
+# Steam's own GameOverlayRenderer64.dll imports this module statically, and it
+# was the ONE module of the ten it imports that had no guest thunk at all.
+# [MEASURED] 2026-08-18, ppc64le/thunks/import_chain.py on
+# ~/.local/share/Steam/GameOverlayRenderer64.dll: kernel32, user32, gdi32,
+# advapi32, ole32, oleaut32, winmm, imm32 and psapi all had one; cfgmgr32 did
+# not.  On this port that difference is the difference between the two failure
+# shapes ppc64le/corpus/CATALOG.md opens with -- a missing EXPORT binds a
+# sentinel and dies by name at the first call, a missing MODULE fails the whole
+# import walk before a single guest instruction runs.
+#
+# It is also ordinary furniture rather than anything to do with Steam: cfgmgr32
+# is the Configuration Manager, and any guest DLL that enumerates devices --
+# an input library, an audio library, a monitor-topology query -- imports it.
+# Boltgun's and Styx's fifteen were the same discovery about the same class.
+#
+# Most of this module's 276 spec entries are `stub`, which spec2thunk does not
+# emit for on any module; what is emitted is the implemented surface.  Its
+# declarations live in cfgmgr32.h, which windows.h does not pull in, so the
+# header is named here for the same reason dwmapi.h and winldap.h are named in
+# theirs: without it the declaration does not exist and every export it
+# declares is refused with the compiler's own reason.
+DLL cfgmgr32.dll
+FROM-SPEC auto
+
+PROBE-EXTRA cfgmgr32.h

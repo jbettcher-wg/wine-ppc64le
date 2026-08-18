@@ -3,6 +3,7 @@ IMPORTLIB = cfgmgr32
 IMPORTS   = advapi32 rpcrt4 sechost
 
 SOURCES = \
+	cfgmgr32.thunks \
 	cfgmgr32.c \
 	devobject.c \
 	notification.c
