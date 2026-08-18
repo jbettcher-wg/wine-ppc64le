@@ -114,20 +114,66 @@ command -v ss    >/dev/null || skip "need ss (iproute2) for the teardown layer"
 # Anything that accepts a window will do, including the Xvfb this box runs on
 # :0; no GPU and no compositor are involved, only a window manager-less X
 # server that lets a dialog exist.
+#
+# THE DISPLAY IS THIS GATE'S OWN, AND THAT IS NOT A COURTESY.  The whole point
+# of layer 6 is to raise a real modal dialog; pointed at a session somebody is
+# using, that dialog lands on THEIR screen, and it outlives the run because the
+# tool does not block on it.  [MEASURED] 2026-08-18: running this suite with
+# DISPLAY=:1 put "Bad format." boxes onto the user's desktop, repeatedly, with
+# no indication of where they came from.  A gate that raises dialogs has to
+# own the screen it raises them on -- the same rule check-fullscreen-smoke.sh
+# follows with its private weston.
+XVFB_PID=
+if [ -z "${LAUNCH_SMOKE_USE_CALLER_DISPLAY:-}" ]; then
+    command -v Xvfb >/dev/null || \
+        skip "need Xvfb so this gate's dialogs land on its own display, not \
+somebody's session; set LAUNCH_SMOKE_USE_CALLER_DISPLAY=1 to override"
+    for n in 71 72 73 74 75; do
+        [ -e "/tmp/.X11-unix/X$n" ] && continue
+        Xvfb ":$n" -screen 0 1024x768x24 >"$OUT/xvfb.log" 2>&1 &
+        XVFB_PID=$!
+        for _ in 1 2 3 4 5 6 7 8 9 10; do
+            [ -e "/tmp/.X11-unix/X$n" ] && break
+            sleep 0.3
+        done
+        if [ -e "/tmp/.X11-unix/X$n" ]; then
+            DISPLAY=":$n"; export DISPLAY
+            unset WAYLAND_DISPLAY
+            say "display: private Xvfb on :$n (pid $XVFB_PID)"
+            break
+        fi
+        kill "$XVFB_PID" 2>/dev/null; XVFB_PID=
+    done
+    [ -n "$XVFB_PID" ] || skip "could not start a private Xvfb"
+    trap 'kill "$XVFB_PID" 2>/dev/null' EXIT INT TERM HUP
+fi
+
 [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] || \
     skip "set DISPLAY (or WAYLAND_DISPLAY): with no driver a message box cannot be created, and the negative control would prove nothing"
 
 mkdir -p "$OUT" || skip "cannot create $OUT"
 
 # ---------------------------------------------------------------------------
-# The guest probe, and the 32-bit image it is pointed at.
+# The guest probe, and the REFUSED image it is pointed at.
 #
-# The image is the probe itself with one 16-bit field rewritten: the PE
-# machine word at e_lfanew+4 becomes 0x014c, IMAGE_FILE_MACHINE_I386.  That is
-# a real i386-marked PE rather than a mock of one, so the refusal it draws is
-# the loader's own -- measured to be the same "Bad format" the real
-# legacycompat\SteamService.exe draws -- and the gate needs no 32-bit
+# The image is the probe itself with one 16-bit field rewritten: the PE machine
+# word at e_lfanew+4.  That makes a real machine-marked PE rather than a mock of
+# one, so the refusal it draws is the loader's own and the gate needs no foreign
 # toolchain to produce it.
+#
+# THE MACHINE IS ARMNT (0x01c4), AND IT USED TO BE I386 (0x014c).  I386 stopped
+# working as a negative control the day this port grew a 32-bit lane: the server
+# now advertises IMAGE_FILE_MACHINE_I386, so an i386-marked PE is ACCEPTED, no
+# ERROR_BAD_EXE_FORMAT is raised, no dialog appears, and this control silently
+# proved nothing.  [MEASURED] 2026-08-18: layer 6 exited 0 in 11s instead of
+# hanging, on a build where every other layer passed.
+#
+# ARMNT is durable rather than merely different.  server/registry.c lists the
+# machines this prefix will accept and says why ARM is not among them -- "there
+# is no ARM emulator in this stack, and listing a machine is a promise the
+# prefix will run it".  A control built on a machine that is refused BY DESIGN
+# survives the port growing new architectures; one built on a machine that
+# merely has not been implemented yet does not.
 # ---------------------------------------------------------------------------
 INCL="-I$BUILD/include -I$SRC/include -I$SRC/include/msvcrt"
 clang -target x86_64-windows-gnu -nostdlibinc $INCL -D_MSVCR_VER=0 \
@@ -142,11 +188,11 @@ clang -target x86_64-windows-gnu -fuse-ld=lld -nostdlib \
 
 cp -f "$OUT/launch_probe.exe" "$OUT/fake32.exe" || skip "cannot write $OUT/fake32.exe"
 lfanew=$(od -An -tu4 -j60 -N4 "$OUT/fake32.exe" | tr -d ' ')
-printf '\114\001' | dd of="$OUT/fake32.exe" bs=1 seek=$((lfanew + 4)) \
+printf '\304\001' | dd of="$OUT/fake32.exe" bs=1 seek=$((lfanew + 4)) \
     conv=notrunc status=none || skip "cannot patch the machine word"
 machine=$(od -An -tx2 -j$((lfanew + 4)) -N2 "$OUT/fake32.exe" | tr -d ' ')
-[ "$machine" = "014c" ] || skip "machine word is $machine, expected 014c"
-say "guest probe built; $OUT/fake32.exe is machine 0x$machine (i386)"
+[ "$machine" = "01c4" ] || skip "machine word is $machine, expected 01c4"
+say "guest probe built; $OUT/fake32.exe is machine 0x$machine (ARMNT, refused by design)"
 
 # Z: is / in every prefix, so the DOS path can be computed without a wine run.
 FAKE32_DOS="Z:$(printf '%s' "$OUT/fake32.exe" | tr '/' '\\')"
@@ -227,9 +273,19 @@ rc=$RC
     t1=$(date +%s)
     TOOL_ENV=
     say "  tool exit $rc after $((t1 - t0))s"
+    # RED IS "THE DIALOG WAS RAISED", not "the run hung", and the difference is
+    # measured rather than assumed.  Whether an unanswered box HANGS depends on
+    # what the caller does with it: the pre-step that wedged a real Steam launch
+    # waited on it, but this probe's ShellExecuteExW returns and the tool walks
+    # on.  So the control asks the only question that is always meaningful --
+    # did the port put a message box up at all -- and shell32's own
+    # do_error_dialog line is the evidence.  A hang is still accepted, because
+    # on a caller's display with something to block on it is what happens.
     if [ "$rc" = 124 ] || [ "$rc" = 137 ]; then
         say "  ok: without the suppression the pre-step never returned -- the gate goes red"
         want_no_log "probe: done"
+    elif grep -qF "do_error_dialog" "$TOOL_LOG" 2>/dev/null; then
+        say "  ok: without the suppression the port raised the dialog -- $(grep -m1 -oF 'Bad format' "$TOOL_LOG")"
     elif grep -qF "nodrv_CreateWindow" "$TOOL_LOG" 2>/dev/null; then
         # Not a red and not a green: the dialog was never created, so nothing
         # about the suppression was exercised.  Say so rather than let a

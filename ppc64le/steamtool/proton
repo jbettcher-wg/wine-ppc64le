@@ -52,14 +52,46 @@ wineserver=$tree/server/wineserver
 bridge=
 reg_fex=$(sed -n 's/^interpreter //p' /proc/sys/fs/binfmt_misc/FEX-x86_64 2>/dev/null)
 reg_bridge=${reg_fex:+${reg_fex%/Bin/FEX}/Source/Tools/FexBridge/libfexbridge.so}
-for cand in \
-    ${WINE_PPC64LE_FEXBRIDGE:-} \
-    ${reg_bridge:-} \
-    "$tree/../fex-ppc64le/build/Source/Tools/FexBridge/libfexbridge.so" \
-    "$HOME/Projects/power8/fex-ppc64le/build/Source/Tools/FexBridge/libfexbridge.so"
-do
-    if [ -n "$cand" ] && [ -r "$cand" ]; then bridge=$cand; break; fi
+bridge_cands="${WINE_PPC64LE_FEXBRIDGE:-} ${reg_bridge:-} \
+$tree/../fex-ppc64le/build/Source/Tools/FexBridge/libfexbridge.so \
+$HOME/Projects/power8/fex-ppc64le/build/Source/Tools/FexBridge/libfexbridge.so"
+
+# A 32-BIT-CAPABLE BRIDGE WINS, and the order above is otherwise unchanged.
+#
+# A bridge without fexbridge_process_init32 cannot start a 32-bit process at
+# all, and the way that surfaces is not an error about the bridge.  Steam's own
+# legacycompat/SteamService.exe is a PE32; with such a bridge the launch fails
+# ERROR_BAD_EXE_FORMAT (193) and shell32 puts up a MODAL "Bad format." box in
+# the middle of somebody's game.  [MEASURED] 2026-08-18: with a bridge carrying
+# the symbol, that same binary loads and runs, and fails on its own business
+# ("Failed to find Steam executable") instead.
+#
+# The symbol is looked for with grep rather than nm because this runs inside
+# the FEX environment where binutils may not be, and a .so's dynamic symbol
+# table holds the name as a plain string either way.
+#
+# The preference is a preference, not a veto: if nothing 32-bit-capable is
+# readable the first readable candidate is still used, because a 64-bit-only
+# guest works perfectly well on it.  What must not happen is choosing that one
+# SILENTLY and leaving a modal dialog as the only evidence.
+bridge32=
+for cand in $bridge_cands; do
+    [ -n "$cand" ] && [ -r "$cand" ] || continue
+    [ -z "$bridge" ] && bridge=$cand
+    if grep -q fexbridge_process_init32 "$cand" 2>/dev/null; then
+        bridge32=$cand
+        break
+    fi
 done
+if [ -n "$bridge32" ]; then
+    bridge=$bridge32
+elif [ -n "$bridge" ]; then
+    say "WARNING: no 32-bit-capable bridge found; using $bridge"
+    say "  It has no fexbridge_process_init32, so any PE32 this title launches"
+    say "  -- Steam's own legacycompat/SteamService.exe is one -- will fail"
+    say "  ERROR_BAD_EXE_FORMAT and raise a modal 'Bad format.' box."
+    say "  Rebuild it: 'ninja fexbridge' in the FEX build directory."
+fi
 
 # ------------------------------------------------------------------ logging --
 
@@ -186,6 +218,42 @@ if [ ! -e "$prefix/.wine-ppc64le-native" ]; then
     else
         say "FATAL: wineboot failed (rc=$?)"
         exit 1
+    fi
+fi
+
+# A PREFIX BOOTED BEFORE 32-BIT SUPPORT HAS NO 32-BIT WINDOWS, and it does not
+# heal itself on the next run: the marker above says "initialised" and this
+# block is skipped forever.
+#
+# What populates C:\windows\syswow64 is wineboot's Wow64Install pass, which
+# starts syswow64\rundll32.exe as an i386 process.  With a bridge that cannot
+# do 32 bits that process dies in BTCpuProcessInit and wineboot REPORTS SUCCESS
+# over an empty directory -- so a prefix made in that state looks fine and
+# fails later, on whatever PE32 the title happens to launch.
+#
+# Re-booting is safe: wineboot -u is the update path, it is what Proton itself
+# runs on every launch, and it leaves an already-correct prefix alone.
+if [ -n "$bridge32" ] && \
+   [ -z "$(ls -A "$prefix/drive_c/windows/syswow64" 2>/dev/null)" ]; then
+    say "prefix has no 32-bit windows; forcing wineboot -u to stage it"
+    # The timestamp has to go first.  wineboot compares .update-timestamp
+    # against wine.inf and, finding the prefix current, runs update_wineprefix()
+    # NOT AT ALL -- no Wow64Install pass, no rundll32, rc=0, nothing staged.
+    # [MEASURED] plain `wineboot -u` on an existing prefix: zero rundll32
+    # invocations and syswow64 still empty; with the timestamp removed, 890
+    # entries.  wineboot writes a fresh one, so this costs one slower launch.
+    rm -f "$prefix/.update-timestamp"
+    if "$wine" wineboot -u; then
+        "$wineserver" -w
+        n=$(ls -A "$prefix/drive_c/windows/syswow64" 2>/dev/null | wc -l)
+        if [ "$n" -gt 0 ]; then
+            say "staged $n entries into syswow64"
+        else
+            say "WARNING: syswow64 is still empty after wineboot -u; a PE32 this"
+            say "  title launches will fail ERROR_BAD_EXE_FORMAT"
+        fi
+    else
+        say "WARNING: wineboot -u failed; leaving the prefix as it was"
     fi
 fi
 
