@@ -401,7 +401,21 @@ run|runinprefix|waitforexitandrun)
     # the exe Steam asked for, an absolute path is taken as-is.  Explicit,
     # logged, and refused loudly when the file is not there -- silently
     # launching the original would report the wrong binary's failure.
-    if [ -n "${WINE_PPC64LE_RUN_EXE:-}" ] && [ $# -ge 1 ]; then
+    #
+    # THE GAME'S EXE, not whatever this tool was handed.  The swap names a
+    # replacement for the binary Steam's launch config picked, so it only
+    # makes sense on the verb Steam launches the game with.  A background
+    # pre-step arrives on `run` with an exe from somewhere else entirely --
+    # legacycompat\iscriptevaluator.exe -- and the bare-name form resolves
+    # beside THAT, so the swap would look for DOOMx64vk.exe in Steam's
+    # legacycompat directory, not find it, and the "refused loudly" branch
+    # would kill the pre-step before it ran at all.  Measured: rc=1 with
+    # "FATAL: WINE_PPC64LE_RUN_EXE names .../legacycompat/DOOMx64vk.exe, which
+    # does not exist" and no guest started.  Live Steam does not hit this only
+    # because it leaves SteamAppId unset on the pre-step, so appconfig is
+    # keyed to "none" there -- an accident, not a design, and one that would
+    # stop protecting us the day Steam sets it or a user exports it by hand.
+    if [ "$verb" = waitforexitandrun ] && [ -n "${WINE_PPC64LE_RUN_EXE:-}" ] && [ $# -ge 1 ]; then
         case $WINE_PPC64LE_RUN_EXE in
         */*) swap=$WINE_PPC64LE_RUN_EXE ;;
         *)   swap=$(dirname "$1")/$WINE_PPC64LE_RUN_EXE ;;
@@ -427,6 +441,36 @@ run|runinprefix|waitforexitandrun)
         WINEDLLOVERRIDES="winedbg.exe=d${WINEDLLOVERRIDES:+;$WINEDLLOVERRIDES}"
         export WINEDLLOVERRIDES
         say "winedbg suppressed (WINEDLLOVERRIDES=$WINEDLLOVERRIDES)"
+    fi
+    # The same argument one step further out.  Suppressing winedbg stops a
+    # CRASH from raising a window; it does nothing about a program that asks a
+    # question.  A modal message box on a run with no user is not a slow
+    # answer, it is a permanent one -- the process sits in the dialog's own
+    # message loop until something kills it, and Steam's launch sits behind
+    # its exit code.
+    #
+    # MEASURED, and this is what task #12 turned out to be: after any change
+    # to a compatibility tool Steam inserts its legacycompat pre-step, and
+    # iscriptevaluator.exe calls ShellExecuteEx on legacycompat\SteamService.exe.
+    # That helper is a 32-bit i386 PE; this port has no 32-bit guest, so
+    # CreateProcess answers ERROR_BAD_EXE_FORMAT, shell32 raises its error box,
+    # and the pre-step never returns.  Under `timeout 60` that is rc=124; with
+    # somebody to click OK it is rc=1 and a dialog naming a handle that was
+    # never the problem.
+    #
+    # Which runs get this is not a guess.  Steam sends the game as
+    # waitforexitandrun and every background pre-step as run -- true of all 22
+    # launches recorded in this app's compatdata, and it is the same split
+    # Proton's own protocol makes.  So `run` is the verb with nobody watching,
+    # and only `run` answers its dialogs; the game keeps every box it raises.
+    # Nothing is swallowed either way: user32 logs the caption, the text and
+    # the button it pressed at ERR level, which is on without WINEDEBUG.
+    # A caller that already set the variable -- a launch option, a gate --
+    # keeps its own value, so WINE_PPC64LE_NO_DIALOGS=0 restores the dialogs.
+    if [ "$verb" = run ] && [ -z "${WINE_PPC64LE_NO_DIALOGS:-}" ]; then
+        WINE_PPC64LE_NO_DIALOGS=1
+        export WINE_PPC64LE_NO_DIALOGS
+        say "background pre-step: message boxes answered, not shown (WINE_PPC64LE_NO_DIALOGS=1)"
     fi
     ;;
 esac
