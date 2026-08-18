@@ -1018,6 +1018,67 @@ HRESULT WINAPI __wine_guest_MFInvokeCallback( IMFAsyncResult *result )
     return hr;
 }
 
+/* THE LOCAL MFT REGISTRY, and it is here because putting IClassFactory on the
+ * roster made spec2thunk's flat audit able to SEE it.  Both of these take an
+ * IClassFactory the application implements -- that is the whole point of a
+ * "local" MFT: the process registers a transform of its own and Media
+ * Foundation instantiates it through that factory.  Until IClassFactory was on
+ * the roster the audit's "does this signature carry an interface" token set
+ * did not contain the name, so both exports read as carrying no interface at
+ * all and passed a guest proxy straight into native MF unclassified.  That is
+ * the same hole ppc64le/mf/README.md records for a bare IUnknown * argument
+ * and MFShutdownObject, found the same way and closed the same way.
+ *
+ * The factory is KEPT by the registry -- dlls/mfplat/main.c holds it in a list
+ * and AddRefs it -- and MFTUnregisterLocal finds it again by POINTER IDENTITY.
+ * That works across the boundary only because winecom_reverse_wrap interns:
+ * the same guest object handed in twice yields the same native proxy, so the
+ * pointer the registration stored is the pointer the unregistration presents.
+ * A mechanism that minted a fresh proxy per call would register successfully
+ * and then never be able to unregister, which is exactly the class of bug that
+ * looks like it works.
+ *
+ * NULL is meaningful for MFTUnregisterLocal -- it means "unregister everything
+ * this process registered" -- and winecom_to_native passes NULL through as
+ * NULL, so it needs no special case here.
+ */
+HRESULT WINAPI __wine_guest_MFTRegisterLocal( IClassFactory *factory, REFGUID category,
+                                              LPCWSTR name, UINT32 flags, UINT32 cinput,
+                                              const MFT_REGISTER_TYPE_INFO *input_types,
+                                              UINT32 coutput,
+                                              const MFT_REGISTER_TYPE_INFO *output_types )
+{
+    static LONG logged;
+    void *host = NULL;
+    HRESULT hr;
+
+    if (!mf_ready()) return E_FAIL;
+    if (!MF_IN( "MFTRegisterLocal", "IClassFactory", MF_IFACE_IClassFactory,
+                factory, &host ))
+        return E_NOTIMPL;
+    hr = MFTRegisterLocal( host, category, name, flags, cinput, input_types,
+                           coutput, output_types );
+    /* Give the borrow back: the registry took its own reference if it kept the
+     * factory, and the interned proxy stays alive on that reference alone. */
+    __wine_mf_translate_in_end( host );
+    return hr;
+}
+
+HRESULT WINAPI __wine_guest_MFTUnregisterLocal( IClassFactory *factory )
+{
+    static LONG logged;
+    void *host = NULL;
+    HRESULT hr;
+
+    if (!mf_ready()) return E_FAIL;
+    if (!MF_IN( "MFTUnregisterLocal", "IClassFactory", MF_IFACE_IClassFactory,
+                factory, &host ))
+        return E_NOTIMPL;
+    hr = MFTUnregisterLocal( host );
+    __wine_mf_translate_in_end( host );
+    return hr;
+}
+
 HRESULT WINAPI __wine_guest_MFPutWorkItem( DWORD queue, IMFAsyncCallback *callback,
                                            IUnknown *state )
 {

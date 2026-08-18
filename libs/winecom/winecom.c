@@ -740,6 +740,24 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
         case WINECOM_CA_PASS:
         case WINECOM_CA_RIID:
         case WINECOM_CA_RET_PTR:
+            /* A by-value integer narrower than 32 bits arrives with UNDEFINED
+             * upper bits: MS-x64 lets the caller write only the declared width
+             * (clang emits `movw $0x1, %dx`) and makes ignoring the rest the
+             * callee's job, while ELFv2 makes extending it the CALLER's job
+             * and the ppc64 callee trusts that it happened.  Do it here, which
+             * is the only place that knows both the register and the declared
+             * width.  See struct winecom_slot::narrowmask for the measurement.
+             */
+            if (sl->narrowmask & (1u << (i - 1)))
+            {
+                unsigned int bits = (sl->narrowwide & (1u << (i - 1))) ? 16 : 8;
+                UINT64 mask = (1ull << bits) - 1;
+
+                raw &= mask;
+                if ((sl->narrowsign & (1u << (i - 1))) &&
+                    (raw & (1ull << (bits - 1))))
+                    raw |= ~mask;
+            }
             args[i] = raw;
             break;
         case WINECOM_CA_IFACE_IN:

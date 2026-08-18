@@ -1,6 +1,25 @@
 MODULE    = wmvcore.dll
 IMPORTLIB = wmvcore
-IMPORTS   = kernel32 combase mfplat
+# mfplat MUST come before combase, and this is not cosmetic.  Both modules
+# export a symbol called __wine_com_wrap_out_iface -- they are two DIFFERENT
+# libs/winecom instances, combase's system-COM one and Media Foundation's --
+# and the linker binds this module's undefined reference to whichever import
+# library it sees first.  With combase first, every object dlls/wmvcore/mfcom.c
+# vends was handed to the SYSCOM surface: a roster with no IWMSyncReader and no
+# IWMProfileManager in it, and (since nothing loads the guest combase.dll here)
+# no guest module at all, so the wrap silently did not happen and the guest was
+# given a RAW NATIVE VTABLE.  Measured in the built binary's import table --
+#
+#   dlls/wmvcore/ppc64-windows/wmvcore.dll
+#     combase.dll ['__wine_com_wrap_out_iface']
+#     mfplat.dll  ['__wine_mf_translate_in']
+#
+# -- and at run time as an x86-64 guest executing ppc64 bytes on its first
+# method call, with "syscom: no guest thunk module in this process" as the only
+# clue.  ppc64le/mf/check-mf-modules.sh layer 0b now reads this import table and
+# fails if any module on the surface binds a __wine_com_* helper anywhere but
+# mfplat, so the order cannot quietly go back.
+IMPORTS   = kernel32 mfplat combase
 DELAYIMPORTS = winegstreamer
 
 VER_FILEDESCRIPTION_STR = "Wine Media Playback dll"

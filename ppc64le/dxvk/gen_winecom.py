@@ -440,6 +440,30 @@ class Refused(Exception):
     pass
 
 
+# Sub-word by-value integer types.  Not used to DESCRIBE anything on this
+# surface -- it has none -- but to RECOGNISE one if a roster entry ever adds
+# it, so the refusal below can be by name.  Kept spelled the same as
+# ppc64le/mf/gen_winecom.py's copy so the two can be compared at a glance.
+NARROW_BYVAL = {
+    "WORD":    (2, False), "USHORT": (2, False), "UINT16":  (2, False),
+    "SHORT":   (2, True),  "INT16":  (2, True),
+    "BYTE":    (1, False), "UCHAR":  (1, False), "UINT8":   (1, False),
+    "BOOLEAN": (1, False),
+    "CHAR":    (1, True),  "INT8":   (1, True),
+}
+
+# The same widths spelled as plain C, matched against the whole declaration
+# because Param.base keeps only the FIRST token.
+NARROW_RAW = (
+    (r'\bunsigned\s+short\b',  (2, False)),
+    (r'\bsigned\s+short\b',    (2, True)),
+    (r'\bunsigned\s+char\b',   (1, False)),
+    (r'\bsigned\s+char\b',     (1, True)),
+    (r'\bshort\b',              (2, True)),
+    (r'\bchar\b',               (1, True)),
+)
+
+
 def classify(key, slot, ifaces, iface_index, byval_ok, bearing,
              why_bearing, opaque, why_opaque, void_pp_is_memory):
     """-> (cls[], xaux[], caux[], aux, aux2) or raise Refused(reason)."""
@@ -480,6 +504,42 @@ def classify(key, slot, ifaces, iface_index, byval_ok, bearing,
                     "by-value parameter `%s` is of a type this generator "
                     "cannot prove is integer-class on both ABIs; refusing "
                     "rather than assuming it is an enum" % p.raw)
+            # NARROWER THAN 32 BITS IS REFUSED HERE, not passed.
+            #
+            # A by-value integer of 1 or 2 bytes arrives with its upper bits
+            # UNDEFINED: MS-x64 lets the caller write only the declared width
+            # and makes ignoring the rest the callee's job, while ELFv2 makes
+            # extending it the CALLER's job and a ppc64 callee at -O2 is
+            # entitled to trust that.  Passed through unchanged it is a wrong
+            # number, not a crash -- measured on the MF surface, where
+            # IWMSyncReader::GetStreamSelected read a guest-passed 1 as
+            # 0x40000001 (ppc64le/mf/README.md).
+            #
+            # ppc64le/mf/gen_winecom.py carries the fix: narrowmask/narrowwide/
+            # narrowsign per slot, extended by libs/winecom, whose runtime half
+            # is SHARED with this lane.  This generator does not carry it
+            # because THIS ROSTER HAS NO SUCH PARAMETER -- measured, zero slots
+            # -- and a table that emits nothing is a table that rots.
+            #
+            # So the absence is checked rather than assumed.  The day a roster
+            # entry adds one, this refuses it by name instead of handing native
+            # code a value with garbage above its own width, and the fix is to
+            # port narrow_of() and the three mask fields from the MF copy.
+            narrow = NARROW_BYVAL.get(p.base)
+            if narrow is None:
+                for pat, w in NARROW_RAW:
+                    if re.search(pat, p.raw):
+                        narrow = w
+                        break
+            if narrow is not None:
+                raise Refused(
+                    "by-value parameter `%s` is %d byte(s) wide, and this "
+                    "generator publishes no width for a sub-word integer -- "
+                    "so it would reach native code with the guest's leftovers "
+                    "above its own width.  Port narrow_of() and the "
+                    "narrowmask/narrowwide/narrowsign fields from "
+                    "ppc64le/mf/gen_winecom.py, which measures them"
+                    % (p.raw, narrow[0]))
             cls[i] = CA["PASS"]
             continue
 

@@ -255,6 +255,103 @@ if [ "$mfc_have" = 0 ]; then
     say "  WINEPREFIX=$prefix -- and run again.  Nothing is downloaded here."
 fi
 
+# ------------------------------------------ Microsoft's VC++ 2010 C++ runtime --
+#
+# msvcp100.dll is a C++ ABI, and translating the MSVC C++ ABI is exactly what
+# this port decided not to do: all 46 eligible exports of
+# dlls/msvcp100/msvcp100.thunks are MSVC-mangled member functions
+# (?_Lockit_ctor@_Lockit@std@@SAXH@Z and its kind), no Wine header declares
+# them as flat prototypes because they are not flat prototypes, and the thunk
+# PE therefore has NO EXPORTS AT ALL.  Styx: Master of Shadows imports 65 of
+# them; its bundled wxmsw28u_vc_custom_64.dll calls one at PROCESS_ATTACH and
+# lands on a 0xDEAD000B sentinel.
+#
+# The answer is the one dlls/msvcp140 already takes: run a REAL x86-64
+# msvcp100.dll as a guest module under the emulator.  A copy is on this disk if
+# the user provisioned a Proton prefix for the app, and -- this is the
+# correction to what ppc64le/corpus/CATALOG.md handoff #4 assumed -- that file
+# is not Microsoft's.  Measured: 1,747,524 bytes, machine 0x8664, and the
+# string "Wine builtin DLL" in its DOS stub, with 1628 exports.  It is WINE'S
+# OWN msvcp100 built for x86-64 by Proton.  That is better rather than worse:
+# nothing has to be redistributed, and the implementation is the same one this
+# tree compiles for ppc64.
+#
+# sysx8664 rather than system32, and this is the opposite of the mfc140u block
+# above.  find_dll_file()'s guest branch searches the machine's own system
+# directory FIRST, then builtins, then the ordinary load path.  mfc140u has no
+# builtin competing with it so system32 (on the load path) is fine; msvcp100
+# HAS one, so a copy on the load path is never reached.
+#
+# NO LOAD-ORDER OVERRIDE, and that is a correction too.  The obvious-looking
+# "msvcp100=n" is exactly wrong: LO_NATIVE refuses a Wine builtin outright
+# (dlls/ntdll/unix/loader.c, load_builtin), and this file IS one -- so the
+# override turned a module that merely had no useful exports into one that
+# would not load at all, which is why the first attempt at this block made Styx
+# worse (rc=53) instead of better.  With no override the staged file is found
+# and kept, because load_builtin no longer re-resolves the name of a module
+# staged in a guest machine's own system directory against the build tree.
+#
+# msvcr100 DELIBERATELY STAYS WINE'S OWN, i.e. this tree's native ppc64
+# implementation behind its guest thunk.  Two reasons, both measured.  The C
+# runtime is the half this port CAN translate -- 766 of 1185 exports cross --
+# and dlls/msvcr100/msvcr100.thunks carries the callback-registration rows
+# (_beginthread, _beginthreadex, _onexit, __dllonexit, qsort, bsearch,
+# _set_invalid_parameter_handler, _set_purecall_handler, __setusermatherr) that
+# ppc64le/seh/check-crt-callbacks.sh gates; staging a guest msvcr100 would put
+# all of that behind the emulator for nothing.  And it does not work anyway:
+# Proton's x86-64 msvcr100.dll is a Wine builtin that imports Wine's INTERNAL
+# ntdll helpers, which this port's guest ntdll thunk does not publish, so it
+# dies at its own PROCESS_ATTACH on
+#
+#   err:seh:dispatch_guest_exception guest called through a wild pointer:
+#     00000000DEAD0005 ... from msvcr100.dll+7ef80        (= __wine_dbg_header)
+#
+# WHAT THIS DOES NOT YET FIX, stated here rather than left to be discovered.
+# With msvcp100 staged, the module maps with all 1628 exports and Styx's 65
+# imports bind for real.  msvcp100's own DllMain then GetProcAddress's four
+# C++ symbols out of msvcr100 -- ??2@YAPEAX_K@Z (operator new),
+# ??3@YAXPEAX@Z (operator delete),
+# ?_set_new_handler@@YAP6AH_K@ZP6AH0@Z@Z and
+# ?IsCurrentTaskCollectionCanceling@Context@Concurrency@@SA_NXZ -- and this
+# tree's msvcr100 thunk refuses all four as mangled C++ names, so the call
+# through NULL is where it stops now.  Closing that is four rows in
+# dlls/msvcr100/msvcr100.thunks, three of them ordinary and one
+# (_set_new_handler) needing a callback row because its argument is a guest
+# function pointer.  Staging is still the right half to ship: the module now
+# has real exports instead of none, and the fault names a symbol instead of
+# being a bare sentinel.
+sysx8664=$prefix/drive_c/windows/sysx8664
+cpp_missing=
+
+for dll in msvcp100.dll; do
+    if [ -f "$sysx8664/$dll" ]; then
+        continue
+    fi
+    if [ -f "$foreign/$dll" ]; then
+        mkdir -p "$sysx8664" 2>/dev/null
+        if cp -f "$foreign/$dll" "$sysx8664/.$dll.tmp" 2>/dev/null &&
+           mv -f "$sysx8664/.$dll.tmp" "$sysx8664/$dll" 2>/dev/null; then
+            say "provisioned $dll into the guest system directory ($sysx8664)"
+        else
+            rm -f "$sysx8664/.$dll.tmp" 2>/dev/null
+            say "could not copy $dll from $foreign into $sysx8664"
+            cpp_missing="$cpp_missing $dll"
+        fi
+    else
+        cpp_missing="$cpp_missing $dll"
+    fi
+done
+
+if [ -n "$cpp_missing" ]; then
+    say "no x86-64 VC++ 2010 C++ runtime to stage;$cpp_missing"
+    say "  a game built against it (Styx: Master of Shadows) will bind sentinels"
+    say "  for every std:: symbol, because this tree's msvcp100 thunk has no"
+    say "  exports -- the MSVC C++ ABI is not a flat surface and is refused"
+    say "  honestly rather than guessed.  To fix it, provision a prefix for this"
+    say "  app -- 'protontricks ${SteamAppId:-<appid>} vcrun2010' -- and run"
+    say "  again.  Nothing is downloaded here."
+fi
+
 # ------------------------------------------------------------ Steam bridge --
 #
 # A Windows game reaches Steam through steam_api64.dll, which reads

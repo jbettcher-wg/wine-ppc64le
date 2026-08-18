@@ -139,6 +139,63 @@ struct winecom_slot
                                    CLOSED and is refused by name, which is the
                                    only safe reading of "no information".
                                    Appended last, same rule as caux. */
+    unsigned char narrowmask;   /* bit i: parameter i is a by-value integer
+                                   NARROWER THAN 32 BITS, and the dispatcher
+                                   must extend it before handing it to the
+                                   native callee.
+
+                                   THE TWO ABIs DISAGREE ABOUT WHOSE JOB THAT
+                                   IS.  MS-x64 leaves the upper bits of a
+                                   register holding a narrow argument
+                                   UNDEFINED -- clang really does emit
+                                   `movw $0x1, %dx`, a 16-bit store that leaves
+                                   RDX's top 48 bits as whatever was there --
+                                   and requires the CALLEE to ignore them.
+                                   ELFv2 says the opposite: arguments smaller
+                                   than a doubleword are extended BY THE
+                                   CALLER, and a ppc64 callee is compiled to
+                                   trust that.  So the raw register handed
+                                   straight through arrives as garbage above
+                                   the declared width.
+
+                                   [MEASURED] IWMSyncReader::GetStreamSelected
+                                   and ::GetOutputNumberForStream both take a
+                                   WORD stream number.  A guest passing 1 was
+                                   read by Wine's own winegstreamer code as
+                                   0x40000001: one call answered E_INVALIDARG
+                                   and the other returned output number
+                                   0x40000000.  A WRONG NUMBER, NOT A CRASH --
+                                   the same class as the ldexp() exponent the
+                                   FP marshalling work found, and invisible to
+                                   any check that only asks whether the call
+                                   returned.
+
+                                   32-bit arguments need nothing: x86-64
+                                   zero-extends every 32-bit register write to
+                                   64 bits by hardware rule, so a DWORD is
+                                   already clean.  Only 8- and 16-bit
+                                   parameters are at risk.
+
+                                   A table generated before this field existed
+                                   has narrowmask 0 and behaves exactly as it
+                                   did.  That is deliberately NOT fail-closed,
+                                   because the alternative -- refusing every
+                                   row on every surface whose generator has not
+                                   been taught this yet -- would take working
+                                   lanes away to fix a hazard they may not
+                                   have; the lanes that have not been
+                                   regenerated are named in
+                                   ppc64le/mf/README.md instead. */
+    unsigned char narrowwide;   /* bit i: that parameter is 16 bits, not 8.
+                                   Same shape as fpwide above and for the same
+                                   reason: the width has to be known to move
+                                   the value correctly. */
+    unsigned char narrowsign;   /* bit i: that parameter is SIGNED, so it must
+                                   be sign-extended rather than zero-extended.
+                                   SHORT and CHAR are the ones that care: a
+                                   SHORT of -1 arrives as DX=0xFFFF and has to
+                                   reach the callee as 0xFFFFFFFFFFFFFFFF, not
+                                   as 0x000000000000FFFF. */
 };
 
 /* winecom_iface flags */

@@ -96,6 +96,15 @@ fi
 
 # The rows this gate stands on.  Each is a one-line assertion about a shape the
 # probe depends on, and each would otherwise be able to change underneath it.
+#
+# The expected text now runs to the NARROWING masks that close each row, and
+# that is deliberate rather than incidental.  struct winecom_slot grew
+# narrowmask/narrowwide/narrowsign when a WORD argument was found crossing with
+# its upper bits undefined (ppc64le/mf/README.md records the measurement), and
+# every row below is a slot whose by-value parameter is a float or a double --
+# never a narrow integer -- so all three masks MUST be zero on all three.  A
+# generator that ever set one here would be claiming a double is 8 or 16 bits
+# wide, so pinning the zeros is a real assertion and not padding.
 row_is() {   # <grep-pattern> <what it must contain> <description>
     if grep -A3 -F "$1" "$MARSHAL" | grep -qF "$2"; then
         say "row: $3"
@@ -104,15 +113,15 @@ row_is() {   # <grep-pattern> <what it must contain> <description>
     fi
 }
 row_is '{ "IMFAttributes::SetDouble"' \
-       'WINECOM_F_REV, 0, 0, NULL, 0x02, 0x02, 0x00 }' \
+       'WINECOM_F_REV, 0, 0, NULL, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00 }' \
        "IMFAttributes::SetDouble is reverse-servable, its double in the second \
 parameter position"
 row_is '{ "IMFSimpleAudioVolume::SetMasterVolume"' \
-       'WINECOM_F_REV, 0, 0, NULL, 0x01, 0x00, 0x00 }' \
+       'WINECOM_F_REV, 0, 0, NULL, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00 }' \
        "IMFSimpleAudioVolume::SetMasterVolume is reverse-servable, its SINGLE \
 in the first"
 row_is '{ "IMFAttributes::SetUnknown", NULL, cls_IMFAttributes_27' \
-       'xaux_IMFAttributes_27, 3, 0, 0, 0, NULL, 0, 0, 0x02 }' \
+       'xaux_IMFAttributes_27, 3, 0, 0, 0, NULL, 0, 0, 0x02, 0x00, 0x00, 0x00 }' \
        "IMFAttributes::SetUnknown records the interface TYPE of its IN \
 parameter AND the xmask bit that says the generator wrote it -- without the \
 bit an untouched zero would read as roster index 0, a real interface"

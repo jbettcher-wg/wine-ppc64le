@@ -232,6 +232,43 @@ def build(srctree, build_dir):
                dict(slot=1, owner="IUnknown", name="AddRef", ret="ULONG", params=[]),
                dict(slot=2, owner="IUnknown", name="Release", ret="ULONG", params=[])])
 
+    # IClassFactory is on the roster for a reason measured rather than
+    # assumed: WITHOUT it, this surface's only door is welded shut.
+    #
+    # mfmediaengine has exactly one flat export a caller can use --
+    # DllGetClassObject -- and dlls/mfmediaengine/mfcom.c wraps its result
+    # with __wine_com_wrap_out_iface(hr, riid, out).  That helper looks the
+    # riid up in THIS roster and, finding nothing, releases the object and
+    # answers E_NOINTERFACE rather than hand a guest a native vtable.  So a
+    # guest asking for IID_IClassFactory got E_NOINTERFACE and there was no
+    # second way in: IMFMediaEngineClassFactory is reached only through a
+    # class object, and evr's and mfplat's DllGetClassObject were shut for the
+    # same reason.  Measured by ppc64le/mf/check-mf-modules.sh, which is the
+    # first thing that ever asked one of these modules for an object.
+    #
+    # It is written out here rather than by adding unknwn.h to HEADERS,
+    # exactly as IUnknown above is: that header also declares AsyncIUnknown,
+    # whose Begin_/Finish_ split is a second vtable nothing on this surface
+    # vends, and a roster grows by decisions rather than by whatever a header
+    # happened to contain.
+    #
+    # Both crossing slots have complete plans and neither is a special case:
+    # CreateInstance is (IUnknown *outer, REFIID, void **) -- the same
+    # IFACE_IN/RIID/PPV_OUT triple IMFGetService::GetService already carries,
+    # so an aggregation outer arriving as a guest proxy is translated in and
+    # the vended object comes back wrapped by IID; LockServer takes a BOOL.
+    ifaces["IClassFactory"] = dict(
+        uuid="00000001-0000-0000-c000-000000000046",
+        base="IUnknown", header="unknwn.h",
+        slots=[dict(slot=0, owner="IUnknown", name="QueryInterface", ret="HRESULT",
+                    params=["REFIID riid", "void **ppvObject"]),
+               dict(slot=1, owner="IUnknown", name="AddRef", ret="ULONG", params=[]),
+               dict(slot=2, owner="IUnknown", name="Release", ret="ULONG", params=[]),
+               dict(slot=3, owner="IClassFactory", name="CreateInstance", ret="HRESULT",
+                    params=["IUnknown *pUnkOuter", "REFIID riid", "void **ppvObject"]),
+               dict(slot=4, owner="IClassFactory", name="LockServer", ret="HRESULT",
+                    params=["BOOL fLock"])])
+
     # Base-chain closure: every interface's ENTIRE chain must be present, or
     # its inherited slot NUMBERS are unknown and a table with the wrong slot
     # numbers is the silent mis-dispatch this design exists to prevent.

@@ -2627,6 +2627,70 @@ NTSTATUS load_builtin( struct pe_mapping_info *pe_mapping, USHORT machine,
 
     if (loadorder == LO_DISABLED) return STATUS_DLL_NOT_FOUND;
 
+    /* A file that lives in a GUEST machine's own system directory --
+     * C:\windows\sysx8664 and its siblings -- has already been chosen, on
+     * purpose, by the guest branch of find_dll_file(), which searches that
+     * directory BEFORE anything else precisely so that a module staged there
+     * wins.  Re-resolving the NAME here would undo that decision, and it can
+     * only ever substitute a DIFFERENT module: find_builtin_dll() looks in the
+     * build and install trees and never in the prefix, so the file just opened
+     * is not even a candidate for the search that would replace it.
+     *
+     * Measured, with Proton's x86-64 msvcp100.dll staged there for Styx:
+     *
+     *   find_builtin_dll looking for "msvcp100.dll" for file
+     *     L"\??\C:\windows\sysx8664\msvcp100.dll"
+     *   map_image_into_view mapping PE file
+     *     L"\??\C:\windows\sysx8664\msvcp100.dll" at ...-0x...3000
+     *     section .rdata ... section .reloc ...
+     *
+     * -- a three-page image wearing the staged file's name, which is this
+     * tree's own msvcp100 guest thunk.  That thunk has NO exports at all,
+     * because all 46 are MSVC-mangled C++ member functions the signature
+     * oracle refuses, so the 1.7 MB module the user staged was opened,
+     * machine-checked, and then thrown away for one that answers NULL to
+     * every GetProcAddress.
+     *
+     * The nt_name is a reliable discriminator rather than a guess: it is the
+     * name the SERVER recorded for the file the section was created from
+     * (server/mapping.c, get_nt_name), so an ordinary guest thunk resolved out
+     * of the build tree arrives here as
+     * L"\??\Z:\home\...\dlls\msvcr100\x86_64-windows\msvcr100.dll" and does not
+     * match, while a staged file arrives as its sysx8664 path and does.
+     * find_builtin_without_file() rewrites the CALLER's copy of the name to
+     * the synthetic system-directory form afterwards -- which is what the
+     * module list shows -- but that happens after the mapping already exists.
+     *
+     * AMD64's directory ONLY, and that restriction is load-bearing rather than
+     * cautious.  The rule is really "this machine's modules are not staged into
+     * the prefix, so a file found there was put there deliberately and the
+     * builtin search cannot be looking for it" -- and that is true of
+     * sysx8664, which this port introduced and which nothing populates
+     * automatically, while it is false of syswow64.  Measured: a booted prefix
+     * here has 858 entries in C:\windows\syswow64, wineboot's own copies of the
+     * 32-bit builtins, "Wine builtin DLL" in their DOS stubs and machine i386 --
+     * every one of which would match a rule written on sysdir_machine alone.
+     * Those must keep going through find_builtin_dll, because that is the path
+     * that also resolves a builtin's .so unixlib (set_builtin_unixlib_name);
+     * mapping them as if they were ordinary files would take the unixlib away
+     * from every 32-bit module that has one.
+     *
+     * The current machine's own system32 is excluded for the same reason and
+     * one more: there, builtin-first is the load order Wine has always had, and
+     * changing it would change every native load in every prefix.  LO_BUILTIN
+     * is excluded too -- an explicit "=b" asks for the tree's builtin and must
+     * still get it.
+     */
+    if (is_system_dir && sysdir_machine == IMAGE_FILE_MACHINE_AMD64 &&
+        sysdir_machine != current_machine &&
+        pe_mapping->image.machine == sysdir_machine && loadorder != LO_BUILTIN)
+    {
+        TRACE( "%s is staged in the %04x system directory; keeping it rather "
+               "than re-resolving the name against the builtins\n",
+               debugstr_us(&pe_mapping->nt_name), sysdir_machine );
+        return STATUS_IMAGE_ALREADY_LOADED;
+    }
+
     if (pe_mapping->image.wine_builtin)
     {
         if (loadorder == LO_NATIVE) return STATUS_DLL_NOT_FOUND;

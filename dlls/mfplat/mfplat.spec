@@ -246,6 +246,8 @@
 @ stdcall __wine_guest_MFRegisterLocalSchemeHandler(wstr ptr)
 @ stdcall __wine_guest_MFCreateAsyncResult(ptr ptr ptr ptr)
 @ stdcall __wine_guest_MFInvokeCallback(ptr)
+@ stdcall __wine_guest_MFTRegisterLocal(ptr ptr wstr long long ptr long ptr)
+@ stdcall __wine_guest_MFTUnregisterLocal(ptr)
 @ stdcall __wine_guest_MFPutWorkItem(long ptr ptr)
 @ stdcall __wine_guest_MFPutWorkItem2(long long ptr ptr)
 @ stdcall __wine_guest_MFPutWorkItemEx(long ptr)

@@ -126,6 +126,17 @@ GUEST-IMPL   MFCreateDXGISurfaceBuffer             __wine_guest_MFCreateDXGISurf
 GUEST-IMPL   MFCreateDXSurfaceBuffer               __wine_guest_MFCreateDXSurfaceBuffer
 GUEST-IMPL   MFCreateLegacyMediaBufferOnMFMediaBuffer __wine_guest_MFCreateLegacyMediaBufferOnMFMediaBuffer
 
+# --- the local MFT registry: an IClassFactory the APPLICATION implements ---
+#
+# Both take a guest-implemented class factory and MFTUnregisterLocal finds it
+# again by pointer identity, so both go through the typed translate-in and get
+# the same interned reverse proxy.  They are here at all because IClassFactory
+# joined the roster: before that the flat audit's interface-token set did not
+# contain the name, so these two read as carrying no interface and passed a
+# guest proxy into native MF unclassified.  See dlls/mfplat/mfcom.c.
+GUEST-IMPL   MFTRegisterLocal                      __wine_guest_MFTRegisterLocal
+GUEST-IMPL   MFTUnregisterLocal                    __wine_guest_MFTUnregisterLocal
+
 # --- a PROPVARIANT the caller supplies: served, with the tag audited ---
 GUEST-IMPL   MFCreateMediaEvent                    __wine_guest_MFCreateMediaEvent
 

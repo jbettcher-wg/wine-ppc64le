@@ -44,9 +44,11 @@ module as the last line of defence.
 |---|---|
 | `gen_interfaces.py` | Wine's widl-generated MF headers → `interfaces_mf.json` |
 | `gen_winecom.py` | that roster → `dlls/mfplat/mf_marshal.h`; `--report` explains every refusal |
-| `interfaces_mf.json` | the ONE roster: 184 interfaces, 2373 vtable slots, across `mfplat`, `mf`, `mfreadwrite`, `mfmediaengine`, `evr` and `wmvcore` |
+| `interfaces_mf.json` | the ONE roster: 185 interfaces, 2378 vtable slots, across `mfplat`, `mf`, `mfreadwrite`, `mfmediaengine`, `evr` and `wmvcore` |
 | `check-mf-smoke.sh` | the runtime gate (7 layers); `--sabotage` runs all three negative controls |
+| `check-mf-modules.sh` | the runtime gate for `mfmediaengine`/`wmvcore`/`evr` (7 layers, 3 controls) |
 | `probes/mf_smoke.c` | one source, built as a native ppc64 PE and as an x86-64 guest PE |
+| `probes/mf_modules.c` | the same, for the three modules that joined later |
 | `probes/mf_async_probe.c` | guest-only: the reverse-proxy async path, measured |
 
 ```sh
@@ -78,8 +80,8 @@ uploads to a shader anyway.)
 **The ASYNCHRONOUS path too**, which used to be this surface's headline
 refusal; see the reverse-proxy section below.
 
-Of the roster's **1821 non-`IUnknown` vtable slots, 1647 (90%) are served in
-the FORWARD direction** — 1641 by the generated marshal tables and 6 by
+Of the roster's **1823 non-`IUnknown` vtable slots, 1649 (90%) are served in
+the FORWARD direction** — 1643 by the generated marshal tables and 6 by
 hand-written slots — and 174 are refused with a named reason. Fifty-five of
 those 174 are
 refused *only forward*: they pass a float by value, which the forward invoker
@@ -237,8 +239,8 @@ exactly as `mf` and `mfreadwrite` already did.
 
 | | before | after |
 |---|---|---|
-| interfaces | 93 | **184** |
-| vtable slots | 1139 | **2373** |
+| interfaces | 93 | **185** |
+| vtable slots | 1139 | **2378** |
 | dropped by base-chain closure | 0 | **0** |
 
 `mfmediaengine.h` contributes 20 interfaces, `evr.h`/`evr9.h` 13, `wmsdkidl.h`
@@ -246,7 +248,7 @@ exactly as `mf` and `mfreadwrite` already did.
 three header sets close under `IUnknown`, so a curated subset would only have
 been a second place to get slot numbers wrong.
 
-Of the roster's non-`IUnknown` slots, **1641 are marshalled and 6 hand-written
+Of the roster's non-`IUnknown` slots, **1643 are marshalled and 6 hand-written
 against 174 refused** — the same 90% the smaller surface had, on a surface
 more than twice the size.
 
@@ -298,14 +300,67 @@ same class as the `psapi`/`wldap32` renames in `ppc64le/corpus/CATALOG.md`: a
 tooling gap, and the fix belongs in the oracle rather than in a `.thunks` file
 asserting a signature by hand.
 
-**NOT MEASURED, and this is the honest part.** No corpus title has created a
-media engine, opened a Windows Media file or built an EVR sink on this port.
-`ppc64le/mf/check-mf-smoke.sh` proves the surface these three joined still
-works — the same 7 layers, the same byte-identical native-vs-guest transcript,
-against a roster more than twice the size — and that is the whole of what has
-been proven. What these three modules do when a program actually drives one is
-unmeasured, and a gate for it needs a program that drives one. Written down
-here rather than left to be inferred from the absence of a gate.
+**MEASURED NOW, and it took four defects out of the surface.**
+`ppc64le/mf/check-mf-modules.sh` is the gate: one source
+(`probes/mf_modules.c`) built twice, run as a native ppc64 PE and as an x86-64
+guest PE, transcripts byte-identical, 80 value-checking steps and three
+negative controls. It drives a media engine through a load that must fail and
+one that must succeed, an `IWMSyncReader` over the gate's own WAV, and evr's
+sample allocator down to a 2D buffer's pitch. None of the four below was found
+by reading; every one was found by running it.
+
+1. **`IClassFactory` was not on the roster, so `mfmediaengine` had no door at
+   all.** Its one usable flat export is `DllGetClassObject`, whose wrapper
+   wraps the result *by IID* — and an IID that is not on the roster is released
+   and answered `E_NOINTERFACE`. There was no second way in:
+   `IMFMediaEngineClassFactory` is reachable only through a class object, and
+   `evr`'s and `mfplat`'s `DllGetClassObject` were shut for the same reason.
+   `gen_interfaces.py` now writes `IClassFactory` out beside `IUnknown`; both
+   crossing slots have complete plans, `CreateInstance` being the same
+   `IFACE_IN`/`RIID`/`PPV_OUT` triple `IMFGetService::GetService` carries.
+2. **Two flat exports were passing a guest proxy into native MF
+   unclassified**, and putting `IClassFactory` on the roster is what made them
+   visible. `spec2thunk`'s flat audit builds its "does this signature carry an
+   interface" token set out of the roster, so `MFTRegisterLocal` and
+   `MFTUnregisterLocal` — both of which take an `IClassFactory *` the
+   application implements — read as carrying no interface at all. The build
+   failed closed the moment the name existed. Both now have typed wrappers in
+   `dlls/mfplat/mfcom.c`, and because `MFTUnregisterLocal` finds the factory
+   again by pointer identity, they depend on `winecom_reverse_wrap` interning:
+   the same guest object handed in twice must yield the same native proxy.
+3. **`wmvcore` was linked to the WRONG winecom instance.** `combase` and
+   `mfplat` both export `__wine_com_wrap_out_iface` — two different per-linkee
+   instances — and `dlls/wmvcore/Makefile.in` listed `combase` first, so the
+   linker bound combase's. Every object wmvcore vended went to the syscom
+   surface, whose roster has no `IWMSyncReader` and whose guest module is not
+   even loaded, so the wrap silently did not happen and the guest was handed a
+   **raw native vtable**. It is visible only in the built import table, which is
+   why layer 0b of the gate now reads that table for all six modules.
+4. **Narrow by-value integers crossed unextended — a wrong number, not a
+   crash.** `IWMSyncReader::GetStreamSelected(WORD)` and
+   `::GetOutputNumberForStream(WORD)` were handed a guest-supplied `1` and read
+   it as `0x40000001`. MS-x64 lets the caller write only the declared width
+   (clang emits `movw $0x1, %dx`) and makes ignoring the rest the callee's job;
+   ELFv2 makes extending it the **caller's** job, and a ppc64 callee is compiled
+   to trust that. **128 slots on this roster carried it.** `struct
+   winecom_slot` gained `narrowmask`/`narrowwide`/`narrowsign`, `libs/winecom`
+   does the extension, and `gen_winecom.py` records the widths.
+
+**What is still not measured, stated rather than implied.** A guest cannot
+DECODE through `wmvcore`: `IWMSyncReader::GetNextSample` writes
+`INSSBuffer **`, a pointer-to-pointer whose pointee the generator cannot prove
+is plain memory, so the slot is refused and everything up TO the decode is what
+the gate covers. `evr`'s presenter and mixer are not driven either — both go
+through `Direct3DCreate9` and belong to the DXVK surface. And the narrowing fix
+is per-generator. There are two other `gen_winecom.py` copies — `ppc64le/dxvk`
+and `ppc64le/audio`; `vkd3d`, `syscom` and `shell` have no copy at all — and
+**both measure zero sub-word by-value parameters on their rosters**, so there is
+nothing for the fix to describe there. Rather than carry a table that emits
+nothing, each of those two now **refuses** a by-value parameter narrower than 32
+bits by name, so the day a roster entry adds one it fails closed instead of
+passing the value through unextended. The runtime half in `libs/winecom` is
+shared, so porting `narrow_of()` and the three mask fields is all either would
+need.
 
 ## Not done
 

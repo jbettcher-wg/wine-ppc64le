@@ -40,7 +40,7 @@ a Windows build, and the fix for all fifteen was one `.thunks` file each.
 | Title | appid | Machine | Before this pass | After |
 |---|---|---|---|---|
 | Warhammer 40,000: Boltgun | 2005010 | PE32+ | dead in `loader_init`, `c0000135`, 0 guest instructions | past the loader, and now **past the DRM stub** too |
-| Styx: Master of Shadows | 242640 | PE32+ | dead in `loader_init`, `c0000135`, 0 guest instructions | past the loader — see below |
+| Styx: Master of Shadows | 242640 | PE32+ | dead in `loader_init`, `c0000135`, 0 guest instructions | **past `loader_init`** — 58 modules, every DllMain runs; now stops in its own code on `mscoree._CorExeMain` (handoff #4) |
 | The Elder Scrolls V: Skyrim SE | 489830 | PE32+ | loader completes, then `c0000005` at the image entry | **past the DRM stub** — see the 2026-08-18 re-run below |
 | Half-Life 2 | 220 | **PE32** | refused — no 32-bit guest | unchanged, and correctly so |
 | FreeInfantry | 2830720 | **PE32** | refused — no 32-bit guest | unchanged, and correctly so |
@@ -666,82 +666,105 @@ that failed here, twice, in two titles.
 
 ### 4. To the compat tool: the VC++ 2010 C++ runtime
 
-> **ATTEMPTED 2026-08-18 AND NOT SHIPPED — but the blocker is now named, and it is
-> not the one below.** Everything this handoff proposed turns out to work; what
-> stops it is one step further in, in the port's own guest loader.
+> **CLOSED 2026-08-18. Styx: Master of Shadows is past `loader_init`.** It now
+> loads 58 modules, every DllMain runs — including the
+> `wxmsw28u_vc_custom_64.dll` one this handoff was written about — and the game
+> stops somewhere else entirely (below). Four things had to be true, and the
+> first is that **this handoff's central premise was false**.
 >
-> The provisioning itself is right, with one correction: the file must go to
-> `C:\windows\sysx8664`, **not** `system32` as the `mfc140u.dll` block does.
-> `find_dll_file`'s guest branch searches the machine's own system directory
-> FIRST, then the tree's builtins, then the ordinary load path — and `msvcp100`
-> HAS a builtin, so a copy on the load path is outranked and never opened, while
-> `mfc140u` has none and so is fine where it is.
+> **The file is not Microsoft's.** `compatdata/242640/pfx/drive_c/windows/
+> system32/msvcp100.dll` is 1,747,524 bytes and machine `0x8664`, both as
+> recorded — and its DOS stub reads **`Wine builtin DLL`**, with 1628 exports.
+> It is WINE'S OWN msvcp100 built for x86-64 by Proton. So the open question
+> this handoff ended on — "why is `image.wine_builtin` set at all for a 1.7 MB
+> Microsoft DLL" — dissolves: the flag describes the FILE, the file is a
+> builtin, and the flag was right. Nothing was wrong in `load_builtin`'s
+> reading of it.
 >
-> Staging alone is still not enough. Wine's load order for a DLL it implements is
-> builtin-first, and the traced result is a loader naming the right path while
-> mapping the wrong file:
+> **Which makes `msvcp100=n` the actual defect.** `LO_NATIVE` refuses a builtin
+> outright, by the line this handoff quoted. Adding the override could only ever
+> turn "a module with no useful exports" into "a module that will not load",
+> which is exactly the rc=53 that made the first attempt worse than doing
+> nothing. There is no override in the shipped block.
+>
+> **The real bug was one layer up, and it was measured rather than reasoned
+> about.** With the file staged in `C:\windows\sysx8664` and no override at all:
 >
 > ```
-> trace:module:get_load_order got hardcoded default for L"...\MSVCP100.dll"
-> trace:module:find_builtin_dll looking for "msvcp100.dll" for file L"...\MSVCP100.dll"
-> trace:module:map_image_into_view mapping PE file L"...\MSVCP100.dll" at ...-0x...3000
+> find_builtin_dll looking for "msvcp100.dll" for file
+>   L"\??\C:\windows\sysx8664\msvcp100.dll"
+> map_image_into_view mapping PE file
+>   L"\??\C:\windows\sysx8664\msvcp100.dll" at ...-0x...3000
 >   section .rdata ... section .reloc ...
 > ```
 >
-> — a three-page image with a `.rdata` and a `.reloc` and nothing else, which is
-> this tree's exports-less builtin wearing the staged file's name. So the tool has
-> to ask for the file as well as copy it: `msvcp100=n`.
+> — a three-page image wearing the staged file's name. `load_builtin` re-resolves
+> the NAME through `find_builtin_dll`, which searches the build and install trees
+> and never the prefix, so the 1.7 MB module was opened, machine-checked and then
+> thrown away for this tree's exports-less msvcp100 thunk. `dlls/ntdll/unix/
+> loader.c` now keeps a file that is already in a GUEST machine's own system
+> directory instead of re-resolving it: `find_dll_file`'s guest branch searched
+> that directory FIRST on purpose, and `load_builtin` was undoing the decision.
+> The discriminator is the mapping's own nt_name (the SERVER's record of the file
+> the section came from), and it was checked both ways — an ordinary thunk
+> arrives as `L"\??\Z:\home\...\dlls\msvcr100\x86_64-windows\msvcr100.dll"` and
+> does not match; only a staged file arrives as its `sysx8664` path.
 >
-> With BOTH, the imports resolve. The hundred-odd
-> `No implementation for MSVCP100.dll.?_Lockit_ctor@...` warnings drop to **zero**,
-> and the file is found and opened —
-> `get_nt_and_unix_names ... -> ret 0 ... unix ".../sysx8664/msvcp100.dll"`,
-> `get_load_order_value got environment n for L"MSVCP100"`.
->
-> **And then the load fails anyway**: `load_dll Failed to load module
-> L"MSVCP100.dll"; status=c0000135`, so `import_dll` reports the library not found
-> and the image never starts — rc=53 where the sentinel build reached rc=5. That is
-> worse, not better, which is why nothing was committed.
->
-> So the next step is not the copy list. It is why the guest-machine load path
-> cannot complete a NATIVE-order file it has already found, opened and
-> machine-checked in the machine system directory. `load_native_dll`
-> (`dlls/ntdll/loader.c:3004`) has no guest guard, and both callers of
-> `load_builtin` (`dlls/ntdll/unix/virtual.c:3546` and `:3863`) do handle
-> `STATUS_IMAGE_ALREADY_LOADED` by mapping the real image — so the refusal is
-> inside `load_builtin` itself (`dlls/ntdll/unix/loader.c:2092`). **Traced, with
-> a temporary WARN at the top of that function:**
+> **And the sentinel this handoff blamed on msvcp100 was msvcr100's.** With
+> msvcp100 staged, all 65 of Styx's std:: imports bind and the
+> "No implementation for MSVCP100.dll…" warnings go to **zero** — and the game
+> died in the same place, because `0xDEAD000B` was never msvcp100's number:
 >
 > ```
-> load_builtin L"\??\C:\windows\sysx8664\MSVCP100.dll"
->              order=2 builtin=1 fakedll=0 machine=0000 search=8664 sysdir=1/8664
-> load_dll Failed to load module L"MSVCP100.dll"; status=c0000135
+> No implementation for MSVCR100.dll.??2@YAPEAX_K@Z imported from
+>   wxmsw28u_vc_custom_64.dll, setting to 00000000DEAD000B
+> guest called through a wild pointer: 00000000DEAD000B ... from
+>   L"wxmsw28u_vc_custom_64.dll"+5d580
 > ```
 >
-> `order=2` is `LO_NATIVE` and `builtin=1`, so it takes the first of the two
-> exits — `if (pe_mapping->image.wine_builtin) { if (loadorder == LO_NATIVE)
-> return STATUS_DLL_NOT_FOUND; }`. The open question the next pass starts from is
-> why `image.wine_builtin` is set at all for a 1.7 MB Microsoft DLL: either the
-> flag describes the NAME rather than the file, or the section under examination
-> is already the builtin by the time `load_builtin` sees it (`machine=0000` on
-> that line is a hint that this call is not the one carrying the guest's demanded
-> machine). Answer that and the C++ runtime loads.
+> `operator new`. Sentinel indices are per IMPORTING module, so the number says
+> nothing about which DLL owns the name — worth remembering, because reading it
+> as msvcp100's is what pointed this whole handoff at the wrong module.
+> `??2@YAPEAX_K@Z`, `??3@YAXPEAX@Z` and their array forms are flat prototypes
+> with a mangled NAME — one integer-class argument, a pointer or nothing back,
+> no `this` and no EH state — so they are four rows in
+> `dlls/msvcr100/msvcr100.thunks` citing `msvcr100.spec`, not an ABI problem.
+> Two tooling gaps stood in the way and both are fixed in `tools/spec2thunk`:
+> the "plain C identifier" filter ran before overrides were consulted (it
+> protects the header ORACLE, which a `.spec` location does not use), and the
+> `-arch=` refusal in `wine_sig.py` was unconditional (it guards against citing
+> the arm form of a name that also has a win64 form, so it now accepts a line
+> the tool's own `_spec_cpus` filter already proved applicable).
+>
+> **msvcr100 deliberately stays Wine's own**, and this is now measured rather
+> than assumed. The C runtime is the half this port CAN translate — 766 of 1185
+> exports cross — and `msvcr100.thunks` carries the callback-registration rows
+> `ppc64le/seh/check-crt-callbacks.sh` gates; staging a guest msvcr100 would put
+> all of that behind the emulator for nothing. It also does not work: Proton's
+> x86-64 msvcr100.dll is a Wine builtin that imports Wine's INTERNAL ntdll
+> helpers, which this port's guest ntdll thunk does not publish, and it dies at
+> its own PROCESS_ATTACH on
+> `guest called through a wild pointer: 00000000DEAD0005 … from msvcr100.dll+7ef80`
+> (= `__wine_dbg_header`).
+>
+> **Where Styx stops now**, and it is a different wall in a different place:
+>
+> ```
+> No implementation for mscoree.dll._CorExeMain imported from
+>   Z:\…\Styx\Binaries\Win64\StyxGame.exe, setting to 00000000DEAD0099
+> guest called through a wild pointer: 00000000DEAD0099 is in no guest image,
+>   and the return address on its stack (…) is in none either
+> ```
+>
+> The .NET hosting entry point, imported and CALLED by StyxGame.exe itself.
+> That is not a marshalling or a C++ ABI problem: Wine's own `mscoree` needs
+> Mono to do anything with it. `StyxGame/Logs/` is still never created, so UE3's
+> own log has not opened yet. What this pass proved is that the whole C++
+> runtime wall — the one this handoff was about — is behind us.
+>
+> The compat-tool half is `ppc64le/steamtool/proton`, beside the `mfc140u`
+> block, and it stages msvcp100 only.
 
-
-`msvcp100.dll` is a C++ ABI, and translating the MSVC C++ ABI is exactly what
-this port decided **not** to do — `dlls/msvcp140` already takes the other road,
-and Microsoft's own `msvcp140.dll` runs as an x86-64 guest module under the
-emulator. Styx needs the 2010 vintage of the same thing.
-
-Measured: `pfx-ppc64le-native/drive_c/windows/system32/msvcr100.dll` and
-`msvcp100.dll` exist but are `Unknown processor 0x01f3` — Wine's own ppc64
-builtins. Styx bundles no copies of its own. So there is nothing to load today
-and this is not a bug, it is an unprovisioned prefix: the same situation
-`ppc64le/steamtool/proton` already handles for `mfc140u.dll`, where it copies
-the user's own file across from the app's Proton prefix if they provisioned one
-(`protontricks 242640 vcrun2010`). Extending that copy list to the VC++ 2010
-redistributable is the fix, and nothing needs to be downloaded or redistributed
-to make it work.
 
 ### 5. To `tools/spec2thunk`: follow a header's alias of an export name
 

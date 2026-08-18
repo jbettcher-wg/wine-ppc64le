@@ -103,6 +103,65 @@ BYVAL_INTEGER = frozenset("""
 # `DWORD` under another name: 2 or 4 bytes, one integer register, identical on
 # MS-x64 and ELFv2, and nothing about them was ever unrepresentable.
 
+# By-value integers NARROWER THAN 32 BITS, and what they are: (bytes, signed).
+#
+# These need a marshalling step the wider ones do not, and the reason is a
+# straight disagreement between the two ABIs about whose job it is.  MS-x64
+# leaves the upper bits of a register holding a narrow argument UNDEFINED and
+# makes ignoring them the CALLEE's job -- clang emits `movw $0x1, %dx`, which
+# writes 16 bits and leaves RDX's top 48 alone.  ELFv2 says the opposite:
+# arguments smaller than a doubleword are extended by the CALLER, and a ppc64
+# callee is compiled to trust it.
+#
+# [MEASURED] IWMSyncReader::GetStreamSelected(WORD) and
+# ::GetOutputNumberForStream(WORD) crossed with a guest-supplied 1 and reached
+# Wine's own winegstreamer code as 0x40000001 -- E_INVALIDARG from one and
+# output number 0x40000000 from the other.  A wrong number, not a crash.  The
+# runtime does the extension (struct winecom_slot::narrowmask); this table is
+# what tells it the width and the signedness.
+#
+# 32-bit types are deliberately absent: x86-64 zero-extends every 32-bit
+# register write to 64 bits by hardware rule, so a DWORD is already clean.
+#
+# THE RESIDUAL, stated rather than left to be discovered: a typedef in the
+# roster's `integer_types` that resolves to one of these is NOT caught here,
+# because the roster records those names without their widths.  No interface
+# on this surface has one -- every narrow by-value parameter in
+# interfaces_mf.json spells WORD, USHORT, SHORT, BYTE or BOOLEAN outright --
+# and the --report output prints the narrow parameters it found so a new one
+# arriving under an alias is visible rather than silent.
+NARROW_BYVAL = {
+    "WORD":    (2, False), "USHORT": (2, False), "UINT16":  (2, False),
+    "SHORT":   (2, True),  "INT16":  (2, True),
+    "BYTE":    (1, False), "UCHAR":  (1, False), "UINT8":   (1, False),
+    "BOOLEAN": (1, False),
+    "CHAR":    (1, True),  "INT8":   (1, True),
+}
+
+# The same widths spelled as plain C, which is how a header that did not use a
+# Windows typedef writes them.  Matched against the parameter's whole
+# declaration text because Param.base keeps only the FIRST token, so
+# `unsigned short x` has base "unsigned" and the width is only in the raw text.
+NARROW_RAW = (
+    (r'\bunsigned\s+short\b',  (2, False)),
+    (r'\bsigned\s+short\b',    (2, True)),
+    (r'\bunsigned\s+char\b',   (1, False)),
+    (r'\bsigned\s+char\b',     (1, True)),
+    (r'\bshort\b',              (2, True)),
+    (r'\bchar\b',               (1, True)),
+)
+
+
+def narrow_of(p):
+    """(bytes, signed) for a by-value parameter narrower than 32 bits, else None."""
+    if p.base in NARROW_BYVAL:
+        return NARROW_BYVAL[p.base]
+    for pat, w in NARROW_RAW:
+        if re.search(pat, p.raw):
+            return w
+    return None
+
+
 # 8-byte aggregates that are ONE integer register on both the MS-x64 and the
 # ELFv2 side.  Each is here because its layout was checked.
 BYVAL_AGGREGATE = {
@@ -333,12 +392,15 @@ class Plan:
     Refused, and stands in both directions."""
 
     __slots__ = ("cls", "xaux", "caux", "aux", "aux2", "fpmask", "fpwide",
-                 "xmask", "fp_reason")
+                 "xmask", "fp_reason", "narrowmask", "narrowwide",
+                 "narrowsign", "narrow_params")
 
     def __init__(self):
         self.cls = self.xaux = self.caux = None
         self.aux = self.aux2 = 0
         self.fpmask = self.fpwide = self.xmask = 0
+        self.narrowmask = self.narrowwide = self.narrowsign = 0
+        self.narrow_params = []
         self.fp_reason = None
 
 
@@ -394,6 +456,23 @@ def classify(key, slot, ifaces, iface_index, byval_ok, bearing, why_bearing):
                 raise Refused(
                     "by-value %s is not provably integer-class on both ABIs; "
                     "refusing rather than assuming it is an enum" % p.base)
+            # An integer narrower than 32 bits crosses with UNDEFINED upper
+            # bits (MS-x64) into a callee that trusts them (ELFv2).  Record the
+            # width and signedness so libs/winecom can extend it; see
+            # NARROW_BYVAL above for the measurement that made this necessary.
+            narrow = narrow_of(p)
+            if narrow:
+                if i >= 8:
+                    raise Refused(
+                        "passes a %d-byte %s by value in argument position %d, "
+                        "past the eight parameters the narrowing masks cover"
+                        % (narrow[0], p.base, i + 1))
+                plan.narrowmask |= 1 << i
+                if narrow[0] == 2:
+                    plan.narrowwide |= 1 << i
+                if narrow[1]:
+                    plan.narrowsign |= 1 << i
+                plan.narrow_params.append((i, p.base, narrow[0], narrow[1]))
             cls[i] = CA["PASS"]
             continue
 
@@ -516,9 +595,36 @@ def generate(roster, prefix, header_dir):
     # its flat API shares with the vtables.  Scanning all of include/ would
     # over-approximate into unrelated trees and refuse slots for a reason
     # that had nothing to do with Media Foundation.
-    paths = [os.path.join(header_dir, h)
-             for h in list(roster["headers"]) + list(roster["type_headers"])
-             if os.path.exists(os.path.join(header_dir, h))]
+    # A rostered header that is not on disk is a HARD ERROR here, never a
+    # quietly smaller scan.  scan_structs is what decides which structs reach
+    # an interface pointer through a member chain, and a struct whose
+    # definition it never saw is not refused -- it is PASSED THROUGH, which is
+    # the single outcome this surface exists to prevent.
+    #
+    # [MEASURED] Generated in an unbuilt tree, where include/wmsdkidl.h does
+    # not exist yet because widl makes it, IWMMediaProps::GetMediaType and
+    # ::SetMediaType lost their refusals and came out as ordinary marshalled
+    # slots -- handing native winegstreamer a WM_MEDIA_TYPE whose embedded
+    # IUnknown* is a guest proxy.  Two rows out of 2378, no warning, and the
+    # table still compiles and still passes every gate that only asks whether
+    # a call returned.
+    #
+    # The roster NAMES every header it needs, so a missing one always means
+    # the tree is not built -- it never means the surface got smaller.
+    paths, missing = [], []
+    for h in list(roster["headers"]) + list(roster["type_headers"]):
+        full = os.path.join(header_dir, h)
+        if os.path.exists(full):
+            paths.append(full)
+        else:
+            missing.append(h)
+    if missing:
+        sys.exit("gen_winecom: %d rostered header(s) are not in %s: %s\n"
+                 "  They are widl-generated -- build the tree first.  "
+                 "Generating without them silently drops refusals, because a "
+                 "struct whose definition was never seen is passed through "
+                 "rather than refused."
+                 % (len(missing), header_dir, ", ".join(sorted(missing))))
     bearing, why_bearing = scan_structs(paths, set(ifaces))
     hand_index, hand_order = {}, []
     for key, fn in HAND_SLOTS:
@@ -623,19 +729,22 @@ def generate(roster, prefix, header_dir):
                 flags.append("WINECOM_F_REV")
                 rows.append('    { "%s",\n      "%s: %s",\n'
                             '      %s, %s, %d, %s, %d, %d, %s, 0x%02x, 0x%02x,'
-                            ' 0x%02x },'
+                            ' 0x%02x, 0x%02x, 0x%02x, 0x%02x },'
                             % (key, key, reason.replace('"', "'"), cname, xname,
                                argc, "|".join(flags), plan.aux, plan.aux2,
-                               kname, plan.fpmask, plan.fpwide, plan.xmask))
+                               kname, plan.fpmask, plan.fpwide, plan.xmask,
+                               plan.narrowmask, plan.narrowwide,
+                               plan.narrowsign))
                 stats["refused"] += 1
                 stats["reverse_only"] += 1
                 refusal_log.append((n, s["slot"], key, reason))
                 continue
             rows.append('    { "%s", NULL, %s, %s, %d, %s, %d, %d, %s, 0, 0,'
-                        ' 0x%02x },'
+                        ' 0x%02x, 0x%02x, 0x%02x, 0x%02x },'
                         % (key, cname, xname, argc,
                            "|".join(flags) or "0", plan.aux, plan.aux2, kname,
-                           plan.xmask))
+                           plan.xmask, plan.narrowmask, plan.narrowwide,
+                           plan.narrowsign))
             stats["marshalled"] += 1
 
         if len(slots) <= 3:
