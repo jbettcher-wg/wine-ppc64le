@@ -1,0 +1,47 @@
+# AMD64 thunk export spec for the guest mfmediaengine.dll -- COM mode.
+#
+# COM-JSON is ppc64le/mf/interfaces_mf.json, the SAME file dlls/mfplat,
+# dlls/mf and dlls/mfreadwrite name.  Every guest module on this surface
+# publishes an identical roster, which is what lets the one winecom instance
+# in native mfplat.dll serve a proxy whose vtable came from any of them --
+# and it is why IMFMediaEngine joined that roster rather than getting one of
+# its own.  A media engine is handed IMFAttributes and IMFMediaType objects
+# that mfplat minted; a second roster would make those a different surface's
+# proxies and the first SetSource would be refused as a guest-implemented
+# object.  mfmediaengine.spec forwards __wine_com_dispatch into mfplat for
+# the same reason mf.spec and mfreadwrite.spec do: there can be only one
+# instance.
+#
+# WHAT THIS MODULE IS FOR.  IMFMediaEngine is the HTML5-shaped player -- load
+# a URL, play, seek, ask for the current frame -- and it is what a game's
+# video plugin reaches for when it wants a cutscene without building a
+# topology by hand.  ppc64le/mf/README.md used to record it as "not a blocker
+# in principle, since reverse proxies exist; it is a separate roster and a
+# separate module, and nothing in the corpus has asked for it yet."  It is now
+# the same roster and no longer a separate module.
+#
+# THE CALLBACK IS THE POINT, and it is the reverse direction.  The engine is
+# useless without IMFMediaEngineNotify: the application implements it and
+# Media Foundation calls EventNotify from its own thread for every state
+# change.  That is a guest-implemented object handed into native code, which
+# is precisely what libs/winecom/reverse.c builds a native vtable for, and
+# what dlls/mfplat/mfcom.c turns on with WINECOM_SF_REVERSE.  The notify
+# object arrives through IMFMediaEngineClassFactory::CreateInstance's
+# attribute store (MF_MEDIA_ENGINE_CALLBACK), by the same road
+# MF_SOURCE_READER_ASYNC_CALLBACK already travels.
+#
+# THE FLAT SURFACE IS THREE ENTRIES and only one of them carries an
+# interface.  DllCanUnloadNow takes nothing; DllGetActivationFactory is a stub
+# in the .spec and spec2thunk emits nothing for a stub; DllGetClassObject is
+# the door, and it gets the same riid/void** wrapper every other module's has.
+DLL mfmediaengine.dll
+FROM-SPEC auto
+
+PROBE-EXTRA mfapi.h
+PROBE-EXTRA mfidl.h
+PROBE-EXTRA mfmediaengine.h
+PROBE-EXTRA mferror.h
+
+COM-JSON  ../../ppc64le/mf/interfaces_mf.json
+
+GUEST-IMPL   DllGetClassObject                     __wine_guest_DllGetClassObject

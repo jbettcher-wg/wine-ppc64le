@@ -1,0 +1,78 @@
+# AMD64 thunk export spec for the guest evr.dll -- COM mode.
+#
+# COM-JSON is ppc64le/mf/interfaces_mf.json, the SAME file every other module
+# on this surface names; evr.spec forwards __wine_com_dispatch into mfplat,
+# where the one winecom instance lives.  See dlls/mfplat/mfplat.thunks for the
+# banner and ppc64le/mf/README.md for why there is exactly one instance.
+#
+# WHY evr JOINS THE MF ROSTER AND NOT A NEW ONE.  ppc64le/mf/README.md
+# recorded this module as belonging to "a different winecom surface" because
+# the enhanced video renderer presents through DirectX.  Half of that is
+# right and it is the half that stays refused: anything of evr's that takes or
+# returns a Direct3D object -- MFCreateDXSurfaceBuffer's IDirect3DSurface9,
+# the presenter's IDirect3DDeviceManager9 -- is a cross-surface pointer and is
+# refused with the owning surface named, exactly as
+# MFCreateDXGISurfaceBuffer already is inside mfplat.
+#
+# The other half is not about DirectX at all.  IMFVideoDisplayControl is what
+# a game calls to place a video inside its window, letterbox it, and read the
+# frame back -- SetVideoPosition, SetAspectRatioMode, GetCurrentImage -- and
+# every one of those arguments is a rectangle, an enum or a buffer.  It is
+# reached with MFGetService on a media SINK that mfplat and mf minted, so it
+# has to be the same surface's proxy or the QueryInterface behind MFGetService
+# is refused before anything DirectX-shaped is ever mentioned.
+#
+# THE FLAT SURFACE.  Most of evr's spec is `stub`, which spec2thunk emits
+# nothing for.  Of what is left, four exports carry no interface at all
+# (MFCopyImage, MFGetPlaneSize, MFGetStrideForBitmapInfoHeader,
+# MFInitVideoFormat_RGB, MFIsFormatYUV, MFConvertColorInfoToDXVA) and go
+# through the ordinary integer path; the rest vend an object and are
+# GUEST-IMPL below, including the ones that only refuse -- the shared
+# __wine_com_refuse stub cannot name the export that trapped, and on this
+# surface a refusal that names itself is the useful half of the answer.
+DLL evr.dll
+FROM-SPEC auto
+
+PROBE-EXTRA d3d9.h
+PROBE-EXTRA dxva2api.h
+PROBE-EXTRA mfapi.h
+PROBE-EXTRA mfidl.h
+PROBE-EXTRA evr.h
+PROBE-EXTRA evr9.h
+PROBE-EXTRA mferror.h
+
+COM-JSON  ../../ppc64le/mf/interfaces_mf.json
+
+# --- the door ---
+GUEST-IMPL   DllGetClassObject                     __wine_guest_DllGetClassObject
+
+# --- evr's OWN exports, vending an object ---
+GUEST-IMPL   MFCreateVideoMixer                    __wine_guest_MFCreateVideoMixer
+GUEST-IMPL   MFCreateVideoMixerAndPresenter        __wine_guest_MFCreateVideoMixerAndPresenter
+GUEST-IMPL   MFCreateVideoPresenter                __wine_guest_MFCreateVideoPresenter
+GUEST-IMPL   MFCreateVideoSampleAllocator          __wine_guest_MFCreateVideoSampleAllocator
+GUEST-IMPL   MFCreateVideoSampleFromSurface        __wine_guest_MFCreateVideoSampleFromSurface
+
+# --- mfplat's exports, reached through evr's -import forwards -------------
+#
+# evr.spec re-exports these with `-import`, which means the implementation is
+# mfplat's and evr's entry is a forward to it.  They therefore MUST resolve to
+# mfplat's OWN wrapper rather than to a second one written here: two wrappers
+# for one implementation is two places for the roster's opinion of an
+# IMFVideoMediaType to be recorded, and the second one is the one nobody
+# updates.  dlls/evr/evr.spec carries the matching
+# `__wine_guest_X ... mfplat.__wine_guest_X` forwards, exactly as
+# dlls/mf/mf.spec does for MFCreateSourceResolver and for the same reason.
+GUEST-IMPL   MFCreateVideoMediaType                __wine_guest_MFCreateVideoMediaType
+GUEST-IMPL   MFCreateVideoMediaTypeFromSubtype     __wine_guest_MFCreateVideoMediaTypeFromSubtype
+GUEST-IMPL   MFCreateDXSurfaceBuffer               __wine_guest_MFCreateDXSurfaceBuffer
+
+# MFCreateVideoMediaTypeFromVideoInfoHeader is deliberately NOT here, and the
+# reason is the oracle rather than the shape.  include/mfapi.h declares it
+# behind `#ifdef _KSMEDIA_` (its first argument is a KS_VIDEOINFOHEADER), so
+# the translation unit the signature oracle compiles has no declaration for it
+# at all -- which is also why mfplat itself has no wrapper for it.  Naming it
+# here would claim a wrapper that the audit cannot see the need for and the
+# oracle cannot type.  It keeps its ordinal as a named sentinel, which is the
+# honest failure, and it is the same class as the psapi/wldap32 rename above:
+# a tooling gap, not an ABI fact.

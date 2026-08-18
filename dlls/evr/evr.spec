@@ -26,3 +26,21 @@
 @ stub MFInitVideoFormat
 @ stdcall -import MFInitVideoFormat_RGB(ptr long long long)
 @ stdcall MFIsFormatYUV(long)
+
+# Media Foundation for x86-64 guests (ppc64le/mf/README.md).  The ONE winecom
+# instance for this surface lives in mfplat.dll, so the dispatcher forwards
+# there; the wrappers are dlls/evr/mfcom.c.
+@ stdcall __wine_com_dispatch(long long ptr) mfplat.__wine_com_dispatch
+@ stdcall __wine_guest_DllGetClassObject(ptr ptr ptr)
+@ stdcall __wine_guest_MFCreateVideoMixer(ptr ptr ptr ptr)
+@ stdcall __wine_guest_MFCreateVideoMixerAndPresenter(ptr ptr ptr ptr ptr ptr)
+@ stdcall __wine_guest_MFCreateVideoPresenter(ptr ptr ptr ptr)
+@ stdcall __wine_guest_MFCreateVideoSampleAllocator(ptr ptr)
+@ stdcall __wine_guest_MFCreateVideoSampleFromSurface(ptr ptr)
+# ...and the three whose implementation is mfplat's, reached through evr's own
+# -import forwards.  Both names MUST resolve to the same wrapper, or the
+# resolver would arrive unwrapped through one of them -- exactly the second
+# door dlls/mf/mf.spec closes for MFCreateSourceResolver.
+@ stdcall __wine_guest_MFCreateVideoMediaType(ptr ptr) mfplat.__wine_guest_MFCreateVideoMediaType
+@ stdcall __wine_guest_MFCreateVideoMediaTypeFromSubtype(ptr ptr) mfplat.__wine_guest_MFCreateVideoMediaTypeFromSubtype
+@ stdcall __wine_guest_MFCreateDXSurfaceBuffer(ptr ptr long ptr) mfplat.__wine_guest_MFCreateDXSurfaceBuffer

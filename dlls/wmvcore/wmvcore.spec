@@ -18,3 +18,14 @@
 @ stdcall WMCreateWriterPriv(ptr)
 @ stub WMCreateWriterPushSink
 @ stdcall WMIsContentProtected(wstr ptr)
+
+# Windows Media for x86-64 guests (ppc64le/mf/README.md).  The ONE winecom
+# instance for this surface lives in mfplat.dll, so the dispatcher forwards
+# there; the wrappers are dlls/wmvcore/mfcom.c.
+@ stdcall __wine_com_dispatch(long long ptr) mfplat.__wine_com_dispatch
+@ stdcall __wine_guest_WMCreateReader(ptr long ptr)
+@ stdcall __wine_guest_WMCreateSyncReader(ptr long ptr)
+@ stdcall __wine_guest_WMCreateWriter(ptr ptr)
+@ stdcall __wine_guest_WMCreateProfileManager(ptr)
+@ stdcall __wine_guest_WMCreateEditor(ptr)
+@ stdcall __wine_guest_WMCreateBackupRestorer(ptr ptr)

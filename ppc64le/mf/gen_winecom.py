@@ -89,8 +89,19 @@ BYVAL_INTEGER = frozenset("""
     UINT64 INT8 INT16 INT32 INT64 SIZE_T SSIZE_T LONGLONG ULONGLONG
     ULONG64 LONG64 QWORD HANDLE HWND HRESULT
     ULONG_PTR DWORD_PTR UINT_PTR LONG_PTR INT_PTR
+    SHORT USHORT CHAR UCHAR BOOLEAN COLORREF
     unsigned int short char long
 """.split())
+# SHORT/USHORT/CHAR/UCHAR/BOOLEAN/COLORREF were absent from the line above
+# while ppc64le/gen_interfaces.py's SCALAR_BASE has carried the first two all
+# along, and two lists that disagree is how a tooling gap gets reported as an
+# ABI fact -- which is the one thing this generator must never do.  [MEASURED]
+# it cost IMFMediaEngine::GetNetworkState and ::GetReadyState, which are the
+# two methods anything driving a media engine polls on every frame, plus
+# IMFMediaError::GetErrorCode, IMFMediaKeySessionNotify::KeyError and
+# IMFVideoDisplayControl::SetBorderColor.  All six are `unsigned short` or
+# `DWORD` under another name: 2 or 4 bytes, one integer register, identical on
+# MS-x64 and ELFv2, and nothing about them was ever unrepresentable.
 
 # 8-byte aggregates that are ONE integer register on both the MS-x64 and the
 # ELFv2 side.  Each is here because its layout was checked.

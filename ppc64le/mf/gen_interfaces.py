@@ -60,7 +60,27 @@ SRCTREE = os.path.abspath(os.path.join(HERE, "..", ".."))
 # by hand reaches.  Nothing else is included: an interface that is not here
 # gets no proxy vtable, and QueryInterface for it is refused loudly rather
 # than answered with a native vtable (libs/winecom.c proxy_qi).
-HEADERS = ("mfobjects.h", "mfidl.h", "mfreadwrite.h", "mftransform.h")
+HEADERS = ("mfobjects.h", "mfidl.h", "mfreadwrite.h", "mftransform.h",
+           # The three modules beside mfplat that a game's media code reaches.
+           # They join THIS roster rather than getting one each, because
+           # libs/winecom's state is per-linkee and there is exactly one
+           # instance for the whole surface (native mfplat.dll owns it, the
+           # others forward __wine_com_dispatch into it) -- so a proxy minted
+           # for an IMFMediaType by mfplat has to be usable as an argument to
+           # an evr method, and it can only be that if both guest modules
+           # publish the same vtable for it.  Splitting the roster would put
+           # an IMFMediaType proxy from one surface into another's dispatch
+           # loop, which is the cross-surface refusal ppc64le/mf/README.md
+           # already documents for combase's IStream.
+           #
+           #   mfmediaengine  IMFMediaEngine and friends -- the HTML5-shaped
+           #                  player a game's video plugin uses.
+           #   evr            the enhanced video renderer's control surface:
+           #                  IMFVideoDisplayControl is what a game calls to
+           #                  place and letterbox a cutscene.
+           #   wmsdkidl       wmvcore's IWMReader/IWMSyncReader/IWMProfile --
+           #                  Windows Media, which older titles still ship.
+           "mfmediaengine.h", "evr.h", "evr9.h", "wmsdkidl.h")
 
 # Headers scanned for TYPES only -- the enum, scalar-typedef and struct
 # spellings the interfaces above use by name.  mfapi.h holds MFTIME and the

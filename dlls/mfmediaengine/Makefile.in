@@ -4,6 +4,8 @@ IMPORTS = oleaut32 ole32 mfplat mf mfuuid uuid
 EXTRADLLFLAGS = -Wb,--prefer-native
 
 SOURCES = \
+	mfmediaengine.thunks \
 	main.c \
 	mediaengine_classes.idl \
+	mfcom.c \
 	video_frame_sink.c

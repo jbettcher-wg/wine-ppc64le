@@ -9,8 +9,9 @@ and this is the layer that fixes them — the same shape as `dlls/combase`'s
 system COM, not a second decoder.
 
 ```
-guest x86-64 PE  -->  C:\windows\sysx8664\{mfplat,mf,mfreadwrite}.dll
-   |                  (spec2thunk COM mode from the three .thunks files:
+guest x86-64 PE  -->  C:\windows\sysx8664\{mfplat,mf,mfreadwrite,
+   |                                       mfmediaengine,evr,wmvcore}.dll
+   |                  (spec2thunk COM mode from the six .thunks files:
    |                   pure trap surface, no marshalling knowledge)
    |  trap; ntdll maps RIP -> (iface, slot), calls the NATIVE namesake's
    |  __wine_com_dispatch
@@ -21,14 +22,14 @@ native mfplat.dll (dlls/mfplat/mfcom.c)
 Wine's own mfplat/mf/mfreadwrite  -->  winegstreamer  -->  GStreamer 1.28
 ```
 
-**One winecom instance for three DLLs.** `libs/winecom`'s proxy state is
+**One winecom instance for six DLLs.** `libs/winecom`'s proxy state is
 per-linkee, so if native `mf.dll` linked its own copy the `IMFMediaType` proxy
 it minted would not be one of `mfplat`'s and the first `SetCurrentMediaType`
 would be refused as a guest-implemented object. Native `mfplat.dll` owns the
-only instance; `dlls/mf/mf.spec` and `dlls/mfreadwrite/mfreadwrite.spec`
-forward `__wine_com_dispatch` into it and reach it through the exported
-`__wine_com_*` helpers. All three GUEST modules publish the same roster, which
-is what makes a proxy's guest vtable interchangeable between them.
+only instance; `mf`, `mfreadwrite`, `mfmediaengine`, `evr` and `wmvcore` each
+forward `__wine_com_dispatch` into it in their `.spec` and reach it through the
+exported `__wine_com_*` helpers. All six GUEST modules publish the same roster,
+which is what makes a proxy's guest vtable interchangeable between them.
 
 `interfaces_mf.json` deliberately has **one copy**. Two generators read it —
 `spec2thunk` COM mode for the guest stub arrays, `gen_winecom.py` for the
@@ -43,7 +44,7 @@ module as the last line of defence.
 |---|---|
 | `gen_interfaces.py` | Wine's widl-generated MF headers → `interfaces_mf.json` |
 | `gen_winecom.py` | that roster → `dlls/mfplat/mf_marshal.h`; `--report` explains every refusal |
-| `interfaces_mf.json` | the ONE roster: 93 interfaces, 1139 vtable slots |
+| `interfaces_mf.json` | the ONE roster: 184 interfaces, 2373 vtable slots, across `mfplat`, `mf`, `mfreadwrite`, `mfmediaengine`, `evr` and `wmvcore` |
 | `check-mf-smoke.sh` | the runtime gate (7 layers); `--sabotage` runs all three negative controls |
 | `probes/mf_smoke.c` | one source, built as a native ppc64 PE and as an x86-64 guest PE |
 | `probes/mf_async_probe.c` | guest-only: the reverse-proxy async path, measured |
@@ -77,9 +78,10 @@ uploads to a shader anyway.)
 **The ASYNCHRONOUS path too**, which used to be this surface's headline
 refusal; see the reverse-proxy section below.
 
-Of the roster's **860 non-`IUnknown` vtable slots, 773 (90%) are served in the
-FORWARD direction** — 768 by the generated marshal tables and 5 by hand-written
-slots — and 87 are refused with a named reason. Nineteen of those 87 are
+Of the roster's **1821 non-`IUnknown` vtable slots, 1647 (90%) are served in
+the FORWARD direction** — 1641 by the generated marshal tables and 6 by
+hand-written slots — and 174 are refused with a named reason. Fifty-five of
+those 174 are
 refused *only forward*: they pass a float by value, which the forward invoker
 (a widest-integer vtable call) cannot place and the reverse dispatcher can, so
 their rows carry a complete plan and `WINECOM_F_REV`.
@@ -105,8 +107,9 @@ loudly as the blanket rule was. The gate proves the seek actually rewound
 rather than merely returning `S_OK`, by decoding the whole file a second time
 and requiring the same hash.
 
-All **104 interface-bearing flat exports** across the three modules are
-classified — 67 in `mfplat`, 31 in `mf`, 6 in `mfreadwrite` — because
+All **118 interface-bearing flat exports** across the six modules are
+classified — 67 in `mfplat`, 31 in `mf`, 6 in `mfreadwrite`, 1 in
+`mfmediaengine`, 7 in `evr` and 6 in `wmvcore` — because
 `spec2thunk`'s flat-surface audit fails the build otherwise. Every one is
 `GUEST-IMPL` with its own wrapper, including the ones that only refuse: the
 shared `__wine_com_refuse` stub cannot say which export trapped, and on this
@@ -214,14 +217,105 @@ served and then **audited**: a string vector passes, a `VT_UNKNOWN` is cleared
 and refused. There is no such audit for vtable slots because there is no
 wrapper to put one in.
 
+## The other three modules: `mfmediaengine`, `wmvcore`, `evr`
+
+They were listed here as not done, each for a reason that turned out to be
+about the ROSTER rather than about the module. All three are now on this one,
+built by the same two generators, dispatched by the same single winecom
+instance in native `mfplat.dll`.
+
+**They share this roster; they do not each get one.** `libs/winecom`'s state is
+per-linkee, so a second roster means a second instance and an object minted by
+one is refused by the other as guest-implemented. A media engine is handed
+`IMFAttributes` and `IMFMediaType` objects mfplat minted; an EVR display
+control is reached with `MFGetService` on a sink `mf` minted; and Wine's
+`wmvcore` sits on the same winegstreamer pipeline mfplat's source reader does,
+so a title playing a `.wmv` through `IWMSyncReader` and its cutscenes through
+`IMFSourceReader` is one process with both. One roster is what stops that being
+two worlds. Each module's `.spec` forwards `__wine_com_dispatch` into mfplat,
+exactly as `mf` and `mfreadwrite` already did.
+
+| | before | after |
+|---|---|---|
+| interfaces | 93 | **184** |
+| vtable slots | 1139 | **2373** |
+| dropped by base-chain closure | 0 | **0** |
+
+`mfmediaengine.h` contributes 20 interfaces, `evr.h`/`evr9.h` 13, `wmsdkidl.h`
+58. Nothing was hand-picked: the roster is generated from the headers and all
+three header sets close under `IUnknown`, so a curated subset would only have
+been a second place to get slot numbers wrong.
+
+Of the roster's non-`IUnknown` slots, **1641 are marshalled and 6 hand-written
+against 174 refused** — the same 90% the smaller surface had, on a surface
+more than twice the size.
+
+**A finding on the way in, and it is the kind this fold exists to catch.**
+`gen_winecom.py`'s `BYVAL_INTEGER` did not list `SHORT`/`USHORT`, while
+`gen_interfaces.py`'s `SCALAR_BASE` has carried them all along. Two lists that
+disagree is how a tooling gap gets reported as an ABI fact. It cost eight
+slots, and they were not obscure ones: `IMFMediaEngine::GetNetworkState` and
+`::GetReadyState` are what anything driving a media engine polls on every
+frame, and `IMFMediaError::GetErrorCode` is how it finds out why playback
+stopped. All are `unsigned short` — 2 bytes, one integer register, identical on
+MS-x64 and ELFv2, never unrepresentable. `COLORREF` (a `DWORD`) went in beside
+them for the same reason.
+
+**What each module gets, and what it refuses.**
+
+* **`mfmediaengine`** — one flat export that matters, `DllGetClassObject`, and
+  the rest is interfaces. The notify callback that makes an engine useful
+  (`IMFMediaEngineNotify`, called from MF's own thread) needs no code here: it
+  is a guest-implemented object reaching native MF through the creation
+  attribute store, i.e. through `IMFAttributes::SetUnknown`, whose `CA_IFACE_IN`
+  row carries the interface type the reverse direction needs — the same road
+  `MF_SOURCE_READER_ASYNC_CALLBACK` already travels.
+* **`evr`** — the half a game actually calls is served and the half that is
+  DirectX is refused by name. `IMFVideoDisplayControl` (place the video,
+  letterbox it, grab a frame) is rectangles and enums and crosses;
+  `MFCreateVideoMixer`, `MFCreateVideoPresenter` and
+  `MFCreateVideoSampleFromSurface` take an `IDirect3DDeviceManager9` or an
+  `IDirect3DSurface9`, which belong to the DXVK surface's winecom instance and
+  not to this one. Those refuse the ARGUMENT rather than the export: `NULL`,
+  which is legal and is what the EVR's own default path passes, is served.
+  Three of evr's exports are mfplat's implementation re-exported with
+  `-import`, and their `.spec` forwards point at mfplat's own wrapper so that
+  one implementation does not get two opinions about its roster.
+* **`wmvcore`** — six creation exports wrapped. `IWMSyncReader` is the path
+  that needs no callback at all and is the analogue of the synchronous
+  `IMFSourceReader` this fold's gate measures. `IWMReader` is asynchronous and
+  its `IWMReaderCallback` is a vtable-method argument rather than a flat one,
+  so the generated tables carry it.
+
+**Refused, and each for a reason of its own rather than a shrug.** The four
+`Priv` exports (`WMCreateReaderPriv`, `WMCreateSyncReaderPriv`,
+`WMCreateWriterPriv`, `WMCreateBackupRestorerPrivate`) are implemented by Wine
+and declared by no Wine header, so the signature oracle — which resolves a
+NAME against the translation unit it compiles — cannot type them. So does
+`MFCreateVideoMediaTypeFromVideoInfoHeader`, whose declaration sits behind
+`#ifdef _KSMEDIA_`. Each keeps its ordinal as a named sentinel. That is the
+same class as the `psapi`/`wldap32` renames in `ppc64le/corpus/CATALOG.md`: a
+tooling gap, and the fix belongs in the oracle rather than in a `.thunks` file
+asserting a signature by hand.
+
+**NOT MEASURED, and this is the honest part.** No corpus title has created a
+media engine, opened a Windows Media file or built an EVR sink on this port.
+`ppc64le/mf/check-mf-smoke.sh` proves the surface these three joined still
+works — the same 7 layers, the same byte-identical native-vs-guest transcript,
+against a roster more than twice the size — and that is the whole of what has
+been proven. What these three modules do when a program actually drives one is
+unmeasured, and a gate for it needs a program that drives one. Written down
+here rather than left to be inferred from the absence of a gate.
+
 ## Not done
 
-* **`mfmediaengine`** — the HTML5-style `IMFMediaEngine` is callback-driven
-  (`IMFMediaEngineNotify`) end to end. That is no longer a blocker in
-  principle, since reverse proxies exist; it is a separate roster and a
-  separate module, and nothing in the corpus has asked for it yet.
-* **`wmvcore`** — no corpus title has been observed asking for it. It is a
-  separate roster (`IWMReader` and friends) and adding it before something
-  needs it would be surface with no gate behind it.
-* **`evr`** — the enhanced video renderer presents through DirectX, which is a
-  different winecom surface (see the cross-surface gap above).
+* **A guest-implemented `IMFMediaSource` or `IWMStatusCallback`** still reaches
+  the shared untyped `__wine_mf_translate_in`, which carries no roster index
+  and therefore has no slot table to build a reverse proxy from. Named refusals
+  in `MFCreateSourceReaderFromMediaSource` and `WMCreateBackupRestorer`; the
+  fix is the typed `__wine_mf_translate_in_iface` call, which already exists.
+* **The DirectX cross-surface boundary.** `libs/winecom`'s state is per-linkee
+  by design, so a `IDirect3DSurface9` from the DXVK surface cannot be
+  translated by this instance. `evr`'s three D3D-taking exports, plus
+  `MFCreateDXGISurfaceBuffer` and `MFCreateMFByteStreamOnStream`, all refuse
+  with the owning surface named.

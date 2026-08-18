@@ -6,9 +6,11 @@ DELAYIMPORTS = mfplat
 EXTRADLLFLAGS = -Wb,--prefer-native
 
 SOURCES = \
+	evr.thunks \
 	evr.c \
 	evr_classes.idl \
 	main.c \
+	mfcom.c \
 	mixer.c \
 	presenter.c \
 	sample.c

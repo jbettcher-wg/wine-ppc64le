@@ -1,0 +1,64 @@
+# AMD64 thunk export spec for the guest wmvcore.dll -- COM mode.
+#
+# COM-JSON is ppc64le/mf/interfaces_mf.json, the SAME file every other module
+# on this surface names; wmvcore.spec forwards __wine_com_dispatch into
+# mfplat, where the one winecom instance lives.  See dlls/mfplat/mfplat.thunks
+# for the banner.
+#
+# WHY WINDOWS MEDIA IS ON THE MEDIA FOUNDATION ROSTER.  It is not Media
+# Foundation and its objects share nothing with MF's: IWMReader, IWMSyncReader
+# and IWMProfile are their own graph, rooted in IUnknown, from an SDK that
+# predates MF entirely.  They are on the same roster all the same, and the
+# reason is the runtime rather than the API.  libs/winecom's proxy state is
+# PER-LINKEE: a second roster means a second instance, and an object minted by
+# one instance handed to the other is refused as a guest-implemented object.
+# Wine's wmvcore is implemented on top of winegstreamer, the same pipeline
+# mfplat's source reader uses, and a title that plays a .wmv through
+# IWMSyncReader and its cutscenes through IMFSourceReader is one process with
+# both.  One roster is what keeps that from being two worlds.
+#
+# It is also why the roster grew by 58 interfaces at once rather than by the
+# handful a first probe would need: interfaces_mf.json is generated from the
+# headers, not curated, and the whole of wmsdkidl.h closes under IUnknown with
+# nothing dropped.  A hand-picked subset would be a second place to get slot
+# numbers wrong.
+#
+# NOTHING IN THE CORPUS HAS ASKED FOR THIS YET.  ppc64le/mf/README.md recorded
+# that as the reason not to build it, and it is still true -- what changed is
+# that the roster and the flat surface now cost one file each rather than a
+# design, so the module is here with its refusals named instead of being
+# absent with its whole surface unnamed.  A guest that loads wmvcore today
+# gets real objects; what it does with them is unmeasured, and that is written
+# down in ppc64le/mf/README.md rather than implied by silence.
+#
+# THE FLAT SURFACE.  Twelve implemented exports.  WMCheckURLExtension,
+# WMCheckURLScheme and WMIsContentProtected take strings and a BOOL out and
+# carry no interface; six vend an object and are GUEST-IMPL below.
+#
+# The `Priv` variants -- WMCreateReaderPriv, WMCreateSyncReaderPriv,
+# WMCreateWriterPriv, WMCreateBackupRestorerPrivate -- are deliberately NOT
+# here, and for the reason the psapi/wldap32 rename above gives rather than
+# any reason of their own.  They vend the same objects under the names the
+# SDK's own static library calls, and Wine implements every one of them --
+# dlls/wmvcore/async_reader.c:1956, wmvcore_main.c:40, writer.c:373 -- but no
+# Wine HEADER declares them.  The signature oracle resolves a NAME against the
+# translation unit it compiles, so an implementation with no declaration is
+# invisible to it and the export is refused with the compiler's own reason.
+# Naming a wrapper for one would assert a signature by hand, which is the one
+# thing this generator exists not to do.  They keep their ordinals as named
+# sentinels.  If a title ever calls one, the fix is a declaration, not a
+# .thunks entry.
+DLL wmvcore.dll
+FROM-SPEC auto
+
+PROBE-EXTRA wmsdkidl.h
+PROBE-EXTRA wmsdk.h
+
+COM-JSON  ../../ppc64le/mf/interfaces_mf.json
+
+GUEST-IMPL   WMCreateReader                        __wine_guest_WMCreateReader
+GUEST-IMPL   WMCreateSyncReader                    __wine_guest_WMCreateSyncReader
+GUEST-IMPL   WMCreateWriter                        __wine_guest_WMCreateWriter
+GUEST-IMPL   WMCreateProfileManager                __wine_guest_WMCreateProfileManager
+GUEST-IMPL   WMCreateEditor                        __wine_guest_WMCreateEditor
+GUEST-IMPL   WMCreateBackupRestorer                __wine_guest_WMCreateBackupRestorer
