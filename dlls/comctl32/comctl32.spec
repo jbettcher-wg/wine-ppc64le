@@ -204,3 +204,5 @@
 @ stdcall __wine_guest_DSA_DestroyCallback(ptr ptr ptr)
 @ stdcall __wine_guest_PropertySheetA(ptr)
 @ stdcall __wine_guest_PropertySheetW(ptr)
+@ stdcall __wine_guest_RemoveWindowSubclass(ptr ptr long)
+@ stdcall __wine_guest_SetWindowSubclass(ptr ptr long long)

@@ -247,3 +247,14 @@
 @ stdcall UnlockUrlCacheEntryStream(ptr long)
 @ stub UpdateUrlCacheContentPath
 @ stub UrlZonesDetach
+
+# The guest-side entry points for the two exports above that take guest code.
+# An x86-64 guest's InternetSetStatusCallbackA/W resolves HERE
+# (tools/spec2thunk GUEST-IMPL, named in wininet.thunks) rather than at the
+# plain name; each wrapper swaps the application's INTERNET_STATUS_CALLBACK
+# for ntdll's five-argument guest-callback trampoline
+# (__wine_guest_wrap_callback5) before calling the real export, which is
+# untouched and still serves native ppc64 callers.  See
+# dlls/wininet/guestthunk.c.
+@ stdcall __wine_guest_InternetSetStatusCallbackA(ptr ptr)
+@ stdcall __wine_guest_InternetSetStatusCallbackW(ptr ptr)

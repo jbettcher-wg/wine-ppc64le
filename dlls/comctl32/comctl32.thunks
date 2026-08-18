@@ -22,12 +22,12 @@ FROM-SPEC auto
 # declaration at all.
 
 # --------------------------------------------------------- the callback class
-# comctl32 takes guest code in three shapes.  TWO ARE SERVED NOW, by wrappers
-# in this module (dlls/comctl32/guestthunk.c) that resolve ntdll's exported
-# trampoline factory __wine_guest_wrap_callback with LdrGetProcedureAddress
-# and swap the application's pointer for a native trampoline before calling
-# the real export.  The third is still refused, and for a reason that has
-# changed -- see below, because it is the finding of this pass.
+# comctl32 takes guest code in three shapes, and all three are SERVED NOW, by
+# wrappers in this module (dlls/comctl32/guestthunk.c) that resolve ntdll's
+# exported trampoline factory (__wine_guest_wrap_callback, or its
+# six-argument sibling __wine_guest_wrap_callback6 for the subclass
+# procedure) with LdrGetProcedureAddress and swap the application's pointer
+# for a native trampoline before calling the real export.
 #
 # 1.  THE COMPARATOR / ENUMERATOR ARGUMENTS -- SERVED.  DPA_Sort, DPA_Search,
 #     DPA_EnumCallback, DPA_DestroyCallback and DSA_DestroyCallback each take
@@ -44,64 +44,42 @@ FROM-SPEC auto
 #
 # 2.  THE PROPERTY SHEET PROCEDURES -- SERVED.  See the next section.
 #
-# 3.  THE SUBCLASS PROCEDURE -- STILL REFUSED, AND THE REASON IS NOT THE ONE
-#     THIS FILE USED TO GIVE.  It is not that nothing can wrap a callback.  It
-#     is that a SUBCLASSPROC takes SIX arguments:
+# 3.  THE SUBCLASS PROCEDURE -- NOW SERVED.  A SUBCLASSPROC takes SIX
+#     arguments:
 #
 #       LRESULT CALLBACK (HWND, UINT, WPARAM, LPARAM, UINT_PTR uIdSubclass,
 #                         DWORD_PTR dwRefData)
 #
-#     and ntdll's trampoline carries FOUR.  call_guest_function_args() in
-#     dlls/ntdll/signal_ppc64.c writes RCX/RDX/R8/R9 into a parameter block and
-#     tail-jumps to the guest, and its own comment states the limit: "A
-#     callback with stack arguments (five or more) would need a thunk that
-#     builds a frame; nothing in the corpus has one, and this is where it would
-#     go."  MS-x64 passes arguments five and six on the stack.  A wrapped guest
-#     SUBCLASSPROC would therefore receive a correct hwnd/msg/wParam/lParam and
-#     GARBAGE for its subclass id and its own reference data -- a silent wrong
-#     answer, and strictly worse than the missing import it is today.
+#     which the original four-argument trampoline could not carry --
+#     call_guest_function_args() in dlls/ntdll/signal_ppc64.c only ever wrote
+#     RCX/RDX/R8/R9 and tail-jumped, so arguments five and six, which MS-x64
+#     passes on the stack, were whatever happened to be there.  A wrapped
+#     guest SUBCLASSPROC would have received a correct hwnd/msg/wParam/lParam
+#     and GARBAGE for its subclass id and its own reference data -- a silent
+#     wrong answer, and strictly worse than the missing import it was instead.
 #
-#     THE HANDOFF, and it is in a file this pass does not edit
-#     (dlls/ntdll/signal_ppc64.c, currently held by the winecom re-entrancy
-#     work).  Two parts:
-#
-#       a. a six-argument form of call_guest_function_args().  The existing
-#          thunk tail-jumps, which is why it cannot place stack arguments; the
-#          six-argument one has to reserve a frame, store a4/a5 at [rsp+0x20]
-#          and [rsp+0x28], CALL rather than JMP, and unwind.  Sketched, NOT
-#          verified by the author of this note:
-#
-#            sub rsp,0x48 / mov rax,[rcx] / mov rdx,[rcx+0x10] /
-#            mov r8,[rcx+0x18] / mov r9,[rcx+0x20] / mov r10,[rcx+0x28] /
-#            mov r11,[rcx+0x30] / mov [rsp+0x20],r10 / mov [rsp+0x28],r11 /
-#            mov rcx,[rcx+0x08] / call rax / add rsp,0x48 / ret
-#
-#          (0x48 keeps the 16-byte alignment MS-x64 wants at the callee's
-#          entry, given that run_entry aligns the thunk's own entry as if it
-#          had been called.)
-#       b. a trampoline whose stub forwards r7..r8 as well, or -- simpler and
-#          the shape this file would prefer -- a second factory export
-#            @ cdecl -arch=ppc64 __wine_guest_wrap_callback6(ptr long)
-#          so that the arity stays a property of the SLOT, exactly as the
-#          return width already is.
-#
-#     With (a) and (b) the rows here become two more GUEST-IMPL lines and two
-#     more wrappers in guestthunk.c, and the identity a Set/Remove pair turns
-#     on needs nothing else: the pool already returns the SAME stub for the
-#     same (guest target, width), so wrapping in both places is the whole
-#     mechanism and a mapping table would be a second source of truth for it.
+#     THE HANDOFF this section used to describe is done: ntdll now exports
+#     call_guest_function_args6() and the factory
+#     __wine_guest_wrap_callback6(ptr long), the six-argument sibling of
+#     __wine_guest_wrap_callback -- same tail-jump shape as the four-argument
+#     thunk, just with a4/a5 additionally written to [rsp+0x28]/[rsp+0x30]
+#     before the jump, which is where marshal_thunk_args() already reads
+#     stack arguments from in the opposite direction.  (An earlier version of
+#     this note sketched a CALL-based frame-building thunk instead, marked
+#     "NOT verified" -- that turned out to be unnecessary: the tail jump
+#     already leaves RSP as a genuine MS-x64 entry frame, with room above the
+#     shadow space for exactly this.)  The identity a Set/Remove pair turns on
+#     needed nothing else: the pool returns the SAME stub for the same
+#     (guest target, width, arity), so wrapping independently in both
+#     guestthunk.c wrappers is the whole mechanism.
 #     (GetWindowSubclass is `-noname` in the .spec -- exported by ordinal only
-#     -- so it is skipped for want of a name either way, and it would need the
-#     same wrap for the same identity reason the day it is not.)
+#     -- so it is skipped for want of a name, same as before; it would need
+#     the identical wrap for the identical reason the day it is not.)
 #
-# Until then the two remain ABSENT from the export table and bind to a distinct
-# missing-import sentinel: a guest that subclasses a control dies at 0xdead00nn
-# with the symbol in the loader's WARN, at the moment it subclasses, rather
-# than reading a garbage dwRefData five messages later.  DefSubclassProc is NOT
-# excluded -- it takes no pointer, and a guest with no subclass installed never
-# reaches it.
-EXCLUDE SetWindowSubclass
-EXCLUDE RemoveWindowSubclass
+# DefSubclassProc is NOT wrapped -- it takes no pointer, and a guest with no
+# subclass installed never reaches it.
+GUEST-IMPL SetWindowSubclass        __wine_guest_SetWindowSubclass
+GUEST-IMPL RemoveWindowSubclass     __wine_guest_RemoveWindowSubclass
 
 GUEST-IMPL DPA_Sort                 __wine_guest_DPA_Sort
 GUEST-IMPL DPA_Search               __wine_guest_DPA_Search

@@ -35,8 +35,8 @@ PROBE-INCLUDE windows.h
 PROBE-INCLUDE wininet.h
 
 # ------------------------------------------------- the callback registration
-# THE ONE HAZARD IN THIS SURFACE, EXCLUDED BY NAME -- AND THE REASON HAS
-# CHANGED, WHICH IS THE FINDING OF THIS PASS.
+# THE ONE HAZARD IN THIS SURFACE -- NOW SERVED, AND THE REASON IS THE SAME
+# ARITHMETIC THAT USED TO EXCLUDE IT.
 #
 # InternetSetStatusCallbackA/W hand native wininet an INTERNET_STATUS_CALLBACK
 # that wininet retains for the life of the handle and calls from its own worker
@@ -47,54 +47,35 @@ PROBE-INCLUDE wininet.h
 # and worse than either, because it fires asynchronously and there is no
 # guest frame anywhere on the stack to blame.
 #
-# THIS FILE USED TO SAY the fix was two rows in signal_ppc64.c's override
-# table, or -- once ntdll exported its trampoline factory -- two three-line
-# wrappers in this module.  Neither is true, and the reason is arithmetic:
-#
 #     typedef VOID (CALLBACK *INTERNET_STATUS_CALLBACK)(
 #         HINTERNET hInternet, DWORD_PTR dwContext, DWORD dwInternetStatus,
 #         LPVOID lpvStatusInformation, DWORD dwStatusInformationLength );
 #
-# FIVE arguments.  ntdll's trampoline carries FOUR: call_guest_function_args()
-# writes RCX/RDX/R8/R9 into a parameter block and tail-jumps, and its own
-# comment states the limit ("A callback with stack arguments (five or more)
-# would need a thunk that builds a frame; nothing in the corpus has one, and
-# this is where it would go").  MS-x64 passes the fifth argument on the stack.
-#
-# The fifth argument here is dwStatusInformationLength, and it is not
-# decoration: INTERNET_STATUS_HANDLE_CREATED, _REQUEST_COMPLETE and
+# FIVE arguments, which the original four-argument trampoline could not carry
+# -- call_guest_function_args() only ever wrote RCX/RDX/R8/R9 and tail-jumped,
+# so the fifth argument, which MS-x64 passes on the stack, was whatever
+# happened to be there.  That fifth argument is dwStatusInformationLength, and
+# it is not decoration: INTERNET_STATUS_HANDLE_CREATED, _REQUEST_COMPLETE and
 # _REDIRECT all describe the SIZE of what lpvStatusInformation points at, and a
 # callback that trusted a garbage length would read or copy an arbitrary
-# amount of memory.  Wrapping with the four-argument trampoline would turn a
-# loud missing import into a silent wrong answer on a worker thread -- the
-# single failure mode this whole registration-side mechanism exists to remove.
+# amount of memory.  Wrapping with the four-argument trampoline would have
+# turned a loud missing import into a silent wrong answer on a worker thread
+# -- the single failure mode this whole registration-side mechanism exists to
+# remove.
 #
-# THE HANDOFF is the same one dlls/comctl32/comctl32.thunks files for
-# SetWindowSubclass, and one change serves both: a guest-call thunk in
-# dlls/ntdll/signal_ppc64.c that builds a frame and places the stack arguments,
-# plus a factory export that names the arity the way the existing one names the
-# return width.  With it these two become one GUEST-IMPL line each and a
-# wrapper that swaps argument 1 for a narrow trampoline (an
-# INTERNET_STATUS_CALLBACK returns void).  That file is not this pass's to
-# edit.
-#
-# One more thing that wrapper will have to say when it is written: the RETURN
-# of InternetSetStatusCallback is the PREVIOUSLY registered callback, which for
-# a guest that registers twice is one of our own trampolines.  Handing it back
-# is right -- the pool is idempotent, so re-registering it maps to itself --
-# and it is the same answer SetUnhandledExceptionFilter already gives on this
-# port.  A guest that CALLS the returned pointer rather than re-registering it
-# would execute ppc64 bytes as x86-64, which is the accepted residual risk
-# everywhere the port hands a trampoline back.
-#
-# Until then these two are ABSENT from the export table and bind to a distinct
-# missing-import sentinel, so a guest that registers a progress callback dies
-# at 0xdead00nn with the symbol named in the loader's WARN, at the moment it
-# registers -- not five seconds later on a worker thread.  Everything else in
-# the module keeps working; a status callback is progress reporting, and no
-# download depends on it.
-EXCLUDE InternetSetStatusCallbackA
-EXCLUDE InternetSetStatusCallbackW
+# THE HANDOFF this section used to describe is done: ntdll now exports
+# call_guest_function_args5() and the factory __wine_guest_wrap_callback5,
+# the five-argument sibling of __wine_guest_wrap_callback -- same tail-jump
+# shape as the four-argument thunk, with dwStatusInformationLength
+# additionally written to [rsp+0x28] before the jump, exactly where
+# marshal_thunk_args() already reads a fifth stack argument from in the
+# opposite direction.  dlls/comctl32/comctl32.thunks files the six-argument
+# sibling for SetWindowSubclass the same way.  See dlls/wininet/guestthunk.c
+# for the two GUEST-IMPL wrappers below and the RETURN-value note (the
+# previously registered callback, possibly one of our own trampolines --
+# same answer SetUnhandledExceptionFilter already gives on this port).
+GUEST-IMPL InternetSetStatusCallbackA  __wine_guest_InternetSetStatusCallbackA
+GUEST-IMPL InternetSetStatusCallbackW  __wine_guest_InternetSetStatusCallbackW
 
 # --------------------------------------------------------------- the ceiling
 # The 44 refusals are named individually in the build's --report.  Two shapes,

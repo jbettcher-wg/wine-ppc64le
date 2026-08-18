@@ -1650,6 +1650,155 @@ static ULONG_PTR call_guest_function_args( void *fn, ULONG_PTR a0, ULONG_PTR a1,
 
 
 /***********************************************************************
+ *           call_guest_function_args5 / call_guest_function_args6
+ *
+ * The five- and six-argument forms call_guest_function_args's own comment
+ * says would go here: "A callback with stack arguments (five or more) would
+ * need a thunk that builds a frame; nothing in the corpus has one, and this
+ * is where it would go."  Two consumers now have one -- SetWindowSubclass /
+ * RemoveWindowSubclass's SUBCLASSPROC (six arguments) and
+ * InternetSetStatusCallback's INTERNET_STATUS_CALLBACK (five) -- both
+ * integer/pointer-only, so neither of these carries floating-point handling;
+ * see the FP note on call_native_thunk_fp if that ever changes.
+ *
+ * MS-x64 passes the fifth and sixth arguments on the STACK, above the 32
+ * bytes of shadow space the first four reserve: at [rsp+0x28] and [rsp+0x30]
+ * from the callee's own entry point, the same offsets marshal_thunk_args()
+ * reads them at for the opposite direction (guest calling host) --
+ * ctx->Rsp + 8 + i*8 for i=4,5, i.e. Rsp+0x28 and Rsp+0x30 there too.
+ *
+ * MEASURED, and the first cut of this comment was wrong.  It argued run_entry
+ * leaves "room above the shadow space for nobody yet" and that a plain
+ * write to [rsp+0x28]/[rsp+0x30] before the tail jump was therefore safe, no
+ * sub-rsp of our own needed.  A ppc64le/shell/ gate exercising
+ * SetWindowSubclass -> SendMessage instead produced:
+ *
+ *   Unhandled page fault on WRITE access to 00003FFF53E00000 at address
+ *   00003FFF53E10013
+ *
+ * PC (00003FFF53E10013) is this thunk's own code, offset 0x13 -- exactly the
+ * `mov [rsp+0x28],r10` instruction.  The faulting address is
+ * PC_thunk_base - 0x10000, i.e. nowhere near this code; it is where RSP's
+ * OWN valid page ends.  0x10013 - 0x13 = 0x10000 confirms the fault address
+ * is page-aligned, and 0x53E00000 minus the write's own +0x28 offset puts
+ * RSP at exactly base-0x28: run_entry reserves precisely the 0x28 bytes a
+ * four-argument call needs (a return address plus the four-register shadow
+ * space, offsets 0x00-0x27) and NOT ONE BYTE MORE -- the page immediately
+ * above that is unmapped.  So the four-argument thunk's own comment about
+ * "room above the shadow space" was describing memory that was never there;
+ * it merely never got read that far.
+ *
+ * The fix is the shape dlls/comctl32/comctl32.thunks originally sketched
+ * (build a frame) with a smaller footprint than that sketch used (no CALL,
+ * no RET -- still one tail jump): save the return address run_entry placed
+ * at [rsp+0], SUB RSP into the stack's own (downward, and -- empirically --
+ * spacious) free region, restore the return address at the NEW [rsp+0], and
+ * only then write a4 (and a5) at the new frame's +0x28 (and +0x30).  Every
+ * offset this thunk touches after the sub is AT OR BELOW the original RSP,
+ * never above it -- the one direction this crash proved is actually backed
+ * by mapped memory.  Machine-verified with objdump -D -b binary
+ * -m i386:x86-64 -M intel against the exact byte arrays below, not reasoned
+ * about by eye: both disassemble to precisely the intended instructions, in
+ * the intended order, with the intended ModRM/SIB/displacement encoding for
+ * every [rsp+disp8] operand (mod=01, rm=100 forces the SIB byte; a dropped
+ * SIB is the classic way this silently becomes a different addressing mode,
+ * and objdump is how this pass confirmed none is missing).
+ */
+static ULONG_PTR call_guest_function_args5( void *fn, ULONG_PTR a0, ULONG_PTR a1,
+                                            ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4 )
+{
+    static const BYTE thunk_code[] =
+    {
+        0x4c, 0x8b, 0x1c, 0x24,        /* mov r11,[rsp]        save run_entry's return addr */
+        0x48, 0x83, 0xec, 0x40,        /* sub rsp,0x40         into the stack's own free space below */
+        0x4c, 0x89, 0x1c, 0x24,        /* mov [rsp],r11        return addr back at the NEW frame's +0x00 */
+        0x48, 0x8b, 0x01,              /* mov rax,[rcx]       target */
+        0x48, 0x8b, 0x51, 0x10,        /* mov rdx,[rcx+0x10]  a1 */
+        0x4c, 0x8b, 0x41, 0x18,        /* mov r8,[rcx+0x18]   a2 */
+        0x4c, 0x8b, 0x49, 0x20,        /* mov r9,[rcx+0x20]   a3 */
+        0x4c, 0x8b, 0x51, 0x28,        /* mov r10,[rcx+0x28]  a4 */
+        0x4c, 0x89, 0x54, 0x24, 0x28,  /* mov [rsp+0x28],r10  a4's stack slot, new frame */
+        0x48, 0x8b, 0x49, 0x08,        /* mov rcx,[rcx+0x08]  a0 */
+        0xff, 0xe0,                    /* jmp rax */
+    };
+    static void *thunk;
+    struct
+    {
+        void      *fn;    /* 0x00 */
+        ULONG_PTR  a[5];  /* 0x08 0x10 0x18 0x20 0x28 */
+    } params = { fn, { a0, a1, a2, a3, a4 } };
+
+    if (!thunk)
+    {
+        void *mem = NULL;
+        SIZE_T size = sizeof(thunk_code);
+        NTSTATUS status = NtAllocateVirtualMemory( GetCurrentProcess(), &mem, 0, &size,
+                                                   MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE );
+        if (status)
+        {
+            ERR( "no memory for the guest argument thunk, status %08x\n", (UINT)status );
+            return 0;
+        }
+        memcpy( mem, thunk_code, sizeof(thunk_code) );
+        if (InterlockedCompareExchangePointer( &thunk, mem, NULL ))
+        {
+            SIZE_T free_size = 0;
+            NtFreeVirtualMemory( GetCurrentProcess(), &mem, &free_size, MEM_RELEASE );
+        }
+    }
+    return call_guest_function( thunk, &params );
+}
+
+static ULONG_PTR call_guest_function_args6( void *fn, ULONG_PTR a0, ULONG_PTR a1,
+                                            ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4,
+                                            ULONG_PTR a5 )
+{
+    static const BYTE thunk_code[] =
+    {
+        0x4c, 0x8b, 0x1c, 0x24,        /* mov r11,[rsp]        save run_entry's return addr */
+        0x48, 0x83, 0xec, 0x40,        /* sub rsp,0x40         into the stack's own free space below */
+        0x4c, 0x89, 0x1c, 0x24,        /* mov [rsp],r11        return addr back at the NEW frame's +0x00 */
+        0x48, 0x8b, 0x01,              /* mov rax,[rcx]       target */
+        0x48, 0x8b, 0x51, 0x10,        /* mov rdx,[rcx+0x10]  a1 */
+        0x4c, 0x8b, 0x41, 0x18,        /* mov r8,[rcx+0x18]   a2 */
+        0x4c, 0x8b, 0x49, 0x20,        /* mov r9,[rcx+0x20]   a3 */
+        0x4c, 0x8b, 0x51, 0x28,        /* mov r10,[rcx+0x28]  a4 */
+        0x4c, 0x89, 0x54, 0x24, 0x28,  /* mov [rsp+0x28],r10  a4's stack slot, new frame */
+        0x4c, 0x8b, 0x51, 0x30,        /* mov r10,[rcx+0x30]  a5 */
+        0x4c, 0x89, 0x54, 0x24, 0x30,  /* mov [rsp+0x30],r10  a5's stack slot, new frame */
+        0x48, 0x8b, 0x49, 0x08,        /* mov rcx,[rcx+0x08]  a0 */
+        0xff, 0xe0,                    /* jmp rax */
+    };
+    static void *thunk;
+    struct
+    {
+        void      *fn;    /* 0x00 */
+        ULONG_PTR  a[6];  /* 0x08 0x10 0x18 0x20 0x28 0x30 */
+    } params = { fn, { a0, a1, a2, a3, a4, a5 } };
+
+    if (!thunk)
+    {
+        void *mem = NULL;
+        SIZE_T size = sizeof(thunk_code);
+        NTSTATUS status = NtAllocateVirtualMemory( GetCurrentProcess(), &mem, 0, &size,
+                                                   MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE );
+        if (status)
+        {
+            ERR( "no memory for the guest argument thunk, status %08x\n", (UINT)status );
+            return 0;
+        }
+        memcpy( mem, thunk_code, sizeof(thunk_code) );
+        if (InterlockedCompareExchangePointer( &thunk, mem, NULL ))
+        {
+            SIZE_T free_size = 0;
+            NtFreeVirtualMemory( GetCurrentProcess(), &mem, &free_size, MEM_RELEASE );
+        }
+    }
+    return call_guest_function( thunk, &params );
+}
+
+
+/***********************************************************************
  *           call_guest_tls_callback
  *
  * A PIMAGE_TLS_CALLBACK of a guest image, at process and thread attach and
@@ -4098,13 +4247,22 @@ static ULONG_PTR emu_onexit( const ULONG_PTR *a, void *native )
  * invoked a million times costs one slot; slots live for the process, like
  * allocate_stub's.  Each is twelve instructions:
  *
- *      r7  = guest target                (the fifth ELFv2 argument)
- *      r12 = guest_callback_dispatch     (entered by its global entry)
+ *      r(3+argc) = guest target          (one past the last real argument)
+ *      r12       = guest_callback_dispatch[5|6][_wide]  (its global entry)
  *      mtctr r12 / bctr
  *
- * r3-r6 pass through untouched, so the dispatcher receives the native
- * caller's first four integer arguments plus the guest target, and four
- * arguments always travel (see call_guest_function_args).
+ * r3..r(2+argc) pass through untouched, so the dispatcher receives the
+ * native caller's first argc integer arguments plus the guest target, and
+ * argc arguments always travel for that slot's dispatcher (see
+ * call_guest_function_args[5|6]).  ARITY IS PER SLOT, the same way WIDTH is
+ * (next paragraph): argc is 4 for every callback this pool carried until
+ * SetWindowSubclass's SUBCLASSPROC (six arguments) and
+ * InternetSetStatusCallback's INTERNET_STATUS_CALLBACK (five) needed their
+ * own, so the identity register moves with it -- r7 at argc=4 (the original,
+ * fixed shape), r8 at argc=5, r9 at argc=6 -- and is never one of the real
+ * argument registers for that slot's arity.  code[12] does not grow: only
+ * the register number written into the load-immediate at the top changes,
+ * and r3..r(2+argc) were never touched to begin with.
  *
  * THE RETURN WIDTH IS PER SLOT, and the day the corpus demanded it has come.
  * The default is the guest's RAX with the low 32 bits sign-extended: every
@@ -4117,8 +4275,8 @@ static ULONG_PTR emu_onexit( const ULONG_PTR *a, void *native )
  * at native user32 with its top half replaced by a copy of bit 31.  So the
  * width is a property of the SLOT, chosen at registration by whoever knows
  * what the callback is, and it is spelled by which dispatcher the stub jumps
- * to rather than by a flag the dispatcher reads: one stub per (target, width),
- * so the two can never be confused for one another.
+ * to rather than by a flag the dispatcher reads: one stub per
+ * (target, width, arity), so none of the three can be confused with another.
  *
  * WINEEMUNOCBWRAP=1 is the negative control, same shape as
  * WINEEMUNOGSTHREADS: registration hands the raw guest pointer to native
@@ -4127,10 +4285,18 @@ static ULONG_PTR emu_onexit( const ULONG_PTR *a, void *native )
  */
 struct guest_callback_stub
 {
-    UINT  code[12];      /* r7 = guest_fn; r12 = dispatch; mtctr; bctr */
+    UINT  code[12];      /* r(3+argc) = guest_fn; r12 = dispatch; mtctr; bctr --
+                          * the identity register sits one past the last real
+                          * ELFv2 argument register, so a 4-argument slot
+                          * carries it in r7 (the original, fixed shape), a
+                          * 5-argument one in r8, a 6-argument one in r9 */
     void *guest_fn;      /* identity: one stub per target, and post-mortem */
     UINT  wide;          /* ...per WIDTH too: the other half of that identity */
-    UINT  pad;           /* one cache line per slot */
+    UINT  argc;          /* ...and per ARITY: the third and last part of it,
+                          * since the same guest function can legitimately be
+                          * registered as callbacks of different shapes.  Was
+                          * an unused `pad` field; one cache line per slot
+                          * either way. */
 };
 
 /* Trampolines are handed OUT, so a full pool cannot be reallocated: native
@@ -4209,6 +4375,82 @@ static ULONG_PTR guest_callback_dispatch_wide( ULONG_PTR a0, ULONG_PTR a1, ULONG
     return ret;
 }
 
+/* The five- and six-argument forms of guest_callback_run/_dispatch[_wide],
+ * for the two consumers that need call_guest_function_args5/6: comctl32's
+ * SUBCLASSPROC (six arguments, LRESULT return -> wide) and wininet's
+ * INTERNET_STATUS_CALLBACK (five arguments, void return -> narrow is fine
+ * either way, since there is no result to truncate).  Integer/pointer-only,
+ * same as every other row this pool carries; see the FP note beside
+ * call_guest_function_args5/6 above. */
+static ULONG_PTR guest_callback_run5( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
+                                      ULONG_PTR a3, ULONG_PTR a4, void *fn, BOOL *ended )
+{
+    ULONG_PTR ret;
+
+    TRACE( "calling guest callback %p (%p,%p,%p,%p,%p)\n", fn,
+           (void *)a0, (void *)a1, (void *)a2, (void *)a3, (void *)a4 );
+    ret = call_guest_function_args5( fn, a0, a1, a2, a3, a4 );
+    if ((*ended = guest_exit_requested)) return 0;
+    TRACE( "guest callback %p returned %p\n", fn, (void *)ret );
+    return ret;
+}
+
+static ULONG_PTR guest_callback_dispatch5( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
+                                           ULONG_PTR a3, ULONG_PTR a4, void *fn )
+{
+    BOOL ended;
+    ULONG_PTR ret = guest_callback_run5( a0, a1, a2, a3, a4, fn, &ended );
+
+    if (ended) return 0;
+    return (ULONG_PTR)(LONG_PTR)(LONG)ret;
+}
+
+static ULONG_PTR guest_callback_dispatch5_wide( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
+                                                ULONG_PTR a3, ULONG_PTR a4, void *fn )
+{
+    BOOL ended;
+    ULONG_PTR ret = guest_callback_run5( a0, a1, a2, a3, a4, fn, &ended );
+
+    if (ended) return 0;
+    return ret;
+}
+
+static ULONG_PTR guest_callback_run6( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
+                                      ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5,
+                                      void *fn, BOOL *ended )
+{
+    ULONG_PTR ret;
+
+    TRACE( "calling guest callback %p (%p,%p,%p,%p,%p,%p)\n", fn,
+           (void *)a0, (void *)a1, (void *)a2, (void *)a3, (void *)a4, (void *)a5 );
+    ret = call_guest_function_args6( fn, a0, a1, a2, a3, a4, a5 );
+    if ((*ended = guest_exit_requested)) return 0;
+    TRACE( "guest callback %p returned %p\n", fn, (void *)ret );
+    return ret;
+}
+
+static ULONG_PTR guest_callback_dispatch6( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
+                                           ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5,
+                                           void *fn )
+{
+    BOOL ended;
+    ULONG_PTR ret = guest_callback_run6( a0, a1, a2, a3, a4, a5, fn, &ended );
+
+    if (ended) return 0;
+    return (ULONG_PTR)(LONG_PTR)(LONG)ret;
+}
+
+static ULONG_PTR guest_callback_dispatch6_wide( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
+                                                ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5,
+                                                void *fn )
+{
+    BOOL ended;
+    ULONG_PTR ret = guest_callback_run6( a0, a1, a2, a3, a4, a5, fn, &ended );
+
+    if (ended) return 0;
+    return ret;
+}
+
 /* emit `reg = val' as the classic five-instruction absolute load */
 static UINT *emit_load_imm64( UINT *p, UINT reg, ULONG_PTR val )
 {
@@ -4234,15 +4476,32 @@ static BOOL emu_env_flag( const WCHAR *name )
            value.Length && buf[0] == '1';
 }
 
-static void *wrap_guest_callback_ex( void *fn, BOOL wide )
+/* argc is 4, 5 or 6: which fixed-arity trampoline pair (dispatch,
+ * dispatch_wide) the stub jumps to, and which register carries the guest_fn
+ * identity -- see the comment on struct guest_callback_stub.code above. */
+static void *wrap_guest_callback_ex( void *fn, BOOL wide, UINT argc )
 {
     static int nowrap = -1;
     struct guest_callback_stub *stub;
     ULONG_PTR magic;
     void *ret = fn;
-    UINT *p, i;
+    UINT *p, i, fn_reg;
+    ULONG_PTR dispatch;   /* a function pointer, cast the same way the single
+                          * dispatch it used to be always was -- see the
+                          * emit_load_imm64 call below */
 
     if (!fn) return fn;
+
+    switch (argc)
+    {
+    case 4: dispatch = (ULONG_PTR)(wide ? guest_callback_dispatch_wide  : guest_callback_dispatch);  break;
+    case 5: dispatch = (ULONG_PTR)(wide ? guest_callback_dispatch5_wide : guest_callback_dispatch5); break;
+    case 6: dispatch = (ULONG_PTR)(wide ? guest_callback_dispatch6_wide : guest_callback_dispatch6); break;
+    default:
+        ERR( "guest callback %p registered with unsupported arity %u\n", fn, argc );
+        return fn;
+    }
+    fn_reg = 3 + argc;
 
     if (nowrap == -1) nowrap = emu_env_flag( L"WINEEMUNOCBWRAP" );
     if (nowrap)
@@ -4276,11 +4535,12 @@ static void *wrap_guest_callback_ex( void *fn, BOOL wide )
         TRACE( "callback %p lies in no image, wrapping as guest code\n", fn );
     }
 
-    /* One stub per distinct (target, return width), across every block.  The
-     * width is part of the identity rather than a property of the target,
-     * because the same guest function genuinely can be registered as two
-     * different callback kinds -- and a lookup that ignored it would hand the
-     * second registration the first one's truncating stub. */
+    /* One stub per distinct (target, return width, arity), across every
+     * block.  Width and arity are both part of the identity rather than a
+     * property of the target, because the same guest function genuinely can
+     * be registered as two different callback kinds -- and a lookup that
+     * ignored either would hand the second registration the first one's
+     * stub, truncating its result or misreading its fifth/sixth argument. */
     {
         UINT b;
         for (b = 0; b < guest_cb_blocks; b++)
@@ -4288,7 +4548,8 @@ static void *wrap_guest_callback_ex( void *fn, BOOL wide )
             UINT used = (b + 1 == guest_cb_blocks) ? guest_cb_count : GUEST_CB_BLOCK;
             for (i = 0; i < used; i++)
                 if (guest_cb_block[b][i].guest_fn == fn &&
-                    guest_cb_block[b][i].wide == (wide ? 1u : 0u))
+                    guest_cb_block[b][i].wide == (wide ? 1u : 0u) &&
+                    guest_cb_block[b][i].argc == argc)
                 { ret = &guest_cb_block[b][i]; goto done; }
         }
     }
@@ -4318,17 +4579,17 @@ static void *wrap_guest_callback_ex( void *fn, BOOL wide )
 
     stub = &guest_cb_block[guest_cb_blocks - 1][guest_cb_count];
     p = stub->code;
-    p = emit_load_imm64( p, 7, (ULONG_PTR)fn );
-    p = emit_load_imm64( p, 12, (ULONG_PTR)(wide ? guest_callback_dispatch_wide
-                                                 : guest_callback_dispatch) );
+    p = emit_load_imm64( p, fn_reg, (ULONG_PTR)fn );
+    p = emit_load_imm64( p, 12, dispatch );
     *p++ = 0x7D8903A6;   /* mtctr r12 */
     *p++ = 0x4E800420;   /* bctr */
     stub->guest_fn = fn;
     stub->wide     = wide ? 1u : 0u;
+    stub->argc     = argc;
     NtFlushInstructionCache( GetCurrentProcess(), stub, sizeof(*stub) );
     guest_cb_count++;    /* publish only after the code is flushed */
-    TRACE( "guest callback %p -> trampoline %p (%u total, %s return)\n",
-           fn, stub, guest_cb_count, wide ? "64-bit" : "sign-extended 32-bit" );
+    TRACE( "guest callback %p -> trampoline %p (%u total, %s return, %u args)\n",
+           fn, stub, guest_cb_count, wide ? "64-bit" : "sign-extended 32-bit", argc );
     ret = stub;
 done:
     LdrUnlockLoaderLock( 0, magic );
@@ -4337,7 +4598,7 @@ done:
 
 static void *wrap_guest_callback( void *fn )
 {
-    return wrap_guest_callback_ex( fn, FALSE );
+    return wrap_guest_callback_ex( fn, FALSE, 4 );
 }
 
 /* The trampoline factory, exported for guest-COM modules.  A COM method traps
@@ -4348,7 +4609,26 @@ static void *wrap_guest_callback( void *fn )
  * without it refuses loudly rather than failing to load. */
 void * CDECL __wine_guest_wrap_callback( void *fn, BOOL wide )
 {
-    return wrap_guest_callback_ex( fn, wide );
+    return wrap_guest_callback_ex( fn, wide, 4 );
+}
+
+/* The five- and six-argument factory exports, same shape as
+ * __wine_guest_wrap_callback above but naming the arity the way the existing
+ * one names the return width -- exactly the follow-up comctl32.thunks and
+ * wininet.thunks both ask for by name (__wine_guest_wrap_callback6 for
+ * SetWindowSubclass/RemoveWindowSubclass's SUBCLASSPROC, this one's sibling
+ * for InternetSetStatusCallback's INTERNET_STATUS_CALLBACK).  Arity is a
+ * property of the SLOT, exactly as width already is: the pool above keys on
+ * (target, width, argc) so wrapping the same guest function through two
+ * different factory exports can never be confused for one registration. */
+void * CDECL __wine_guest_wrap_callback5( void *fn, BOOL wide )
+{
+    return wrap_guest_callback_ex( fn, wide, 5 );
+}
+
+void * CDECL __wine_guest_wrap_callback6( void *fn, BOOL wide )
+{
+    return wrap_guest_callback_ex( fn, wide, 6 );
 }
 
 /***********************************************************************
@@ -4395,17 +4675,20 @@ static void *wrap_guest_wndproc( void *fn )
             return fn;
         }
     }
-    return wrap_guest_callback_ex( fn, TRUE );
+    return wrap_guest_callback_ex( fn, TRUE, 4 );
 }
 
 /* swap the arguments a thunk_override row declares as callbacks; `wide` names
- * the subset of them whose return value is a full 64 bits */
+ * the subset of them whose return value is a full 64 bits.  Every override
+ * table row in the corpus so far is a four-argument-or-fewer callback, so
+ * this always mints the original fixed-arity trampoline; a row needing five
+ * or six would pass its own argc here instead of the literal 4. */
 static void wrap_thunk_callback_args( ULONG_PTR *a, UINT argc, UINT mask, UINT wide )
 {
     UINT i;
     for (i = 0; i < argc; i++)
         if (mask & (1u << i))
-            a[i] = (ULONG_PTR)wrap_guest_callback_ex( (void *)a[i], (wide >> i) & 1 );
+            a[i] = (ULONG_PTR)wrap_guest_callback_ex( (void *)a[i], (wide >> i) & 1, 4 );
 }
 
 

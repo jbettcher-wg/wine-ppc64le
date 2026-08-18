@@ -14,6 +14,7 @@ SOURCES = \
 	dialogs.c \
 	ftp.c \
 	gopher.c \
+	guestthunk.c \
 	http.c \
 	internet.c \
 	netconnection.c \

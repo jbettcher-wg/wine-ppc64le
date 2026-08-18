@@ -54,6 +54,15 @@
  *             prints which callback codes arrived and whether the page's own
  *             lParam came back through each of them intact.
  *
+ *             Then a THIRD shape: SetWindowSubclass/RemoveWindowSubclass hand
+ *             native comctl32 a bare SUBCLASSPROC of SIX arguments -- two more
+ *             than a WNDPROC, and the two ntdll's original callback trampoline
+ *             could not carry.  The probe subclasses its own window with
+ *             distinctive 64-bit uIdSubclass/dwRefData patterns, SendMessages
+ *             it, value-checks all six arguments the proc receives, has the
+ *             proc call back into DefSubclassProc, removes the subclass and
+ *             proves the proc is no longer entered.
+ *
  * IDirectInput8::EnumDevices HAS ITS OWN LEG, and what that leg claims has
  * just inverted.  It used to be REFUSED on the guest side by name, because it
  * hands native dinput a bare guest FUNCTION POINTER that dinput retains and
@@ -185,6 +194,16 @@ static void out_hr( const char *label, HRESULT hr )
     out( label );
     out( "=0x" );
     out_hex( (ULONG)hr, 8 );
+}
+
+/* A full sixty-four bits, printed as two 32-bit words: uIdSubclass and
+ * dwRefData below are pointer-width values chosen so that a truncation to 32
+ * bits, or the two arguments landing swapped, produces a DIFFERENT sixteen
+ * hex digits and not a coincidentally-matching low half. */
+static void out_hex64( DWORD64 v )
+{
+    out_hex( (ULONG)(v >> 32), 8 );
+    out_hex( (ULONG)v, 8 );
 }
 
 static void out_guid( const GUID *g )
@@ -766,6 +785,117 @@ static void run_comctl32_callbacks( void )
              "the DSA destructor did not see all three items by value" );
 }
 
+/* ==================== comctl32: the SIX-ARGUMENT subclass procedure =======
+ *
+ * SetWindowSubclass/RemoveWindowSubclass hand native comctl32 a bare
+ * SUBCLASSPROC:
+ *
+ *   LRESULT CALLBACK (HWND, UINT, WPARAM, LPARAM, UINT_PTR uIdSubclass,
+ *                     DWORD_PTR dwRefData)
+ *
+ * -- the two arguments beyond the four a WNDPROC has are exactly what the
+ * original four-argument trampoline could not carry (dlls/ntdll's
+ * call_guest_function_args() only ever wrote RCX/RDX/R8/R9), so this leg's
+ * whole point is proving those last two arrive AT ALL, and arrive in the
+ * right slots.  uIdSubclass and dwRefData below are full 64-bit patterns with
+ * no repeating half, chosen so that truncation to 32 bits, a swap of the two,
+ * or either one landing as garbage from the stack, is a DIFFERENT sixteen hex
+ * digits and not a coincidence.
+ *
+ * The proc value-checks hwnd, msg, wParam, lParam, uIdSubclass and dwRefData
+ * -- all six -- calls DefSubclassProc (proving the guest proc can itself call
+ * back into comctl32, the same "can it do its job" claim the enumeration leg
+ * makes), and RemoveWindowSubclass is then proven to have worked by sending
+ * the same message again and requiring the call count to NOT have advanced:
+ * a subclass that failed to remove leaves the window answering through code
+ * nobody asked it to keep answering through.
+ */
+#define SMOKE_SUBCLASS_ID      ((UINT_PTR)0x0102030405060708ull)
+#define SMOKE_SUBCLASS_REF     ((DWORD_PTR)0xFEDCBA9876543210ull)
+#define SMOKE_SUBCLASS_MSG     (WM_APP + 7)
+#define SMOKE_SUBCLASS_WPARAM  ((WPARAM)0x1122334455667788ull)
+#define SMOKE_SUBCLASS_LPARAM  ((LPARAM)0x99AABBCCDDEEFF11ull)
+
+static HWND  smoke_subclass_hwnd;
+static ULONG smoke_subclass_calls;
+static ULONG smoke_subclass_hwnd_ok = 1;
+static ULONG smoke_subclass_arg_ok  = 1;
+static ULONG smoke_subclass_id_ok   = 1;
+static ULONG smoke_subclass_ref_ok  = 1;
+
+static LRESULT CALLBACK smoke_subclass_proc( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
+                                              UINT_PTR uIdSubclass, DWORD_PTR dwRefData )
+{
+    if (msg == SMOKE_SUBCLASS_MSG)
+    {
+        smoke_subclass_calls++;
+        if (hwnd != smoke_subclass_hwnd) smoke_subclass_hwnd_ok = 0;
+        if (wp != SMOKE_SUBCLASS_WPARAM || lp != SMOKE_SUBCLASS_LPARAM)
+            smoke_subclass_arg_ok = 0;
+        if (uIdSubclass != SMOKE_SUBCLASS_ID) smoke_subclass_id_ok = 0;
+        if (dwRefData != SMOKE_SUBCLASS_REF) smoke_subclass_ref_ok = 0;
+    }
+    /* THE CALL BACK IN: the same "can it do its job, not just get entered"
+     * claim the enumeration callback's GetTickCount/GetCurrentThreadId calls
+     * make.  DefSubclassProc walks the rest of the subclass chain down to
+     * DefWindowProcA, which answers an unrecognised message with 0. */
+    return DefSubclassProc( hwnd, msg, wp, lp );
+}
+
+static void run_comctl32_subclass( HWND hwnd )
+{
+    BOOL ok;
+    LRESULT lr;
+    ULONG calls_before;
+
+    smoke_subclass_hwnd = hwnd;
+
+    begin( "SetWindowSubclass(uIdSubclass=" );
+    out_hex64( (DWORD64)SMOKE_SUBCLASS_ID );
+    out( ", dwRefData=" );
+    out_hex64( (DWORD64)SMOKE_SUBCLASS_REF );
+    out( ")" );
+    ok = SetWindowSubclass( hwnd, smoke_subclass_proc, SMOKE_SUBCLASS_ID,
+                            SMOKE_SUBCLASS_REF );
+    out( ok ? " TRUE" : " FALSE" );
+    verdict( ok, "SetWindowSubclass failed" );
+    if (!ok) return;
+
+    begin( "SendMessage: guest SUBCLASSPROC" );
+    lr = SendMessageA( hwnd, SMOKE_SUBCLASS_MSG, SMOKE_SUBCLASS_WPARAM,
+                       SMOKE_SUBCLASS_LPARAM );
+    out( "calls=" );
+    out_dec( smoke_subclass_calls );
+    out( " hwnd_ok=" );
+    out_dec( smoke_subclass_hwnd_ok );
+    out( " arg_ok=" );
+    out_dec( smoke_subclass_arg_ok );
+    out( " id_ok=" );
+    out_dec( smoke_subclass_id_ok );
+    out( " ref_ok=" );
+    out_dec( smoke_subclass_ref_ok );
+    out( " lr=0x" );
+    out_hex( (ULONG)lr, 8 );
+    verdict( smoke_subclass_calls == 1 && smoke_subclass_hwnd_ok &&
+             smoke_subclass_arg_ok && smoke_subclass_id_ok &&
+             smoke_subclass_ref_ok && lr == 0,
+             "the SUBCLASSPROC was not entered with all six arguments intact" );
+
+    begin( "RemoveWindowSubclass" );
+    calls_before = smoke_subclass_calls;
+    ok = RemoveWindowSubclass( hwnd, smoke_subclass_proc, SMOKE_SUBCLASS_ID );
+    out( ok ? "TRUE" : "FALSE" );
+    verdict( ok, "RemoveWindowSubclass failed" );
+
+    begin( "SendMessage after RemoveWindowSubclass: the proc is not entered" );
+    SendMessageA( hwnd, SMOKE_SUBCLASS_MSG, SMOKE_SUBCLASS_WPARAM,
+                 SMOKE_SUBCLASS_LPARAM );
+    out( "calls=" );
+    out_dec( smoke_subclass_calls );
+    verdict( smoke_subclass_calls == calls_before,
+             "the proc still ran after being removed" );
+}
+
 /* ==================== comctl32: a callback INSIDE a struct ================
  *
  * A property sheet page carries its dialog procedure in a field, so there is
@@ -1029,6 +1159,7 @@ static int shell_smoke_run( void )
     run_comctl32();
     run_comctl32_callbacks();
     run_propsheet();
+    run_comctl32_subclass( hwnd );
 #ifdef SHELL_SMOKE_HOOK
     run_comdlg32_hook();
 #endif

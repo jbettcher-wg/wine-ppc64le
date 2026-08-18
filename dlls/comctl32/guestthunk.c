@@ -1,7 +1,7 @@
 /*
  * comctl32.dll -- the callbacks an x86-64 guest hands to native comctl32.
  *
- * comctl32 takes guest code in two shapes, and neither is reachable from
+ * comctl32 takes guest code in three shapes, and none is reachable from
  * dlls/ntdll/signal_ppc64.c's override table:
  *
  *   * AS A PLAIN ARGUMENT.  DPA_Sort, DPA_Search, DPA_EnumCallback,
@@ -29,34 +29,42 @@
  * WNDPROC: "ignoring exception c000001d", a page that never processes a
  * message, and no error anywhere.
  *
- * WHAT IS STILL REFUSED, AND WHY IT IS A DIFFERENT REASON THAN IT WAS.
- * SetWindowSubclass and RemoveWindowSubclass are still absent from the guest
- * export list, and no longer because nothing can wrap a callback: because a
- * SUBCLASSPROC takes SIX arguments --
+ *   * THE SIX-ARGUMENT SUBCLASS PROCEDURE -- NOW SERVED, and this is the
+ *     finding that changed since the last pass through this file.
+ *     SetWindowSubclass and RemoveWindowSubclass take a SUBCLASSPROC --
  *
- *     LRESULT CALLBACK (HWND, UINT, WPARAM, LPARAM, UINT_PTR uIdSubclass,
- *                       DWORD_PTR dwRefData)
+ *         LRESULT CALLBACK (HWND, UINT, WPARAM, LPARAM, UINT_PTR uIdSubclass,
+ *                           DWORD_PTR dwRefData)
  *
- * -- and ntdll's trampoline carries FOUR.  call_guest_function_args() in
- * dlls/ntdll/signal_ppc64.c says so in as many words ("A callback with stack
- * arguments (five or more) would need a thunk that builds a frame; nothing in
- * the corpus has one, and this is where it would go"): its guest thunk loads
- * RCX/RDX/R8/R9 and tail-jumps, so arguments five and six -- which MS-x64
- * passes on the stack -- are whatever happened to be there.  A guest
- * SUBCLASSPROC would receive a correct hwnd/msg/wParam/lParam and GARBAGE for
- * its subclass id and its own reference data: a silent wrong answer, and
- * strictly worse than a missing import that kills the process at the
- * registration.  Nothing in this file can fix it -- the frame has to be built
- * by the side that owns the guest run-entry primitive, and ntdll exports no
- * other way in.  comctl32.thunks carries the exact handoff.
+ *     -- six arguments, which the original four-argument trampoline could
+ *     not carry: MS-x64 passes the fifth and sixth on the stack, and the old
+ *     tail-jumping guest thunk in dlls/ntdll/signal_ppc64.c only ever loaded
+ *     RCX/RDX/R8/R9.  Wrapping with it would have handed a guest SUBCLASSPROC
+ *     a correct hwnd/msg/wParam/lParam and GARBAGE for its subclass id and
+ *     its own reference data -- a silent wrong answer, and strictly worse
+ *     than the missing import it was instead.  ntdll now exports
+ *     __wine_guest_wrap_callback6, the six-argument sibling of
+ *     __wine_guest_wrap_callback that builds the two extra stack slots (see
+ *     call_guest_function_args6 in dlls/ntdll/signal_ppc64.c), and this file
+ *     resolves it the same way it resolves the four-argument factory.
  *
- * IDENTITY, since it is what a Set/Remove pair turns on and it needs no
- * machinery here: the trampoline pool is keyed on (guest target, return width)
- * and returns the SAME stub for the same pair, for the life of the process.
- * So the day the six-argument thunk lands, wrapping in both SetWindowSubclass
- * and RemoveWindowSubclass is all the identity those two need -- there is no
- * mapping table to keep, and a separate one would be a second source of truth
- * for something the pool already guarantees.
+ *     SUBCLASSPROC returns LRESULT, sixty-four bits of it, so this takes the
+ *     WIDE trampoline -- the same reason a WNDPROC does.
+ *
+ *     IDENTITY, since it is what a Set/Remove pair turns on and it needs no
+ *     machinery here: the trampoline pool is keyed on (guest target, return
+ *     width, arity) and returns the SAME stub for the same triple, for the
+ *     life of the process.  So wrapping independently in SetWindowSubclass
+ *     and RemoveWindowSubclass is all the identity those two need -- native
+ *     comctl32 compares the pfnSubclass pointer it was given at Set time
+ *     against the one it is handed at Remove time, and both calls resolve to
+ *     the identical trampoline for the identical guest function.  There is
+ *     no mapping table to keep, and a separate one would be a second source
+ *     of truth for something the pool already guarantees.
+ *
+ *     GetWindowSubclass is `-noname` in the .spec -- exported by ordinal only
+ *     -- so it is skipped for want of a name, same as before; it would need
+ *     the identical wrap for the identical reason the day it is not.
  *
  * Copyright 2026 the ppc64le port authors
  *
@@ -142,6 +150,56 @@ static void *guest_wrap( void *fn, BOOL wide, const char *what )
         return NULL;
     }
     TRACE( "%s %p -> trampoline %p\n", what, fn, wrapped );
+    return wrapped;
+}
+
+/* The six-argument sibling, resolved separately because it is a distinct
+ * ntdll export -- same discipline, same refusal-by-name if this ntdll
+ * predates it.  Used by SetWindowSubclass/RemoveWindowSubclass below; see
+ * the SUBCLASSPROC banner at the top of this file for why SIX rather than
+ * FOUR. */
+static void *(CDECL *guest_wrap_callback6)( void *fn, BOOL wide );
+static LONG wrap6_resolved;
+
+static BOOL resolve_wrap_callback6(void)
+{
+    UNICODE_STRING ntdllW;
+    ANSI_STRING name;
+    HMODULE ntdll;
+    void *proc;
+
+    if (InterlockedCompareExchange( &wrap6_resolved, 1, 0 ))
+        return guest_wrap_callback6 != NULL;
+
+    RtlInitUnicodeString( &ntdllW, L"ntdll.dll" );
+    RtlInitAnsiString( &name, "__wine_guest_wrap_callback6" );
+    if (LdrGetDllHandle( NULL, 0, &ntdllW, &ntdll ) ||
+        LdrGetProcedureAddress( ntdll, &name, 0, &proc ))
+    {
+        ERR( "comctl32: this ntdll exports no __wine_guest_wrap_callback6; a "
+             "guest SUBCLASSPROC cannot be swapped for a trampoline, and "
+             "SetWindowSubclass/RemoveWindowSubclass will refuse rather than "
+             "let native comctl32 call x86-64 bytes with two of its six "
+             "arguments unmarshalled\n" );
+        return FALSE;
+    }
+    guest_wrap_callback6 = proc;
+    return TRUE;
+}
+
+static void *guest_wrap6( void *fn, BOOL wide, const char *what )
+{
+    void *wrapped;
+
+    if (!fn) return NULL;
+    if (!resolve_wrap_callback6()) return NULL;
+    if (!(wrapped = guest_wrap_callback6( fn, wide )))
+    {
+        ERR( "comctl32: the trampoline pool would not mint a six-argument "
+             "stub for %s %p\n", what, fn );
+        return NULL;
+    }
+    TRACE( "%s %p -> six-argument trampoline %p\n", what, fn, wrapped );
     return wrapped;
 }
 
@@ -542,4 +600,38 @@ HPROPSHEETPAGE WINAPI __wine_guest_CreatePropertySheetPageW( LPCPROPSHEETPAGEW p
     ret = CreatePropertySheetPageW( copy );
     Free( copy );
     return ret;
+}
+
+/* ------------------------------------------------------- window subclassing
+ *
+ * SUBCLASSPROC returns LRESULT -- the WIDE trampoline, same reason a WNDPROC
+ * takes it (see wrap_guest_wndproc's banner in dlls/ntdll/signal_ppc64.c).
+ * Six arguments, so guest_wrap6 rather than guest_wrap; see the banner at the
+ * top of this file for why. */
+BOOL WINAPI __wine_guest_SetWindowSubclass( HWND hWnd, SUBCLASSPROC pfnSubclass,
+                                            UINT_PTR uIdSubclass, DWORD_PTR dwRefData )
+{
+    void *wrapped = guest_wrap6( (void *)pfnSubclass, TRUE,
+                                 "SetWindowSubclass SUBCLASSPROC" );
+
+    if (guest_wrap_failed( (const void *)pfnSubclass, wrapped, "SetWindowSubclass" ))
+        return FALSE;
+    return SetWindowSubclass( hWnd, (SUBCLASSPROC)wrapped, uIdSubclass, dwRefData );
+}
+
+/* RemoveWindowSubclass takes no dwRefData -- native comctl32 matches the
+ * subclass to remove by (hWnd, pfnSubclass, uIdSubclass) alone.  Wrapping the
+ * SAME guest pfnSubclass here resolves to the SAME trampoline SetWindowSubclass
+ * minted for it (the pool is keyed on (target, width, arity), not on when it
+ * is asked), which is exactly the pointer native comctl32 is holding -- see
+ * the IDENTITY paragraph at the top of this file. */
+BOOL WINAPI __wine_guest_RemoveWindowSubclass( HWND hWnd, SUBCLASSPROC pfnSubclass,
+                                               UINT_PTR uIdSubclass )
+{
+    void *wrapped = guest_wrap6( (void *)pfnSubclass, TRUE,
+                                 "RemoveWindowSubclass SUBCLASSPROC" );
+
+    if (guest_wrap_failed( (const void *)pfnSubclass, wrapped, "RemoveWindowSubclass" ))
+        return FALSE;
+    return RemoveWindowSubclass( hWnd, (SUBCLASSPROC)wrapped, uIdSubclass );
 }

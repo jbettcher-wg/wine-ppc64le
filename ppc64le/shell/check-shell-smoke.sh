@@ -40,8 +40,14 @@
 #      being WRAPPED as proxies, the individual methods arriving in
 #      winecom_dispatch BY NAME, and -- the half this pass added -- each guest
 #      COMPARATOR and each PROPERTY SHEET PROCEDURE being swapped for a
-#      trampoline BY NAME as it crosses.  Without this a guest that somehow
-#      reached the right answers natively would still pass D-F.
+#      trampoline BY NAME as it crosses.  A later pass added SetWindowSubclass/
+#      RemoveWindowSubclass's SUBCLASSPROC to this same trace requirement: it
+#      is a SIX-argument callback, the first shape this port's callback
+#      trampolines could not originally carry in full, and the probe checks
+#      that uIdSubclass and dwRefData -- arguments five and six, passed on the
+#      Microsoft-x64 stack -- arrive as the full 64-bit patterns it sent and
+#      not truncated or swapped.  Without this a guest that somehow reached
+#      the right answers natively would still pass D-F.
 #   H  REFUSAL IS THE BOUNDARY'S, NOT THE API'S: a second pair of builds
 #      (-DSHELL_SMOKE_ENUM) calls IDirectInput8A::EnumDevices, which hands
 #      native dinput a bare GUEST FUNCTION POINTER.  Both runs must now agree
@@ -194,10 +200,9 @@ prevent"
 check_module dinput8  5
 check_module hid      38
 check_module d3dx9_42 264 D3DXSHEvalHemisphereLight D3DXComputeTangentFrameEx
-check_module comctl32 90  SetWindowSubclass RemoveWindowSubclass \
-                          HIMAGELIST_QueryInterface ImageList_Read ImageList_Write
+check_module comctl32 90  HIMAGELIST_QueryInterface ImageList_Read ImageList_Write
 check_module comdlg32 22  DllGetClassObject
-check_module wininet  158 InternetSetStatusCallbackA InternetSetStatusCallbackW
+check_module wininet  161
 check_module wintrust 45
 check_module usp10    36  ScriptPlaceOpenType
 check_module d2d1     9   D2D1MakeRotateMatrix D2D1MakeSkewMatrix
@@ -305,6 +310,7 @@ DestroyWindow
 GetClassInfoExA
 GetParent
 PostMessageA
+SendMessageA
 EOF
 cat > "$OUT/dinput8.def" <<'EOF'
 LIBRARY dinput8.dll
@@ -339,6 +345,9 @@ DSA_DestroyCallback
 CreatePropertySheetPageA
 DestroyPropertySheetPage
 PropertySheetA
+SetWindowSubclass
+RemoveWindowSubclass
+DefSubclassProc
 EOF
 # Only the -DSHELL_SMOKE_HOOK build imports these, but the import library is
 # built unconditionally: an unreferenced one contributes nothing to a PE.
@@ -491,14 +500,17 @@ for want in "materialised .* guest vtable slots" \
             "DSA_DestroyCallback callback .* -> trampoline" \
             "property sheet pfnDlgProc .* -> trampoline" \
             "property sheet pfnCallback .* -> trampoline" \
-            "property sheet header pfnCallback .* -> trampoline"; do
+            "property sheet header pfnCallback .* -> trampoline" \
+            "SetWindowSubclass SUBCLASSPROC .* -> six-argument trampoline" \
+            "RemoveWindowSubclass SUBCLASSPROC .* -> six-argument trampoline"; do
     if ! grep -qE "$want" "$OUT/guest.trace.err"; then
         bad "no '$want' in the +winecom,+guestcb trace of the guest run"
     fi
 done
 [ $fail -eq 0 ] && say "mechanism: guest vtables materialised, IDirectInput8A \
-and its device wrapped, every method dispatched by name, and every comparator \
-and property-sheet procedure swapped for a trampoline as it crossed"
+and its device wrapped, every method dispatched by name, and every comparator, \
+property-sheet procedure and the six-argument SUBCLASSPROC swapped for a \
+trampoline as it crossed"
 
 # ---- H: the enumeration crosses, and the two runs agree --------------------
 # EnumDevices hands native dinput a bare GUEST FUNCTION POINTER that dinput
