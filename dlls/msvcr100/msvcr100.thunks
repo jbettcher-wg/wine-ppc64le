@@ -21,11 +21,12 @@
 DLL msvcr100.dll
 FROM-SPEC auto
 
-# Six headers the oracle's default translation unit does not reach, and this
-# module's surface is declared across all of them.  Measured: they take the
-# emitted count from 666 to 766 -- a hundred exports that were named sentinels
-# purely because nothing had told the oracle where to look.  Each is here
-# because a name in THIS .spec needed it, not on speculation:
+# Seven headers the oracle's default translation unit does not reach, and this
+# module's surface is declared across all of them.  Measured (before the
+# msvcrt.h addition below): they take the emitted count from 666 to 766 -- a
+# hundred exports that were named sentinels purely because nothing had told
+# the oracle where to look.  Each is here because a name in THIS .spec needed
+# it, not on speculation:
 #
 #   locale.h      setlocale, localeconv, _configthreadlocale
 #   setjmp.h      longjmp
@@ -36,13 +37,28 @@ FROM-SPEC auto
 #                 public header at all.  msvcrt.thunks reaches them the same
 #                 way; INCLUDE-DIR points at ../msvcrt because that is this
 #                 module's PARENTSRC and where its implementation lives.
+#   msvcrt.h      __dllonexit -- same story as _lock/_unlock: declared only in
+#                 msvcrt's own private header (msvcrt.thunks and
+#                 ucrtbase.thunks both PROBE-EXTRA it for the same name).
+#                 Without it __dllonexit had no declaration this module's
+#                 oracle could see and was emitted as a named sentinel -- a
+#                 guest calling it landed on 0xDEAD00nn instead of the real
+#                 export.  Styx: Master of Shadows imports it (its bundled
+#                 wxmsw28u_vc_custom_64.dll calls it to grow its own private
+#                 onexit table) and died there once the exports before it on
+#                 its import list were fixed.  __dllonexit itself never CALLS
+#                 the function pointer it is handed -- it only reallocs the
+#                 caller's table and stores the pointer -- so correct arity is
+#                 the whole fix; no ntdll override row is needed for this one,
+#                 unlike _onexit below.
 INCLUDE-DIR   ../msvcrt
 PROBE-EXTRA   locale.h
 PROBE-EXTRA   setjmp.h
 PROBE-EXTRA   sys/utime.h
 PROBE-EXTRA   sys/timeb.h
-PROBE-EXTRA   mbstring.h
 PROBE-EXTRA   mtdll.h
+PROBE-EXTRA   msvcrt.h
+PROBE-EXTRA   mbstring.h
 
 # _initterm walks a table of the CALLER's initializers.  For a guest caller
 # those entries are x86-64 code and this walker is ppc64, so the guest import
@@ -98,15 +114,19 @@ GUEST-IMPL   _initterm_e                      __wine_guest__initterm_e
 # and the assertion is that a pointer return is integer class.
 _malloc_crt                   0x0000A110  1  int   msvcr100.spec:1243
 
-# KNOWN LATENT HAZARD -- host->guest callback, NOT fixed here.  Read the
+# KNOWN LATENT HAZARD -- host->guest callback, PARTIALLY fixed here.  Read the
 # banner in dlls/msvcrt/msvcrt.thunks before debugging a crash in this module.
-# The registration-interception table in dlls/ntdll/signal_ppc64.c lists
-# msvcrt.dll and ucrtbase.dll for the callback-taking CRT entry points and
-# does NOT list msvcr100.dll -- so for a guest that reaches this module,
-# qsort's comparator, bsearch's, _beginthread/_beginthreadex's start routine,
-# _onexit/__dllonexit's table, _set_invalid_parameter_handler,
-# _set_purecall_handler and __setusermatherr all pass a RAW GUEST POINTER into
-# native code that will eventually bctrl it.  Styx imports every one of them.
-# That table is in a file this change does not own; the fix is a handful more
-# rows beside the existing msvcrt/ucrtbase ones, and it is filed in
-# ppc64le/corpus/CATALOG.md rather than done here.
+# The registration-interception table in dlls/ntdll/signal_ppc64.c now lists
+# msvcr100.dll beside msvcrt.dll and ucrtbase.dll for qsort's comparator,
+# bsearch's, and _onexit's registered handler -- the three rows msvcrt and
+# ucrtbase already carried and this module was missing.  __dllonexit is
+# covered too, but by construction rather than by a row: it never calls the
+# guest pointer it is handed (see the PROBE-EXTRA msvcrt.h note above), so
+# fixing its arity was the whole fix.
+#
+# STILL OPEN, and still a RAW GUEST POINTER reaching native code that will
+# eventually bctrl it: _beginthread/_beginthreadex's start routine,
+# _set_invalid_parameter_handler, _set_purecall_handler and __setusermatherr.
+# Styx imports all four.  That table is in a file this change does not own
+# beyond the three rows above; the rest is filed in ppc64le/corpus/CATALOG.md
+# rather than done here.

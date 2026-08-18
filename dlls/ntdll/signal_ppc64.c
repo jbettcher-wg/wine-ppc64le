@@ -4647,6 +4647,14 @@ static const struct thunk_override thunk_overrides[] =
     { L"msvcrt.dll",   "atexit",            1, emu_crt_atexit },
     { L"msvcrt.dll",   "_onexit",           1, emu_onexit },
     { L"ucrtbase.dll", "_onexit",           1, emu_onexit },
+    /* msvcr100.dll: the same _onexit registration point msvcrt.dll and
+     * ucrtbase.dll already have above -- Styx: Master of Shadows imports it,
+     * and this is the VC++ 2010 runtime a game statically linked against the
+     * DLL CRT actually calls, not msvcrt.dll's.  msvcr100 exports no
+     * _crt_atexit and no public atexit (its atexit is `-private`, "not
+     * imported to avoid conflicts with Mingw"), so those two have no row
+     * here; there is nothing for them to intercept. */
+    { L"msvcr100.dll", "_onexit",           1, emu_onexit },
     { L"kernel32.dll", "ExitThread",        1, emu_ExitThread },
     { L"kernelbase.dll", "ExitThread",      1, emu_ExitThread },
     /* native->guest WITH identity: these thunks receive a guest function
@@ -4784,8 +4792,10 @@ static const struct thunk_override thunk_overrides[] =
      * reach native qsort as 0xffffffff */
     { L"msvcrt.dll",   "qsort",   4, NULL, 1u << 3 },
     { L"ucrtbase.dll", "qsort",   4, NULL, 1u << 3 },
+    { L"msvcr100.dll", "qsort",   4, NULL, 1u << 3 },
     { L"msvcrt.dll",   "bsearch", 5, NULL, 1u << 4 },
     { L"ucrtbase.dll", "bsearch", 5, NULL, 1u << 4 },
+    { L"msvcr100.dll", "bsearch", 5, NULL, 1u << 4 },
     /* window procedures: the callback carried INSIDE A STRUCT, which no
      * argument-position mask can name, plus the other entry points through
      * which a WNDPROC reaches native user32.  See the block above the four
