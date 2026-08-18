@@ -39,9 +39,9 @@ a Windows build, and the fix for all fifteen was one `.thunks` file each.
 
 | Title | appid | Machine | Before this pass | After |
 |---|---|---|---|---|
-| Warhammer 40,000: Boltgun | 2005010 | PE32+ | dead in `loader_init`, `c0000135`, 0 guest instructions | past the loader — see below |
+| Warhammer 40,000: Boltgun | 2005010 | PE32+ | dead in `loader_init`, `c0000135`, 0 guest instructions | past the loader, and now **past the DRM stub** too |
 | Styx: Master of Shadows | 242640 | PE32+ | dead in `loader_init`, `c0000135`, 0 guest instructions | past the loader — see below |
-| The Elder Scrolls V: Skyrim SE | 489830 | PE32+ | loader completes, then `c0000005` at the image entry | unchanged — root-caused, fix is not a `.thunks` one |
+| The Elder Scrolls V: Skyrim SE | 489830 | PE32+ | loader completes, then `c0000005` at the image entry | **past the DRM stub** — see the 2026-08-18 re-run below |
 | Half-Life 2 | 220 | **PE32** | refused — no 32-bit guest | unchanged, and correctly so |
 | FreeInfantry | 2830720 | **PE32** | refused — no 32-bit guest | unchanged, and correctly so |
 | Styx: Master of Shadows (Win32) | 242640 | **PE32** | refused — no 32-bit guest | unchanged, and correctly so |
@@ -430,8 +430,23 @@ Ordered by value. The first two are the ones worth doing next.
 
 ### 1. To the guest loader: `ntdll.dll` must always be in the guest namespace
 
-**This is the single highest-value item in this pass: two titles, one cause,
-and it will recur on every Steam-DRM-wrapped title.** Full evidence in the
+> **CLOSED 2026-08-18, by commit `39f8835393e`** — `dlls/ntdll/loader.c:4902` seeds
+> every AMD64 guest process's namespace with `ntdll.dll` once, exactly as this
+> handoff asked. Nobody re-ran the titles afterwards, so here is the measurement,
+> headless, with this file's own recipe and a 180-second bound:
+>
+> | | before | after |
+> |---|---|---|
+> | Skyrim SE (489830) | `c0000005` at the image entry, 0 guest instructions | **rc=124** — past the stub, past `loader_init`, through display-driver and keyboard-layout setup, still alive when the bound fired |
+> | Boltgun (2005010) | same fault, byte-identical stub | **rc=124** — same, plus the Common-Controls manifest `fixme` |
+>
+> Neither run shows `handle_syscall_fault pc=0`, and neither shows the wild-pointer
+> fault any more. The expected next wall named below — the stub's Steam checks —
+> was not reached inside the bound; what either title is doing after keyboard-layout
+> setup is not established, and that is the next measurement rather than a claim.
+
+**This was the single highest-value item in that pass: two titles, one cause,
+and it would have recurred on every Steam-DRM-wrapped title.** Full evidence in the
 Skyrim entry above.
 
 `find_guest_module()` (`dlls/ntdll/signal_ppc64.c:1186`) walks
@@ -480,6 +495,8 @@ of rows beside the existing two, and it belongs to whoever owns that file.
 
 ### 3. To the port's own legibility: name the fault, not the run's start
 
+> **CLOSED 2026-08-18, by commit `9fc52010e0c`.**
+
 `dlls/ntdll/signal_ppc64.c:5625` prints
 
     ERR( "failed to emulate AMD64 entry point %p, status %08x\n", entry, status );
@@ -503,6 +520,54 @@ RUN_FAULT internally without any host signal" — that is precisely the case
 that failed here, twice, in two titles.
 
 ### 4. To the compat tool: the VC++ 2010 C++ runtime
+
+> **ATTEMPTED 2026-08-18 AND NOT SHIPPED — but the blocker is now named, and it is
+> not the one below.** Everything this handoff proposed turns out to work; what
+> stops it is one step further in, in the port's own guest loader.
+>
+> The provisioning itself is right, with one correction: the file must go to
+> `C:\windows\sysx8664`, **not** `system32` as the `mfc140u.dll` block does.
+> `find_dll_file`'s guest branch searches the machine's own system directory
+> FIRST, then the tree's builtins, then the ordinary load path — and `msvcp100`
+> HAS a builtin, so a copy on the load path is outranked and never opened, while
+> `mfc140u` has none and so is fine where it is.
+>
+> Staging alone is still not enough. Wine's load order for a DLL it implements is
+> builtin-first, and the traced result is a loader naming the right path while
+> mapping the wrong file:
+>
+> ```
+> trace:module:get_load_order got hardcoded default for L"...\MSVCP100.dll"
+> trace:module:find_builtin_dll looking for "msvcp100.dll" for file L"...\MSVCP100.dll"
+> trace:module:map_image_into_view mapping PE file L"...\MSVCP100.dll" at ...-0x...3000
+>   section .rdata ... section .reloc ...
+> ```
+>
+> — a three-page image with a `.rdata` and a `.reloc` and nothing else, which is
+> this tree's exports-less builtin wearing the staged file's name. So the tool has
+> to ask for the file as well as copy it: `msvcp100=n`.
+>
+> With BOTH, the imports resolve. The hundred-odd
+> `No implementation for MSVCP100.dll.?_Lockit_ctor@...` warnings drop to **zero**,
+> and the file is found and opened —
+> `get_nt_and_unix_names ... -> ret 0 ... unix ".../sysx8664/msvcp100.dll"`,
+> `get_load_order_value got environment n for L"MSVCP100"`.
+>
+> **And then the load fails anyway**: `load_dll Failed to load module
+> L"MSVCP100.dll"; status=c0000135`, so `import_dll` reports the library not found
+> and the image never starts — rc=53 where the sentinel build reached rc=5. That is
+> worse, not better, which is why nothing was committed.
+>
+> So the next step is not the copy list. It is why the guest-machine load path
+> cannot complete a NATIVE-order file it has already found, opened and
+> machine-checked in the machine system directory. `load_native_dll`
+> (`dlls/ntdll/loader.c:3004`) has no guest guard, and both callers of
+> `load_builtin` (`dlls/ntdll/unix/virtual.c:3546` and `:3863`) do handle
+> `STATUS_IMAGE_ALREADY_LOADED` by mapping the real image — so the refusal is
+> inside `load_builtin` itself (`dlls/ntdll/unix/loader.c:2092`), whose only two
+> `LO_NATIVE` exits to `STATUS_DLL_NOT_FOUND` are the `wine_builtin` and
+> `wine_fakedll` arms. One trace of which arm it takes closes this.
+
 
 `msvcp100.dll` is a C++ ABI, and translating the MSVC C++ ABI is exactly what
 this port decided **not** to do — `dlls/msvcp140` already takes the other road,
