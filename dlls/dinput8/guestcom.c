@@ -146,7 +146,19 @@ static const WCHAR *const dinput8_guest_modules[] = { L"dinput8.dll" };
  * predates the export refuses loudly here rather than failing to load, which
  * is the same discipline the rest of this file keeps. */
 static void *(CDECL *guest_wrap_callback)( void *fn, BOOL wide );
-static LONG wrap_resolved;
+/* PUBLICATION IS THE POINTER ITSELF, not a separate "have we looked yet"
+ * flag.  The flag form -- InterlockedCompareExchange(&resolved, 1, 0) and then
+ * `return ptr != NULL` -- has a window: the thread that WINS the exchange is
+ * still inside LdrGetProcedureAddress when a second thread arrives, sees the
+ * flag already set, reads a pointer that has not been stored yet, and reports
+ * "this ntdll has no such export" about an ntdll that does.  The caller then
+ * refuses a callback it could have served, on a race, once, and never again
+ * for the life of the process -- which is exactly the kind of failure that
+ * gets blamed on the guest.  Resolving twice costs two name lookups and
+ * publishes the same address, so the lookup is simply repeated until it
+ * succeeds; wrap_missing remembers a genuine absence so an old ntdll does
+ * not pay a loader walk on every call, and the ERR is said once. */
+static LONG wrap_missing, wrap_said;
 
 static BOOL resolve_wrap_callback(void)
 {
@@ -155,20 +167,22 @@ static BOOL resolve_wrap_callback(void)
     HMODULE ntdll;
     void *proc;
 
-    if (InterlockedCompareExchange( &wrap_resolved, 1, 0 ))
-        return guest_wrap_callback != NULL;
+    if (guest_wrap_callback) return TRUE;
+    if (wrap_missing) return FALSE;
 
     RtlInitUnicodeString( &ntdllW, L"ntdll.dll" );
     RtlInitAnsiString( &name, "__wine_guest_wrap_callback" );
     if (LdrGetDllHandle( NULL, 0, &ntdllW, &ntdll ) ||
         LdrGetProcedureAddress( ntdll, &name, 0, &proc ))
     {
-        ERR( "dinput8: this ntdll exports no __wine_guest_wrap_callback; the "
-             "Enum* slots cannot swap a guest callback for a trampoline and "
-             "will refuse rather than let native dinput call x86-64 bytes\n" );
+        if (!InterlockedExchange( &wrap_said, 1 ))
+            ERR( "dinput8: this ntdll exports no __wine_guest_wrap_callback; the "
+                 "Enum* slots cannot swap a guest callback for a trampoline and "
+                 "will refuse rather than let native dinput call x86-64 bytes\n" );
+        InterlockedExchange( &wrap_missing, 1 );
         return FALSE;
     }
-    guest_wrap_callback = proc;
+    InterlockedExchangePointer( (void **)&guest_wrap_callback, proc );
     return TRUE;
 }
 

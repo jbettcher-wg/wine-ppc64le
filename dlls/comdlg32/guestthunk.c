@@ -113,7 +113,19 @@ WINE_DEFAULT_DEBUG_CHANNEL(guestcb);
  * refuses HERE, loudly and by name, instead of failing to load comdlg32 at
  * all and taking every dialog down with it. */
 static void *(CDECL *guest_wrap_callback)( void *fn, BOOL wide );
-static LONG wrap_resolved;
+/* PUBLICATION IS THE POINTER ITSELF, not a separate "have we looked yet"
+ * flag.  The flag form -- InterlockedCompareExchange(&resolved, 1, 0) and then
+ * `return ptr != NULL` -- has a window: the thread that WINS the exchange is
+ * still inside LdrGetProcedureAddress when a second thread arrives, sees the
+ * flag already set, reads a pointer that has not been stored yet, and reports
+ * "this ntdll has no such export" about an ntdll that does.  The caller then
+ * refuses a callback it could have served, on a race, once, and never again
+ * for the life of the process -- which is exactly the kind of failure that
+ * gets blamed on the guest.  Resolving twice costs two name lookups and
+ * publishes the same address, so the lookup is simply repeated until it
+ * succeeds; wrap_missing remembers a genuine absence so an old ntdll does
+ * not pay a loader walk on every call, and the ERR is said once. */
+static LONG wrap_missing, wrap_said;
 
 static BOOL resolve_wrap_callback(void)
 {
@@ -122,21 +134,23 @@ static BOOL resolve_wrap_callback(void)
     HMODULE ntdll;
     void *proc;
 
-    if (InterlockedCompareExchange( &wrap_resolved, 1, 0 ))
-        return guest_wrap_callback != NULL;
+    if (guest_wrap_callback) return TRUE;
+    if (wrap_missing) return FALSE;
 
     RtlInitUnicodeString( &ntdllW, L"ntdll.dll" );
     RtlInitAnsiString( &name, "__wine_guest_wrap_callback" );
     if (LdrGetDllHandle( NULL, 0, &ntdllW, &ntdll ) ||
         LdrGetProcedureAddress( ntdll, &name, 0, &proc ))
     {
-        ERR( "comdlg32: this ntdll exports no __wine_guest_wrap_callback; a "
-             "hook-enabled common dialog cannot swap the application's hook "
-             "procedure for a trampoline and will refuse rather than let "
-             "native comdlg32 call x86-64 bytes\n" );
+        if (!InterlockedExchange( &wrap_said, 1 ))
+            ERR( "comdlg32: this ntdll exports no __wine_guest_wrap_callback; a "
+                 "hook-enabled common dialog cannot swap the application's hook "
+                 "procedure for a trampoline and will refuse rather than let "
+                 "native comdlg32 call x86-64 bytes\n" );
+        InterlockedExchange( &wrap_missing, 1 );
         return FALSE;
     }
-    guest_wrap_callback = proc;
+    InterlockedExchangePointer( (void **)&guest_wrap_callback, proc );
     return TRUE;
 }
 

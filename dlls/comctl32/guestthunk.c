@@ -107,7 +107,19 @@ WINE_DEFAULT_DEBUG_CHANNEL(guestcb);
  * ntdll predates the export refuses HERE, loudly and by name, rather than
  * failing to load comctl32 and taking every control down with it. */
 static void *(CDECL *guest_wrap_callback)( void *fn, BOOL wide );
-static LONG wrap_resolved;
+/* PUBLICATION IS THE POINTER ITSELF, not a separate "have we looked yet"
+ * flag.  The flag form -- InterlockedCompareExchange(&resolved, 1, 0) and then
+ * `return ptr != NULL` -- has a window: the thread that WINS the exchange is
+ * still inside LdrGetProcedureAddress when a second thread arrives, sees the
+ * flag already set, reads a pointer that has not been stored yet, and reports
+ * "this ntdll has no such export" about an ntdll that does.  The caller then
+ * refuses a callback it could have served, on a race, once, and never again
+ * for the life of the process -- which is exactly the kind of failure that
+ * gets blamed on the guest.  Resolving twice costs two name lookups and
+ * publishes the same address, so the lookup is simply repeated until it
+ * succeeds; wrap_missing remembers a genuine absence so an old ntdll does
+ * not pay a loader walk on every call, and the ERR is said once. */
+static LONG wrap_missing, wrap_said;
 
 static BOOL resolve_wrap_callback(void)
 {
@@ -116,21 +128,23 @@ static BOOL resolve_wrap_callback(void)
     HMODULE ntdll;
     void *proc;
 
-    if (InterlockedCompareExchange( &wrap_resolved, 1, 0 ))
-        return guest_wrap_callback != NULL;
+    if (guest_wrap_callback) return TRUE;
+    if (wrap_missing) return FALSE;
 
     RtlInitUnicodeString( &ntdllW, L"ntdll.dll" );
     RtlInitAnsiString( &name, "__wine_guest_wrap_callback" );
     if (LdrGetDllHandle( NULL, 0, &ntdllW, &ntdll ) ||
         LdrGetProcedureAddress( ntdll, &name, 0, &proc ))
     {
-        ERR( "comctl32: this ntdll exports no __wine_guest_wrap_callback; a "
-             "guest comparator or dialog procedure cannot be swapped for a "
-             "trampoline, and these entry points will refuse rather than let "
-             "native comctl32 call x86-64 bytes\n" );
+        if (!InterlockedExchange( &wrap_said, 1 ))
+            ERR( "comctl32: this ntdll exports no __wine_guest_wrap_callback; a "
+                 "guest comparator or dialog procedure cannot be swapped for a "
+                 "trampoline, and these entry points will refuse rather than let "
+                 "native comctl32 call x86-64 bytes\n" );
+        InterlockedExchange( &wrap_missing, 1 );
         return FALSE;
     }
-    guest_wrap_callback = proc;
+    InterlockedExchangePointer( (void **)&guest_wrap_callback, proc );
     return TRUE;
 }
 
@@ -159,7 +173,7 @@ static void *guest_wrap( void *fn, BOOL wide, const char *what )
  * the SUBCLASSPROC banner at the top of this file for why SIX rather than
  * FOUR. */
 static void *(CDECL *guest_wrap_callback6)( void *fn, BOOL wide );
-static LONG wrap6_resolved;
+static LONG wrap6_missing, wrap6_said;   /* see the publication note above */
 
 static BOOL resolve_wrap_callback6(void)
 {
@@ -168,22 +182,24 @@ static BOOL resolve_wrap_callback6(void)
     HMODULE ntdll;
     void *proc;
 
-    if (InterlockedCompareExchange( &wrap6_resolved, 1, 0 ))
-        return guest_wrap_callback6 != NULL;
+    if (guest_wrap_callback6) return TRUE;
+    if (wrap6_missing) return FALSE;
 
     RtlInitUnicodeString( &ntdllW, L"ntdll.dll" );
     RtlInitAnsiString( &name, "__wine_guest_wrap_callback6" );
     if (LdrGetDllHandle( NULL, 0, &ntdllW, &ntdll ) ||
         LdrGetProcedureAddress( ntdll, &name, 0, &proc ))
     {
-        ERR( "comctl32: this ntdll exports no __wine_guest_wrap_callback6; a "
-             "guest SUBCLASSPROC cannot be swapped for a trampoline, and "
-             "SetWindowSubclass/RemoveWindowSubclass will refuse rather than "
-             "let native comctl32 call x86-64 bytes with two of its six "
-             "arguments unmarshalled\n" );
+        if (!InterlockedExchange( &wrap6_said, 1 ))
+            ERR( "comctl32: this ntdll exports no __wine_guest_wrap_callback6; a "
+                 "guest SUBCLASSPROC cannot be swapped for a trampoline, and "
+                 "SetWindowSubclass/RemoveWindowSubclass will refuse rather than "
+                 "let native comctl32 call x86-64 bytes with two of its six "
+                 "arguments unmarshalled\n" );
+        InterlockedExchange( &wrap6_missing, 1 );
         return FALSE;
     }
-    guest_wrap_callback6 = proc;
+    InterlockedExchangePointer( (void **)&guest_wrap_callback6, proc );
     return TRUE;
 }
 
