@@ -100,6 +100,9 @@
  *       hang.
  *   =4  corrupt the expected pBufferContext in step 17, so the value check on
  *       what the callback received is shown to be a check.
+ *   =5  ask the reverb effect (step 22) for an IID nothing implements, so the
+ *       S_OK that step normally reports is shown to be a check rather than a
+ *       constant.  The XAPO counterpart of =4.
  *
  * NO C RUNTIME on the guest leg; the program formats its own output.
  *
@@ -121,7 +124,37 @@
 
 #include <windows.h>
 #include <mmreg.h>
+#ifdef XA_SMOKE_V8
+/* The xaudio2_8 leg compiles against THAT MODULE'S OWN widl output rather than
+ * include/xaudio2.h, and it has to: include/xaudio2.h is generated once, at
+ * the 2_9 shape (its IID_IXAudio2 is 2b02e3cf-..., which is 2_9's; 2_8's is
+ * 60d8dac8-...), and three of IXAudio2's methods differ between the versions.
+ * A probe built against the 2_9 declarations and pointed at xaudio2_8.dll
+ * would call the right slots with the wrong argument lists -- silently.  So
+ * the gate passes -I<build>/dlls/xaudio2_8 and this include picks up the
+ * header that module was itself compiled from, exactly as
+ * dlls/xaudio2_7/guestcom.c does. */
+#include <xaudio_classes.h>
+#else
 #include <xaudio2.h>
+#endif
+#include <xapo.h>
+
+/* The two XAPO IIDs, spelled out here rather than linked from libuuid, for the
+ * reason ppc64le/syscom/com_smoke.c gives for its own: the guest leg links no
+ * Wine import libraries at all, so a GUID both builds compile from the same
+ * literal is the only way the two legs can be comparing the same thing.  The
+ * values are include/xapo.idl's own uuid() attributes, copied. */
+static const GUID xa_IID_IXAPO =
+    { 0xa410b984, 0x9839, 0x4819, { 0xa0, 0xbe, 0x28, 0x56, 0xae, 0x6b, 0x3a, 0xdb } };
+static const GUID xa_IID_IXAPOParameters =
+    { 0x26d95c66, 0x80f2, 0x499a, { 0xad, 0x54, 0x5a, 0xe7, 0xf0, 0x1c, 0x6d, 0x98 } };
+
+/* CreateAudioReverb is declared in include/xaudio2fx.h, which this probe does
+ * not include because that header drags in the effect PARAMETER structs and
+ * their version conditionals for no benefit here.  One prototype, copied from
+ * xaudio2fx.idl:72. */
+HRESULT WINAPI CreateAudioReverb( IUnknown **out );
 
 /* ------------------------------------------------------------- output */
 
@@ -706,7 +739,101 @@ static int xa_smoke_run( void )
                  "-- the same registration was not found" );
     }
 
-    /* ---- 20: it all comes apart ---------------------------------------- */
+    /* ---- 20-22: AN XAPO EFFECT, WHICH IS A SECOND KIND OF OBJECT --------
+     *
+     * Everything above reaches XAudio2 through XAudio2Create and the voices it
+     * vends.  An effect is different: CreateAudioReverb is a FLAT export that
+     * hands back an object, and until IXAPO and IXAPOParameters were rostered
+     * there was nothing to wrap it as -- so the three XAPO factories were
+     * EXCLUDEd from the guest thunk and a guest asking for a reverb bound the
+     * 0xdead0000 sentinel and faulted by name.  These steps are the proof that
+     * a guest instantiating an audio effect now reaches native code.
+     *
+     * The reverb is created and interrogated but never attached to a voice: an
+     * effect chain is carried INSIDE XAUDIO2_EFFECT_CHAIN, which this surface
+     * still refuses by name (see dlls/xaudio2_7/guestcom.c), and a probe should
+     * not pretend to test something the port says it does not do.  What is
+     * tested is the whole of what the factories now serve: the object arrives,
+     * both of its interfaces answer, and a method on it returns real data.
+     */
+    {
+        IUnknown *reverb = NULL;
+        IXAPO *xapo = NULL;
+        IXAPOParameters *xapop = NULL;
+        XAPO_REGISTRATION_PROPERTIES *props = NULL;
+        HRESULT hr2;
+
+        begin( "CreateAudioReverb (a flat export that vends an object)" );
+        hr = CreateAudioReverb( &reverb );
+        out_hr( "hr", hr );
+        out( " obj=" ); out( reverb ? "yes" : "no" );
+        verdict( SUCCEEDED(hr) && reverb != NULL,
+                 "the reverb factory returned nothing" );
+
+        begin( "QueryInterface(IID_IXAPO) + GetRegistrationProperties" );
+        if (reverb)
+        {
+            hr = IUnknown_QueryInterface( reverb, &xa_IID_IXAPO, (void **)&xapo );
+            if (SUCCEEDED(hr) && xapo)
+                hr = IXAPO_GetRegistrationProperties( xapo, &props );
+        }
+        else hr = E_FAIL;
+        out_hr( "hr", hr );
+        if (SUCCEEDED(hr) && props)
+        {
+            /* Values, not just success.  These are the effect describing
+             * itself, computed on the native side and read back through the
+             * boundary; the two legs must agree on every one of them.  The
+             * name is checked only for being non-empty because it is FAudio's
+             * string and not this port's to pin. */
+            out( " flags=" );      out_hex( props->Flags, 8 );
+            out( " in=" );         out_dec( props->MinInputBufferCount );
+            out( ".." );           out_dec( props->MaxInputBufferCount );
+            out( " out=" );        out_dec( props->MinOutputBufferCount );
+            out( ".." );           out_dec( props->MaxOutputBufferCount );
+            out( " named=" );      out( props->FriendlyName[0] ? "yes" : "no" );
+        }
+        verdict( SUCCEEDED(hr) && xapo != NULL && props != NULL &&
+                 props->FriendlyName[0] != 0 &&
+                 props->MaxInputBufferCount >= props->MinInputBufferCount &&
+                 props->MaxOutputBufferCount >= props->MinOutputBufferCount,
+                 "the effect did not describe itself through IXAPO" );
+        /* props is FAudio's allocation handed straight through by
+         * dlls/xaudio2_7/xapo.c (it does not copy), and no deallocator for it
+         * is exported on this surface.  Freeing it with the wrong allocator
+         * would be worse than not freeing it in a probe that is about to
+         * exit, so it is deliberately left alone and said so here. */
+
+        begin( "QueryInterface(IID_IXAPOParameters) -- the second rostered interface" );
+#if XA_SMOKE_BREAK == 5
+        /* Ask the effect for an interface nothing implements.  The object must
+         * answer E_NOINTERFACE and this step must go red -- which is what
+         * shows the S_OK it normally reports is a CHECK and not a constant.
+         * The bogus IID is IID_IXAPOParameters with its first byte changed. */
+        {
+            static const GUID bogus =
+                { 0x27d95c66, 0x80f2, 0x499a,
+                  { 0xad, 0x54, 0x5a, 0xe7, 0xf0, 0x1c, 0x6d, 0x98 } };
+            hr2 = reverb ? IUnknown_QueryInterface( reverb, &bogus, (void **)&xapop )
+                         : E_FAIL;
+        }
+#else
+        if (reverb)
+            hr2 = IUnknown_QueryInterface( reverb, &xa_IID_IXAPOParameters,
+                                           (void **)&xapop );
+        else hr2 = E_FAIL;
+#endif
+        out_hr( "hr", hr2 );
+        out( " obj=" ); out( xapop ? "yes" : "no" );
+        verdict( SUCCEEDED(hr2) && xapop != NULL,
+                 "the effect did not answer IXAPOParameters" );
+
+        if (xapop) IXAPOParameters_Release( xapop );
+        if (xapo) IXAPO_Release( xapo );
+        if (reverb) IUnknown_Release( reverb );
+    }
+
+    /* ---- 23: it all comes apart ---------------------------------------- */
     {
         ULONG refs;
 

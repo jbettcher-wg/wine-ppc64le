@@ -5,3 +5,14 @@
 5 cdecl -ordinal X3DAudioCalculate(ptr ptr ptr long ptr)
 6 cdecl -ordinal X3DAudioInitialize(long float ptr)
 7 stdcall -ordinal XAudio2CreateWithVersionInfo(ptr long long long)
+
+# The x86-64 guest boundary (dlls/xaudio2_7/guestcom.c, shared with
+# xaudio2_9 through PARENTSRC).  Private entry points, never imported by an
+# application; see dlls/xaudio2_9/xaudio2_9.spec for what each one is.
+@ stdcall -private __wine_com_dispatch(long long ptr)
+@ stdcall -private __wine_com_refuse()
+@ stdcall -private __wine_guest_XAudio2Create(ptr long long)
+@ stdcall -private __wine_guest_XAudio2CreateWithVersionInfo(ptr long long long)
+@ stdcall -private __wine_guest_CreateAudioReverb(ptr)
+@ stdcall -private __wine_guest_CreateAudioVolumeMeter(ptr)
+@ cdecl -private __wine_guest_CreateFX(ptr ptr ptr long)

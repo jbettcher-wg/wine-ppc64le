@@ -67,8 +67,12 @@
  *   * XAUDIO2_VOICE_SENDS and XAUDIO2_EFFECT_CHAIN carry IXAudio2Voice* and
  *     IUnknown* members INSIDE a struct.  A send list holds proxies the guest
  *     got FROM us and wants unwrapping, not reverse-proxying; an effect chain
- *     holds XAPO objects the guest implemented, of an interface this roster
- *     does not carry, so there is no slot table to build a native vtable from.
+ *     holds XAPO objects the GUEST implemented, which needs a reverse proxy
+ *     built from a struct FIELD rather than from an argument position.  Note
+ *     that IXAPO and IXAPOParameters are on the roster now -- that is what
+ *     lets the three factories at the end of this file hand a guest an effect
+ *     THIS module created -- so what is missing here is specifically the
+ *     struct-carried reverse direction, not the interface.
  *     Both are refused BY NAME, and the three creators stay hand-written so
  *     that the NULL case -- which is what a game that pushes buffers and polls
  *     actually passes -- is fully served.
@@ -104,6 +108,15 @@ WINE_DEFAULT_DEBUG_CHANNEL(xaudio2);
 HRESULT WINAPI XAudio2Create( IXAudio2 **ppxa2, UINT32 flags, XAUDIO2_PROCESSOR proc );
 HRESULT WINAPI XAudio2CreateWithVersionInfo( IXAudio2 **ppxa2, UINT32 flags,
                                              XAUDIO2_PROCESSOR proc, DWORD version );
+/* The XAPO factories, declared here for the same reason: their prototypes live
+ * in include/xapofx.h and include/xapo.h, which this module does not include
+ * because those too are generated once for everybody.  These are xapo.c's and
+ * xapofx.c's own lines, copied -- CreateFX is CDECL and the other two are
+ * WINAPI, exactly as the .spec says. */
+HRESULT WINAPI CreateAudioReverb( IUnknown **out );
+HRESULT WINAPI CreateAudioVolumeMeter( IUnknown **out );
+HRESULT CDECL  CreateFX( REFCLSID clsid, IUnknown **out, void *initdata,
+                         UINT32 initdata_bytes );
 
 /* ------------------------------------------------ the live-voice registry */
 
@@ -420,13 +433,41 @@ static const winecom_hand_fn xaudio2_hand_funcs[] =
 
 C_ASSERT( ARRAYSIZE(xaudio2_hand_funcs) == XAUDIO2_HAND_COUNT );
 
-/* ------------------------------------------------- the runtime instance */
+/* ------------------------------------------------- the runtime instance
+ *
+ * THE ONLY VERSION-DEPENDENT LINES IN THIS FILE, which is why it lives in
+ * xaudio2_7 and is reached by both 2_8 and 2_9 through their PARENTSRC rather
+ * than copied.  Everything above -- the marshal dispatch, the hand slots, the
+ * reverse-proxy plumbing -- is identical for the two versions, because the
+ * ROSTERS are the same shape (8 interfaces, 115 slots); what differs between
+ * them is IXAudio2's IID and the argument lists of three of its methods, and
+ * all of that is data in the generated xaudio2_marshal.h each module compiles
+ * against its own copy of.  Sharing the code and NOT the table is the whole
+ * point: a second copy of 609 lines would drift.
+ *
+ * Spelled as an explicit per-version block rather than token-pasting
+ * XAUDIO2_VER into a name, so that the set of versions this file serves is
+ * something you can read.  2_7 is deliberately absent: it exports no creator
+ * at all, so a 2.7 guest arrives through CoCreateInstance in combase's
+ * winecom instance instead, and there is nothing for this surface to serve
+ * (see the banner in dlls/xaudio2_9/xaudio2_9.thunks).
+ */
 
-static const WCHAR *const xaudio2_guest_modules[] = { L"xaudio2_9.dll" };
+#if XAUDIO2_VER == 9
+# define XAUDIO2_GUEST_MODULE  L"xaudio2_9.dll"
+# define XAUDIO2_SURFACE_NAME  "xaudio2_9"
+#elif XAUDIO2_VER == 8
+# define XAUDIO2_GUEST_MODULE  L"xaudio2_8.dll"
+# define XAUDIO2_SURFACE_NAME  "xaudio2_8"
+#else
+# error "this winecom surface serves xaudio2_8 and xaudio2_9 only; see the comment above"
+#endif
+
+static const WCHAR *const xaudio2_guest_modules[] = { XAUDIO2_GUEST_MODULE };
 
 static const struct winecom_surface xaudio2_surface =
 {
-    .name = "xaudio2_9",
+    .name = XAUDIO2_SURFACE_NAME,
     .guest_modules = xaudio2_guest_modules,
     .module_count = ARRAYSIZE(xaudio2_guest_modules),
     .ifaces = xaudio2_com_ifaces,
@@ -605,5 +646,70 @@ HRESULT WINAPI __wine_guest_XAudio2CreateWithVersionInfo( IXAudio2 **out, UINT32
     if (!xaudio2_com_ready()) return E_FAIL;
     hr = XAudio2CreateWithVersionInfo( out, flags, proc, version );
     if (SUCCEEDED(hr)) winecom_wrap_static( (void **)out, XAUDIO2_IFACE_IXAudio2 );
+    return hr;
+}
+
+/* ------------------------------------------------- the XAPO factories
+ *
+ * The three effect factories, which xaudio2_9.thunks used to EXCLUDE -- so a
+ * guest asking for a reverb bound a 0xdead0000 sentinel and faulted by name.
+ * They are served now because IXAPO and IXAPOParameters are on the roster.
+ *
+ * WHY THE WRAP IS IXAPO AND NOT SOMETHING CLEVERER.  All three hand back
+ * `IUnknown **`, but the pointer is not an anonymous IUnknown: dlls/
+ * xaudio2_7/xapo.c writes `*out = (IUnknown *)&object->IXAPO_iface` in both
+ * CreateAudioReverb and CreateAudioVolumeMeter, and xapofx.c's CreateFX
+ * reaches the same object through its class factory.  So the vtable at that
+ * address IS an IXAPO vtable, and wrapping it as anything else would line the
+ * guest's stub array up against the wrong slot list.  IXAPOParameters is
+ * reached the way COM says it is -- QueryInterface on the returned object,
+ * which xapo.c answers from the same allocation -- and libs/winecom wraps
+ * that result through the roster like any other interface-returning slot.
+ *
+ * WHY THEY ARE GUEST-IMPL RATHER THAN GUEST-REFUSE, and this is the part
+ * xaudio2_9.thunks called a finding rather than a preference: spec2thunk's
+ * flat-surface audit classifies a parameter as interface-bearing when it
+ * names a ROSTERED interface, a known carrier struct or a bare void**, and
+ * `IUnknown **ppApo` was none of those.  It still is none of those -- the
+ * audit's blind spot is not closed by this change and is recorded as open in
+ * dlls/xaudio2_9/xaudio2_9.thunks -- but with a GUEST-IMPL there is nothing
+ * for the audit to be wrong about: the redirect is explicit, the wrap is
+ * written here by hand, and a guest never sees the native pointer at all.
+ *
+ * CreateFX is CDECL, unlike the other two, because its .spec line is -- it
+ * takes four arguments and the trailing two are pass-through.  The
+ * XAUDIO2_VER split is xapofx.c's own (the 2.7 form takes two arguments);
+ * this file only serves 2_8 and 2_9, both of which have the four-argument
+ * form, so there is no conditional here.
+ */
+
+HRESULT WINAPI __wine_guest_CreateAudioReverb( IUnknown **out )
+{
+    HRESULT hr;
+
+    if (!xaudio2_com_ready()) return E_FAIL;
+    hr = CreateAudioReverb( out );
+    if (SUCCEEDED(hr)) winecom_wrap_static( (void **)out, XAUDIO2_IFACE_IXAPO );
+    return hr;
+}
+
+HRESULT WINAPI __wine_guest_CreateAudioVolumeMeter( IUnknown **out )
+{
+    HRESULT hr;
+
+    if (!xaudio2_com_ready()) return E_FAIL;
+    hr = CreateAudioVolumeMeter( out );
+    if (SUCCEEDED(hr)) winecom_wrap_static( (void **)out, XAUDIO2_IFACE_IXAPO );
+    return hr;
+}
+
+HRESULT CDECL __wine_guest_CreateFX( REFCLSID clsid, IUnknown **out,
+                                     void *initdata, UINT32 initdata_bytes )
+{
+    HRESULT hr;
+
+    if (!xaudio2_com_ready()) return E_FAIL;
+    hr = CreateFX( clsid, out, initdata, initdata_bytes );
+    if (SUCCEEDED(hr)) winecom_wrap_static( (void **)out, XAUDIO2_IFACE_IXAPO );
     return hr;
 }

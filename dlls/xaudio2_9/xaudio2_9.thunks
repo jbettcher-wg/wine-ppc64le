@@ -3,7 +3,7 @@
 # Read dlls/dsound/dsound.thunks first: this is the same arrangement -- a
 # NATIVE Wine implementation (xaudio_dll.c over FAudio) served to an emulated
 # x86-64 guest through libs/winecom -- with the two complications XAudio2 adds,
-# both of which dlls/xaudio2_9/guestcom.c explains at length:
+# both of which dlls/xaudio2_7/guestcom.c explains at length:
 #
 #   * four of the six rostered interfaces are `[local]` and NOT
 #     IUnknown-derived, so the native module claims them in its own
@@ -11,12 +11,16 @@
 #     QueryInterface;
 #   * a voice is destroyed by DestroyVoice, not by Release.
 #
-# WHY 2_9 AND NOT THE WHOLE FAMILY.  IXAudio2's IID and two of its method lists
-# are version-conditional, so each version is a DIFFERENT roster and needs its
-# own generated pair.  2_9 is the one modern titles link.  xaudio2_8 is a
-# mechanical repeat -- add "xaudio2_8" to SURFACES in ppc64le/audio/
-# gen_interfaces.py and gen_winecom.py, generate the two files, copy this file
-# and the three Makefile/spec lines.  xaudio2_7 is NOT mechanical: it exports
+# WHY A ROSTER PER VERSION.  IXAudio2's IID and two of its method lists are
+# version-conditional, so each version is a DIFFERENT roster and needs its own
+# generated pair.  2_9 is the one modern titles link.  xaudio2_8 was the
+# mechanical repeat this banner used to describe as future work and it is now
+# DONE -- dlls/xaudio2_8/xaudio2_8.thunks, its own
+# ppc64le/audio/interfaces_xaudio2_8.json and its own xaudio2_marshal.h.  The
+# code behind both is one file, dlls/xaudio2_7/guestcom.c, reached from here
+# and from 2_8 through PARENTSRC: the two rosters come out the same SHAPE (8
+# interfaces, 115 slots), so only the TABLES differ and a second copy of 609
+# lines would only have drifted.  xaudio2_7 is NOT mechanical: it exports
 # no creator at all, so a 2.7 guest reaches XAudio2 through
 # CoCreateInstance(CLSID_XAudio2_7), which lands in COMBASE's winecom instance
 # -- a different instance with a different roster, in which IXAudio2 does not
@@ -33,26 +37,47 @@ COM-JSON  ../../ppc64le/audio/interfaces_xaudio2_9.json
 # declaration -- which is exactly the state x3daudio1_7.dll was in.
 PROBE-EXTRA xaudio2.h
 PROBE-EXTRA x3daudio.h
+# xaudio2fx.h declares CreateAudioReverb and CreateAudioVolumeMeter;
+# xaudio2_flat_surface.h declares CreateFX, which Wine ships and no Wine
+# header declares (see that file, and dlls/xapofx1_5/xapofx1_5.thunks
+# where the same finding was first written down).  Without these three
+# the XAPO factories below are refused as "no declaration found in Wine
+# headers" and the GUEST-IMPL lines naming them fail the flat-surface
+# audit -- which is exactly how this was found.
+PROBE-EXTRA xaudio2fx.h
+PROBE-EXTRA xaudio2_flat_surface.h
+INCLUDE-DIR ../xaudio2_7
 
 GUEST-IMPL XAudio2Create                 __wine_guest_XAudio2Create
 GUEST-IMPL XAudio2CreateWithVersionInfo  __wine_guest_XAudio2CreateWithVersionInfo
 
-# The three XAPO factories vend an IUnknown -- an audio effect object -- and
-# IUnknown is not in this roster, so there is no guest stub vtable to give one.
-# They are EXCLUDED rather than GUEST-REFUSEd, and that is a finding rather
-# than a preference: spec2thunk's flat-surface audit classifies a parameter as
-# interface-bearing when it names a ROSTERED interface, a known carrier struct
-# or a bare void**, and `IUnknown **ppApo` is none of those -- so the audit
-# calls a GUEST-REFUSE on them STALE and would let them pass through, handing
-# the guest a native vtable it would then call as x86-64.  Excluding them binds
-# a guest import to the usual per-symbol 0xdead0000 sentinel, so an application
-# that wants a reverb faults with the symbol's own name instead of crashing
-# inside it.  The audit's blind spot is handed off separately; serving these
-# properly means rostering the XAPO interfaces (IXAPO, IXAPOParameters), which
-# is its own piece of work and is not needed to play a sound.
-EXCLUDE CreateAudioReverb
-EXCLUDE CreateAudioVolumeMeter
-EXCLUDE CreateFX
+# The three XAPO factories, SERVED now rather than excluded.  They used to be
+# EXCLUDEd -- a guest asking for a reverb bound the per-symbol 0xdead0000
+# sentinel and faulted by name -- because they vend the effect as
+# `IUnknown **ppApo` and there was no XAPO interface on this roster to wrap it
+# as.  IXAPO and IXAPOParameters are on the roster now (10 interfaces, 133
+# slots), so each factory gets a GUEST-IMPL wrapper in
+# dlls/xaudio2_7/guestcom.c that calls the native entry point and wraps the
+# result as IXAPO -- which is what the object actually is: xapo.c writes
+# `*out = (IUnknown *)&object->IXAPO_iface`.  IXAPOParameters is reached from
+# there by QueryInterface, which winecom wraps through the roster like any
+# other interface-returning slot.
+#
+# GUEST-IMPL rather than GUEST-REFUSE, and the reason is the same finding this
+# block used to record: spec2thunk's flat-surface audit classifies a parameter
+# as interface-bearing when it names a ROSTERED interface, a known carrier
+# struct or a bare void**, and `IUnknown **ppApo` is still none of those, so a
+# GUEST-REFUSE here would be reported STALE and let the export through.  That
+# blind spot in the audit is NOT closed by this change and is still open; what
+# changed is that these three no longer depend on it, because a GUEST-IMPL
+# redirect is explicit and the wrap is written by hand.
+GUEST-IMPL CreateAudioReverb     __wine_guest_CreateAudioReverb
+GUEST-IMPL CreateAudioVolumeMeter __wine_guest_CreateAudioVolumeMeter
+GUEST-IMPL CreateFX              __wine_guest_CreateFX
+
+EXCLUDE __wine_guest_CreateAudioReverb
+EXCLUDE __wine_guest_CreateAudioVolumeMeter
+EXCLUDE __wine_guest_CreateFX
 
 # X3DAudioInitialize and X3DAudioCalculate are NOT here: they are flat maths
 # over plain structs, they carry no interface pointer, and the audit agrees.

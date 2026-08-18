@@ -270,7 +270,7 @@ SURFACES = {
     "xaudio2_9": dict(
         prefix="xaudio2",
         roster="interfaces_xaudio2_9.json",
-        headers=["dlls/xaudio2_9/xaudio_classes.h"],
+        headers=["dlls/xaudio2_9/xaudio_classes.h", "include/xapo.h"],
         headers_from_build=True,
         extra_headers=["windef.h", "minwindef.h", "winnt.h", "guiddef.h", "mmreg.h",
                        "basetsd.h"],
@@ -318,7 +318,7 @@ SURFACES = {
     "xaudio2_8": dict(
         prefix="xaudio2",
         roster="interfaces_xaudio2_8.json",
-        headers=["dlls/xaudio2_8/xaudio_classes.h"],
+        headers=["dlls/xaudio2_8/xaudio_classes.h", "include/xapo.h"],
         headers_from_build=True,
         extra_headers=["windef.h", "minwindef.h", "winnt.h", "guiddef.h", "mmreg.h",
                        "basetsd.h"],

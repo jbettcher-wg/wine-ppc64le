@@ -1,5 +1,5 @@
 {
-  "surface": "wine-xaudio2_9",
+  "surface": "wine-xaudio2_8",
   "iface_ptr_aliases": {},
   "enums": [
     "XAPO_BUFFER_FLAGS",
@@ -189,7 +189,7 @@
       ]
     },
     "IXAudio2": {
-      "uuid": "2b02e3cf-2e0b-4ec3-be45-1b2a3fe7210d",
+      "uuid": "60d8dac8-5aa1-4e8e-b597-2f5e2883d484",
       "base": "IUnknown",
       "header": "xaudio_classes.h",
       "slots": [

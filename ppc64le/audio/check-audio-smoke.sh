@@ -77,7 +77,7 @@
 #   1  WINEEMUNOCOMWRAP=1 hands the guest RAW host pointers -- the exact defect
 #      libs/winecom exists to fix, in EITHER direction now -- and neither
 #      guest leg may PASS.
-#   2  each DS_SMOKE_BREAK=1..3 and XA_SMOKE_BREAK=1..4 build of the NATIVE leg
+#   2  each DS_SMOKE_BREAK=1..3 and XA_SMOKE_BREAK=1..5 build of the NATIVE leg
 #      must FAIL, so the checks are shown to be checks.
 #
 # Exit 0 = pass, 1 = a check failed, 2 = could not run at all (a skip is NOT a
@@ -162,6 +162,7 @@ TIMEOUT=${TIMEOUT:-240}
 INCL="-I$BUILD/include -I$SRC/include -I$SRC/include/msvcrt"
 DS_GUEST="$BUILD/dlls/dsound/x86_64-windows/dsound.dll"
 XA_GUEST="$BUILD/dlls/xaudio2_9/x86_64-windows/xaudio2_9.dll"
+XA8_GUEST="$BUILD/dlls/xaudio2_8/x86_64-windows/xaudio2_8.dll"
 X3D_GUEST="$BUILD/dlls/x3daudio1_7/x86_64-windows/x3daudio1_7.dll"
 
 # ---- A: the rosters and the marshal tables are current ---------------------
@@ -184,6 +185,7 @@ roster_check() {   # roster_check <surface> <marshal header>
 }
 roster_check dsound    "$SRC/dlls/dsound/dsound_marshal.h"
 roster_check xaudio2_9 "$SRC/dlls/xaudio2_9/xaudio2_marshal.h"
+roster_check xaudio2_8 "$SRC/dlls/xaudio2_8/xaudio2_marshal.h"
 
 # ---- B: the guest thunk modules -------------------------------------------
 # Reads the module's own __wine_com_thunk_info the way libs/winecom does, so
@@ -241,7 +243,15 @@ check_guest_module() {   # <label> <dll> <want ifaces> <want slots>
     fi
 }
 check_guest_module dsound    "$DS_GUEST" 21 202
-check_guest_module xaudio2_9 "$XA_GUEST" 8 115
+# 10/133 rather than 8/115 since IXAPO and IXAPOParameters joined the roster,
+# which is what lets the three XAPO factories be served instead of excluded.
+check_guest_module xaudio2_9 "$XA_GUEST" 10 133
+# xaudio2_8 is the SAME roster shape as 2_9 -- 10 interfaces, 133 slots -- and
+# that is the point of it having its own generated pair rather than sharing
+# 2_9's: what differs between the versions is IXAudio2's IID and three of its
+# method signatures, neither of which changes the counts.  Equal numbers here
+# are therefore a real check that both were generated, not a tautology.
+check_guest_module xaudio2_8 "$XA8_GUEST" 10 133
 
 # The one-line regression: x3daudio1_7 exported NOTHING until x3daudio.h
 # reached the thunk generator's signature oracle, so every SkyrimSE import of
@@ -314,7 +324,7 @@ native_build() {   # native_build <probe> <define> <output> [extra cflags...]
         --cc-cmd="${CC:-gcc}" -mno-cygwin -fPIC -fasynchronous-unwind-tables \
         -Wl,--wine-builtin -mconsole "$OUT/native.o" \
         "$BUILD/dlls/dsound/ppc64-windows/libdsound.a" \
-        "$BUILD/dlls/xaudio2_9/ppc64-windows/libxaudio2_9.a" \
+        "$BUILD/dlls/${XA_MODULE:-xaudio2_9}/ppc64-windows/lib${XA_MODULE:-xaudio2_9}.a" \
         "$BUILD/dlls/winmm/ppc64-windows/libwinmm.a" \
         "$BUILD/dlls/user32/ppc64-windows/libuser32.a" \
         "$BUILD/libs/winecrt0/ppc64-windows/libwinecrt0.a" \
@@ -364,6 +374,16 @@ cat > "$OUT/xaudio2_9.def" <<'EOF'
 LIBRARY xaudio2_9.dll
 EXPORTS
 XAudio2Create
+; The XAPO factory xa_smoke.c steps 20-22 drive.  It used to be EXCLUDEd
+; from the guest thunk, so importing it would have bound a sentinel.
+; (a .def comment is ";", not "#" -- llvm-dlltool rejects the latter)
+CreateAudioReverb
+EOF
+cat > "$OUT/xaudio2_8.def" <<'EOF'
+LIBRARY xaudio2_8.dll
+EXPORTS
+XAudio2Create
+CreateAudioReverb
 EOF
 cat > "$OUT/winmm.def" <<'EOF'
 LIBRARY winmm.dll
@@ -379,7 +399,7 @@ waveOutClose
 waveOutGetPosition
 PlaySoundW
 EOF
-for m in kernel32 user32 dsound xaudio2_9 winmm; do
+for m in kernel32 user32 dsound xaudio2_9 xaudio2_8 winmm; do
     llvm-dlltool -m i386:x86-64 -d "$OUT/$m.def" -l "$OUT/lib$m.a" \
         || skip "llvm-dlltool failed for $m"
 done
@@ -391,7 +411,9 @@ GUESTLD="clang -target x86_64-windows-gnu -fuse-ld=lld -nostdlib \
 
 guest_build() {   # guest_build <probe> <entry> <output> <extra libs...>
     probe=$1; entry=$2; gout=$3; shift 3
-    $GUESTCC -c -o "$OUT/guest.o" "$HERE/probes/$probe" \
+    # GUEST_EXTRA is how the xaudio2_8 leg points the same source at that
+    # module's own widl header; empty for every other caller.
+    $GUESTCC ${GUEST_EXTRA:-} -c -o "$OUT/guest.o" "$HERE/probes/$probe" \
         2>"$OUT/guest.build.err" || return 1
     $GUESTLD -Wl,--entry="$entry" -o "$gout" "$OUT/guest.o" "$@" \
         "$OUT/libuser32.a" "$OUT/libkernel32.a" 2>>"$OUT/guest.build.err" || return 1
@@ -436,7 +458,7 @@ it must"
             echo "check-audio-smoke: sabotage(ds_break=$b): failed, as it must"
         fi
     done
-    for b in 1 2 3 4; do
+    for b in 1 2 3 4 5; do
         native_build xa_smoke.c XA_SMOKE_NATIVE "$OUT/xa_break$b.exe" \
             -DXA_SMOKE_BREAK=$b || {
             echo "check-audio-smoke: FAIL XA_SMOKE_BREAK=$b did not build" >&2
@@ -515,6 +537,23 @@ $(grep -c '^step ' "$OUT/${lbl}_native.out") checked steps)"
 
 run_leg ds ds_smoke.c ds_smoke_entry DS_SMOKE_NATIVE "$OUT/libdsound.a" ds_smoke
 run_leg xa xa_smoke.c xa_smoke_entry XA_SMOKE_NATIVE "$OUT/libxaudio2_9.a" xa_smoke
+# The SAME probe, the same 23 steps, driven through xaudio2_8 instead.  This is
+# not a duplicate of the leg above: 2_8 is a different roster, a different
+# IXAudio2 IID and three different method signatures, all reached through a
+# separately generated marshal table and a separately generated guest thunk.
+# The two legs' transcripts are each diffed against their OWN native control
+# rather than against each other, because what is being proved is that each
+# version's boundary carries its own version's values -- not that the two
+# versions agree, which is a claim about XAudio2 and not about this port.
+#
+# XA_MODULE swaps the ppc64 import library the native leg links; GUEST_EXTRA
+# points the guest compile at dlls/xaudio2_8/xaudio_classes.h, that module's
+# own widl output.  Both are unset again afterwards so nothing below inherits
+# them.
+XA_MODULE=xaudio2_8 \
+GUEST_EXTRA="-DXA_SMOKE_V8 -I$BUILD/dlls/xaudio2_8" \
+run_leg xa8 xa_smoke.c xa_smoke_entry XA_SMOKE_NATIVE "$OUT/libxaudio2_8.a" xa_smoke
+unset XA_MODULE GUEST_EXTRA
 run_leg mm mm_smoke.c mm_smoke_entry MM_SMOKE_NATIVE "$OUT/libwinmm.a" mm_smoke
 
 # ---- H: the DirectSound refusal, by name -----------------------------------
@@ -555,7 +594,7 @@ of guest vtables -- the proxies did not come from libs/winecom"
     fi
 }
 mechanism ds ds_guest.exe 21 202
-mechanism xa xa_guest.exe 8 115
+mechanism xa xa_guest.exe 10 133
 
 # ---- L: the reverse-proxy path is SERVED, and the trace proves it ---------
 # xa_smoke.c's steps 13-19 already diffed RegisterForCallbacks and

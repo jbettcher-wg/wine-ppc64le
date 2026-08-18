@@ -82,7 +82,7 @@ SURFACES = {
         # dlls/xaudio2_9/xaudio_classes.h is the header xaudio2_9.dll was
         # actually compiled from -- IIDs, IXAudio2's first three methods and
         # IXAudio2SourceVoice::GetState all differ by version.
-        headers=["dlls/xaudio2_9/xaudio_classes.h"],
+        headers=["dlls/xaudio2_9/xaudio_classes.h", "include/xapo.h"],
         from_build=True,
         # What a guest can be handed, AND what a guest can HAND OVER.  The two
         # callback interfaces are the second kind: IXAudio2EngineCallback and
@@ -100,7 +100,22 @@ SURFACES = {
         keep=["IXAudio2", "IXAudio2Extension", "IXAudio2Voice",
               "IXAudio2SourceVoice", "IXAudio2SubmixVoice",
               "IXAudio2MasteringVoice",
-              "IXAudio2EngineCallback", "IXAudio2VoiceCallback"],
+              "IXAudio2EngineCallback", "IXAudio2VoiceCallback",
+              # AND the two XAPO effect interfaces, which come from a
+              # DIFFERENT header: include/xapo.h, widl's translation of
+              # include/xapo.idl.  They are not version-conditional the way
+              # IXAudio2 is -- xapo.idl has no XAUDIO2_VER in it -- so the
+              # same declarations serve 2_8 and 2_9, and unlike the voices
+              # they are REAL IUnknown-derived interfaces with real IIDs in
+              # the header (a410b984-... and 26d95c66-...), so nothing here
+              # is synthetic.  They are rostered because the three XAPO
+              # factories vend one: dlls/xaudio2_7/xapo.c hands
+              # CreateAudioReverb's and CreateAudioVolumeMeter's caller
+              # `&object->IXAPO_iface` cast to IUnknown*, and that object's
+              # QueryInterface answers IXAPOParameters from the same
+              # allocation.  Without both on the roster the factories had to
+              # be EXCLUDEd and a guest asking for a reverb got a sentinel.
+              "IXAPO", "IXAPOParameters"],
     ),
     # The mechanical repeat xaudio2_9.thunks describes: SAME roster shape as
     # 2_9 (IXAudio2's IID and the first three methods are version-conditional,
@@ -110,12 +125,15 @@ SURFACES = {
     # (shared via PARENTSRC) with -DXAUDIO2_VER=8.  Requires a build tree.
     "xaudio2_8": dict(
         dialect="midl",
-        headers=["dlls/xaudio2_8/xaudio_classes.h"],
+        headers=["dlls/xaudio2_8/xaudio_classes.h", "include/xapo.h"],
         from_build=True,
         keep=["IXAudio2", "IXAudio2Extension", "IXAudio2Voice",
               "IXAudio2SourceVoice", "IXAudio2SubmixVoice",
               "IXAudio2MasteringVoice",
-              "IXAudio2EngineCallback", "IXAudio2VoiceCallback"],
+              "IXAudio2EngineCallback", "IXAudio2VoiceCallback",
+              # Same two XAPO interfaces, same header, same reason -- see the
+              # 2_9 entry above.
+              "IXAPO", "IXAPOParameters"],
     ),
     # The WHOLE system-COM surface -- the roster libs/winecom, combase's
     # syscom.c and every guest COM module are built from.  This is the surface

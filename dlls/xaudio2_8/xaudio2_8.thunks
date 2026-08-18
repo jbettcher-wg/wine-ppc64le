@@ -1,0 +1,80 @@
+# AMD64 thunk export spec for the guest xaudio2_8.dll -- COM mode.
+#
+# Read dlls/xaudio2_9/xaudio2_9.thunks first.  Everything structural is that
+# file's: the winecom arrangement, the four `[local]` non-IUnknown interfaces
+# the native module claims in its own __wine_com_dispatch, and DestroyVoice
+# rather than Release ending a voice's life.  This file is the "mechanical
+# repeat" that one names, and the repeat is now done.
+#
+# WHY IT IS A SEPARATE ROSTER AND NOT A SHARED ONE.  IXAudio2's IID differs
+# between 2.8 and 2.9, and so do the argument lists of three of its methods --
+# xaudio_classes.idl is compiled once per version with -DXAUDIO2_VER, and widl
+# emits a different vtable each time.  A shared table would therefore dispatch
+# a 2.8 guest's call through 2.9's slot descriptions, which is the class of
+# mistake that compiles and then plays the wrong thing.  So this module gets
+# its own generated pair, from its own header:
+#
+#   ppc64le/audio/interfaces_xaudio2_8.json    8 interfaces, 115 vtable slots,
+#                                              from dlls/xaudio2_8/xaudio_classes.h
+#   dlls/xaudio2_8/xaudio2_marshal.h           93 marshalled, 16 hand-written,
+#                                              0 refused
+#
+# The two versions come out the same SHAPE (8 and 115 either way), which is
+# what makes dlls/xaudio2_7/guestcom.c shareable between them through
+# PARENTSRC -- the code is common, the tables are not.  That file carries the
+# only two version-dependent lines and picks them with XAUDIO2_VER; see its
+# "the runtime instance" comment for why it is spelled as an explicit block.
+
+# PROVEN AT RUNTIME, not just built.  ppc64le/audio/check-audio-smoke.sh runs
+# the xa8 leg: probes/xa_smoke.c compiled a SECOND time against
+# dlls/xaudio2_8/xaudio_classes.h (via -DXA_SMOKE_V8) and linked against this
+# module, native ppc64 and x86-64 guest, 23 value-checking steps each and the
+# two transcripts byte-identical.  The second compile is not fussiness:
+# include/xaudio2.h is generated once at the 2_9 shape -- its IID_IXAudio2 is
+# 2b02e3cf-..., which is 2_9's, where this module's is 60d8dac8-... -- so a
+# probe built against it and pointed here would call the right slots with the
+# wrong argument lists and say nothing about it.
+
+DLL       xaudio2_8.dll
+FROM-SPEC auto
+COM-JSON  ../../ppc64le/audio/interfaces_xaudio2_8.json
+
+# The oracle's default translation unit has neither xaudio2.h nor x3daudio.h,
+# and without them every export of this module would be refused for having no
+# declaration -- exactly as xaudio2_9.thunks records.
+PROBE-EXTRA xaudio2.h
+PROBE-EXTRA x3daudio.h
+# xaudio2fx.h declares CreateAudioReverb and CreateAudioVolumeMeter;
+# xaudio2_flat_surface.h declares CreateFX, which Wine ships and no Wine
+# header declares (see that file, and dlls/xapofx1_5/xapofx1_5.thunks
+# where the same finding was first written down).  Without these three
+# the XAPO factories below are refused as "no declaration found in Wine
+# headers" and the GUEST-IMPL lines naming them fail the flat-surface
+# audit -- which is exactly how this was found.
+PROBE-EXTRA xaudio2fx.h
+PROBE-EXTRA xaudio2_flat_surface.h
+INCLUDE-DIR ../xaudio2_7
+
+# Both creators, because dlls/xaudio2_8/xaudio2_8.spec exports both -- the
+# export lists of 2_8 and 2_9 are identical, ordinal for ordinal.  It is the
+# vtables behind IXAudio2 that differ between the versions, not the flat
+# surface in front of it.
+GUEST-IMPL XAudio2Create                 __wine_guest_XAudio2Create
+GUEST-IMPL XAudio2CreateWithVersionInfo  __wine_guest_XAudio2CreateWithVersionInfo
+
+# The three XAPO factories, served through GUEST-IMPL wrappers exactly as in
+# xaudio2_9.thunks -- see that file's block for the full reasoning and for the
+# audit blind spot that is still open.  The wrappers themselves are shared:
+# dlls/xaudio2_7/guestcom.c, reached from here through PARENTSRC.
+GUEST-IMPL CreateAudioReverb     __wine_guest_CreateAudioReverb
+GUEST-IMPL CreateAudioVolumeMeter __wine_guest_CreateAudioVolumeMeter
+GUEST-IMPL CreateFX              __wine_guest_CreateFX
+
+EXCLUDE __wine_guest_CreateAudioReverb
+EXCLUDE __wine_guest_CreateAudioVolumeMeter
+EXCLUDE __wine_guest_CreateFX
+
+EXCLUDE __wine_com_dispatch
+EXCLUDE __wine_com_refuse
+EXCLUDE __wine_guest_XAudio2Create
+EXCLUDE __wine_guest_XAudio2CreateWithVersionInfo
