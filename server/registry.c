@@ -1827,13 +1827,17 @@ static void init_supported_machines(void)
          * guest image has to clear before any emulator is ever asked to run it.
          * As on aarch64 it is unconditional -- it says the prefix will accept
          * such an image, not that a backend is present, and it is only the
-         * first entry that has to be real (native_machine below).
-         * I386 is deliberately not here.  It is not merely an unused extra: the
-         * init_registry() loops downstream key off this list, so adding it also
-         * creates drive_c/windows/syswow64 and marks Software\Classes\
-         * Wow6432Node shared.  AMD64 triggers neither.  Add I386 when there is
-         * a 32-bit guest story, not before. */
+         * first entry that has to be real (native_machine below). */
         supported_machines[count++] = IMAGE_FILE_MACHINE_AMD64;
+        /* I386 is the 32-bit guest story: real WoW64, with the embedded
+         * emulator as the CPU backend (ppc64le/wow64/DESIGN.md).  Listing it
+         * is load-bearing beyond is_machine_supported(): the init_registry()
+         * loops downstream key off this list, so it also creates
+         * drive_c/windows/syswow64 and marks Software\Classes\Wow6432Node
+         * shared -- both of which the wow64 lane needs.  ARMNT stays out:
+         * there is no ARM emulator in this stack, and listing a machine is a
+         * promise the prefix will run it. */
+        supported_machines[count++] = IMAGE_FILE_MACHINE_I386;
     }
 #else
 #error Unsupported machine

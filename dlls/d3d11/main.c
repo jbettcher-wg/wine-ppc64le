@@ -44,6 +44,15 @@
  * version 2.1 of the License, or (at your option) any later version.
  */
 
+/* The body of this file is the 64-bit native lane: its marshal tables and
+ * layout asserts describe the x86-64 guest ABI, which has no meaning for an
+ * i386 build of this module.  The #else arm at the bottom is what i386 gets:
+ * every .spec export still exists and still links, and each one refuses with
+ * the unimplemented-function exception, naming itself -- because 32-bit D3D
+ * belongs to a future 32-bit DXVK lane, not to a silently-wrong build of
+ * this one.  See ppc64le/wow64/DESIGN.md. */
+#ifdef __powerpc64__
+
 #include <stdarg.h>
 
 #include "ntstatus.h"
@@ -1414,3 +1423,174 @@ BOOL WINAPI DllMain( HINSTANCE inst, DWORD reason, void *reserved )
     }
     return TRUE;
 }
+
+#else  /* __powerpc64__ */
+
+/* The i386 build: every export the .spec names still exists and still links
+ * (the d3dx9 family, dxdiagn, evr and the tests import several by name), but
+ * each one refuses through the same unimplemented-function exception a
+ * winebuild "@ stub" raises, naming the module and entry point.  32-bit D3D
+ * belongs to a future 32-bit DXVK lane; a loud, named refusal beats either a
+ * missing export (silent link/load breakage elsewhere) or a build of the
+ * 64-bit marshal tables whose own layout asserts refuse i386.  Signatures
+ * are argument-count-faithful so the stdcall decoration and callee cleanup
+ * match the .spec exactly.  See ppc64le/wow64/DESIGN.md. */
+
+#include <stdarg.h>
+#include "windef.h"
+#include "winbase.h"
+
+extern void __cdecl DECLSPEC_NORETURN __wine_spec_unimplemented_stub( const char *module,
+                                                                      const char *function );
+
+ULONG_PTR WINAPI D3D11CoreCreateDevice( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5, ULONG_PTR a6 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "D3D11CoreCreateDevice" );
+}
+
+ULONG_PTR WINAPI D3D11CoreRegisterLayers( void )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "D3D11CoreRegisterLayers" );
+}
+
+ULONG_PTR WINAPI D3D11CreateDevice( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5, ULONG_PTR a6, ULONG_PTR a7, ULONG_PTR a8, ULONG_PTR a9, ULONG_PTR a10 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "D3D11CreateDevice" );
+}
+
+ULONG_PTR WINAPI D3D11CreateDeviceAndSwapChain( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5, ULONG_PTR a6, ULONG_PTR a7, ULONG_PTR a8, ULONG_PTR a9, ULONG_PTR a10, ULONG_PTR a11, ULONG_PTR a12 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "D3D11CreateDeviceAndSwapChain" );
+}
+
+ULONG_PTR WINAPI D3D11On12CreateDevice( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5, ULONG_PTR a6, ULONG_PTR a7, ULONG_PTR a8, ULONG_PTR a9, ULONG_PTR a10 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "D3D11On12CreateDevice" );
+}
+
+ULONG_PTR WINAPI __wine_com_dispatch( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "__wine_com_dispatch" );
+}
+
+ULONG_PTR WINAPI __wine_guest_D3D11CreateDevice( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5, ULONG_PTR a6, ULONG_PTR a7, ULONG_PTR a8, ULONG_PTR a9, ULONG_PTR a10 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "__wine_guest_D3D11CreateDevice" );
+}
+
+ULONG_PTR WINAPI __wine_guest_D3D11CreateDeviceAndSwapChain( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5, ULONG_PTR a6, ULONG_PTR a7, ULONG_PTR a8, ULONG_PTR a9, ULONG_PTR a10, ULONG_PTR a11, ULONG_PTR a12 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "__wine_guest_D3D11CreateDeviceAndSwapChain" );
+}
+
+ULONG_PTR WINAPI __wine_guest_D3D11CoreCreateDevice( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5, ULONG_PTR a6 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "__wine_guest_D3D11CoreCreateDevice" );
+}
+
+ULONG_PTR WINAPI __wine_guest_D3D11On12CreateDevice( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5, ULONG_PTR a6, ULONG_PTR a7, ULONG_PTR a8, ULONG_PTR a9, ULONG_PTR a10 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "__wine_guest_D3D11On12CreateDevice" );
+}
+
+ULONG_PTR WINAPI __wine_guest_CreateDXGIFactory( ULONG_PTR a1, ULONG_PTR a2 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "__wine_guest_CreateDXGIFactory" );
+}
+
+ULONG_PTR WINAPI __wine_guest_CreateDXGIFactory1( ULONG_PTR a1, ULONG_PTR a2 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "__wine_guest_CreateDXGIFactory1" );
+}
+
+ULONG_PTR WINAPI __wine_guest_CreateDXGIFactory2( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "__wine_guest_CreateDXGIFactory2" );
+}
+
+ULONG_PTR WINAPI __wine_guest_DXGIGetDebugInterface1( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "__wine_guest_DXGIGetDebugInterface1" );
+}
+
+ULONG_PTR WINAPI __wine_guest_DXGID3D10CreateDevice( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5, ULONG_PTR a6, ULONG_PTR a7 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "__wine_guest_DXGID3D10CreateDevice" );
+}
+
+ULONG_PTR WINAPI __wine_guest_D3D10CoreCreateDevice( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "__wine_guest_D3D10CoreCreateDevice" );
+}
+
+ULONG_PTR WINAPI __wine_guest_D3D10CreateDevice( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5, ULONG_PTR a6 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "__wine_guest_D3D10CreateDevice" );
+}
+
+ULONG_PTR WINAPI __wine_guest_D3D10CreateDeviceAndSwapChain( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5, ULONG_PTR a6, ULONG_PTR a7, ULONG_PTR a8 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "__wine_guest_D3D10CreateDeviceAndSwapChain" );
+}
+
+ULONG_PTR WINAPI CreateDXGIFactory( ULONG_PTR a1, ULONG_PTR a2 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "CreateDXGIFactory" );
+}
+
+ULONG_PTR WINAPI CreateDXGIFactory1( ULONG_PTR a1, ULONG_PTR a2 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "CreateDXGIFactory1" );
+}
+
+ULONG_PTR WINAPI CreateDXGIFactory2( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "CreateDXGIFactory2" );
+}
+
+ULONG_PTR WINAPI DXGIGetDebugInterface1( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "DXGIGetDebugInterface1" );
+}
+
+ULONG_PTR WINAPI DXGIDeclareAdapterRemovalSupport( void )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "DXGIDeclareAdapterRemovalSupport" );
+}
+
+ULONG_PTR WINAPI DXGID3D10CreateDevice( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5, ULONG_PTR a6, ULONG_PTR a7 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "DXGID3D10CreateDevice" );
+}
+
+ULONG_PTR WINAPI DXGID3D10RegisterLayers( ULONG_PTR a1, ULONG_PTR a2 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "DXGID3D10RegisterLayers" );
+}
+
+ULONG_PTR WINAPI D3D10CoreCreateDevice( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "D3D10CoreCreateDevice" );
+}
+
+ULONG_PTR WINAPI D3D10CoreGetVersion( void )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "D3D10CoreGetVersion" );
+}
+
+ULONG_PTR WINAPI D3D10CoreRegisterLayers( void )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "D3D10CoreRegisterLayers" );
+}
+
+ULONG_PTR WINAPI D3D10CreateDevice( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5, ULONG_PTR a6 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "D3D10CreateDevice" );
+}
+
+ULONG_PTR WINAPI D3D10CreateDeviceAndSwapChain( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5, ULONG_PTR a6, ULONG_PTR a7, ULONG_PTR a8 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "D3D10CreateDeviceAndSwapChain" );
+}
+
+#endif  /* __powerpc64__ */

@@ -1031,10 +1031,12 @@ static int  (*p_fexbridge_run_entry)( void *entry, void *arg,
 static void (*p_fexbridge_set_trap_handler)( int (*cb)( void *thread, void *ctx, void *user ),
                                              void *user );
 static int  (*p_fexbridge_process_init)(void);
+static int  (*p_fexbridge_process_init32)( ULONGLONG exit_page );
 static int  (*p_fexbridge_thread_init)( void **thread_out );
 static void (*p_fexbridge_thread_term)( void *thread );
 static void *(*p_fexbridge_current_thread)(void);
 static int  (*p_fexbridge_set_gs_base)( void *thread, ULONGLONG base );
+static int  (*p_fexbridge_set_fs_base)( void *thread, ULONGLONG base );
 static int  (*p_fexbridge_fault_is_jit)( const void *host_ucontext );
 static int  (*p_fexbridge_fault_unwind)( void *host_ucontext );
 static int  (*p_fexbridge_run)( void *thread, void *ctx );
@@ -1157,6 +1159,12 @@ static void emu_load_bridge(void)
     p_fexbridge_fault_unwind   = dlsym( so, "fexbridge_fault_unwind" );
     p_fexbridge_run            = dlsym( so, "fexbridge_run" );
     p_fexbridge_invalidate_code_range = dlsym( so, "fexbridge_invalidate_code_range" );
+    /* ABI 4: the 32-bit (WoW64) lane.  Resolved unconditionally like the
+     * rest; their absence is diagnosed where the 32-bit lane starts, not
+     * here, so a 64-bit-only bridge keeps serving the AMD64 lane exactly as
+     * before. */
+    p_fexbridge_process_init32 = dlsym( so, "fexbridge_process_init32" );
+    p_fexbridge_set_fs_base    = dlsym( so, "fexbridge_set_fs_base" );
     TRACE( "loaded emulator bridge %s, ABI %u\n", loaded, p_abi_version() );
 }
 
@@ -1833,6 +1841,322 @@ static NTSTATUS unixcall_emu_guest_stack( void *args )
 }
 
 
+/***********************************************************************
+ * The 32-bit (WoW64) lane.
+ *
+ * Everything below serves dlls/ntdll/wow64cpu_ppc64.c, the BTCpu* backend
+ * wow64.dll drives on this host.  It shares this file's bridge handle and
+ * the fault path (emu_handle_fault classifies a JIT fault identically in
+ * either mode), and deliberately does NOT share the AMD64 lane's run shape:
+ * every emu32 run is BOUNDED -- no trap handler is registered, so a guest
+ * bop ends fexbridge_run and the PE side dispatches from its own loop on
+ * the Win32 stack.  Why that matters is a stack-cutting story told in
+ * ppc64le/wow64/DESIGN.md and at the top of wow64cpu_ppc64.c.
+ *
+ * The two trap sites are int 0x80 (CD 80): the one 32-bit instruction this
+ * FEXCore build routes into the same OS_GENERIC syscall sink the 64-bit
+ * lane's 0F 05 uses, with RIP likewise left at the trapping instruction.
+ * Both sites live on one page below 4 GiB -- their addresses are stored
+ * into 32-bit cells (Wow64Transition, WOW32Reserved) -- and the rest of
+ * the page is int3 so a stray jump into it dies legibly.  The exit page is
+ * a page of hlt the bridge routes every cooperative run exit through; it
+ * must be guest-executable, hence guest-legal, hence allocated HERE with
+ * wow64-shaped zero_bits rather than mmapped by the bridge (the bridge
+ * cannot place low pages without racing Wine's own reservations).
+ */
+#define EMU_CTX_FLOATING_POINT (EMU_CTX_AMD64 | 0x8u)
+
+static ULONG_PTR emu32_bop_page;
+static ULONG_PTR emu32_exit_page;
+static NTSTATUS  emu32_status = STATUS_PENDING;
+
+static NTSTATUS emu32_alloc_low_page( ULONG_PTR *addr_ret, BYTE fill,
+                                      const BYTE *bytes, SIZE_T len )
+{
+    void *mem = NULL;
+    SIZE_T size = page_size;
+    ULONG old_prot;
+    NTSTATUS status;
+
+    /* below 2 GiB: guest-legal whatever the image's large-address-awareness,
+     * and representable in the 32-bit cells wow64.dll stores bops into */
+    if ((status = NtAllocateVirtualMemory( NtCurrentProcess(), &mem, 0x7fffffff, &size,
+                                           MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE )))
+    {
+        ERR( "cannot allocate a guest-legal low page, status %08x\n", (UINT)status );
+        return status;
+    }
+    memset( mem, fill, size );
+    if (bytes) memcpy( mem, bytes, len );
+    NtProtectVirtualMemory( NtCurrentProcess(), &mem, &size, PAGE_EXECUTE_READ, &old_prot );
+    /* NOT published to the emulator here: this runs before
+     * fexbridge_process_init32, and invalidation against a bridge with no
+     * context yet dereferences null inside the emulator (measured: the fault
+     * is then swallowed into a bare c0000005 by the syscall fault handler).
+     * The caller publishes the bop page after the bridge is up; the exit
+     * page is published by process_init32 itself. */
+    *addr_ret = (ULONG_PTR)mem;
+    return STATUS_SUCCESS;
+}
+
+/***********************************************************************
+ *           unixcall_emu32_init
+ *
+ * Reached exactly once, from wow64.dll's RtlRunOnceExecuteOnce'd
+ * process_init via BTCpuProcessInit, before any second guest thread can
+ * exist -- so the statics need no locking.
+ */
+static NTSTATUS unixcall_emu32_init( void *args )
+{
+    /* CD 80 at +0 (the syscall bop) and +16 (the unix-call bop); int3 blocks
+     * between and after so that only the two published addresses mean
+     * anything */
+    static const BYTE bops[] = { 0xcd, 0x80, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc,
+                                 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc,
+                                 0xcd, 0x80 };
+    struct emu32_init_params *params = args;
+    const char *str;
+    NTSTATUS status;
+    int rc;
+
+    pthread_once( &emu_bridge_once, emu_load_bridge );
+    if (emu_bridge_status) return emu_bridge_status;
+
+    if (emu32_status == STATUS_PENDING)
+    {
+        emu32_status = STATUS_UNSUCCESSFUL;
+
+        /* The negative control for the whole lane: with the mechanism
+         * disabled the refusal must be prompt and must name its lever, so
+         * the gate has a red state to prove the green one means something. */
+        if ((str = getenv( "WINEEMUNOWOW32" )) && *str == '1')
+        {
+            ERR( "WINEEMUNOWOW32: refusing to start the 32-bit emulator lane\n" );
+            emu32_status = STATUS_NOT_SUPPORTED;
+            return emu32_status;
+        }
+        if (!p_fexbridge_process_init32 || !p_fexbridge_set_fs_base ||
+            !p_fexbridge_run || !p_fexbridge_thread_init || !p_fexbridge_current_thread)
+        {
+            ERR( "the emulator bridge has no 32-bit guest support; 32-bit "
+                 "Windows programs need a bridge with fexbridge_process_init32 (ABI 4)\n" );
+            emu32_status = STATUS_ENTRYPOINT_NOT_FOUND;
+            return emu32_status;
+        }
+
+        if ((status = emu32_alloc_low_page( &emu32_exit_page, 0xf4 /* hlt */, NULL, 0 ))) return status;
+        if ((status = emu32_alloc_low_page( &emu32_bop_page, 0xcc /* int3 */,
+                                            bops, sizeof(bops) ))) return status;
+
+        if ((rc = p_fexbridge_process_init32( emu32_exit_page )))
+        {
+            ERR( "32-bit emulator process init failed (%d)\n", rc );
+            return emu32_status;
+        }
+        p_fexbridge_invalidate_code_range( emu32_bop_page, page_size );
+        emu32_status = STATUS_SUCCESS;
+        TRACE( "32-bit lane up: bops at %p/+16, exit page %p\n",
+               (void *)emu32_bop_page, (void *)emu32_exit_page );
+    }
+    if (emu32_status) return emu32_status;
+
+    params->bop_syscall  = emu32_bop_page;
+    params->bop_unixcall = emu32_bop_page + 16;
+    return STATUS_SUCCESS;
+}
+
+/***********************************************************************
+ *           unixcall_emu32_thread
+ */
+static NTSTATUS unixcall_emu32_thread( void *args )
+{
+    struct emu32_thread_params *params = args;
+    static int no_fs_base = -1;
+    void *thread;
+
+    if (emu32_status) return emu32_status;
+
+    if (params->term)
+    {
+        if ((thread = p_fexbridge_current_thread()) && p_fexbridge_thread_term)
+            p_fexbridge_thread_term( thread );
+        return STATUS_SUCCESS;
+    }
+
+    if (!(thread = p_fexbridge_current_thread()) && p_fexbridge_thread_init( &thread ))
+    {
+        ERR( "cannot create the emulator thread state\n" );
+        return STATUS_NO_MEMORY;
+    }
+
+    /* The FS base is what makes the 32-bit TIB reachable: every fs: access
+     * in the guest -- SEH registration, TLS, stack bounds, the CRT's very
+     * first moves -- adds it.  WINEEMUNOFSBASE32=1 leaves it unset, which is
+     * this mechanism's own negative control: the guest then dereferences its
+     * TIB offsets against base 0 and dies before it can claim anything
+     * works.  Same shape as WINEEMUNOGSTHREADS above. */
+    if (no_fs_base == -1)
+    {
+        const char *str = getenv( "WINEEMUNOFSBASE32" );
+        no_fs_base = (str && *str == '1');
+    }
+    if (no_fs_base)
+        ERR( "WINEEMUNOFSBASE32: deliberately leaving the FS base unset on this thread\n" );
+    else if (p_fexbridge_set_fs_base( thread, params->teb32 ))
+    {
+        ERR( "cannot set the FS base to the 32-bit TEB %p\n", (void *)params->teb32 );
+        return STATUS_UNSUCCESSFUL;
+    }
+    return STATUS_SUCCESS;
+}
+
+/***********************************************************************
+ *           emu32 context conversion
+ *
+ * The bridge speaks flat AMD64_CONTEXT in both modes; the TEB cpu area
+ * speaks I386_CONTEXT.  ExtendedRegisters IS the FXSAVE image and is the
+ * authoritative FP state in a WoW64 context -- FloatSave is the legacy
+ * FSAVE view, derived on the way out for readers that only know it, ignored
+ * on the way in.
+ */
+static void emu32_context_to_bridge( const I386_CONTEXT *wow, AMD64_CONTEXT *ctx )
+{
+    memset( ctx, 0, sizeof(*ctx) );
+    ctx->ContextFlags = EMU_CTX_CONTROL | EMU_CTX_INTEGER | EMU_CTX_FLOATING_POINT;
+    ctx->Rax = wow->Eax;
+    ctx->Rbx = wow->Ebx;
+    ctx->Rcx = wow->Ecx;
+    ctx->Rdx = wow->Edx;
+    ctx->Rsi = wow->Esi;
+    ctx->Rdi = wow->Edi;
+    ctx->Rbp = wow->Ebp;
+    ctx->Rsp = wow->Esp;
+    ctx->Rip = wow->Eip;
+    ctx->EFlags = wow->EFlags;
+    memcpy( &ctx->FltSave, wow->ExtendedRegisters, sizeof(ctx->FltSave) );
+    ctx->MxCsr = ctx->FltSave.MxCsr;
+}
+
+static void emu32_context_from_bridge( const AMD64_CONTEXT *ctx, I386_CONTEXT *wow )
+{
+    wow->ContextFlags = CONTEXT_I386_ALL;
+    wow->Eax = (ULONG)ctx->Rax;
+    wow->Ebx = (ULONG)ctx->Rbx;
+    wow->Ecx = (ULONG)ctx->Rcx;
+    wow->Edx = (ULONG)ctx->Rdx;
+    wow->Esi = (ULONG)ctx->Rsi;
+    wow->Edi = (ULONG)ctx->Rdi;
+    wow->Ebp = (ULONG)ctx->Rbp;
+    wow->Esp = (ULONG)ctx->Rsp;
+    wow->Eip = (ULONG)ctx->Rip;
+    wow->EFlags = ctx->EFlags;
+    wow->SegCs = ctx->SegCs;
+    wow->SegSs = ctx->SegSs;
+    wow->SegDs = ctx->SegDs;
+    wow->SegEs = ctx->SegEs;
+    wow->SegFs = ctx->SegFs;
+    wow->SegGs = ctx->SegGs;
+    wow->Dr0 = wow->Dr1 = wow->Dr2 = wow->Dr3 = wow->Dr6 = wow->Dr7 = 0;
+    memcpy( wow->ExtendedRegisters, &ctx->FltSave, sizeof(ctx->FltSave) );
+    fpux_to_fpu( &wow->FloatSave, (const XSAVE_FORMAT *)wow->ExtendedRegisters );
+}
+
+/***********************************************************************
+ *           unixcall_emu32_run
+ *
+ * One bounded run: guest state in from the TEB cpu area, run until the
+ * guest stops, full state and a reason back out.  Classification is by the
+ * bridge's run result plus WHERE the guest stopped -- the two bop sites are
+ * the only addresses a trap legitimately parks RIP at.
+ */
+static NTSTATUS unixcall_emu32_run( void *args )
+{
+    struct emu32_run_params *params = args;
+    struct thread_data *data = get_thread_data();
+    I386_CONTEXT *wow = params->context;
+    AMD64_CONTEXT ctx;
+    void *thread;
+    int r;
+
+    if (emu32_status) return emu32_status;
+    if (!(thread = p_fexbridge_current_thread()))
+    {
+        ERR( "no emulator thread state; BTCpuThreadInit did not run or failed\n" );
+        return STATUS_UNSUCCESSFUL;
+    }
+
+    emu32_context_to_bridge( wow, &ctx );
+    if (data) data->emu_fault_rec_valid = FALSE;
+    emu_run_depth++;
+    r = p_fexbridge_run( thread, &ctx );
+    emu_run_depth--;
+    emu32_context_from_bridge( &ctx, wow );
+
+    if (r == EMU_RUN_EXITED && (ULONG_PTR)ctx.Rip == emu32_bop_page)
+    {
+        params->reason = EMU32_RUN_SYSCALL;
+        return STATUS_SUCCESS;
+    }
+    if (r == EMU_RUN_EXITED && (ULONG_PTR)ctx.Rip == emu32_bop_page + 16)
+    {
+        params->reason = EMU32_RUN_UNIXCALL;
+        return STATUS_SUCCESS;
+    }
+
+    params->reason = EMU32_RUN_FAULT;
+    memset( &params->rec, 0, sizeof(params->rec) );
+    switch (r)
+    {
+    case EMU_RUN_FAULT:
+        if (data && data->emu_fault_rec_valid)
+        {
+            params->rec = data->emu_fault_rec;
+            data->emu_fault_rec_valid = FALSE;
+        }
+        else
+        {
+            /* the bridge classified a jump to unfetchable memory internally;
+             * no host signal fired, execute-at-Rip is the right record */
+            params->rec.ExceptionCode = EXCEPTION_ACCESS_VIOLATION;
+            params->rec.NumberParameters = 2;
+            params->rec.ExceptionInformation[0] = EXCEPTION_EXECUTE_FAULT;
+            params->rec.ExceptionInformation[1] = (ULONG)ctx.Rip;
+        }
+        break;
+    case EMU_RUN_HLT:
+        /* hlt in guest code: privileged instruction, as on Windows */
+        params->rec.ExceptionCode = EXCEPTION_PRIV_INSTRUCTION;
+        break;
+    case EMU_RUN_EXITED:
+        /* an int 0x80 that is not one of the two bop sites: an unassigned
+         * vector, which 32-bit Windows surfaces as an access violation with
+         * the canonical (0, ffffffff) information pair */
+        params->rec.ExceptionCode = EXCEPTION_ACCESS_VIOLATION;
+        params->rec.NumberParameters = 2;
+        params->rec.ExceptionInformation[1] = ~0u;
+        break;
+    default:
+        ERR( "emulator run error %d at eip=%08x\n", r, (UINT)ctx.Rip );
+        return STATUS_UNSUCCESSFUL;
+    }
+    params->rec.ExceptionAddress = (void *)(ULONG_PTR)(ULONG)ctx.Rip;
+    return STATUS_SUCCESS;
+}
+
+/***********************************************************************
+ *           unixcall_emu32_invalidate
+ */
+static NTSTATUS unixcall_emu32_invalidate( void *args )
+{
+    struct emu32_invalidate_params *params = args;
+
+    if (emu32_status) return emu32_status;
+    if (p_fexbridge_invalidate_code_range)
+        p_fexbridge_invalidate_code_range( params->base, params->size );
+    return STATUS_SUCCESS;
+}
+
+
 static const unixlib_entry_t unix_call_funcs[] =
 {
     load_so_dll,
@@ -1845,6 +2169,10 @@ static const unixlib_entry_t unix_call_funcs[] =
     system_time_precise,
     unixcall_emu_run_entry,
     unixcall_emu_guest_stack,
+    unixcall_emu32_init,
+    unixcall_emu32_thread,
+    unixcall_emu32_run,
+    unixcall_emu32_invalidate,
 };
 
 
@@ -1867,6 +2195,12 @@ const unixlib_entry_t unix_call_wow64_funcs[] =
     system_time_precise,
     wow64_emu_run_entry,
     wow64_emu_run_entry,   /* unix_emu_guest_stack: same not-supported answer */
+    /* the emu32 group is the 64-bit CPU backend's own interface; nothing a
+     * 32-bit caller could say through it is meaningful */
+    wow64_emu_run_entry,   /* unix_emu32_init */
+    wow64_emu_run_entry,   /* unix_emu32_thread */
+    wow64_emu_run_entry,   /* unix_emu32_run */
+    wow64_emu_run_entry,   /* unix_emu32_invalidate */
 };
 
 #endif  /* _WIN64 */

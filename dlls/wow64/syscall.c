@@ -30,6 +30,7 @@
 #include "wine/unixlib.h"
 #include "wine/asm.h"
 #include "wow64_private.h"
+#include "wine/exception.h"
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(wow);
@@ -333,7 +334,61 @@ static void __attribute__((used)) call_raise_user_exception_dispatcher( ULONG co
 /* based on RtlRaiseException: call NtRaiseException with context setup to return to caller */
 void WINAPI raise_exception( EXCEPTION_RECORD32 *rec32, void *ctx32,
                              BOOL first_chance, EXCEPTION_RECORD *rec );
-#ifdef __aarch64__
+#ifdef __powerpc64__
+/* The aarch64 and x86-64 arms below are .seh_handler asm because on a real PE
+ * build the handler has to be found through .pdata.  This port's PE side is
+ * translated ELF with no PE unwind format at all: SEH here dispatches through
+ * the TEB frame chain, which is exactly what __TRY/__EXCEPT registers -- the
+ * same mechanism ntdll's own dispatch_user_callback() uses on this port.  So
+ * each of the three functions restates its asm twin's control flow in C.
+ *
+ * raise_exception's twin captures a native context, patches its resume
+ * address past the NtRaiseException call, and raises: a native handler that
+ * CONTINUES lands on the patched label and the function just returns, while
+ * an exception nobody consumed is caught by the function's own handler --
+ * first on the chain, right after the vectored handlers and the debugger have
+ * had their look, which is the entire reason the raise is routed through
+ * NtRaiseException at all -- and forwarded to the 32-bit guest.  The patched
+ * label is the one thing C cannot express, so a volatile flag at the captured
+ * context takes its place: continuing restores the captured registers, the
+ * flag is in memory and still set, and the retest falls through exactly where
+ * the label would have resumed. */
+/* The asm twins reference RtlUnwind from their handler bodies, and that
+ * reference turns out to be load-bearing at LINK time: this module is
+ * -nodefaultlibs (it may import nothing but ntdll, because it initializes
+ * before kernel32 exists), which puts libntdll.a on the link line BEFORE
+ * libwinecrt0.a -- and the only other RtlUnwind reference is in winecrt0's
+ * __TRY support object, which the linker reaches after it has already put
+ * libntdll.a down.  The C arm keeps the anchor its asm twins carry
+ * implicitly, so the import thunk is extracted while the archive is open. */
+static void (WINAPI * const pRtlUnwind_linker_anchor)( void *, void *,
+        EXCEPTION_RECORD *, void * ) __attribute__((used)) = (void *)RtlUnwind;
+
+void WINAPI raise_exception( EXCEPTION_RECORD32 *rec32, void *ctx32,
+                             BOOL first_chance, EXCEPTION_RECORD *rec )
+{
+    __TRY
+    {
+        CONTEXT context;
+        volatile BOOL raised = FALSE;
+
+        RtlCaptureContext( &context );
+        if (!raised)
+        {
+            raised = TRUE;
+            NtRaiseException( rec, &context, first_chance );
+        }
+    }
+    __EXCEPT_ALL
+    {
+        /* ctx64 is only consulted when the native machine is AMD64 (to copy
+         * FltSave into the i386 extended registers); on this host the full FP
+         * state comes from the CPU backend's own context, so NULL is right. */
+        call_user_exception_dispatcher( rec32, ctx32, NULL );
+    }
+    __ENDTRY
+}
+#elif defined(__aarch64__)
 __ASM_GLOBAL_FUNC( raise_exception,
                    "sub sp, sp, #0x390\n\t"    /* sizeof(context) */
                    ".seh_stackalloc 0x390\n\t"
@@ -920,7 +975,15 @@ static const WCHAR *get_cpu_dll_name(void)
     {
     case IMAGE_FILE_MACHINE_I386:
         RtlInitUnicodeString( &nameW, L"\\Registry\\Machine\\Software\\Microsoft\\Wow64\\x86" );
-        ret = (native_machine == IMAGE_FILE_MACHINE_ARM64 ? L"xtajit.dll" : L"wow64cpu.dll");
+        if (native_machine == IMAGE_FILE_MACHINE_ARM64) ret = L"xtajit.dll";
+        /* On ppc64 the CPU backend is the BTCpu* surface ntdll itself exports:
+         * the emulator bridge, its fault handling and the kernel/Win32 stack
+         * discipline all live in ntdll on this port, and a separate backend
+         * DLL would need a unixlib of its own only to reach state ntdll
+         * already owns.  LdrLoadDll on an already-loaded module returns it,
+         * so the load below is a handle lookup.  See ppc64le/wow64/DESIGN.md. */
+        else if (native_machine == IMAGE_FILE_MACHINE_POWERPC64) ret = L"ntdll.dll";
+        else ret = L"wow64cpu.dll";
         break;
     case IMAGE_FILE_MACHINE_ARMNT:
         RtlInitUnicodeString( &nameW, L"\\Registry\\Machine\\Software\\Microsoft\\Wow64\\arm" );
@@ -1136,7 +1199,30 @@ static void free_temp_data(void)
 /**********************************************************************
  *           wow64_syscall
  */
-#ifdef __aarch64__
+#ifdef __powerpc64__
+/* The asm twins run the thunk under a handler that converts an escaping
+ * native exception into its code as the syscall's NTSTATUS -- and only on
+ * that exception path, never on an ordinary return, does a c0000008 also get
+ * queued to the guest's KiRaiseUserExceptionDispatcher.  __EXCEPT_ALL's
+ * handler body runs after the unwind, which is the same point the asm's
+ * RtlUnwind lands at wow64_syscall_ret. */
+static NTSTATUS wow64_syscall( UINT *args, ULONG_PTR thunk )
+{
+    NTSTATUS status;
+
+    __TRY
+    {
+        status = ((syscall_thunk)thunk)( args );
+    }
+    __EXCEPT_ALL
+    {
+        status = GetExceptionCode();
+        if (status == STATUS_INVALID_HANDLE) call_raise_user_exception_dispatcher( status );
+    }
+    __ENDTRY
+    return status;
+}
+#elif defined(__aarch64__)
 NTSTATUS wow64_syscall( UINT *args, ULONG_PTR thunk );
 __ASM_GLOBAL_FUNC( wow64_syscall,
                    "stp x29, x30, [sp, #-16]!\n\t"
@@ -1219,7 +1305,36 @@ NTSTATUS WINAPI Wow64SystemServiceEx( UINT num, UINT *args )
 /**********************************************************************
  *           cpu_simulate
  */
-#ifdef __aarch64__
+#ifdef __powerpc64__
+/* The asm twins' handler passes an escaping exception to the guest and
+ * unwinds back to the simulate loop.  A filter runs at the same moment the
+ * asm handler does -- before the unwind, with the EXCEPTION_POINTERS still
+ * valid -- so the pass-to-guest happens there; the empty handler body then
+ * stands where the asm's RtlUnwind lands, and the loop re-enters
+ * BTCpuSimulate, which reloads the context Wow64PassExceptionToGuest just
+ * redirected at the guest's own dispatcher. */
+static LONG CALLBACK simulate_filter( EXCEPTION_POINTERS *ptrs )
+{
+    Wow64PassExceptionToGuest( ptrs );
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void DECLSPEC_NORETURN cpu_simulate(void)
+{
+    for (;;)
+    {
+        __TRY
+        {
+            for (;;) pBTCpuSimulate();
+        }
+        __EXCEPT( simulate_filter )
+        {
+            /* the filter already handed the exception to the guest */
+        }
+        __ENDTRY
+    }
+}
+#elif defined(__aarch64__)
 extern void DECLSPEC_NORETURN cpu_simulate(void);
 __ASM_GLOBAL_FUNC( cpu_simulate,
                    "stp x29, x30, [sp, #-16]!\n\t"

@@ -2497,11 +2497,19 @@ do
     AS_VAR_APPEND([PE_ARCHS],[" $wine_arch"])
     dnl compiler-rt is only ever linked into real PE images (winegcc adds it in
     dnl PE mode); a translated arch links as ELF and uses libgcc as the native
-    dnl arch does, so it stays off exactly as it is on a non-PE build.  C++ is
-    dnl likewise left off (enable_cplusplus is untouched): the native g++ does
-    dnl not compile Wine's msvcrt C++ headers, so libs/c++ never built here
-    dnl before this arch existed either.
-    enable_compiler_rt=${enable_compiler_rt:-no}
+    dnl arch does.  So it is scoped to the REAL PE archs, if any: a build that
+    dnl also carries i386 (the WoW64 lane) needs the division/chkstk intrinsics
+    dnl for every i386 module, while a pure translated build has no PE links at
+    dnl all and keeps it off exactly as before.  C++ is likewise left off
+    dnl (enable_cplusplus is untouched): the native g++ does not compile Wine's
+    dnl msvcrt C++ headers, so libs/c++ never built here before this arch
+    dnl existed either.
+    if test -n "$wine_pe_archs"
+    then
+        enable_compiler_rt=${enable_compiler_rt:-`echo $wine_pe_archs | sed 's/^ *//;s/ /,/g'`}
+    else
+        enable_compiler_rt=${enable_compiler_rt:-no}
+    fi
     case $wine_arch in
       dnl ntdll's PE side owns the only PT_TLS in the tree (the TEB lives in an
       dnl initial-exec thread-local, since ppc64 has no register to steal for
@@ -2517,34 +2525,29 @@ dnl *** Check for modules to disable by default
 enable_vcruntime140_1=${enable_vcruntime140_1:-x86_64,arm64ec}
 
 dnl The four lists below name the arch that *hosts* the emulator, not the arch
-dnl being emulated, so ppc64 would belong in wow64/wow64win and not in the two
-dnl CPU-backend modules.  It is deliberately absent from all four anyway.
-dnl Measured on the AC922, compiling each source standalone with the ppc64 PE
-dnl flags the build uses:
+dnl being emulated, so ppc64 belongs in wow64/wow64win and not in the two
+dnl CPU-backend modules.  Measured on the AC922, compiling each source
+dnl standalone with the ppc64 PE flags the build uses:
 dnl   dlls/wow64win  all 3 sources compile clean for ppc64.
-dnl   dlls/wow64     7 of 8 compile clean; syscall.c does not.  raise_exception,
-dnl                  wow64_syscall and cpu_simulate (and their unwind handlers)
-dnl                  have an __aarch64__ arm and an x86-64 #else, and ppc64
-dnl                  falls into the #else: 83 assembler errors, x86-64 opcodes
-dnl                  plus .seh_stackalloc/.seh_endprologue/.seh_handler, which
-dnl                  no PowerPC assembler implements.  ppc64 needs its own arm,
-dnl                  and it cannot be a transliteration -- this port has no PE
-dnl                  unwind format at all, so the .seh_handler mechanism those
-dnl                  three rely on has to be replaced, not ported.
+dnl   dlls/wow64     7 of 8 compile clean; syscall.c grew a ppc64 arm for the
+dnl                  three functions whose aarch64/x86-64 arms are .seh_handler
+dnl                  asm.  This port has no PE unwind format, so those are not
+dnl                  transliterated: the translated-ELF PE side dispatches SEH
+dnl                  through the TEB frame chain, and the ppc64 arm states the
+dnl                  same control flow as __TRY/__EXCEPT (see the comment above
+dnl                  raise_exception there).
 dnl   dlls/wow64cpu  fails in C, not asm (context->SegCs et al).  It is x86-64
-dnl                  segment-switching code; a ppc64 host needs a different
-dnl                  backend DLL, not this one built for ppc64.
+dnl                  segment-switching code; the ppc64 host's backend is the
+dnl                  BTCpu* surface exported by ntdll itself, driving the
+dnl                  embedded emulator in 32-bit mode (ppc64le/wow64/DESIGN.md),
+dnl                  so no CPU-backend DLL is built here at all.
 dnl   dlls/xtajit64  the arm64ec x86-64 emulator; not ours.
-dnl Enabling wow64win alone would build a module whose only consumer is
-dnl wow64.dll, so it would be dead weight.  Beyond the build, an amd64 guest on
-dnl a ppc64 host is same-bitness, and dlls/ntdll/unix/env.c sets WowTebOffset
-dnl only for a 32-bit main image -- so nothing in this group is reached for such
-dnl a guest whatever is built.  Turning these on is downstream of deciding how a
-dnl same-bitness guest is hosted, not a prerequisite for it.
+dnl An amd64 guest on a ppc64 host remains same-bitness and never enters this
+dnl machinery; only a 32-bit (i386) main image does.
 if test -n "$PE_ARCHS"
 then
-    enable_wow64=${enable_wow64:-aarch64,x86_64}
-    enable_wow64win=${enable_wow64win:-aarch64,x86_64}
+    enable_wow64=${enable_wow64:-aarch64,x86_64,ppc64}
+    enable_wow64win=${enable_wow64win:-aarch64,x86_64,ppc64}
     enable_wow64cpu=${enable_wow64cpu:-x86_64}
     enable_xtajit64=${enable_xtajit64:-arm64ec}
 else

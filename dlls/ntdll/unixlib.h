@@ -137,6 +137,47 @@ struct emu_guest_stack_params
     void *limit;   /* lowest address */
 };
 
+/* The 32-bit (WoW64) lane: the CPU backend wow64.dll drives through ntdll's
+ * BTCpu* exports (dlls/ntdll/wow64cpu_ppc64.c) reaches the embedded emulator
+ * through these three calls.  Unlike the AMD64 lane above, which keeps one
+ * run alive and dispatches from inside the emulator's trap callback, this
+ * lane is BOUNDED-RUN: every emu32_run returns to the PE side on every trap,
+ * so that wow64.dll's own control transfers -- NtCallbackReturn's longjmp,
+ * an APC's NtContinueEx -- only ever cut PE frames, never a live emulator
+ * run or its kernel-stack syscall frames.  See ppc64le/wow64/DESIGN.md. */
+struct emu32_init_params
+{
+    ULONG_PTR bop_syscall;    /* out: guest address of the syscall trap */
+    ULONG_PTR bop_unixcall;   /* out: guest address of the unix-call trap */
+};
+
+struct emu32_thread_params
+{
+    int       term;           /* 0: adopt this thread for guest runs; 1: tear it down */
+    ULONG_PTR teb32;          /* in (init): the 32-bit TEB, installed as the FS base */
+};
+
+/* Why the run stopped.  SYSCALL/UNIXCALL name the bop site the guest reached
+ * (told apart by Eip); FAULT carries a guest-shaped record in rec. */
+#define EMU32_RUN_SYSCALL   0
+#define EMU32_RUN_UNIXCALL  1
+#define EMU32_RUN_FAULT     2
+
+struct emu32_run_params
+{
+    I386_CONTEXT     *context;  /* in/out: the WOW64_CPURESERVED context in the TEB */
+    ULONG             reason;   /* out: EMU32_RUN_* */
+    EXCEPTION_RECORD  rec;      /* out (FAULT): ExceptionAddress = guest Eip */
+};
+
+/* Native writes into guest pages the emulator's own store detection cannot
+ * see: forwarded to the emulator's code invalidation (BTCpu notify hooks). */
+struct emu32_invalidate_params
+{
+    ULONG_PTR base;
+    SIZE_T    size;
+};
+
 enum ntdll_unix_funcs
 {
     unix_load_so_dll,
@@ -149,6 +190,10 @@ enum ntdll_unix_funcs
     unix_system_time_precise,
     unix_emu_run_entry,
     unix_emu_guest_stack,
+    unix_emu32_init,
+    unix_emu32_thread,
+    unix_emu32_run,
+    unix_emu32_invalidate,
 };
 
 extern unixlib_handle_t __wine_unixlib_handle;

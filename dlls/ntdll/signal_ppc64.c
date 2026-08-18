@@ -523,7 +523,17 @@ NTSTATUS call_seh_handlers( EXCEPTION_RECORD *rec, CONTEXT *orig_context )
  */
 void WINAPI KiUserExceptionDispatcher( EXCEPTION_RECORD *rec, CONTEXT *context )
 {
-    NTSTATUS status = dispatch_exception( rec, context );
+    NTSTATUS status;
+
+    /* In a WoW64 process, wow64.dll gets the exception before native
+     * dispatch, exactly as the aarch64 and x86-64 dispatchers hand it over:
+     * it forwards to the CPU backend's BTCpuResetToConsistentState.  On this
+     * backend that is a stated no-op -- a guest fault arrives here with the
+     * guest state already parked in the TEB cpu area -- so the call is kept
+     * for the contract, not for work it does today. */
+    if (pWow64PrepareForException) pWow64PrepareForException( rec, context );
+
+    status = dispatch_exception( rec, context );
     RtlRaiseStatus( status );
 }
 
@@ -537,7 +547,16 @@ void WINAPI KiUserExceptionDispatcher( EXCEPTION_RECORD *rec, CONTEXT *context )
 void WINAPI KiUserApcDispatcher( CONTEXT *context, ULONG_PTR arg1, ULONG_PTR arg2, ULONG_PTR arg3,
                                  PNTAPCFUNC func )
 {
-    func( arg1, arg2, arg3 );
+    /* The context rides along as a FOURTH argument, exactly as the x86-64
+     * dispatcher passes it in r9 and the aarch64 one in x3: an ordinary
+     * 3-argument APC routine never looks at r6, but wow64.dll's
+     * Wow64ApcRoutine -- which is what every APC queued for 32-bit code
+     * resolves to (apc_32to64) -- is defined to receive the interrupted
+     * 64-bit CONTEXT there, and wow64_NtContinueEx restores it to end the
+     * APC.  Without it the wow64 APC path reads a garbage register. */
+    void (WINAPI *func_with_context)( ULONG_PTR, ULONG_PTR, ULONG_PTR, CONTEXT * ) = (void *)func;
+
+    func_with_context( arg1, arg2, arg3, context );
     NtContinue( context, TRUE );
     RtlRaiseStatus( STATUS_ACCESS_VIOLATION );
 }

@@ -48,6 +48,15 @@
  * version 2.1 of the License, or (at your option) any later version.
  */
 
+/* The body of this file is the 64-bit native lane: its marshal tables and
+ * layout asserts describe the x86-64 guest ABI, which has no meaning for an
+ * i386 build of this module.  The #else arm at the bottom is what i386 gets:
+ * every .spec export still exists and still links, and each one refuses with
+ * the unimplemented-function exception, naming itself -- because 32-bit D3D
+ * belongs to a future 32-bit DXVK lane, not to a silently-wrong build of
+ * this one.  See ppc64le/wow64/DESIGN.md. */
+#ifdef __powerpc64__
+
 #include <stdarg.h>
 
 #include "ntstatus.h"
@@ -822,3 +831,114 @@ BOOL WINAPI DllMain( HINSTANCE inst, DWORD reason, void *reserved )
     }
     return TRUE;
 }
+
+#else  /* __powerpc64__ */
+
+/* The i386 build: every export the .spec names still exists and still links
+ * (the d3dx9 family, dxdiagn, evr and the tests import several by name), but
+ * each one refuses through the same unimplemented-function exception a
+ * winebuild "@ stub" raises, naming the module and entry point.  32-bit D3D
+ * belongs to a future 32-bit DXVK lane; a loud, named refusal beats either a
+ * missing export (silent link/load breakage elsewhere) or a build of the
+ * 64-bit marshal tables whose own layout asserts refuse i386.  Signatures
+ * are argument-count-faithful so the stdcall decoration and callee cleanup
+ * match the .spec exactly.  See ppc64le/wow64/DESIGN.md. */
+
+#include <stdarg.h>
+#include "windef.h"
+#include "winbase.h"
+
+extern void __cdecl DECLSPEC_NORETURN __wine_spec_unimplemented_stub( const char *module,
+                                                                      const char *function );
+
+ULONG_PTR WINAPI D3DPERF_BeginEvent( ULONG_PTR a1, ULONG_PTR a2 )
+{
+    __wine_spec_unimplemented_stub( "d3d9.dll", "D3DPERF_BeginEvent" );
+}
+
+ULONG_PTR WINAPI D3DPERF_EndEvent( void )
+{
+    __wine_spec_unimplemented_stub( "d3d9.dll", "D3DPERF_EndEvent" );
+}
+
+ULONG_PTR WINAPI D3DPERF_GetStatus( void )
+{
+    __wine_spec_unimplemented_stub( "d3d9.dll", "D3DPERF_GetStatus" );
+}
+
+ULONG_PTR WINAPI D3DPERF_QueryRepeatFrame( void )
+{
+    __wine_spec_unimplemented_stub( "d3d9.dll", "D3DPERF_QueryRepeatFrame" );
+}
+
+ULONG_PTR WINAPI D3DPERF_SetMarker( ULONG_PTR a1, ULONG_PTR a2 )
+{
+    __wine_spec_unimplemented_stub( "d3d9.dll", "D3DPERF_SetMarker" );
+}
+
+ULONG_PTR WINAPI D3DPERF_SetOptions( ULONG_PTR a1 )
+{
+    __wine_spec_unimplemented_stub( "d3d9.dll", "D3DPERF_SetOptions" );
+}
+
+ULONG_PTR WINAPI D3DPERF_SetRegion( ULONG_PTR a1, ULONG_PTR a2 )
+{
+    __wine_spec_unimplemented_stub( "d3d9.dll", "D3DPERF_SetRegion" );
+}
+
+ULONG_PTR WINAPI DebugSetMute( void )
+{
+    __wine_spec_unimplemented_stub( "d3d9.dll", "DebugSetMute" );
+}
+
+ULONG_PTR WINAPI Direct3DCreate9( ULONG_PTR a1 )
+{
+    __wine_spec_unimplemented_stub( "d3d9.dll", "Direct3DCreate9" );
+}
+
+ULONG_PTR WINAPI Direct3DCreate9Ex( ULONG_PTR a1, ULONG_PTR a2 )
+{
+    __wine_spec_unimplemented_stub( "d3d9.dll", "Direct3DCreate9Ex" );
+}
+
+ULONG_PTR WINAPI Direct3DCreate9On12( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3 )
+{
+    __wine_spec_unimplemented_stub( "d3d9.dll", "Direct3DCreate9On12" );
+}
+
+ULONG_PTR WINAPI Direct3DCreate9On12Ex( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4 )
+{
+    __wine_spec_unimplemented_stub( "d3d9.dll", "Direct3DCreate9On12Ex" );
+}
+
+ULONG_PTR WINAPI Direct3DShaderValidatorCreate9( void )
+{
+    __wine_spec_unimplemented_stub( "d3d9.dll", "Direct3DShaderValidatorCreate9" );
+}
+
+ULONG_PTR WINAPI __wine_com_dispatch( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3 )
+{
+    __wine_spec_unimplemented_stub( "d3d9.dll", "__wine_com_dispatch" );
+}
+
+ULONG_PTR WINAPI __wine_guest_Direct3DCreate9( ULONG_PTR a1 )
+{
+    __wine_spec_unimplemented_stub( "d3d9.dll", "__wine_guest_Direct3DCreate9" );
+}
+
+ULONG_PTR WINAPI __wine_guest_Direct3DCreate9Ex( ULONG_PTR a1, ULONG_PTR a2 )
+{
+    __wine_spec_unimplemented_stub( "d3d9.dll", "__wine_guest_Direct3DCreate9Ex" );
+}
+
+ULONG_PTR WINAPI __wine_guest_Direct3DCreate9On12( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3 )
+{
+    __wine_spec_unimplemented_stub( "d3d9.dll", "__wine_guest_Direct3DCreate9On12" );
+}
+
+ULONG_PTR WINAPI __wine_guest_Direct3DCreate9On12Ex( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4 )
+{
+    __wine_spec_unimplemented_stub( "d3d9.dll", "__wine_guest_Direct3DCreate9On12Ex" );
+}
+
+#endif  /* __powerpc64__ */

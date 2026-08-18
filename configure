@@ -22499,7 +22499,12 @@ do
         eval "${wine_arch}_DEBUG="
         eval "${wine_arch}_DELAYLOADFLAG=\"-Wl,-delayload,\""
     as_fn_append PE_ARCHS " $wine_arch"
-                            enable_compiler_rt=${enable_compiler_rt:-no}
+                            if test -n "$wine_pe_archs"
+    then
+        enable_compiler_rt=${enable_compiler_rt:-`echo $wine_pe_archs | sed 's/^ *//;s/ /,/g'`}
+    else
+        enable_compiler_rt=${enable_compiler_rt:-no}
+    fi
     case $wine_arch in
                                     ppc64) SO_BUILTIN_SUBDIRS="$SO_BUILTIN_SUBDIRS dlls/ntdll" ;;
     esac
@@ -22510,8 +22515,8 @@ enable_vcruntime140_1=${enable_vcruntime140_1:-x86_64,arm64ec}
 
 if test -n "$PE_ARCHS"
 then
-    enable_wow64=${enable_wow64:-aarch64,x86_64}
-    enable_wow64win=${enable_wow64win:-aarch64,x86_64}
+    enable_wow64=${enable_wow64:-aarch64,x86_64,ppc64}
+    enable_wow64win=${enable_wow64win:-aarch64,x86_64,ppc64}
     enable_wow64cpu=${enable_wow64cpu:-x86_64}
     enable_xtajit64=${enable_xtajit64:-arm64ec}
 else

@@ -77,7 +77,8 @@ SOURCES = \
 	unix/virtual.c \
 	unwind.c \
 	version.c \
-	wcstring.c
+	wcstring.c \
+	wow64cpu_ppc64.c
 
 EXTRA_OBJS = unix/version.o
 

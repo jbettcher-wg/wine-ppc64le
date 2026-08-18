@@ -343,7 +343,7 @@ void *get_native_context( CONTEXT *context )
  */
 void *get_wow_context( CONTEXT *context )
 {
-    return NULL;  /* no WoW64 machines are supported on PowerPC64 */
+    return get_cpu_area( get_thread_data(), main_image_info.Machine );
 }
 
 
@@ -537,7 +537,78 @@ NTSTATUS signal_set_full_context( CONTEXT *context )
  */
 NTSTATUS get_thread_wow64_context( HANDLE handle, void *ctx, ULONG size )
 {
-    return STATUS_INVALID_INFO_CLASS;
+    BOOL self = (handle == GetCurrentThread());
+    struct thread_data *data = get_thread_data();
+    I386_CONTEXT *wow_frame, *context = ctx;
+    DWORD needed_flags;
+
+    /* The one WoW64 machine this host serves is i386 (server/registry.c);
+     * the copy below is the signal_arm64.c i386 arm, which is the reference
+     * emulated-WoW64 host.  The cpu-area context is the register file the
+     * CPU backend parks on every trap, so reading it here IS reading the
+     * guest. */
+    if (size != sizeof(I386_CONTEXT)) return STATUS_INFO_LENGTH_MISMATCH;
+
+    if (!self)
+    {
+        NTSTATUS ret = get_thread_context( handle, ctx, &self, IMAGE_FILE_MACHINE_I386 );
+        if (ret || !self) return ret;
+    }
+
+    if (!(wow_frame = get_cpu_area( data, IMAGE_FILE_MACHINE_I386 ))) return STATUS_INVALID_PARAMETER;
+
+    needed_flags = context->ContextFlags & ~CONTEXT_i386;
+    if (needed_flags & CONTEXT_I386_INTEGER)
+    {
+        context->Eax = wow_frame->Eax;
+        context->Ebx = wow_frame->Ebx;
+        context->Ecx = wow_frame->Ecx;
+        context->Edx = wow_frame->Edx;
+        context->Esi = wow_frame->Esi;
+        context->Edi = wow_frame->Edi;
+        context->ContextFlags |= CONTEXT_I386_INTEGER;
+    }
+    if (needed_flags & CONTEXT_I386_CONTROL)
+    {
+        context->Esp    = wow_frame->Esp;
+        context->Ebp    = wow_frame->Ebp;
+        context->Eip    = wow_frame->Eip;
+        context->EFlags = wow_frame->EFlags;
+        context->SegCs  = wow_frame->SegCs;
+        context->SegSs  = wow_frame->SegSs;
+        context->ContextFlags |= CONTEXT_I386_CONTROL;
+    }
+    if (needed_flags & CONTEXT_I386_SEGMENTS)
+    {
+        context->SegDs = wow_frame->SegDs;
+        context->SegEs = wow_frame->SegEs;
+        context->SegFs = wow_frame->SegFs;
+        context->SegGs = wow_frame->SegGs;
+        context->ContextFlags |= CONTEXT_I386_SEGMENTS;
+    }
+    if (needed_flags & CONTEXT_I386_EXTENDED_REGISTERS)
+    {
+        memcpy( context->ExtendedRegisters, &wow_frame->ExtendedRegisters, sizeof(context->ExtendedRegisters) );
+        context->ContextFlags |= CONTEXT_I386_EXTENDED_REGISTERS;
+    }
+    if (needed_flags & CONTEXT_I386_FLOATING_POINT)
+    {
+        memcpy( &context->FloatSave, &wow_frame->FloatSave, sizeof(context->FloatSave) );
+        context->ContextFlags |= CONTEXT_I386_FLOATING_POINT;
+    }
+    if (needed_flags & CONTEXT_I386_DEBUG_REGISTERS)
+    {
+        context->Dr0 = wow_frame->Dr0;
+        context->Dr1 = wow_frame->Dr1;
+        context->Dr2 = wow_frame->Dr2;
+        context->Dr3 = wow_frame->Dr3;
+        context->Dr6 = wow_frame->Dr6;
+        context->Dr7 = wow_frame->Dr7;
+    }
+    /* CONTEXT_I386_XSTATE is not carried: the emulator context has no YMM
+     * home either, and DESIGN.md records the whole xstate boundary. */
+    set_context_exception_reporting_flags( &context->ContextFlags, CONTEXT_SERVICE_ACTIVE );
+    return STATUS_SUCCESS;
 }
 
 
@@ -546,7 +617,72 @@ NTSTATUS get_thread_wow64_context( HANDLE handle, void *ctx, ULONG size )
  */
 NTSTATUS set_thread_wow64_context( HANDLE handle, const void *ctx, ULONG size )
 {
-    return STATUS_INVALID_INFO_CLASS;
+    BOOL self = (handle == GetCurrentThread());
+    struct thread_data *data = get_thread_data();
+    const I386_CONTEXT *context = ctx;
+    I386_CONTEXT *wow_frame;
+    DWORD flags;
+
+    if (size != sizeof(I386_CONTEXT)) return STATUS_INFO_LENGTH_MISMATCH;
+
+    if (!self)
+    {
+        NTSTATUS ret = set_thread_context( handle, ctx, &self, IMAGE_FILE_MACHINE_I386 );
+        if (ret || !self) return ret;
+    }
+
+    if (!(wow_frame = get_cpu_area( data, IMAGE_FILE_MACHINE_I386 ))) return STATUS_INVALID_PARAMETER;
+
+    flags = context->ContextFlags & ~CONTEXT_i386;
+    if (flags & CONTEXT_I386_INTEGER)
+    {
+        wow_frame->Eax = context->Eax;
+        wow_frame->Ebx = context->Ebx;
+        wow_frame->Ecx = context->Ecx;
+        wow_frame->Edx = context->Edx;
+        wow_frame->Esi = context->Esi;
+        wow_frame->Edi = context->Edi;
+    }
+    if (flags & CONTEXT_I386_CONTROL)
+    {
+        WOW64_CPURESERVED *cpu = data->teb->TlsSlots[WOW64_TLS_CPURESERVED];
+
+        wow_frame->Esp    = context->Esp;
+        wow_frame->Ebp    = context->Ebp;
+        wow_frame->Eip    = context->Eip;
+        wow_frame->EFlags = context->EFlags;
+        wow_frame->SegCs  = context->SegCs;
+        wow_frame->SegSs  = context->SegSs;
+        /* the flag the CPU backend's simulate loop honours: the context was
+         * wholesale-replaced under a syscall, so the syscall's own return
+         * value must not be written back over the new Eax */
+        cpu->Flags |= WOW64_CPURESERVED_FLAG_RESET_STATE;
+    }
+    if (flags & CONTEXT_I386_SEGMENTS)
+    {
+        wow_frame->SegDs = context->SegDs;
+        wow_frame->SegEs = context->SegEs;
+        wow_frame->SegFs = context->SegFs;
+        wow_frame->SegGs = context->SegGs;
+    }
+    if (flags & CONTEXT_I386_DEBUG_REGISTERS)
+    {
+        wow_frame->Dr0 = context->Dr0;
+        wow_frame->Dr1 = context->Dr1;
+        wow_frame->Dr2 = context->Dr2;
+        wow_frame->Dr3 = context->Dr3;
+        wow_frame->Dr6 = context->Dr6;
+        wow_frame->Dr7 = context->Dr7;
+    }
+    if (flags & CONTEXT_I386_EXTENDED_REGISTERS)
+    {
+        memcpy( &wow_frame->ExtendedRegisters, context->ExtendedRegisters, sizeof(context->ExtendedRegisters) );
+    }
+    if (flags & CONTEXT_I386_FLOATING_POINT)
+    {
+        memcpy( &wow_frame->FloatSave, &context->FloatSave, sizeof(context->FloatSave) );
+    }
+    return STATUS_SUCCESS;
 }
 
 
@@ -1807,6 +1943,40 @@ void init_syscall_frame( LPTHREAD_START_ROUTINE entry, void *arg, TEB *teb )
     context.Gpr4  = (ULONG64)arg;
     context.Gpr12 = (ULONG64)pRtlUserThreadStart;
     context.Iar   = (ULONG64)pRtlUserThreadStart;
+
+    /* In a WoW64 process every new thread also gets a 32-bit register file,
+     * seeded here exactly as signal_arm64.c seeds it for its emulated i386
+     * lane: wow64.dll's thread_init reads this context back and redirects it
+     * at the 32-bit LdrInitializeThunk, so what must be true here is only
+     * the RtlUserThreadStart calling convention (entry in Eax, arg in Ebx),
+     * the wow stack, the Windows selectors the CPU backend's segment model
+     * mirrors, and a sane FPU word.  The 64-bit context above still runs
+     * first -- LdrInitializeThunk on the native side is what loads wow64.dll
+     * and hands over. */
+    {
+        I386_CONTEXT *i386_context;
+
+        if ((i386_context = get_cpu_area( data, IMAGE_FILE_MACHINE_I386 )))
+        {
+            XSAVE_FORMAT *fpu = (XSAVE_FORMAT *)i386_context->ExtendedRegisters;
+
+            i386_context->ContextFlags = CONTEXT_I386_ALL;
+            i386_context->Eax = (ULONG_PTR)entry;
+            i386_context->Ebx = (arg == peb ? (ULONG_PTR)wow_peb : (ULONG_PTR)arg);
+            i386_context->Esp = get_wow_teb( teb )->Tib.StackBase - 16;
+            i386_context->Eip = pLdrSystemDllInitBlock->pRtlUserThreadStart;
+            i386_context->SegCs = 0x23;
+            i386_context->SegDs = 0x2b;
+            i386_context->SegEs = 0x2b;
+            i386_context->SegFs = 0x53;
+            i386_context->SegGs = 0x2b;
+            i386_context->SegSs = 0x2b;
+            i386_context->EFlags = 0x202;
+            fpu->ControlWord = 0x27f;
+            fpu->MxCsr = 0x1f80;
+            fpux_to_fpu( &i386_context->FloatSave, fpu );
+        }
+    }
 
     if (data->suspend)
     {

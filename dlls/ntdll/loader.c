@@ -3379,8 +3379,21 @@ static NTSTATUS find_builtin_without_file( const WCHAR *name, USHORT machine, UN
 
     /* A guest machine's modules are only ever builtins: nothing installs them
      * into the prefix, exactly as nothing installs a native builtin there, so
-     * this is the normal way to find one rather than a bootstrap special case. */
-    if (!is_prefix_bootstrap && !get_machine_system_dir( machine ))
+     * this is the normal way to find one rather than a bootstrap special case.
+     *
+     * The WowTebOffset arm is this port's 32-bit lane.  The loader deciding
+     * this is the emulated i386 ntdll running as a WoW64 guest, and from ITS
+     * point of view i386 IS the native machine -- so get_machine_system_dir()
+     * returns NULL and, in a booted (non-bootstrap) prefix, the bail below
+     * would restrict it to 16-bit modules and never reach the build tree.
+     * But a 32-bit guest's builtins are no more staged into the prefix than
+     * the AMD64 guest's are (which skip this bail because AMD64 is a NON-native
+     * guest machine for the native loader); they live in dlls/<m>/i386-windows
+     * exactly the same way.  WowTebOffset != 0 says this is a WoW64 pair, so
+     * the build-tree resolution below is the right path for its own machine
+     * too.  Native (non-WoW64) loads are unaffected. */
+    if (!is_prefix_bootstrap && !get_machine_system_dir( machine ) &&
+        !NtCurrentTeb()->WowTebOffset)
     {
         /* 16-bit files can't be loaded from the prefix */
         if (!name[1] || wcscmp( name + wcslen(name) - 2, L"16" )) return status;

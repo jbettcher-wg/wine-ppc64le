@@ -2535,6 +2535,13 @@ static struct strarray add_import_libs( const struct makefile *make, struct stra
         /* add crt import lib only when adding the default imports libs */
         if (is_crt_module( name ) && type != IMPORT_TYPE_DEFAULT) continue;
 
+        /* compiler-rt is a PE-link artifact (winegcc adds it in PE mode
+         * only).  The one arch-0 module a multiarch TRANSLATED build links
+         * is the .so builtin (ntdll.dll.so), an ELF object that gets its
+         * intrinsics from libgcc like every other native link -- and no
+         * arch-0 compiler-rt exists to depend on. */
+        if (make->so_builtin && !arch && !strcmp( name, "compiler-rt" )) continue;
+
         if (name[0] == '-')
         {
             switch (name[1])
@@ -5332,12 +5339,16 @@ static void load_sources( struct makefile *make )
     if (make->obj_dir)
     {
         make->disabled[0] = strarray_exists( disabled_dirs[0], make->obj_dir );
-        /* a .so builtin has no PE version at all: it stays a native ELF module
-         * even in a multiarch build, and is disabled for every PE arch */
+        /* a .so builtin has no PE version for a TRANSLATED arch: the ELF
+         * module it stays as IS that arch's build of it.  A genuine
+         * cross-compiled PE arch still builds its own -- the i386 ntdll a
+         * WoW64 process maps is a real PE with a static TLS block of its own,
+         * and nothing about the native module's TEB constraint applies to it. */
         make->so_builtin = so_dll_supported && archs.count > 1 && !make->disabled[0] &&
                            strarray_exists( so_builtin_dirs, make->obj_dir );
         for (arch = 1; arch < archs.count; arch++)
-            make->disabled[arch] = make->disabled[0] || make->so_builtin ||
+            make->disabled[arch] = make->disabled[0] ||
+                                   (make->so_builtin && translated_archs[arch]) ||
                                    strarray_exists( disabled_dirs[arch], make->obj_dir );
     }
     make->external   = make->obj_dir && strarray_exists( external_dirs, make->obj_dir );

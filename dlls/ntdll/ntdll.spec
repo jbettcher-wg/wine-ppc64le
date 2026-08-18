@@ -11,6 +11,24 @@
 @ stdcall AlpcGetMessageAttribute(ptr long)
 @ stdcall ApiSetQueryApiSetPresence(ptr ptr)
 @ stdcall ApiSetQueryApiSetPresenceEx(ptr ptr ptr)
+# The ppc64 WoW64 CPU backend: on this host wow64.dll's CPU module IS ntdll
+# (get_cpu_dll_name returns ntdll.dll), and these are the surface it binds.
+# See dlls/ntdll/wow64cpu_ppc64.c and ppc64le/wow64/DESIGN.md.
+@ stdcall -arch=ppc64 BTCpuFlushInstructionCache2(ptr long)
+@ stdcall -arch=ppc64 BTCpuGetBopCode()
+@ stdcall -arch=ppc64 BTCpuGetContext(long long ptr ptr)
+@ stdcall -arch=ppc64 BTCpuIsProcessorFeaturePresent(long)
+@ stdcall -arch=ppc64 BTCpuNotifyMapViewOfSection(ptr ptr ptr long long long)
+@ stdcall -arch=ppc64 BTCpuNotifyMemoryAlloc(ptr long long long long long)
+@ stdcall -arch=ppc64 BTCpuNotifyMemoryDirty(ptr long)
+@ stdcall -arch=ppc64 BTCpuNotifyMemoryProtect(ptr long long long long)
+@ stdcall -arch=ppc64 BTCpuProcessInit()
+@ stdcall -arch=ppc64 BTCpuResetToConsistentState(ptr)
+@ stdcall -arch=ppc64 BTCpuSetContext(long long ptr ptr)
+@ stdcall -norelay -arch=ppc64 BTCpuSimulate()
+@ stdcall -arch=ppc64 BTCpuThreadInit()
+@ stdcall -arch=ppc64 BTCpuThreadTerm(long long)
+@ stdcall -arch=ppc64 BTCpuTurboThunkControl(long)
 @ stub CsrAllocateCaptureBuffer
 @ stub CsrAllocateCapturePointer
 @ stub CsrAllocateMessagePointer
@@ -1771,6 +1789,7 @@
 @ cdecl -arch=ppc64 __wine_guest_wrap_callback(ptr long)
 @ cdecl -arch=ppc64 __wine_guest_wrap_callback5(ptr long)
 @ cdecl -arch=ppc64 __wine_guest_wrap_callback6(ptr long)
+@ stdcall -arch=ppc64 __wine_get_unix_opcode()
 @ extern -private __wine_syscall_dispatcher
 @ extern -private __wine_unix_call_dispatcher
 @ extern -private -arch=arm64ec __wine_unix_call_dispatcher_arm64ec
