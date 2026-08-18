@@ -200,11 +200,91 @@ static UINT64 hand_propvariant_out( void *host, UINT slot, AMD64_CONTEXT *ctx )
     return (UINT64)(UINT)hr;
 }
 
+/* (this, DWORD flags, DWORD count, MFT_OUTPUT_DATA_BUFFER *samples,
+ * DWORD *status) -- IMFTransform::ProcessOutput.  Every element carries an
+ * IN/OUT IMFSample* (the caller's own buffer for most MFTs; NULL going in and
+ * callee-allocated coming out for the ones that manage their own, e.g.
+ * D3D-aware decoders) and an OUT-only IMFCollection* of stream events, and
+ * neither is visible in the vtable signature -- ppc64le/mf/gen_winecom.py's
+ * struct-bearing scan is what catches it and routes it here instead of
+ * refusing the whole method.  Same shallow-copy-the-array shape as
+ * dlls/d3d12/main.c's hand_resource_barrier; the translation is per FIELD
+ * rather than per union arm because MFT_OUTPUT_DATA_BUFFER has no
+ * discriminant to switch on. */
+static UINT64 hand_process_output( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    DWORD count = (DWORD)winecom_read_arg( ctx, 2 );
+    MFT_OUTPUT_DATA_BUFFER *src = (MFT_OUTPUT_DATA_BUFFER *)(ULONG_PTR)winecom_read_arg( ctx, 3 );
+    UINT64 args[16] = { 0 };
+    MFT_OUTPUT_DATA_BUFFER *copy = NULL;
+    void **borrowed = NULL;
+    HRESULT hr;
+    DWORD i;
+
+    if (count && src)
+    {
+        if (!(copy = calloc( count, sizeof(*copy) )) ||
+            !(borrowed = calloc( count, sizeof(*borrowed) )))
+        {
+            free( copy );
+            return (UINT64)(UINT)E_OUTOFMEMORY;
+        }
+        memcpy( copy, src, count * sizeof(*copy) );
+        for (i = 0; i < count; i++)
+        {
+            /* Same classifier an ordinary CA_IFACE_IN slot would use: one of
+             * our proxies unwraps to its host, NULL stays NULL, and a
+             * guest-implemented object gets a reverse proxy or -- since
+             * MFCreateSample is the only way a guest ever gets an IMFSample
+             * in the first place -- refuses.  Cannot actually happen on this
+             * surface, but it is the fail-closed answer if it ever did. */
+            if (!winecom_to_native( copy[i].pSample, MF_IFACE_IMFSample,
+                                    (void **)&copy[i].pSample ))
+            {
+                WARN( "ProcessOutput: sample %lu (%p) has no reverse proxy; "
+                      "refusing the call\n", i, src[i].pSample );
+                while (i--) winecom_to_native_end( borrowed[i] );
+                free( borrowed );
+                free( copy );
+                return (UINT64)(UINT)E_NOTIMPL;
+            }
+            borrowed[i] = copy[i].pSample;
+            copy[i].pEvents = NULL;      /* OUT only; the callee fills it in */
+        }
+    }
+
+    args[1] = winecom_read_arg( ctx, 1 );           /* flags */
+    args[2] = count;
+    args[3] = (UINT64)(ULONG_PTR)(copy ? copy : src);
+    args[4] = winecom_read_arg( ctx, 4 );            /* status */
+    hr = (HRESULT)mf_invoke( host, slot, 5, args );
+
+    if (copy)
+    {
+        for (i = 0; i < count; i++)
+        {
+            winecom_to_native_end( borrowed[i] );
+            if (SUCCEEDED(hr))
+            {
+                src[i].dwStatus = copy[i].dwStatus;
+                src[i].pSample = copy[i].pSample
+                    ? winecom_wrap( copy[i].pSample, MF_IFACE_IMFSample ) : NULL;
+                src[i].pEvents = copy[i].pEvents
+                    ? winecom_wrap( copy[i].pEvents, MF_IFACE_IMFCollection ) : NULL;
+            }
+        }
+        free( borrowed );
+        free( copy );
+    }
+    return (UINT64)(UINT)hr;
+}
+
 /* The order here IS gen_winecom.py's HAND_SLOTS order. */
 static const winecom_hand_fn mf_hand_funcs[] =
 {
     hand_propvariant_in,
     hand_propvariant_out,
+    hand_process_output,
 };
 
 static const struct winecom_surface mf_surface =

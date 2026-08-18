@@ -46,8 +46,11 @@ Foundation's own shape rather than an accident of this port:
     three-slot proxy the guest QueryInterfaces from -- which is what a COM
     caller does with one anyway.
   * MFT_OUTPUT_DATA_BUFFER (IMFTransform::ProcessOutput) holds an IMFSample*
-    and an IMFCollection* INSIDE a struct; it needs a hand-written walker,
-    the shape dlls/d3d12/main.c's hand_resource_barrier has.
+    and an IMFCollection* INSIDE a struct, which is why the struct-bearing
+    scan below still refuses it for every OTHER slot that carries one; this
+    one slot is routed to a hand-written walker instead (HAND_SLOTS,
+    dlls/mfplat/mfcom.c's hand_process_output), the shape
+    dlls/d3d12/main.c's hand_resource_barrier has.
   * by-value float (IMFRateControl::SetRate, IMFSimpleAudioVolume).  The
     native invoker (dlls/mfplat/mfcom.c mf_invoke) calls the host vtable slot
     with the widest INTEGER form, so a float argument would be placed in the
@@ -172,6 +175,13 @@ HAND_SLOTS = [
     ("IMFSourceReader::SetCurrentPosition",       "hand_propvariant_in"),
     ("IMFMediaSession::Start",                    "hand_propvariant_in"),
     ("IMFSourceReader::GetPresentationAttribute", "hand_propvariant_out"),
+    # MFT_OUTPUT_DATA_BUFFER carries an IMFSample* and an IMFCollection*
+    # inside a struct the classifier below refuses by name (see
+    # CARRIER_STRUCTS/bearing); this hand slot is the walker dlls/d3d12/
+    # main.c's hand_resource_barrier has, one field at a time instead of one
+    # union arm at a time.  Bypasses classify() entirely, exactly like the
+    # PROPVARIANT hands above.
+    ("IMFTransform::ProcessOutput",               "hand_process_output"),
 ]
 
 # Refusals decided here rather than derived, each with the reason the runtime

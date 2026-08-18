@@ -111,11 +111,12 @@ enum mf_iface_index
     MF_IFACE_COUNT = 93
 };
 
-#define MF_HAND_COUNT 2
+#define MF_HAND_COUNT 3
 
 /* hand_funcs[] order in dlls/mfplat/mfcom.c:
      *   0 hand_propvariant_in
      *   1 hand_propvariant_out
+     *   2 hand_process_output
  */
 
 
@@ -2013,9 +2014,7 @@ static const struct winecom_slot slots_IMFTransform[26] =
     { "IMFTransform::ProcessEvent", NULL, cls_IMFTransform_22, xaux_IMFTransform_22, 3, 0, 0, 0, NULL, 0, 0, 0x02 },
     { "IMFTransform::ProcessMessage", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0, 0, 0x00 },
     { "IMFTransform::ProcessInput", NULL, cls_IMFTransform_24, xaux_IMFTransform_24, 4, 0, 0, 0, NULL, 0, 0, 0x02 },
-    { "IMFTransform::ProcessOutput",
-      "IMFTransform::ProcessOutput: MFT_OUTPUT_DATA_BUFFER carries interface pointers inside a struct (MFT_OUTPUT_DATA_BUFFER -> IMFCollection) and has no hand-written walker; the pointers inside it would reach native MF as guest proxies",
-      NULL, NULL, 5, 0, 0, 0, NULL, 0, 0, 0 },
+    { "IMFTransform::ProcessOutput", NULL, NULL, NULL, 5, WINECOM_F_HAND, 2, 0, NULL, 0, 0, 0 },
 };
 
 static const unsigned char cls_IMFVideoMediaType_6[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
@@ -2474,7 +2473,7 @@ static const struct winecom_iface mf_com_ifaces[MF_IFACE_COUNT] =
       3, NULL, 0 },
 };
 
-/* 768 slot(s) marshalled, 5 hand-written, 87 refused with a named
+/* 768 slot(s) marshalled, 6 hand-written, 86 refused with a named
  * reason (19 of them refused FORWARD only -- a by-value float, whose
  * plan is complete and whose WINECOM_F_REV row libs/winecom's reverse
  * dispatcher serves), 279 IUnknown slot(s) served by the runtime;
