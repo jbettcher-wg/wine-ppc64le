@@ -317,6 +317,19 @@ PROBE_SRC = (
                                       # whole 1_0..1_6 chain
     "#include <d3d11_4.h>\n"          # d3d11: D3D11CreateDevice{,AndSwapChain}
     "#include <ddk/d3dkmthk.h>\n"     # d3d11 re-exports the D3DKMT* thunks
+    # The one member of the D3D family this list still had to be told about
+    # module by module.  d3d9.thunks reaches it through DXVK's own
+    # dxvk_flat_surface_d3d9.h and dxva2.thunks names it outright as its first
+    # PROBE-EXTRA -- both because dxva2api.h will not even compile without
+    # D3DFORMAT and D3DPOOL, which live in the d3d9types.h that d3d9.h pulls
+    # in.  Two modules working around the same absent header by hand is the
+    # shape of a gap in THIS list, not of two module-specific facts, and a
+    # third module would have found it the same way: as 100% of its exports
+    # refused for "no declaration found in Wine headers".
+    "#include <d3d9.h>\n"             # d3d9: Direct3DCreate9{,Ex}, D3DPERF_*;
+                                      # dxva2: DXVA2CreateDirect3DDeviceManager9
+                                      # and the IDirect3DDevice9 half of its
+                                      # surface
 )
 
 # ---------------------------------------------------------------------------

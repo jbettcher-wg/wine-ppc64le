@@ -72,8 +72,8 @@ slot nfixed.  That is sound only because ppc64le ELFv2 va_list is a plain
 pointer into a flat 8-byte-slot parameter save area, structurally identical to
 MS-x64's -- measured end to end on the AC922, a guest-built MS-x64 va_list
 consumed correctly by native ppc64 _vsnprintf ("%d-%s-%d" -> "4242-AB-77").
-The sibling project ~/Development/powerpc64le-ports/wine-spec-thunk refuses
-va_list outright; that refusal is about a different boundary and must not be
+The sibling project wine-spec-thunk refuses va_list
+outright; that refusal is about a different boundary and must not be
 copied back here.  impl_names_rva[i] is what carries the v-variant name to the
 host, and the generator REFUSES rather than guesses: the .thunks line must
 name the v-variant, clang must agree the export really is variadic, and the
@@ -794,8 +794,9 @@ def exports_from_module_def(path, overrides=None, excludes=(), start_imm=0):
 # --------------------------------------------------------------------------
 # COM MODE: per-interface stub arrays + __wine_com_thunk_info
 # --------------------------------------------------------------------------
-# Input is an interfaces JSON (dxvk-ppc64le/thunk/gen_interfaces.py output,
-# derived from the implementation's own widl-generated headers): per interface
+# Input is an interfaces JSON (ppc64le/dxvk/gen_interfaces.py output, and its
+# ppc64le/audio and ppc64le/syscom siblings, derived from the
+# implementation's own widl-generated headers): per interface
 # a uuid and the FULL flattened vtable slot list.  The module gains, alongside
 # the flat-export machinery which is completely unchanged:
 #
@@ -898,6 +899,34 @@ _COM_CARRIER_STRUCTS = frozenset((
     'MULTI_QI', 'STGMEDIUM', 'uSTGMEDIUM', 'VARIANT', 'VARIANTARG',
     'PROPVARIANT', 'SAFEARRAY', 'LPVARIANT', 'LPPROPVARIANT', 'LPSAFEARRAY'))
 
+# An out slot typed as the UNIVERSAL interface rather than a rostered one.
+# `IUnknown **ppApo` is every bit as interface-bearing as `IXAudio2 **`, and it
+# used to be invisible here: the roster names concrete interfaces, IUnknown is
+# in no roster, and the void**/LPVOID* rule below does not match a named type.
+# So an export vending an object through IUnknown** read as "not bearing", a
+# GUEST-REFUSE on it was reported STALE, and the only way to stop it passing a
+# native vtable through to a guest was to EXCLUDE it -- which is exactly what
+# dlls/xaudio2_9/xaudio2_9.thunks had to do to CreateFX, CreateAudioReverb and
+# CreateAudioVolumeMeter, and it recorded the blind spot rather than working
+# around it quietly.  This is that blind spot closed.
+#
+# DOUBLE POINTER ONLY, matching the shape of every other rule here.  What this
+# audit is about is stated at the top of the block: a pass-through "writes
+# whatever the native export wrote -- including a native interface pointer --
+# straight into guest-visible memory", which is an OUT parameter.  A singular
+# `IUnknown *pUnkOuter` is an IN parameter -- COM aggregation -- and the hazard
+# there is the opposite one (a guest object reaching native code, which wants a
+# reverse proxy, not a wrap).  Folding that in here would be a different claim
+# under the same name, so it is deliberately not folded in.
+# LPUNKNOWN takes ONE star, not two: it is already `IUnknown *`, so
+# `LPUNKNOWN *ppUnk` is the double pointer and `LPUNKNOWN pUnkOuter` is the
+# singular IN parameter this rule must not claim.  That is the same asymmetry
+# the LPVOID rule below has always had, for the same reason -- and writing
+# both spellings with two stars would have matched a triple pointer nothing
+# declares while missing the OUT slot that does exist.
+_COM_UNIVERSAL_IFACE_RE = re.compile(
+    r'\bIUnknown\s*\*\s*\*|\bLPUNKNOWN\s*\*')
+
 
 def com_flat_bearing(sig, iface_tokens):
     """Which of this signature's positions carry interface pointers."""
@@ -910,6 +939,8 @@ def com_flat_bearing(sig, iface_tokens):
             hits.append('%d:%s' % (i, p))
         elif re.search(r'void\s*\*\s*\*', p or '') or \
                 re.search(r'\bLPVOID\s*\*', p or ''):
+            hits.append('%d:%s' % (i, p))
+        elif _COM_UNIVERSAL_IFACE_RE.search(p or ''):
             hits.append('%d:%s' % (i, p))
     r = sig.get('ret') or ''
     if set(re.findall(r'\w+', r)) & (iface_tokens | _COM_CARRIER_STRUCTS):

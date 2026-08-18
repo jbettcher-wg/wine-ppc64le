@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-check_thunk_pe.py -- independently verify a generated AMD64 thunk PE.
+spec2thunk-check -- independently verify a generated AMD64 thunk PE.
 
 This parses the finished file from raw bytes with its own minimal PE reader.
 It shares NO code with the generator and trusts nothing the generator claims.
