@@ -67,6 +67,20 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* The sysfs root, overridable ONLY at compile time and defaulting to the real
+ * one.  A topology derivation that can only be exercised on the machine it was
+ * written for is a topology derivation nobody can check: this port has to be
+ * right on a dense x86 box, on POWER at every SMT width, and on machines with
+ * more processors than one group can hold, none of which are available to try.
+ * A test translation unit defines this to a directory of synthetic
+ * cpu/online and per-node cpulist files and gets the same code under test.
+ *
+ * Deliberately NOT an environment variable.  This decides where threads run;
+ * a runtime knob that redirects it would be a way to get that wrong quietly. */
+#ifndef WINE_CPU_SYSFS_ROOT
+#define WINE_CPU_SYSFS_ROOT ""
+#endif
+
 /* Windows' own limits.  A group holds at most 64 processors because that is
  * how wide KAFFINITY is, and Windows supports at most 20 groups. */
 #define WINE_CPUS_PER_GROUP  64
@@ -170,17 +184,25 @@ static inline void wine_cpu_list_find( void *ctx, unsigned int value )
  *      hands out 0 and 8 for a two-node machine.
  *   2. Within a node, online CPUs in ascending Linux number.
  *   3. Groups are filled in that order.  A node starts a new group when it
- *      would not fit whole in what remains of the current one, so a group does
- *      not straddle nodes unless it has to; a node larger than 64 is split
- *      across consecutive groups because there is no alternative.
+ *      would not fit whole in what remains of the current one, so a node is
+ *      never split unless it is larger than a whole group -- in which case it
+ *      is split across consecutive groups because there is no alternative.
+ *
+ * A SECOND GROUP APPEARS ONLY WHEN THE MACHINE HAS MORE THAN 64 PROCESSORS,
+ * which is Windows' own rule and not merely a consequence of the above.  Two
+ * NUMA nodes of twenty processors share one group rather than taking one
+ * each, and that is what is wanted: a thread's affinity mask is relative to a
+ * single group, so a machine cut into more groups than it needs is a machine
+ * whose threads cannot be pointed at all of it.  [MEASURED] the same POWER8
+ * part at SMT2 and SMT1 yields 40 and 20 processors and one group each way.
  *
  * A machine with no NUMA information at all is treated as one node holding
  * every online CPU, which is what a single-socket box looks like anyway.
  */
 static inline void wine_cpu_topology_build( struct wine_cpu_topology *t )
 {
-    static const char *const online_path = "/sys/devices/system/cpu/online";
-    static const char *const nodes_path  = "/sys/devices/system/node/online";
+    static const char *const online_path = WINE_CPU_SYSFS_ROOT "/sys/devices/system/cpu/online";
+    static const char *const nodes_path  = WINE_CPU_SYSFS_ROOT "/sys/devices/system/node/online";
     unsigned int online[WINE_MAX_CPUS];
     unsigned int nodes[WINE_MAX_CPU_GROUPS * 4];
     struct wine_cpu_list_ctx oc, nc;
@@ -218,10 +240,11 @@ static inline void wine_cpu_topology_build( struct wine_cpu_topology *t )
         char path[256];
         unsigned int node_cpus[WINE_MAX_CPUS];
         struct wine_cpu_list_ctx pc;
-        unsigned int j, placed = 0;
+        unsigned int j, placed = 0, node_groups, node_share, node_placed;
 
         snprintf( path, sizeof(path),
-                  "/sys/devices/system/node/node%u/cpulist", nodes[n] );
+                  WINE_CPU_SYSFS_ROOT "/sys/devices/system/node/node%u/cpulist",
+                  nodes[n] );
         pc.values = node_cpus; pc.count = 0; pc.max = WINE_MAX_CPUS;
         if (wine_cpu_parse_list( path, &pc, wine_cpu_list_collect ) < 0 || !pc.count)
         {
@@ -242,15 +265,36 @@ static inline void wine_cpu_topology_build( struct wine_cpu_topology *t )
         }
         if (!placed) continue;
 
-        /* Start a new group if this node will not fit whole in what is left of
-         * the current one.  A node bigger than a whole group is split, which is
-         * the only thing that can be done with it. */
-        if (in_g && in_g + placed > WINE_CPUS_PER_GROUP && placed <= WINE_CPUS_PER_GROUP)
+        /* WHERE THIS NODE'S PROCESSORS GO.
+         *
+         * A node that fits in what is left of the current group joins it --
+         * that is how a 40-processor machine with two nodes ends up as one
+         * group, which is what Windows does and what lets a thread's affinity
+         * mask reach the whole machine.
+         *
+         * A node that does not fit starts a fresh group, EVEN IF it is too big
+         * for one group and will have to be split anyway.  Letting it spill
+         * into a partly-filled group would put two different NUMA nodes in one
+         * group, and a group is the unit a thread's affinity is expressed in:
+         * a thread confined to such a group would be spread across sockets
+         * with no way to say otherwise.  [MEASURED] the alternative, packing
+         * greedily, turned a 160-processor two-node machine into groups of
+         * 64/64/32 whose middle group straddled both sockets.
+         *
+         * A node too big for one group is then split into as FEW groups as it
+         * needs and as EVENLY as those allow -- 80 processors become 40 and 40
+         * rather than 64 and 16 -- so no group is left nearly empty and the
+         * scheduler has the same room in each. */
+        if (in_g && in_g + placed > WINE_CPUS_PER_GROUP)
         {
             if (g + 1 >= WINE_MAX_CPU_GROUPS) break;
             g++;
             in_g = 0;
         }
+        node_groups = (placed + WINE_CPUS_PER_GROUP - 1) / WINE_CPUS_PER_GROUP;
+        if (!node_groups) node_groups = 1;
+        node_share = (placed + node_groups - 1) / node_groups;
+        node_placed = 0;
 
         for (j = 0; j < pc.count; j++)
         {
@@ -262,7 +306,12 @@ static inline void wine_cpu_topology_build( struct wine_cpu_topology *t )
             if (cpu >= WINE_MAX_UNIX_CPU) continue;
             if (t->count >= WINE_MAX_CPUS) break;
 
-            if (in_g == WINE_CPUS_PER_GROUP)
+            /* An even share of this node per group, and never more than a
+             * group holds.  node_share is only below the hard limit when the
+             * node is being split, so a node that fits is unaffected. */
+            if (in_g == WINE_CPUS_PER_GROUP ||
+                (node_placed && node_placed % node_share == 0 &&
+                 node_placed < placed))
             {
                 if (g + 1 >= WINE_MAX_CPU_GROUPS) break;
                 g++;
@@ -277,6 +326,7 @@ static inline void wine_cpu_topology_build( struct wine_cpu_topology *t )
             t->group_size[g]            = in_g + 1;
             t->count++;
             in_g++;
+            node_placed++;
         }
 
         if (t->node_count < sizeof(t->node_ids) / sizeof(t->node_ids[0]))
