@@ -170,6 +170,27 @@
 # The descriptors for all three are CORRECT.  The missing piece is the callback
 # path, not the arity -- do not "fix" this by editing the columns.
 #
+# SINCE THE ABOVE WAS WRITTEN there IS a host->guest call path, so the three
+# entries described above are no longer latent: _initterm walks the caller's
+# table through a form that wraps each entry as it is reached, and _onexit and
+# exit are rows in the registration-interception table in
+# dlls/ntdll/signal_ppc64.c.  The paragraphs are kept rather than deleted
+# because they still name exactly which entries traffic in guest pointers and
+# why, which is what someone debugging a crash here needs; only the "we have
+# no host->guest call path" premise has expired.
+#
+# Three more of this module's exports are rows in that same table, added when
+# msvcr100's copies of them were: _beginthread and _beginthreadex, whose start
+# routines reach native code through msvcrt's OWN native trampoline (see
+# dlls/msvcrt/thread.c) rather than through the thread-start interception, and
+# __setusermatherr, whose handler native math_error calls and whose int return
+# it tests.  This module exports neither _set_invalid_parameter_handler nor
+# _set_purecall_handler -- it has _invalid_parameter and _purecall, which are
+# the CALL sites and not registrations -- so it has no row for either and
+# needs none; msvcr100 and ucrtbase, which do export them, carry those rows.
+# See the banner in dlls/msvcr100/msvcr100.thunks for the arity and return
+# width each one required and why.
+#
 # __getmainargs was checked for the same shape and DOES NOT HAVE IT.  Its
 # signature (dlls/msvcrt/data.c:497) is
 #     int CDECL __getmainargs(int *argc, char ***argv, char ***envp,

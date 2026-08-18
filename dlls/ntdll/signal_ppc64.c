@@ -1172,6 +1172,23 @@ struct thunk_override
     UINT                 cb_wide;  /* subset of cb_mask whose callback returns a
                                       full 64 bits rather than a sign-extended
                                       32 (an LRESULT; see the trampoline pool) */
+    UINT                 cb_argc;  /* how many arguments the CALLBACK itself
+                                      takes -- 4, 5 or 6, and 0 means the 4 that
+                                      every row carried before this field
+                                      existed.  Not the same number as `argc`
+                                      above, which counts the arguments of the
+                                      REGISTERING export: _set_invalid_parameter_
+                                      handler takes one argument and that
+                                      argument is a five-argument callback.  It
+                                      has to be per row for the same reason the
+                                      width does: the pool keys a slot on
+                                      (target, width, arity) and puts the guest
+                                      target in the register one past the last
+                                      real argument, so a slot minted at the
+                                      wrong arity does not fail -- it overwrites
+                                      a live argument register with the target
+                                      pointer and passes the callback one
+                                      argument too few. */
 };
 
 /***********************************************************************
@@ -4679,16 +4696,22 @@ static void *wrap_guest_wndproc( void *fn )
 }
 
 /* swap the arguments a thunk_override row declares as callbacks; `wide` names
- * the subset of them whose return value is a full 64 bits.  Every override
- * table row in the corpus so far is a four-argument-or-fewer callback, so
- * this always mints the original fixed-arity trampoline; a row needing five
- * or six would pass its own argc here instead of the literal 4. */
-static void wrap_thunk_callback_args( ULONG_PTR *a, UINT argc, UINT mask, UINT wide )
+ * the subset of them whose return value is a full 64 bits, and `cb_argc` how
+ * many arguments those callbacks themselves take.
+ *
+ * That last one used to be the literal 4, with a comment saying a row needing
+ * five or six would pass its own argc here instead.  This is that row:
+ * _set_invalid_parameter_handler's callback takes five, and minting it at four
+ * would put the pool's identity register on top of the fifth argument native
+ * code had already placed there.  Zero keeps the original shape, so every row
+ * written before the field existed means exactly what it meant then. */
+static void wrap_thunk_callback_args( ULONG_PTR *a, UINT argc, UINT mask, UINT wide, UINT cb_argc )
 {
     UINT i;
+    if (!cb_argc) cb_argc = 4;
     for (i = 0; i < argc; i++)
         if (mask & (1u << i))
-            a[i] = (ULONG_PTR)wrap_guest_callback_ex( (void *)a[i], (wide >> i) & 1, 4 );
+            a[i] = (ULONG_PTR)wrap_guest_callback_ex( (void *)a[i], (wide >> i) & 1, cb_argc );
 }
 
 
@@ -5079,6 +5102,103 @@ static const struct thunk_override thunk_overrides[] =
     { L"msvcrt.dll",   "bsearch", 5, NULL, 1u << 4 },
     { L"ucrtbase.dll", "bsearch", 5, NULL, 1u << 4 },
     { L"msvcr100.dll", "bsearch", 5, NULL, 1u << 4 },
+    /* The rest of the C runtime's registration points -- the ones
+     * msvcr100.thunks named as STILL OPEN, each a raw guest pointer parked in
+     * a native slot that native CRT code later calls directly.  This is the
+     * FlsAlloc failure mode rather than the qsort one: a comparator is called
+     * back before qsort returns, so a wrong row shows up at once, whereas
+     * every registration below stores the pointer and returns success, and the
+     * ELFv2 bctrl into x86-64 bytes happens minutes later on whichever thread
+     * happens to divide by zero or start.  Styx: Master of Shadows imports
+     * _beginthread, _beginthreadex, _set_invalid_parameter_handler,
+     * _set_purecall_handler and __setusermatherr from msvcr100.
+     *
+     * Which module gets which row is read off the .spec files rather than
+     * assumed symmetric, because they genuinely differ: msvcrt.dll exports
+     * neither _set_invalid_parameter_handler nor _set_purecall_handler (it has
+     * _invalid_parameter and _purecall, which are the CALL sites, not the
+     * registrations), so it gets no row for either -- there is nothing to
+     * intercept.  ucrtbase additionally publishes the _o_* forwarders that the
+     * VC runtime imports in preference to the plain names, and a row keyed to
+     * the plain name alone would pass those straight through; that is the
+     * kernelbase lesson above, one export table further on.
+     *
+     * ARITY.  The pool's minimum slot is four arguments and surplus argument
+     * registers are ignored by both ABIs, so a callback taking one argument or
+     * none is served correctly by the default -- there is no real argument for
+     * the identity register to land on.  _set_invalid_parameter_handler is the
+     * exception and the reason cb_argc exists: its callback is
+     *   void (__cdecl *)(const wchar_t *, const wchar_t *, const wchar_t *,
+     *                    unsigned, uintptr_t)
+     * (include/msvcrt/stdlib.h:263), five arguments, and dlls/msvcrt/errno.c:473
+     * calls it with all five.  At the default arity the stub writes the guest
+     * target into r7 -- ELFv2's FIFTH argument register, which native
+     * _invalid_parameter has already loaded with pReserved -- and then passes
+     * four.  That is not a crash: the handler reads a plausible wrong value,
+     * which is the class this port treats as worse than a fault.
+     *
+     * WIDTH.  Four of the five callbacks return void, so nothing reads the
+     * result and the default sign extension is unobservable.  __setusermatherr
+     * is the one that is read: dlls/msvcrt/math.c:129 does
+     * `if (MSVCRT_default_matherr_func && MSVCRT_default_matherr_func(&exception))`
+     * and takes the handler's answer as "I handled it", so the default
+     * sign-extended 32-bit return is required rather than merely harmless -- a
+     * handler returning int must arrive as a full-width zero or non-zero.  None
+     * of the five needs the wide slot: no LRESULT here.
+     */
+    /* _beginthread(start, stack_size, arglist): the start routine is argument
+     * 0 and is `void (__cdecl *)(void *)` -- one argument, no return.  It needs
+     * a row even though thread starts are normally intercepted at INVOCATION
+     * (composition rule 1 above), because this pointer is not a thread start as
+     * far as the kernel is concerned: dlls/msvcrt/thread.c:152 hands CreateThread
+     * the NATIVE _beginthread_trampoline and parks the guest routine in a heap
+     * struct, so RtlUserThreadStart classifies a native entry point, runs it
+     * directly, and thread.c:127 then does start_address(arglist) -- a plain
+     * bctrl straight into x86-64 bytes.  Rule 1 forbids a row for CreateThread's
+     * OWN start routine; this is a different pointer on a different path. */
+    { L"msvcrt.dll",   "_beginthread",     3, NULL, 1u << 0 },
+    { L"msvcr100.dll", "_beginthread",     3, NULL, 1u << 0 },
+    { L"ucrtbase.dll", "_beginthread",     3, NULL, 1u << 0 },
+    { L"ucrtbase.dll", "_o__beginthread",  3, NULL, 1u << 0 },
+    /* _beginthreadex(security, stack_size, start, arglist, initflag, thrdaddr):
+     * the start routine is argument 2 and is `unsigned (__stdcall *)(void *)`.
+     * __stdcall is the documented difference from _beginthread's routine and it
+     * is a no-op here -- x86-64 Windows has one calling convention and the
+     * attribute is ignored -- so what actually differs is the RETURN: unsigned
+     * rather than void.  It still takes the default width, because
+     * thread.c:201 feeds it to _endthreadex(unsigned), which reads 32 bits, so
+     * the upper half the default sign-extends is discarded before anything
+     * looks at it.  Same trampoline path as above: thread.c:238 gives
+     * CreateThread the native _beginthreadex_trampoline. */
+    { L"msvcrt.dll",   "_beginthreadex",     6, NULL, 1u << 2 },
+    { L"msvcr100.dll", "_beginthreadex",     6, NULL, 1u << 2 },
+    { L"ucrtbase.dll", "_beginthreadex",     6, NULL, 1u << 2 },
+    { L"ucrtbase.dll", "_o__beginthreadex",  6, NULL, 1u << 2 },
+    /* _set_invalid_parameter_handler(handler): one argument, and it is the
+     * five-argument callback described above -- the only row in this table that
+     * needs cb_argc.  The thread-local form stores into the per-thread slot
+     * (dlls/msvcrt/errno.c:549) that errno.c:468 prefers over the global one;
+     * it is the same callback shape, so it is the same row. */
+    { L"msvcr100.dll", "_set_invalid_parameter_handler",                    1, NULL, 1u << 0, 0, 5 },
+    { L"ucrtbase.dll", "_set_invalid_parameter_handler",                    1, NULL, 1u << 0, 0, 5 },
+    { L"ucrtbase.dll", "_o__set_invalid_parameter_handler",                 1, NULL, 1u << 0, 0, 5 },
+    { L"ucrtbase.dll", "_set_thread_local_invalid_parameter_handler",       1, NULL, 1u << 0, 0, 5 },
+    { L"ucrtbase.dll", "_o__set_thread_local_invalid_parameter_handler",    1, NULL, 1u << 0, 0, 5 },
+    /* _set_purecall_handler(handler): `void (__cdecl *)(void)`, zero arguments
+     * (include/msvcrt/stdlib.h:259), called bare at dlls/msvcrt/exit.c:504 when
+     * a pure virtual is invoked.  The default four-argument slot is right by
+     * the surplus-register rule: there is no real argument to overwrite.
+     * ucrtbase exports _o__purecall but no _o__set_purecall_handler, so there
+     * is no forwarder row to add -- _purecall is the call site, not a
+     * registration, and needs none. */
+    { L"msvcr100.dll", "_set_purecall_handler",  1, NULL, 1u << 0 },
+    { L"ucrtbase.dll", "_set_purecall_handler",  1, NULL, 1u << 0 },
+    /* __setusermatherr(func): `int (__cdecl *)(struct _exception *)` -- one
+     * pointer argument, and the int return that math.c:129 actually tests.  All
+     * three CRTs export it and none exports an _o_ forwarder for it. */
+    { L"msvcrt.dll",   "__setusermatherr",  1, NULL, 1u << 0 },
+    { L"msvcr100.dll", "__setusermatherr",  1, NULL, 1u << 0 },
+    { L"ucrtbase.dll", "__setusermatherr",  1, NULL, 1u << 0 },
     /* window procedures: the callback carried INSIDE A STRUCT, which no
      * argument-position mask can name, plus the other entry points through
      * which a WNDPROC reaches native user32.  See the block above the four
@@ -5382,7 +5502,7 @@ struct thunk_rip_cache_entry
     void *proc;
     UINT sig;
     thunk_override_func override;
-    UINT cb_mask, cb_wide, fp;
+    UINT cb_mask, cb_wide, cb_argc, fp;
     struct com_thunk_hit com;    /* com.dispatch NULL unless this RIP is a slot */
 };
 
@@ -5478,6 +5598,7 @@ static BOOL thunk_rip_cache_get( ULONG_PTR rip, struct thunk_rip_cache_entry *ou
     out->override     = e->override;
     out->cb_mask      = e->cb_mask;
     out->cb_wide      = e->cb_wide;
+    out->cb_argc      = e->cb_argc;
     out->fp           = e->fp;
     out->com.dispatch = e->com.dispatch;
     out->com.iface    = e->com.iface;
@@ -5599,6 +5720,7 @@ static void thunk_rip_cache_put( ULONG_PTR rip, const struct thunk_rip_cache_ent
     e->override     = val->override;
     e->cb_mask      = val->cb_mask;
     e->cb_wide      = val->cb_wide;
+    e->cb_argc      = val->cb_argc;
     e->fp           = val->fp;
     e->com.dispatch = val->com.dispatch;
     e->com.iface    = val->com.iface;
@@ -5647,7 +5769,7 @@ void flush_guest_thunk_cache(void)
  */
 static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_override_func *override,
                                       struct com_thunk_hit *com, UINT *cb_mask, UINT *cb_wide,
-                                      UINT *fp )
+                                      UINT *cb_argc, UINT *fp )
 {
     static int no_cache = -1;
     struct thunk_rip_cache_entry hit;
@@ -5689,6 +5811,7 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
         *override = hit.override;
         *cb_mask  = hit.cb_mask;
         *cb_wide  = hit.cb_wide;
+        *cb_argc  = hit.cb_argc;
         *fp       = hit.fp;
         /* a COM entry carries a dispatch and a NULL proc; a flat one the
          * reverse, and must leave the caller's zeroed *com alone */
@@ -5799,13 +5922,16 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
                      thunk_overrides[i].argc, THUNK_SIG_ARGC(sig) );
                 goto done;
             }
-            TRACE( "%s.%s -> override %p cb_mask %#x cb_wide %#x (%u args)\n",
+            TRACE( "%s.%s -> override %p cb_mask %#x cb_wide %#x cb_argc %u (%u args)\n",
                    debugstr_w(mod->BaseDllName.Buffer), thunk_overrides[i].name,
                    thunk_overrides[i].func, thunk_overrides[i].cb_mask,
-                   thunk_overrides[i].cb_wide, thunk_overrides[i].argc );
+                   thunk_overrides[i].cb_wide,
+                   thunk_overrides[i].cb_argc ? thunk_overrides[i].cb_argc : 4,
+                   thunk_overrides[i].argc );
             *override = thunk_overrides[i].func;
             *cb_mask  = thunk_overrides[i].cb_mask;
             *cb_wide  = thunk_overrides[i].cb_wide;
+            *cb_argc  = thunk_overrides[i].cb_argc;
             break;
         }
 
@@ -5819,6 +5945,7 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
             val.override = *override;
             val.cb_mask  = *cb_mask;
             val.cb_wide  = *cb_wide;
+            val.cb_argc  = *cb_argc;
             val.fp       = *fp;
             thunk_rip_cache_put( rip, &val );
         }
@@ -6153,7 +6280,7 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
     struct com_thunk_hit com = { 0 };
     NTSTATUS status = STATUS_SUCCESS;
     ULONG_PTR a[THUNK_MAX_ARGS] = { 0 };
-    UINT sig = 0, argc, cb_mask = 0, cb_wide = 0, fp = 0;
+    UINT sig = 0, argc, cb_mask = 0, cb_wide = 0, cb_argc = 0, fp = 0;
     ULONG_PTR ret;
     void *proc;
 
@@ -6163,7 +6290,7 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
     emu_current_trap_ctx = ctx;
     emu_trap_ctx_rewritten = FALSE;
 
-    proc = find_guest_thunk_target( ctx->Rip, &sig, &override, &com, &cb_mask, &cb_wide, &fp );
+    proc = find_guest_thunk_target( ctx->Rip, &sig, &override, &com, &cb_mask, &cb_wide, &cb_argc, &fp );
     argc = THUNK_SIG_ARGC(sig);
     if (com.dispatch)
     {
@@ -6228,7 +6355,7 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
             /* registration-side interception of guest callbacks: swap each
              * declared callback argument for a native trampoline BEFORE the
              * native callee ever sees the pointer */
-            if (cb_mask) wrap_thunk_callback_args( a, argc, cb_mask, cb_wide );
+            if (cb_mask) wrap_thunk_callback_args( a, argc, cb_mask, cb_wide, cb_argc );
             if (sig & THUNK_SIG_VARIADIC)
             {
                 /* the v-variant takes the fixed arguments plus one va_list */

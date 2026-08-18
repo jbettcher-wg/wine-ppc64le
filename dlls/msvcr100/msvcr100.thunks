@@ -114,9 +114,9 @@ GUEST-IMPL   _initterm_e                      __wine_guest__initterm_e
 # and the assertion is that a pointer return is integer class.
 _malloc_crt                   0x0000A110  1  int   msvcr100.spec:1243
 
-# KNOWN LATENT HAZARD -- host->guest callback, PARTIALLY fixed here.  Read the
-# banner in dlls/msvcrt/msvcrt.thunks before debugging a crash in this module.
-# The registration-interception table in dlls/ntdll/signal_ppc64.c now lists
+# host->guest callback -- CLOSED for this module.  Read the banner in
+# dlls/msvcrt/msvcrt.thunks before debugging a crash here.  The
+# registration-interception table in dlls/ntdll/signal_ppc64.c lists
 # msvcr100.dll beside msvcrt.dll and ucrtbase.dll for qsort's comparator,
 # bsearch's, and _onexit's registered handler -- the three rows msvcrt and
 # ucrtbase already carried and this module was missing.  __dllonexit is
@@ -124,9 +124,38 @@ _malloc_crt                   0x0000A110  1  int   msvcr100.spec:1243
 # guest pointer it is handed (see the PROBE-EXTRA msvcrt.h note above), so
 # fixing its arity was the whole fix.
 #
-# STILL OPEN, and still a RAW GUEST POINTER reaching native code that will
-# eventually bctrl it: _beginthread/_beginthreadex's start routine,
-# _set_invalid_parameter_handler, _set_purecall_handler and __setusermatherr.
-# Styx imports all four.  That table is in a file this change does not own
-# beyond the three rows above; the rest is filed in ppc64le/corpus/CATALOG.md
-# rather than done here.
+# The five this file used to list as STILL OPEN now have rows as well, so
+# there is no longer a raw guest pointer leaving this module for native code
+# to bctrl.  Styx: Master of Shadows imports all five.  What each row had to
+# get right, since none of it follows from the registering export's own
+# arity:
+#
+#   _beginthread          start routine at argument 0, `void (*)(void *)`.
+#   _beginthreadex        start routine at argument 2, `unsigned (__stdcall *)
+#                         (void *)`.  __stdcall is a no-op on x86-64, so the
+#                         real difference from _beginthread is the return, and
+#                         it still takes the default width because
+#                         _endthreadex reads 32 bits of it.  Neither of these
+#                         two is reached by the invocation-time thread-start
+#                         interception: msvcrt's own native trampoline is what
+#                         CreateThread is given, and it calls the guest
+#                         routine itself.
+#   _set_invalid_parameter_handler
+#                         the only FIVE-argument callback in the table.  At
+#                         the default arity the trampoline's identity register
+#                         is r7, which is exactly where native
+#                         _invalid_parameter has already put pReserved -- so a
+#                         four-argument slot would not fault, it would hand the
+#                         handler a wrong value.  That is what the cb_argc
+#                         column added for this row exists to prevent.
+#   _set_purecall_handler `void (*)(void)`, no arguments at all; the default
+#                         slot is right because there is nothing to overwrite.
+#   __setusermatherr      `int (*)(struct _exception *)`, and the one whose
+#                         RETURN is read -- dlls/msvcrt/math.c tests it as
+#                         "I handled it" -- so the default sign-extended
+#                         32-bit return is required, not merely harmless.
+#
+# The proof is ppc64le/seh/check-crt-callbacks.sh, which registers all five
+# from a guest, makes native CRT code call each one, and checks the VALUES
+# each callback received and returned against a native control; it goes red
+# under WINEEMUNOCBWRAP=1.

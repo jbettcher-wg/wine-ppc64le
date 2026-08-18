@@ -490,8 +490,35 @@ of them hands over a guest pointer.
 `msvcr100.thunks` deliberately leaves `__dllonexit` as a named sentinel rather
 than serving it: a plain thunk here would convert a fault that names itself
 *now* into a native table full of raw guest pointers that crashes *later*,
-which is the `FlsAlloc` failure README already documents. The fix is a handful
-of rows beside the existing two, and it belongs to whoever owns that file.
+which is the `FlsAlloc` failure README already documents.
+
+**CLOSED.** All eight now have rows. `qsort`, `bsearch` and `_onexit` landed
+first; the remaining five — `_beginthread`, `_beginthreadex`,
+`_set_invalid_parameter_handler`, `_set_purecall_handler` and
+`__setusermatherr` — are in the table now for all three CRT modules that
+actually export each one, which is not the same set for each: `msvcrt.dll`
+exports neither handler setter (it has `_invalid_parameter` and `_purecall`,
+which are the *call* sites), and `ucrtbase.dll` additionally publishes `_o_*`
+forwarders that a name-keyed row would have missed. Two of the five could
+not be got right by inspection alone:
+
+* `_beginthread`/`_beginthreadex` are **not** reached by the invocation-time
+  thread-start interception that covers `CreateThread`. `dlls/msvcrt/thread.c`
+  hands `CreateThread` its own *native* trampoline and calls the guest routine
+  from inside it, so the entry point the port classifies is native and the
+  guest pointer is never inspected;
+* `_set_invalid_parameter_handler`'s callback takes **five** arguments, and
+  the trampoline pool puts the guest target in the register one past the last
+  real one — r7 at the default four-argument arity, which is exactly where
+  native `_invalid_parameter` has already put `pReserved`. A default-arity row
+  would not have faulted; it would have handed the handler a pointer where a
+  reserved value belongs. That is what the `cb_argc` column added for it
+  prevents.
+
+The gate is `ppc64le/seh/check-crt-callbacks.sh`: one source built twice, run
+as a native ppc64 PE and as an x86-64 guest, nine value-checking steps plus a
+separate pure-virtual run, transcripts byte-identical, and red under
+`WINEEMUNOCBWRAP=1`.
 
 ### 3. To the port's own legibility: name the fault, not the run's start
 
