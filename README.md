@@ -40,6 +40,15 @@ Honest, and in progress.
 | `vulkan-1` guest thunks | **252 exports, 0 refused** |
 | System COM for guests | **works** — `ppc64le/syscom/check-com-smoke.sh`, 21/21, native and guest byte-identical |
 | The Steam client for guests | **reaches it** — `ppc64le/steamapi/check-steam-bridge.sh`; a guest gets a real `ISteamClient` and the real client library answers |
+| Launching **from** Steam | **has a gate** — `ppc64le/steamtool/check-launch-smoke.sh`, including the `legacycompat` pre-step that used to hang the launch |
+| The guest thunk boundary | **lock-free** — the RIP→target cache answers without taking the loader lock |
+| Debugging a guest | **works** — `winedbg` attaches, shows the guest's registers, stack, disassembly and backtrace; `ppc64le/winedbg/check-guest-debug.sh` |
+| OpenGL on **both** drivers | **works** — X11 and Wayland legs, native and guest byte-identical on each; `ppc64le/opengl/check-gl-smoke.sh` |
+| A swapchain on a **child** window | **works** — the child leg of `ppc64le/dxvk/check-present-smoke.sh` |
+| Swapchain **resize** | **works** — on screen and in the back buffer; `ppc64le/dxvk/check-fullscreen-smoke.sh` |
+| Exclusive **fullscreen** | **no** — reaches DXGI and stops there; cause named in `ppc64le/dxvk/README.md` |
+| Media Foundation for guests | **works** — measured end to end on `mfplat`/`mf`/`mfreadwrite` |
+| `mfmediaengine`, `evr`, `wmvcore` | **surface built, unexercised** — same roster, same instance; no title has driven one, and `ppc64le/mf/README.md` says so |
 | **A commercial game** | **no** — see "Where real games stop" |
 
 `ntdll` cannot be a PE and never will be: its TEB lives in an initial-exec
@@ -130,9 +139,67 @@ first guest fault to executing 6367 tests.
 **Graphics.** A guest D3D12 program reaches native vkd3d-proton and the GPU, and
 **presents to the screen** — verified texel-exact by reading the window back on
 a live session. Presentation goes through Wine's own win32u client-surface
-layer, the one `winevulkan` uses, so both the X11 and Wayland drivers are served
-by construction and vkd3d-proton needs no changes at all. vkd3d is built by this
-tree's `make`.
+layer, the one `winevulkan` uses, so vkd3d-proton needs no changes at all. vkd3d
+is built by this tree's `make`.
+
+**Graphics, on more than one driver and more than one size.** That
+client-surface argument used to be where the Wayland driver's coverage stopped:
+"served by construction". It is now run rather than argued, and one of the three
+things it was claimed to cover turned out not to be covered by it at all.
+
+* **OpenGL on Wayland is a separate implementation, not the same one served
+  twice.** Context creation, pixel formats and buffer swaps belong to the
+  *driver* — winex11's GLX and winewayland's EGL — and `win32u`'s client surface
+  says nothing about them. `ppc64le/opengl/check-gl-smoke.sh` now runs its whole
+  native-vs-guest comparison a second time against a headless weston, and both
+  legs pass 15/15 byte-identical. It is also the first **hardware** GL in that
+  gate: an Xvfb has no DRI3, so the X11 leg is llvmpipe, while the Wayland leg
+  reports `Radeon Pro V620`.
+* **A Wine session serves one graphics driver**, and that is a fact anyone
+  switching drivers has to know rather than a defect in either. [MEASURED] the
+  identical binary in an identical environment: 15/15 in a session of its own,
+  and 1/2 — dead at `CreateWindow`, `err:winediag:nodrv_CreateWindow ... The
+  explorer process failed to start` — in a session the X11 legs had already
+  started. The desktop window is per session and it has one owner. The gate ends
+  the session between its two driver legs for that reason.
+* **A swapchain on a CHILD window already worked**, which was worth proving
+  rather than assuming: a launcher, an in-game UI panel and an embedded video
+  view all present into a child of their own frame, and a child HWND is a
+  different object to the driver. `check-present-smoke.sh` now creates a 128x96
+  `WS_CHILD` inside a 256x256 parent and requires the compositor's own
+  framebuffer to hold a rectangle of the CHILD's size — and, against the same
+  photograph, requires it *not* to hold one of the parent's, which is the exact
+  shape of "presented to the parent instead".
+* **Resize works. Exclusive fullscreen does not, and the boundary was never
+  the problem in either case.** `dlls/d3d11/d3d11_marshal.h` already carried
+  complete plans for `SetFullscreenState`, `GetFullscreenState`,
+  `ResizeBuffers`, `ResizeTarget` and `GetContainingOutput` on every
+  `IDXGISwapChain` version the roster covers — they are ordinary integer slots
+  and the generator never refused them. What was unproven was whether they
+  *did* anything, since a window operation that never reaches the display
+  server returns `S_OK` and leaves the picture exactly the size it was.
+
+  `ppc64le/dxvk/check-fullscreen-smoke.sh` drives one swapchain through four
+  phases and photographs the screen between them, checking DXGI's own
+  description of the back buffer **and** the size of the rectangle on screen —
+  because checking only the second would pass a resize that moved the window
+  and left DXVK scaling the old buffer into it, which is the commonest way to
+  get this wrong and is the gate's first negative control. Resize passes both
+  ways: 256x256 → 192x144 → 192x144 again after leaving fullscreen.
+
+  Fullscreen does not, and the gate is what found it. [MEASURED]
+  `SetFullscreenState(TRUE)` returns `S_OK`, `GetFullscreenState` agrees,
+  `GetSystemMetrics` reports the whole screen — and the rectangle on screen is
+  still the window's. The cause is one inherited method:
+  `ForeignWsiDriver::enterFullscreenMode` is a deliberate no-op that reports
+  success because *the window belongs to somebody else*, which is right for the
+  foreign-X11 backend and wrong for the Win32u one, whose window is a Wine HWND
+  Wine can move — and `Win32uWsiDriver` inherits it unchanged. It is **recorded
+  as incomplete** in `ppc64le/dxvk/README.md`, with the reason it was not fixed
+  in this pass: the fix needs a road that does not exist yet, because DXVK's WSI
+  runs in the unix library and the five-entry callback table it reaches Wine
+  through cannot move a window. The gate asserts the current behaviour
+  positively, so it goes red the day somebody fixes it.
 
 ### Where real games stop
 
@@ -437,29 +504,84 @@ frame and the handler. A guest exception that must be caught
 **below a nested run** — raised inside a guest callback that native code
 invoked — is a second, untested limit: the frame walk ends at that run's entry
 frame, and the record is re-raised natively where no guest handler can see it.
-D3D11 on this path, swapchain resize and fullscreen, and the Wayland driver leg
-are all unbuilt.
+D3D11 on this path is still unbuilt. Swapchain resize, exclusive fullscreen and
+the Wayland driver leg are no longer: see "Graphics, on more than one driver
+and more than one size" below.
 
-**No debugger can be pointed at a guest.** `winedbg` cannot attach to a process
-running a guest image, so the one tool that would print a backtrace for a guest
-crash is the one tool that cannot be aimed at one. Attaching means injecting a
-thread that starts at `DbgUiRemoteBreakin`, and this port's `RtlUserThreadStart`
-classifies every thread start before running it: a guest entry point goes to the
-run loop, a native one is called directly, and an address that is in **no loaded
-image** is refused rather than guessed at — `thread start 0x3FFF... is in no
-loaded image; refusing to run it either way`. The injected breakin routine lands
-in exactly that third case, because it lives in the ELF `ntdll` rather than in
-any PE the loader has a record of, so the attach dies at the door and takes the
-debugging session with it. Nothing in this file was diagnosed with a debugger
-for that reason; every crash here was read off the port's own `+seh` trace, a
-disassembler and the exception record's `ExceptionAddress`, which is also why
-the loader hands out a **distinct** `0xdead0000+n` per unresolved import instead
-of one shared `0xdeadbeef` — post mortem, the faulting address is the only name
-the symbol has left. It is a gap in the tooling, not in the port: a guest is
-debuggable in principle, and until it is, `AeDebug` is a hazard rather than a
-help. Every gate here runs with `WINEDLLOVERRIDES=winedbg.exe=d`, because a red
-state that starts a debugger that then never attaches is a **hang**, which is
-the one thing a gate must never be.
+**`winedbg` can be pointed at a guest.** It could not, and for most of this
+file's history every crash here was read off the port's own `+seh` trace, a
+disassembler and the exception record's `ExceptionAddress` — which is why the
+loader hands out a **distinct** `0xdead0000+n` per unresolved import instead of
+one shared `0xdeadbeef`: post mortem, the faulting address was the only name a
+symbol had left. Two separate things were wrong.
+
+**The attach never landed, and the reason was an address rather than a
+classification.** `DbgUiIssueRemoteBreakin` creates a thread in the target at
+the *debugger's own* `DbgUiRemoteBreakin`, which is only meaningful because
+`ntdll` normally sits at the same place in every process — it is a PE with a
+fixed image base. Here `ntdll`'s PE side is the one module that cannot be a PE,
+so it is an ELF builtin and the dynamic linker puts it wherever it likes:
+[MEASURED] three concurrent processes of the same binary mapped
+`dlls/ntdll/ntdll.dll.so` at `0x3fff881ed000`, `0x3fffb9a1d000` and
+`0x3fff91a0d000`. The address handed across named nothing in the target, and
+the thread-start classifier said exactly that and refused it — `thread start
+00003FFFB7F11280 is in no loaded image; refusing to run it either way`, which
+is the correct answer to the question it was asked. `winedbg` printed "attached
+to pid" and then waited forever. (An earlier revision of this file read that as
+the breakin routine living outside any PE the loader has a record of. It does
+not: `ntdll`'s ELF text is inside `ntdll`'s own loader entry and
+`RtlPcToFileHeader` finds it.) `DbgUiIssueRemoteBreakin` now resolves the
+routine in the **target's** own `ntdll` — same file, same offset, different
+base — reading the debuggee's loader data and falling back to today's behaviour
+if anything about it fails, which is the identity on every build where `ntdll`
+is a PE.
+
+**The registers were the emulator's.** A guest thread's native ppc64 `CONTEXT`
+describes the JIT, not the program. The guest register file is reconstructed at
+every trap and at every fault, but in a stack frame that is gone by the time
+anybody outside asks — and the guest **stack** is freed by the run loop before a
+fatal fault is even reported, so a debugger with the registers would still have
+had an RSP pointing at unmapped memory. The run loop now keeps a copy of the
+guest `AMD64_CONTEXT` in `thread_data` with a state beside it, and serves it
+through `NtQueryInformationThread(ThreadWow64Context)` — the information class
+that already means "this thread's context in the machine it is really
+executing" — over the second server context block this tree had already
+reserved for the pair and left empty. A run that ends on an unhandled guest
+exception keeps its guest stack mapped **while a debugger is attached**, so the
+stack the registers point at is still there when the report is made.
+
+`winedbg` picks its CPU backend per **thread** rather than per process, because
+a guest process genuinely has threads of both machines in it — the game's are
+x86-64 under the emulator, the debugger's own injected breakin thread and every
+Wine service thread are native ppc64. Whichever answers becomes the backend
+while that thread is current, and a thread with no guest context says so out
+loud instead of being shown zeros. `dbghelp`'s x86-64 stack walker is built on
+ppc64 the same way `unwind.c`'s x86-64 block already is, so a guest backtrace is
+walked from the guest's own `.pdata`.
+
+What that produces, on a guest that faults three calls deep: the exception
+named at the guest RIP, every guest register, a stack dump at the guest RSP,
+the faulting instruction disassembled as x86-64, and four guest frames in
+order. `ppc64le/winedbg/check-guest-debug.sh` is the gate — a native ppc64
+reader that checks ten sentinel registers, CS, the guest RIP and a marker read
+out of the guest stack across a process boundary, beside `winedbg` itself
+reading the same crash; `--sabotage` turns off the breakin translation, the
+context publication and the stack retention in turn and requires each to go red.
+
+**What is still refused, by name.** `set_thread_wow64_context` says no: writing
+a guest register means writing into the emulator's own thread state, which is
+safe only while the guest is stopped and is not checkable from outside. So a
+guest can be **read and not steered** — no guest single-step, no resuming from
+an edited RIP, and no breakpoint that needs the context adjusted past it. And a
+guest thread that is executing inside the JIT *right now* reports no context at
+all rather than the registers it last stopped with, because a debugger printing
+a stale RIP as the current one is a wrong number, and this port treats a wrong
+number as worse than a refusal.
+
+`AeDebug` remains a hazard for gates rather than a help: every gate except the
+debugger's own runs with `WINEDLLOVERRIDES=winedbg.exe=d`, because a red state
+that starts a debugger is a **hang** if anything about the attach goes wrong,
+and a hang is the one thing a gate must never be.
 
 ### Steam
 

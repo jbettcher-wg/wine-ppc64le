@@ -422,6 +422,124 @@ Not installed. `/mnt/caution/steamapps/common/Styx Shards of Darkness/` is an
 empty directory and there is no `appmanifest_*.acf` for it. Its compatdata
 (`355790`) survives from an earlier install. No action.
 
+### Quake II (2023 remaster) — blocked, and the drive is the reason
+
+Not runnable on this machine and not for a reason anyone can fix in this tree.
+`~/.local/share/Steam/steamapps/libraryfolders.vdf` lists four libraries and
+only two of them exist:
+
+| library | mounted |
+|---|---|
+| `~/.local/share/Steam` | yes |
+| `/mnt/caution` | yes — `/dev/nvme0n1p2`, the corpus above |
+| `/mnt/b26f28df-d4ab-4293-8de7-e8972421838f/SteamLibrary` | **the directory does not exist** |
+| `/mnt/11012365-648a-4956-a2da-c5ad6bab12ad/SteamLibrary` | **the directory does not exist** |
+
+[MEASURED] 2026-08-18, op4k: `findmnt` shows exactly three filesystems — `/`,
+`/home` and `/mnt/caution`. `lsblk` shows `sdc` through `sdj` at **0 B**, which
+is what a SCSI slot with no disk in it reports. Neither library path is even a
+directory, so there is nothing to mount onto. There is no `appmanifest_2320.acf`
+anywhere reachable and no `common/Quake*` under any mounted library.
+
+Nothing was faked and nothing was substituted. The title stays on the list with
+its reason written down; when the drive is back it is one `import_chain.py` run
+away from a static answer and one launch away from a real one.
+
+## The Steam overlay — what would have to happen, and what does today
+
+**Nothing today. The overlay is not injected, and one of the two roads to it is
+closed deliberately.** This section is the mechanism written down, because it
+crosses two worlds and neither half is obvious.
+
+There are two overlays, not one, and Steam picks between them by what kind of
+process the game is:
+
+* **`gameoverlayrenderer.so`** — x86-64 **Linux** ELF
+  (`~/.local/share/Steam/ubuntu12_64/`, also under `steamrt64/`). The Steam
+  client `LD_PRELOAD`s it into the whole launched process tree. It hooks the
+  **host** GL/EGL/Vulkan entry points and draws the overlay after the game's
+  own frame. This is the road Proton uses for a Windows game, because under
+  Proton the process that talks to the GPU *is* a Linux process.
+* **`GameOverlayRenderer64.dll`** — x86-64 **PE**
+  (`~/.local/share/Steam/legacycompat/`, and Proton copies it into
+  `drive_c/Program Files (x86)/Steam/` in every prefix it builds — see
+  `proton`'s `filestocopy` list). This is the Windows-side overlay, loaded
+  *inside* the game process, hooking D3D/DXGI at the application's own level.
+
+**Road one is closed by this port, on purpose, and the reason is in the code.**
+`ppc64le/steamtool/proton` strips `LD_PRELOAD` (with `LD_LIBRARY_PATH`,
+`LD_AUDIT` and the rest) out of the environment Steam hands it, because the
+value Steam sets names **x86-64** shared objects and the processes this port
+starts are **native ppc64le**: leaving it in produces a stream of "wrong ELF
+class" errors from the host `ld.so` on every process the port starts, including
+`wineserver`. That is not a decision that can be reversed by keeping the
+variable — the object is the wrong machine for the process that would load it,
+and there is no ppc64le build of it. **The host-side overlay cannot work here at
+all, ever, unless Valve ships a ppc64le `gameoverlayrenderer.so`.**
+
+**Road two is untried, and it is the one that could work.** The Windows-side
+overlay is an x86-64 PE, which is exactly the machine this port already runs as
+a guest: `msvcp140.dll` and every game's own DLLs load and execute the same way.
+So `GameOverlayRenderer64.dll` is not categorically out of reach the way its
+Linux sibling is. Three things stand between here and there, and only the first
+is small:
+
+1. **It is never staged into the prefix.** Proton copies it (and
+   `steamclient.dll`, `Steam.dll`, `SteamService.exe`) into
+   `drive_c/Program Files (x86)/Steam/`; `ppc64le/steamtool/proton` copies none
+   of them, because this port serves `steamclient64.dll` from its own builtin
+   (`dlls/steamclient64`) and never needed a file on disk. Adding a copy is a
+   handful of lines in the same place the MFC-runtime copy already lives.
+2. **Nothing loads it.** On Windows the Steam client injects it; under Proton
+   the `steam.exe` helper `LoadLibrary`s it. This port has no helper `.exe` —
+   `dlls/steamclient64`'s `DllMain` does the job the helper used to do (it
+   writes `ActiveProcess\PID` from inside the game, which is Proton's trick
+   minus the helper). A `LoadLibraryW( L"GameOverlayRenderer64.dll" )` from that
+   same `DllMain` is the natural place, and it would go through the guest
+   loader like any other guest module.
+3. **Its imports have to bind, and they very nearly all do.**
+   [MEASURED] 2026-08-18, `ppc64le/thunks/import_chain.py` on
+   `~/.local/share/Steam/GameOverlayRenderer64.dll`: a PE32+ x86-64 DLL with
+   **280 imports across ten modules** — `kernel32` (166), `user32` (59),
+   `imm32` (16), `advapi32` (15), `gdi32` (10), `ole32` (6), `cfgmgr32` (3),
+   `oleaut32` (2), `psapi` (2), `winmm` (1).
+
+   Nine of the ten already had a guest thunk. **`cfgmgr32` had no `.thunks`
+   file at all**, which on this port is the fatal shape rather than the
+   survivable one — a missing MODULE fails the whole import walk before any
+   guest code runs, while a missing EXPORT only binds a sentinel. That was a
+   one-line fix of exactly the kind the fifteen modules above got, and it is
+   made: `dlls/cfgmgr32/cfgmgr32.thunks`. (cfgmgr32 is ordinary furniture, not
+   a Steam thing: any guest DLL that enumerates devices imports it.)
+
+   With that in, the audit is down to **two holes, both in `psapi`** —
+   `GetModuleInformation` and `GetModuleBaseNameA`. Both are the
+   `PSAPI_VERSION`/`K32*` macro-rename documented under "the signature oracle
+   resolves a NAME, and headers rename" above: `include/psapi.h` `#define`s
+   every one of its 27 names to a `K32*` equivalent before declaring it, so the
+   oracle asks for `GetModuleInformation` and the translation unit only has
+   `K32GetModuleInformation`. They are named sentinels, and an overlay is
+   exactly the kind of code that calls them — it walks the loaded modules to
+   find the graphics API to hook. So handoff 5 below ("follow a header's alias
+   of an export name") is not an abstract tidy-up any more: it is the last
+   thing between this DLL and loading.
+
+**What it would then do, and why nobody should assume it works.** The overlay
+hooks the graphics API *inside* the game. On this port the game's D3D11 calls
+leave the guest through a thunk stub and land in native `d3d11.dll`, so a
+detour installed on the **guest** side of that boundary — an IAT patch on
+`d3d11.dll`, or a vtable patch on the swapchain proxy — still sees every call,
+because the proxy vtable the guest holds *is* guest code
+(`libs/winecom`'s trap-stub array). A detour installed by writing x86-64 jump
+bytes over the entry of what it believes is `IDXGISwapChain::Present` would land
+on a trap stub, which is five bytes long. That is the interesting question and
+it is genuinely open: the overlay's hooking style decides whether it composes
+with this port's proxies or corrupts them, and nothing here has measured it.
+
+**Recorded as INCOMPLETE.** Not "not needed yet": the overlay is what tells a
+player their game is running under Steam at all, and the first two steps above
+are small. The third is a real investigation and it has not been done.
+
 ---
 
 ## Handoffs
