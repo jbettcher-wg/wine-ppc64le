@@ -4242,6 +4242,12 @@ void WINAPI LdrShutdownProcess(void)
     if (!detaching)
         RtlProcessFlsData( NtCurrentTeb()->FlsSlots, 1 );
 
+#ifdef __powerpc64__
+    /* Before the modules go: the histogram names its rows by module and
+     * offset, and process_detach() below unmaps the modules those names come
+     * from. */
+    dump_guest_thunk_profile();
+#endif
     process_detach();
 }
 

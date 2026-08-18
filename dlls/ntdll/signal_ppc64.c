@@ -5388,6 +5388,32 @@ struct thunk_rip_cache_entry
 
 static struct thunk_rip_cache_entry thunk_rip_cache[THUNK_RIP_CACHE_SIZE];
 
+/* WINEEMUPROFILE=1: count the crossings per cache slot and print a histogram
+ * at process shutdown.
+ *
+ * "Which native functions is this guest actually calling, and how often" has
+ * no answer from outside the process, and it is the first question worth
+ * asking about any boundary cost -- a profiler samples the CALLEE and tells
+ * you where the time went inside it, never how many times it was crossed to
+ * get there.  Measured on DOOM (2016): its worker pool wakes ~54,000 times a
+ * second while using 2.4 cores, and the shape of that number is a property of
+ * which APIs it crosses for, not of how long any of them takes.
+ *
+ * OFF BY DEFAULT AND A SEPARATE ARRAY, both deliberately.  The counter is a
+ * shared cache line written by every thread that crosses; keeping it out of
+ * the cache entry keeps the entry immutable, which is what the seqlock above
+ * relies on, and keeping the increment behind a flag keeps the measurement
+ * from being the thing it measures.  With the flag off this is one
+ * already-loaded branch on a path that just did a dozen loads. */
+static LONG thunk_rip_hits[THUNK_RIP_CACHE_SIZE];
+static LONG thunk_rip_total;
+static int thunk_rip_profile = -1;
+
+/* Crossings between periodic histogram prints.  Two million is about a second
+ * of a loading game on this port, which is often enough to see a phase change
+ * and rare enough that the printing is not itself the measurement. */
+#define THUNK_PROFILE_INTERVAL 2000000
+
 static UINT thunk_rip_cache_slot( ULONG_PTR rip )
 {
     /* trap sites are THUNK stride apart (a handful of bytes), not naturally
@@ -5398,6 +5424,8 @@ static UINT thunk_rip_cache_slot( ULONG_PTR rip )
     h ^= h >> 31;
     return (UINT)(h & (THUNK_RIP_CACHE_SIZE - 1));
 }
+
+void dump_guest_thunk_profile(void);
 
 /* Sabotage lever, read once.  Both halves of the cache have to honour it or
  * it proves nothing: a reader forced to slot zero while the writer still
@@ -5468,6 +5496,71 @@ static BOOL thunk_rip_cache_get( ULONG_PTR rip, struct thunk_rip_cache_entry *ou
     TRACE( "thunk cache hit for %p -> proc %p com %p\n",
            (void *)rip, out->proc, out->com.dispatch );
     return TRUE;
+}
+
+/***********************************************************************
+ *           dump_guest_thunk_profile
+ *
+ * Print the crossing histogram WINEEMUPROFILE=1 has been collecting, busiest
+ * first, as module+offset rather than a bare address so `nm` can finish the
+ * job.  Called from LdrShutdownProcess(); a process that dies without
+ * shutting down cleanly simply prints nothing, which is honest.
+ */
+void dump_guest_thunk_profile(void)
+{
+    UINT order[THUNK_RIP_CACHE_SIZE];
+    UINT i, j, n = 0;
+    ULONG total = 0;
+
+    if (thunk_rip_profile != 1) return;
+    ERR( "WINEEMUPROFILE: --- histogram at %u crossings ---\n", (UINT)thunk_rip_total );
+
+    for (i = 0; i < THUNK_RIP_CACHE_SIZE; i++)
+    {
+        if (!thunk_rip_hits[i]) continue;
+        order[n++] = i;
+        total += (ULONG)thunk_rip_hits[i];
+    }
+    /* insertion sort: n is at most 1024 and this runs once, at shutdown */
+    for (i = 1; i < n; i++)
+    {
+        UINT key = order[i];
+        for (j = i; j && thunk_rip_hits[order[j - 1]] < thunk_rip_hits[key]; j--)
+            order[j] = order[j - 1];
+        order[j] = key;
+    }
+
+    ERR( "WINEEMUPROFILE: %u guest->native crossings served from %u cache slots\n",
+         (UINT)total, n );
+    for (i = 0; i < n && i < 40; i++)
+    {
+        struct thunk_rip_cache_entry volatile *e = &thunk_rip_cache[order[i]];
+        void *proc = e->proc;
+        void *image = NULL;
+        const WCHAR *modname = NULL;
+        ULONG_PTR off = 0;
+
+        if (proc && RtlPcToFileHeader( proc, &image ) && image)
+        {
+            LDR_DATA_TABLE_ENTRY *mod;
+            if (!LdrFindEntryForAddress( proc, &mod ))
+            {
+                modname = mod->BaseDllName.Buffer;
+                off = (ULONG_PTR)proc - (ULONG_PTR)mod->DllBase;
+            }
+        }
+        if (modname)
+            ERR( "WINEEMUPROFILE: %10u  rip %p -> %s+%#I64x\n",
+                 (UINT)thunk_rip_hits[order[i]], (void *)e->rip,
+                 debugstr_w(modname), (ULONG64)off );
+        else if (e->com.dispatch)
+            ERR( "WINEEMUPROFILE: %10u  rip %p -> COM iface %u slot %u\n",
+                 (UINT)thunk_rip_hits[order[i]], (void *)e->rip,
+                 e->com.iface, e->com.slot );
+        else
+            ERR( "WINEEMUPROFILE: %10u  rip %p -> proc %p\n",
+                 (UINT)thunk_rip_hits[order[i]], (void *)e->rip, proc );
+    }
 }
 
 /* Publish an answer.  CALLER HOLDS THE LOADER LOCK, which is what serializes
@@ -5554,6 +5647,24 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
     ULONG_PTR magic;
 
     if (no_cache == -1) no_cache = emu_env_flag( L"WINEEMUNORIPCACHE" );
+    if (thunk_rip_profile == -1) thunk_rip_profile = emu_env_flag( L"WINEEMUPROFILE" );
+
+    /* Counted HERE rather than on the hit path, because a crossing that
+     * misses is still a crossing -- and a call site that is only ever crossed
+     * once is exactly the kind the histogram should show as rare rather than
+     * not show at all. */
+    if (thunk_rip_profile)
+    {
+        LONG n;
+
+        InterlockedIncrement( &thunk_rip_hits[thunk_rip_cache_slot( rip )] );
+        /* Printed every so often as well as at shutdown, because the runs
+         * worth profiling are exactly the ones that do not shut down: a game
+         * that dies on its own error path, or one a timeout kills, reaches no
+         * LdrShutdownProcess and would otherwise measure nothing at all. */
+        n = InterlockedIncrement( &thunk_rip_total );
+        if (n % THUNK_PROFILE_INTERVAL == 0) dump_guest_thunk_profile();
+    }
 
     *fp = 0;
 
