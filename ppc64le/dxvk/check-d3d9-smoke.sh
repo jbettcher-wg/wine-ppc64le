@@ -37,7 +37,13 @@
 #   B  ISA FLOOR: scan-isa.sh reports the build tree CLEAN against the
 #      -mcpu=power8 floor.
 #   C  NATIVE: the probe, built for ppc64le and run headless with no Wine and
-#      no guest in the process, reports PASS.
+#      no guest in the process, reports PASS.  Steps 9-11 are the DEPTH
+#      claim: a D3DFMT_D32F_LOCKABLE depth surface is cleared to two
+#      compile-time-known Z values in turn and every one of its 4096
+#      texels is read back and compared bit-exactly, the same way step 7
+#      walks the colour target.  Depth is the only value on this surface
+#      that reaches DXVK through a floating-point argument register, and
+#      a Z that arrives wrong is a silently wrong buffer, not a crash.
 #   D  GUEST: the same probe, built as an x86-64 PE, runs under the emulator
 #      and reports PASS.
 #   E  IDENTITY: cmp(native stdout, guest stdout) is empty.
@@ -50,7 +56,10 @@
 #   1  WINEEMUNOCOMWRAP=1 hands the guest raw host pointers -- the exact defect
 #      this port's proxy runtime exists to fix -- and the guest run MUST NOT
 #      print "d3d9_smoke: PASS".
-#   2  The native probe rebuilt with -DSMOKE_BREAK=1, =2 and =3 MUST each FAIL.
+#   2  The native probe rebuilt with -DSMOKE_BREAK=1..5 MUST each FAIL.  1-3
+#      are the colour cases; 4 and 5 are the depth pair added with steps
+#      9-11 -- skipping the second depth Clear, and checking the first
+#      depth readback against a value nothing ever wrote.
 #   3  The native probe WITHOUT the deferSurfaceCreation option must fail at
 #      device creation, because that is the measurement the whole recipe above
 #      rests on and a gate should not carry an unfalsifiable premise.
@@ -186,8 +195,12 @@ sabotage() {
             "$OUT/sabotage_wrap.out" | cut -c1-60)', as it must"
     fi
 
-    # part 2: each SMOKE_BREAK variant, native, must FAIL.
-    for n in 1 2 3; do
+    # part 2: each SMOKE_BREAK variant, native, must FAIL.  Cases 4 and 5
+    # are the depth pair: 4 skips the second depth Clear so the surface
+    # still holds the first value, 5 checks the first readback against a
+    # depth nothing ever wrote.  A depth assertion that cannot go red for
+    # both reasons is not asserting on the depth VALUES.
+    for n in 1 2 3 4 5; do
         if $NATIVECC -DD3D9_SMOKE_NATIVE -DSMOKE_BREAK=$n \
                 -c -o "$OUT/native_break$n.o" "$HERE/probes/d3d9_smoke.c" \
                 2>"$OUT/native_break$n.build.err" \

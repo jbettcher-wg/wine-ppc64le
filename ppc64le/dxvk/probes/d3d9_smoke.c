@@ -210,6 +210,17 @@
  *                      4096 texels"), so the verdict requires
  *                      checked_count == 4096 as well as mismatches == 0;
  *                      an incomplete scan fails on that arithmetic alone.
+ *   -DSMOKE_BREAK=4   skip the SECOND depth Clear (step 11) only.  The
+ *                      depth surface still holds step 10's 0.25f, so the
+ *                      check against 0.75f mismatches on all 4096 texels.
+ *                      This is the case that proves the two depth values
+ *                      are really being read rather than one of them being
+ *                      matched by a buffer nobody wrote.
+ *   -DSMOKE_BREAK=5   check step 10's depth texels against 0.5f, a value
+ *                      never written by anything (the actual depth data is
+ *                      untouched; the CHECK is deliberately wrong), so all
+ *                      4096 depth comparisons mismatch.  The depth
+ *                      equivalent of case 2.
  *
  *   [MEASURED] 2026-08-17, op4k: native leg built and run under
  *   env -u DISPLAY -u WAYLAND_DISPLAY -u XDG_RUNTIME_DIR
@@ -349,6 +360,11 @@ typedef HRESULT (WINAPI *PFN_LockRect)(
 typedef HRESULT (WINAPI *PFN_UnlockRect)(IDirect3DSurface9 *);
 typedef HRESULT (WINAPI *PFN_SetNPatchMode)(IDirect3DDevice9 *, float);
 typedef float   (WINAPI *PFN_GetNPatchMode)(IDirect3DDevice9 *);
+typedef HRESULT (WINAPI *PFN_CreateDepthStencilSurface)(
+    IDirect3DDevice9 *, UINT, UINT, D3DFORMAT, D3DMULTISAMPLE_TYPE, DWORD,
+    BOOL, IDirect3DSurface9 **, HANDLE *);
+typedef HRESULT (WINAPI *PFN_SetDepthStencilSurface)(
+    IDirect3DDevice9 *, IDirect3DSurface9 *);
 
 static HRESULT call_CreateDevice( IDirect3D9 *d3d9, UINT adapter, D3DDEVTYPE type,
     HWND hwnd, DWORD flags, D3DPRESENT_PARAMETERS *pp, IDirect3DDevice9 **out_dev )
@@ -380,6 +396,27 @@ static HRESULT call_SetRenderTarget( IDirect3DDevice9 *dev, DWORD idx, IDirect3D
 static HRESULT call_Clear( IDirect3DDevice9 *dev, D3DCOLOR colour )
 {
     return ((PFN_Clear)dev->lpVtbl->Clear)( dev, 0, NULL, D3DCLEAR_TARGET, colour, 0.0f, 0 );
+}
+/* The same slot with D3DCLEAR_ZBUFFER instead, which is what carries the
+ * float Z.  Kept separate from call_Clear rather than adding parameters to
+ * it, so the colour steps above are textually untouched by the depth work
+ * below and a reader can see at a glance which flag each step passes. */
+static HRESULT call_ClearZ( IDirect3DDevice9 *dev, float z )
+{
+    return ((PFN_Clear)dev->lpVtbl->Clear)( dev, 0, NULL, D3DCLEAR_ZBUFFER, 0, z, 0 );
+}
+static HRESULT call_CreateDepthStencilSurface( IDirect3DDevice9 *dev, UINT w, UINT h,
+    D3DFORMAT fmt, IDirect3DSurface9 **out_surf )
+{
+    /* Discard=FALSE is the load-bearing argument: with TRUE the runtime is
+     * entitled to throw the contents away the moment the surface stops being
+     * bound, and this probe's whole claim is about what is IN it afterwards. */
+    return ((PFN_CreateDepthStencilSurface)dev->lpVtbl->CreateDepthStencilSurface)(
+        dev, w, h, fmt, D3DMULTISAMPLE_NONE, 0, FALSE, out_surf, NULL );
+}
+static HRESULT call_SetDepthStencilSurface( IDirect3DDevice9 *dev, IDirect3DSurface9 *surf )
+{
+    return ((PFN_SetDepthStencilSurface)dev->lpVtbl->SetDepthStencilSurface)( dev, surf );
 }
 static HRESULT call_CreateOffscreenPlainSurface( IDirect3DDevice9 *dev, UINT w, UINT h,
     D3DFORMAT fmt, D3DPOOL pool, IDirect3DSurface9 **out_surf )
@@ -482,8 +519,20 @@ static int d3d9_smoke_run( void )
 {
     IDirect3D9 *d3d9 = NULL;
     IDirect3DDevice9 *device = NULL;
-    IDirect3DSurface9 *rt = NULL, *sysmem = NULL;
+    IDirect3DSurface9 *rt = NULL, *sysmem = NULL, *ds = NULL;
     const UINT W = 64, H = 64;
+    /* The two depth values steps 9-11 clear to and read back.  Both are
+     * exactly representable in binary32 -- 0.25 is 0x3E800000 and 0.75 is
+     * 0x3F400000, each a power-of-two mantissa -- and D3DFMT_D32F_LOCKABLE is
+     * a straight VK_FORMAT_D32_SFLOAT, so the value a Clear writes is the
+     * value a LockRect reads, bit for bit, with no rounding anywhere in
+     * between.  That is what lets the check below be exact equality rather
+     * than a tolerance, which is the whole point: a tolerance would hide
+     * precisely the boundary bug this gate is looking for.  Two DIFFERENT
+     * values, because one alone cannot tell a depth buffer that was really
+     * cleared from one that happened to contain the expected number. */
+    const DWORD DEPTH_A_BITS = 0x3E800000u;   /* 0.25f */
+    const DWORD DEPTH_B_BITS = 0x3F400000u;   /* 0.75f */
     /* A fabricated, deliberately bogus HWND: nothing in this probe ever
      * created a window, and per the header banner's measurement, nothing
      * this probe does (device creation with deferSurfaceCreation forced,
@@ -671,9 +720,152 @@ static int d3d9_smoke_run( void )
                  "the by-value float did not survive the round trip" );
     }
 
+    /* =================================================================
+     *  steps 9-11: THE DEPTH BUFFER, BY VALUE
+     * =================================================================
+     *
+     * Everything above this line is a COLOUR claim.  A depth buffer is a
+     * separate attachment, a separate format, a separate Clear flag and a
+     * separate argument to that Clear -- and the float Z is the only
+     * argument in this whole probe that reaches DXVK through the
+     * floating-point registers rather than the integer ones.  MS-x64 passes
+     * it in XMM3 (the fourth argument slot, indexed BY POSITION) and ELFv2
+     * in f1 (the first FP register, indexed BY ORDER); that is the exact
+     * mismatch README records ldexp's exponent being lost to, and a Z that
+     * arrives wrong is not a crash, it is a depth buffer quietly full of the
+     * wrong number.  Step 8's SetNPatchMode proves a float survives a
+     * scalar round trip; this proves one survives into a GPU resource and
+     * back out through a mapped pointer.
+     *
+     * D3DFMT_D32F_LOCKABLE is what makes reading the depth buffer BACK legal
+     * at all.  An ordinary D3DFMT_D24S8 depth surface in D3DPOOL_DEFAULT
+     * cannot be locked and cannot be the source of GetRenderTargetData, so
+     * the colour path used above has no depth equivalent.  D32F_LOCKABLE
+     * exists in D3D9 precisely for this and DXVK implements it as a plain
+     * VK_FORMAT_D32_SFLOAT wherever the driver is not Intel
+     * (src/d3d9/d3d9_format.cpp: `m_d32flockableSupport = !isIntel;`), which
+     * on this gate's AMD adapter is true.  If a future adapter says no,
+     * CreateDepthStencilSurface fails and step 9 goes red by name rather
+     * than these steps quietly not testing anything.
+     */
+
+    /* ---- step 9: a lockable 64x64 D32F depth surface, bound ------------- */
+    begin( "CreateDepthStencilSurface(64x64 D32F_LOCKABLE, Discard=FALSE) + SetDepthStencilSurface" );
+    if (device)
+    {
+        hr = call_CreateDepthStencilSurface( device, W, H, D3DFMT_D32F_LOCKABLE, &ds );
+        if (SUCCEEDED(hr) && ds) hr = call_SetDepthStencilSurface( device, ds );
+    }
+    else hr = E_FAIL;
+    out_hr( "hr", hr );
+    verdict( SUCCEEDED(hr) && ds != NULL,
+             "no lockable depth surface (does this adapter support D32F_LOCKABLE?)" );
+
+    /* ---- step 10: Clear(ZBUFFER, 0.25f), read back all 4096 ------------- */
+    /* The value is known at COMPILE TIME -- DEPTH_A_BITS above -- so this is
+     * the depth equivalent of step 7's per-texel colour walk, and it is
+     * checked the same way: every texel, exact bits, and the coverage count
+     * asserted alongside the mismatch count so that a short walk cannot pass
+     * by checking nothing. */
+    begin( "Clear(D3DCLEAR_ZBUFFER, Z=0.25f) + walk all 4096 depth texels" );
+    {
+        UINT checked = 0, mismatches = 0;
+        union { float f; DWORD u; } za;
+
+        za.u = DEPTH_A_BITS;
+        if (ds)
+        {
+            hr = call_ClearZ( device, za.f );
+            if (SUCCEEDED(hr))
+            {
+                D3DLOCKED_RECT lr;
+                hr = call_LockRect( ds, &lr, D3DLOCK_READONLY );
+                if (SUCCEEDED(hr) && lr.pBits)
+                {
+                    UINT x, y;
+                    for (y = 0; y < H; y++)
+                    {
+                        const BYTE *row = (const BYTE *)lr.pBits + (size_t)y * lr.Pitch;
+                        for (x = 0; x < W; x++)
+                        {
+                            DWORD got;
+                            __builtin_memcpy( &got, row + x * 4, 4 );
+                            checked++;
+#if SMOKE_BREAK == 5
+                            if (got != 0x3F000000u) mismatches++;   /* expect 0.5f, which was never written */
+#else
+                            if (got != DEPTH_A_BITS) mismatches++;
+#endif
+                        }
+                    }
+                    call_UnlockRect( ds );
+                }
+            }
+        }
+        else hr = E_FAIL;
+        out_hr( "hr", hr );
+        out( " checked=" ); out_dec( checked );
+        out( " mismatches=" ); out_dec( mismatches );
+        verdict( SUCCEEDED(hr) && checked == W * H && mismatches == 0,
+                 "the depth buffer does not read back as the 0.25f it was cleared to" );
+    }
+
+    /* ---- step 11: Clear(ZBUFFER, 0.75f), read back all 4096 ------------- */
+    /* The second value, and the reason there are two.  A buffer that is
+     * never actually written -- or a Z argument that never arrives and
+     * leaves the driver clearing to some fixed default -- can match ONE
+     * expected number by luck or by construction.  It cannot match two
+     * different ones.  This step is also where SMOKE_BREAK=4 bites: it skips
+     * this Clear, so the surface still holds step 10's 0.25f and the check
+     * against 0.75f goes red on all 4096 texels. */
+    begin( "Clear(D3DCLEAR_ZBUFFER, Z=0.75f) + walk all 4096 depth texels again" );
+    {
+        UINT checked = 0, mismatches = 0;
+        union { float f; DWORD u; } zb;
+
+        zb.u = DEPTH_B_BITS;
+        if (ds)
+        {
+#if SMOKE_BREAK == 4
+            out( "clear skipped (SMOKE_BREAK=4) " );
+            hr = D3D_OK;
+#else
+            hr = call_ClearZ( device, zb.f );
+#endif
+            if (SUCCEEDED(hr))
+            {
+                D3DLOCKED_RECT lr;
+                hr = call_LockRect( ds, &lr, D3DLOCK_READONLY );
+                if (SUCCEEDED(hr) && lr.pBits)
+                {
+                    UINT x, y;
+                    for (y = 0; y < H; y++)
+                    {
+                        const BYTE *row = (const BYTE *)lr.pBits + (size_t)y * lr.Pitch;
+                        for (x = 0; x < W; x++)
+                        {
+                            DWORD got;
+                            __builtin_memcpy( &got, row + x * 4, 4 );
+                            checked++;
+                            if (got != DEPTH_B_BITS) mismatches++;
+                        }
+                    }
+                    call_UnlockRect( ds );
+                }
+            }
+        }
+        else hr = E_FAIL;
+        out_hr( "hr", hr );
+        out( " checked=" ); out_dec( checked );
+        out( " mismatches=" ); out_dec( mismatches );
+        verdict( SUCCEEDED(hr) && checked == W * H && mismatches == 0,
+                 "the depth buffer does not read back as the 0.75f it was cleared to" );
+    }
+
 done:
-    /* ---- step 9: release everything in reverse order -------------------- */
+    /* ---- step 12: release everything in reverse order ------------------- */
     begin( "release everything (reverse order)" );
+    call_Release_Surface( ds );
     call_Release_Surface( sysmem );
     call_Release_Surface( rt );
     call_Release_Device( device );
