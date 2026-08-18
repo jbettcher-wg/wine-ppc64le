@@ -512,6 +512,78 @@ INT WINAPI MessageBoxIndirectA( LPMSGBOXPARAMSA msgbox )
     return ret;
 }
 
+/* WHEN THERE IS NOBODY TO PRESS THE BUTTON.
+ *
+ * A modal message box is a wait for a human, and on a run that has no human
+ * it is a hang -- not a slow answer, a permanent one.  Steam starts several
+ * of these: after any change to a compatibility tool it inserts its
+ * legacycompat pre-step, and iscriptevaluator.exe runs with no window, no
+ * console anybody reads, and a launch blocked behind its exit code.  Measured
+ * on this port: that pre-step called ShellExecuteEx on a 32-bit helper, the
+ * call failed, shell32 raised its error box, and the process sat in the
+ * dialog's own message loop until it was killed -- the whole Steam launch
+ * stopped there, and the only visible symptom was a 149x82 window on a
+ * desktop nobody was looking at.
+ *
+ * So the compat tool sets WINE_PPC64LE_NO_DIALOGS=1 for the verb Steam uses
+ * for its background pre-steps, and a message box then answers itself instead
+ * of being shown.  The answer is the default button -- the one that already
+ * has the focus, so it is exactly what a user pressing Enter would have
+ * chosen, rather than a made-up policy of always cancelling that would make a
+ * plain MB_OK notification behave unlike every other box.  Nothing is
+ * swallowed: the caption, the text and the answer go to the log at ERR level,
+ * which is on by default, because on those runs the log is the only place
+ * they can appear.
+ *
+ * Read once per process, like the port's other environment levers: the answer
+ * cannot change under a running program, and this sits in front of every
+ * MessageBox* entry point in the process. */
+static INT msgbox_default_button( UINT style )
+{
+    /* The button each set presents, in the order MSGBOX_OnInit lays them out,
+     * so MB_DEFBUTTONn indexes straight into the row. */
+    static const WORD sets[][3] =
+    {
+        { IDOK,     0,          0        },  /* MB_OK                  */
+        { IDOK,     IDCANCEL,   0        },  /* MB_OKCANCEL            */
+        { IDABORT,  IDRETRY,    IDIGNORE },  /* MB_ABORTRETRYIGNORE    */
+        { IDYES,    IDNO,       IDCANCEL },  /* MB_YESNOCANCEL         */
+        { IDYES,    IDNO,       0        },  /* MB_YESNO               */
+        { IDRETRY,  IDCANCEL,   0        },  /* MB_RETRYCANCEL         */
+        { IDCANCEL, IDTRYAGAIN, IDCONTINUE }  /* MB_CANCELTRYCONTINUE */
+    };
+    UINT set = style & MB_TYPEMASK;
+    UINT def = (style & MB_DEFMASK) >> 8;
+
+    if (set >= ARRAY_SIZE(sets)) set = 0;
+    if (def > 2 || !sets[set][def]) def = 0;
+    return sets[set][def];
+}
+
+static BOOL msgbox_answer_unattended( LPMSGBOXPARAMSW msgbox, INT *answer )
+{
+    static int unattended = -1;
+
+    if (unattended == -1)
+    {
+        WCHAR value[16];
+        DWORD len = GetEnvironmentVariableW( L"WINE_PPC64LE_NO_DIALOGS", value, ARRAY_SIZE(value) );
+        unattended = (len && len < ARRAY_SIZE(value) && value[0] != '0');
+    }
+    if (!unattended) return FALSE;
+
+    *answer = msgbox_default_button( msgbox->dwStyle );
+
+    if (IS_INTRESOURCE(msgbox->lpszText))
+        ERR("unattended: message box (caption %p, text resource %u, style %#lx) answered %d\n",
+            msgbox->lpszCaption, LOWORD(msgbox->lpszText), msgbox->dwStyle, *answer);
+    else
+        ERR("unattended: message box %s / %s (style %#lx) answered %d\n",
+            debugstr_w(IS_INTRESOURCE(msgbox->lpszCaption) ? NULL : msgbox->lpszCaption),
+            debugstr_w(msgbox->lpszText), msgbox->dwStyle, *answer);
+    return TRUE;
+}
+
 /**************************************************************************
  *		MessageBoxIndirectW (USER32.@)
  */
@@ -522,6 +594,8 @@ INT WINAPI MessageBoxIndirectW( LPMSGBOXPARAMSW msgbox )
     int ret;
     UINT i;
     struct ThreadWindows threadWindows;
+
+    if (msgbox_answer_unattended( msgbox, &ret )) return ret;
 
     if (!(hRes = FindResourceExW(user32_module, (LPWSTR)RT_DIALOG, L"MSGBOX", msgbox->dwLanguageId)))
     {
