@@ -854,8 +854,20 @@ NTSTATUS WINAPI NtCreateUserProcess( HANDLE *process_handle_ptr, HANDLE *thread_
             ERR( "64-bit application %s not supported in 32-bit prefix\n", debugstr_us(&path) );
             break;
         case STATUS_INVALID_IMAGE_FORMAT:
-            ERR( "%s not supported on this installation (machine %04x)\n",
-                 debugstr_us(&path), pe_info.machine );
+            /* is_machine_supported() (server/object.h) allows only
+             * {IMAGE_FILE_MACHINE_POWERPC64, IMAGE_FILE_MACHINE_AMD64} on this
+             * port, deliberately -- but the message used to say only "not
+             * supported (machine 014c)", which names nothing a user or a
+             * future debugging session can act on.  Say what this port does
+             * and does not run. */
+            if (pe_info.machine == IMAGE_FILE_MACHINE_I386)
+                ERR( "%s is a 32-bit (i386) image; this port runs only x86-64 guests "
+                     "(machine %04x) -- 32-bit guest support is not implemented\n",
+                     debugstr_us(&path), pe_info.machine );
+            else
+                ERR( "%s not supported on this installation: machine %04x is neither "
+                     "x86-64 (%04x, the only supported guest architecture) nor native "
+                     "PowerPC64\n", debugstr_us(&path), pe_info.machine, IMAGE_FILE_MACHINE_AMD64 );
             break;
         }
         goto done;

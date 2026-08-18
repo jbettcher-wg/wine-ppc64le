@@ -1187,6 +1187,13 @@ static int emu_no_stack_size = -1;
 static __thread void *emu_guest_stack_base;
 static __thread void *emu_guest_stack_limit;
 
+/* set for exactly the extent of the p_fexbridge_run() call below: a fault
+ * landing while this is TRUE happened while the bridge was executing guest
+ * code, even if the fault's own host program counter cannot itself be
+ * recognized as JIT-owned (see the NULL-guest-call comment on
+ * emu_handle_fault).  Per-thread, like every other run_loop flag here. */
+static __thread BOOL emu_run_in_progress;
+
 
 /***********************************************************************
  *           the TEB's stack description across the machine boundary
@@ -1328,13 +1335,45 @@ static int emu_trap_thunk( void *thread, void *ctx, void *user )
  * Rip at the faulting guest instruction.  fexbridge_fault_unwind does not
  * return when it succeeds.  Called from a signal handler: it touches only
  * function pointers resolved once at bridge load.
- */
+ *
+ * One case fexbridge_fault_is_jit necessarily gets wrong: a guest CALL
+ * through a NULL (or otherwise garbage, low) function pointer lands the
+ * host program counter itself at that address, so the fault's NIP reads 0
+ * (or near it) rather than anywhere inside the JIT's owned code range --
+ * fault_is_jit can only answer "is NIP in JIT code", and the honest answer
+ * to that question is no, even though the branch that produced this fault
+ * was JIT-emitted guest code a moment earlier and the GPR file the ucontext
+ * carries is still the guest's.  Left alone, this used to fall through to
+ * handle_syscall_fault and then a native, unattributed process death: the
+ * guest never saw an EXCEPTION_RECORD, so a __try/__except (or a vectored
+ * handler) around the call could not do what it would on real Windows.
+ * Recognized narrowly -- this thread is inside an active p_fexbridge_run()
+ * call (emu_run_in_progress) and the fault's address is the null page --
+ * and unwound anyway: fexbridge_fault_unwind reconstructs from the GPR
+ * file, not from NIP, so it does not need fault_is_jit's blessing to work
+ * here. */
 BOOL emu_handle_fault( void *sigcontext, EXCEPTION_RECORD *rec )
 {
     struct thread_data *data = get_thread_data();
+    BOOL is_jit;
 
     if (!p_fexbridge_fault_is_jit || !p_fexbridge_fault_unwind) return FALSE;
-    if (!p_fexbridge_fault_is_jit( sigcontext )) return FALSE;
+    is_jit = p_fexbridge_fault_is_jit( sigcontext );
+    if (!is_jit)
+    {
+        if (!emu_run_in_progress || !rec || rec->ExceptionCode != EXCEPTION_ACCESS_VIOLATION ||
+            rec->ExceptionAddress != NULL)
+            return FALSE;
+
+        /* A call through a null pointer faults FETCHING the instruction, not
+         * reading data: on real Windows (DEP) that is an ACCESS_VIOLATION
+         * whose first slot says execute, and the seed gate's sabotage leg
+         * documents exactly that shape -- the address is the target itself,
+         * already sitting in rec->ExceptionAddress. */
+        rec->NumberParameters = 2;
+        rec->ExceptionInformation[0] = EXCEPTION_EXECUTE_FAULT;
+        rec->ExceptionInformation[1] = (ULONG_PTR)rec->ExceptionAddress;  /* the bad target */
+    }
 
     /* Stash the record: fexbridge_fault_unwind longjmps the fault away, so
      * this copy is the only thing that survives into the RUN_FAULT arm of
@@ -1506,7 +1545,9 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
         /* guest code is about to execute: the TEB describes its stack until
          * it stops, whether it stops by trapping, faulting or returning */
         emu_teb_stack_switch( &emu_guest_teb_stack, &native_saved );
+        emu_run_in_progress = TRUE;
         r = p_fexbridge_run( thread, &ctx );
+        emu_run_in_progress = FALSE;
         emu_teb_stack_switch( &native_saved, &emu_guest_teb_stack );
 
         if (r == EMU_RUN_HLT)
