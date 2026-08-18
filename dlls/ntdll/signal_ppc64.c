@@ -5299,6 +5299,57 @@ static BOOL find_guest_com_target( LDR_DATA_TABLE_ENTRY *mod, ULONG_PTR rip,
     return FALSE;
 }
 
+/* A direct-mapped cache of the FLAT half of find_guest_thunk_target, keyed by
+ * the trapping RIP.  Same idiom as find_guest_com_target's per-module
+ * __wine_com_dispatch cache just above (a fixed array, filled and read only
+ * while the caller holds the loader lock, never explicitly invalidated) --
+ * this is the same risk this port already accepts for that cache, applied to
+ * the path that actually needs it: a flat guest thunk resolves through
+ * LdrGetDllHandle/LdrLoadDll AND LdrGetProcedureAddress -- two name lookups,
+ * each walking a loaded-module hash table under the loader lock -- and does
+ * that on EVERY trap, including the two or more GL entry points (bind a
+ * buffer, then draw) a single frame's inner loop calls thousands of times.
+ * A guest CALL site's RIP is a fixed address for as long as its module stays
+ * mapped there, so the resolution is loop-invariant; only the lookup was not
+ * being treated as one.
+ *
+ * ONE slot per hash bucket, like a CPU cache: a collision simply evicts,
+ * which only costs a lookup on the next hit for that RIP, never a wrong
+ * answer -- the slot is keyed by the exact RIP the entry was resolved for,
+ * so a stale or colliding entry is a MISS (`.rip != rip`), not a wrong HIT.
+ * Not invalidated on module unload, same as the COM cache beside it: nothing
+ * in this port unloads and reloads a guest DLL at a reused base address
+ * today, and if that ever changes, both caches need the same fix together.
+ *
+ * WINEEMUNORIPCACHE=1 is the negative control: it forces every lookup to
+ * miss, so a bug that only the cached path has (or only the uncached path
+ * has) shows up as a behaviour difference with the flag toggled, the same
+ * shape as WINEEMUNOCBWRAP/WINEEMUNOGLVEND above. */
+#define THUNK_RIP_CACHE_BITS  10
+#define THUNK_RIP_CACHE_SIZE  (1u << THUNK_RIP_CACHE_BITS)
+
+struct thunk_rip_cache_entry
+{
+    ULONG_PTR rip;
+    void *proc;
+    UINT sig;
+    thunk_override_func override;
+    UINT cb_mask, cb_wide, fp;
+};
+
+static struct thunk_rip_cache_entry thunk_rip_cache[THUNK_RIP_CACHE_SIZE];
+
+static UINT thunk_rip_cache_slot( ULONG_PTR rip )
+{
+    /* trap sites are THUNK stride apart (a handful of bytes), not naturally
+     * spread over the low bits a plain modulo would key on, so mix them the
+     * way any address-keyed direct-mapped cache does. */
+    ULONG_PTR h = rip >> 3;
+    h ^= h >> 17;
+    h ^= h >> 31;
+    return (UINT)(h & (THUNK_RIP_CACHE_SIZE - 1));
+}
+
 /***********************************************************************
  *           find_guest_thunk_target
  *
@@ -5310,9 +5361,13 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
                                       struct com_thunk_hit *com, UINT *cb_mask, UINT *cb_wide,
                                       UINT *fp )
 {
+    static int no_cache = -1;
     LIST_ENTRY *mark, *entry;
     void *ret = NULL;
     ULONG_PTR magic;
+    UINT cache_slot;
+
+    if (no_cache == -1) no_cache = emu_env_flag( L"WINEEMUNORIPCACHE" );
 
     *fp = 0;
 
@@ -5322,6 +5377,23 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
      * resolving while another guest thread is inside LoadLibrary reads a list
      * that is being spliced. */
     LdrLockLoaderLock( 0, NULL, &magic );
+
+    /* COM slots are not cached here: find_guest_com_target's own per-module
+     * cache already turns their resolution into a hash lookup plus one
+     * subtraction, and this cache would only add a second table answering
+     * the same question. */
+    cache_slot = thunk_rip_cache_slot( rip );
+    if (!no_cache && thunk_rip_cache[cache_slot].rip == rip)
+    {
+        *sig_out  = thunk_rip_cache[cache_slot].sig;
+        *override = thunk_rip_cache[cache_slot].override;
+        *cb_mask  = thunk_rip_cache[cache_slot].cb_mask;
+        *cb_wide  = thunk_rip_cache[cache_slot].cb_wide;
+        *fp       = thunk_rip_cache[cache_slot].fp;
+        ret = thunk_rip_cache[cache_slot].proc;
+        LdrUnlockLoaderLock( 0, magic );
+        return ret;
+    }
 
     mark = &NtCurrentTeb()->Peb->LdrData->InMemoryOrderModuleList;
     for (entry = mark->Flink; entry != mark; entry = entry->Flink)
@@ -5430,6 +5502,16 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
         }
 
         ret = proc;
+        if (!no_cache)
+        {
+            thunk_rip_cache[cache_slot].rip      = rip;
+            thunk_rip_cache[cache_slot].proc     = proc;
+            thunk_rip_cache[cache_slot].sig      = *sig_out;
+            thunk_rip_cache[cache_slot].override = *override;
+            thunk_rip_cache[cache_slot].cb_mask  = *cb_mask;
+            thunk_rip_cache[cache_slot].cb_wide  = *cb_wide;
+            thunk_rip_cache[cache_slot].fp       = *fp;
+        }
         goto done;
 
     try_com:
