@@ -1187,12 +1187,30 @@ static int emu_no_stack_size = -1;
 static __thread void *emu_guest_stack_base;
 static __thread void *emu_guest_stack_limit;
 
-/* set for exactly the extent of the p_fexbridge_run() call below: a fault
- * landing while this is TRUE happened while the bridge was executing guest
+/* Non-zero for exactly the extent of the p_fexbridge_run() calls below: a
+ * fault landing while it is set happened while the bridge was executing guest
  * code, even if the fault's own host program counter cannot itself be
  * recognized as JIT-owned (see the NULL-guest-call comment on
- * emu_handle_fault).  Per-thread, like every other run_loop flag here. */
-static __thread BOOL emu_run_in_progress;
+ * emu_handle_fault).  Per-thread, like every other run_loop flag here.
+ *
+ * A DEPTH, not a flag, and that is the whole of what this variable has to get
+ * right.  Runs NEST: a guest trap dispatches into native code, that native
+ * code calls a guest callback, and call_guest_function comes back through
+ * unix_emu_run_entry into a second emu_run_loop on the same thread -- which
+ * the surrounding code already knows, since it stacks the guest stack bounds
+ * and the TEB stack description around exactly that.  A boolean cleared on
+ * the inner run's exit would say "no guest code is running" while the OUTER
+ * run is still executing, and the null-call recovery below would go quietly
+ * missing for the rest of that outer run: the process would die natively
+ * again, and only for programs that use callbacks -- the ones most likely to
+ * have a __try around the call in the first place. */
+static __thread UINT emu_run_depth;
+
+/* Windows reserves the low 64K of every process's address space precisely so
+ * that a dereference of a null-derived pointer faults rather than reading
+ * something; a branch to any address inside it is the null call this port has
+ * to turn back into an exception the guest can handle. */
+#define EMU_NULL_REGION_SIZE  0x10000
 
 
 /***********************************************************************
@@ -1361,11 +1379,26 @@ BOOL emu_handle_fault( void *sigcontext, EXCEPTION_RECORD *rec )
     is_jit = p_fexbridge_fault_is_jit( sigcontext );
     if (!is_jit)
     {
-        if (!emu_run_in_progress || !rec || rec->ExceptionCode != EXCEPTION_ACCESS_VIOLATION ||
-            rec->ExceptionAddress != NULL)
+        if (!emu_run_depth || !rec || rec->ExceptionCode != EXCEPTION_ACCESS_VIOLATION ||
+            (ULONG_PTR)rec->ExceptionAddress >= EMU_NULL_REGION_SIZE)
             return FALSE;
 
-        /* A call through a null pointer faults FETCHING the instruction, not
+        /* THE WHOLE NULL REGION, not the single address zero.  rec's
+         * ExceptionAddress is the faulting NIP (segv_handler builds it from
+         * NIP_sig), so this test says "the host program counter itself landed
+         * in the null region" -- which native ppc64 code never does, and which
+         * only a branch through a bad pointer produces.  Exactly zero is the
+         * least common form of it: what a guest actually does is call through
+         * a null-derived pointer WITH AN OFFSET -- `object->vtbl->Method()`
+         * with a null vtbl lands at the method's slot offset, `p->fn()` with a
+         * null p lands at the member's offset -- so the PC is a small number
+         * rather than 0.  Windows reserves the whole first 64K for this reason
+         * and reports every one of them as the same access violation; testing
+         * only for 0 recovered the rarest case and let the common one kill the
+         * process, which is the opposite of the intent this code was written
+         * with.
+         *
+         * A call through a null pointer faults FETCHING the instruction, not
          * reading data: on real Windows (DEP) that is an ACCESS_VIOLATION
          * whose first slot says execute, and the seed gate's sabotage leg
          * documents exactly that shape -- the address is the target itself,
@@ -1545,9 +1578,9 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
         /* guest code is about to execute: the TEB describes its stack until
          * it stops, whether it stops by trapping, faulting or returning */
         emu_teb_stack_switch( &emu_guest_teb_stack, &native_saved );
-        emu_run_in_progress = TRUE;
+        emu_run_depth++;
         r = p_fexbridge_run( thread, &ctx );
-        emu_run_in_progress = FALSE;
+        emu_run_depth--;
         emu_teb_stack_switch( &native_saved, &emu_guest_teb_stack );
 
         if (r == EMU_RUN_HLT)
