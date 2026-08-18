@@ -44,17 +44,37 @@ done
 # former co-developer and left with them).  They are found at $HERE
 # unconditionally; there is no separate knob for them.
 #
-# Layer 1's instrument (gen_interfaces.py --surface wine-syscom, the FULL
-# 71-interface regeneration) is a different, larger tool that nothing in
-# this tree claims to be: ppc64le/syscom/gen_syscom_audio.py regenerates only
-# the 12-interface audio family and reuses the other 58 rows verbatim (see
-# its own docstring), which is not what layer 1 needs.  THUNK is where a
-# full extractor would live if this port grows one; today it holds the DXVK
-# lane's gen_interfaces.py, which has no wine-syscom surface.  Layer 1 is
-# therefore SKIPPED, individually, when THUNK has no usable extractor --
-# not the whole gate, because layers 2 and 3 do not depend on it and must
-# not be hidden behind a gap that is really layer 1's alone.
-THUNK=${THUNK:-$(cd "$SRCTREE/.." && pwd)/dxvk-ppc64le/thunk}
+# Layer 1's instrument is ppc64le/audio/gen_interfaces.py, which now carries
+# a `syscom` surface covering the whole 71-interface roster -- fourteen
+# headers across BOTH of its dialects and both trees (nine widl-generated
+# ones out of the build tree, the four hand-written DirectX ones out of the
+# source tree, plus XAudio2 2.7's own widl output).  It used to live outside
+# this tree with a former co-developer and left with them, which is why this
+# layer had never run.
+#
+# WHAT LAYER 1 COMPARES, AND WHAT IT DELIBERATELY DOES NOT.  It compares the
+# INTERFACE SET, each interface's IID, each interface's SLOT COUNT, and each
+# slot's METHOD NAME and RETURN TYPE in order.  Every kind of drift that can
+# dispatch a call to the wrong place is in that list: a method added, removed,
+# renamed or reordered, a slot count that moved, an IID that changed.
+#
+# It does NOT compare parameter SPELLING or the `owner` field, because the
+# committed roster was written by that lost tool and spells both differently
+# from this one: it resolved LP-typedefs (`DMUS_PORTCAPS *pPortCaps` where the
+# header says `LPDMUS_PORTCAPS pPortCaps`) and it named each interface as the
+# owner of its own inherited IUnknown slots.  Those are the same types and the
+# same methods written two ways, and demanding one spelling would make this
+# layer a test of a dead tool's habits rather than of the roster.  Parameter
+# LAYOUT is not left unchecked either way -- layer 2 compiles 884 static
+# assertions about it against Wine's own headers, which is a stronger check
+# than string equality would have been.  Layer 1 counts the differences it is
+# ignoring and prints them, so a spelling drift is visible without being
+# fatal.
+#
+# Layer 1 is SKIPPED individually when the extractor or a built tree is
+# missing -- not the whole gate, because layers 2 and 3 do not depend on it
+# and must not be hidden behind a gap that is really layer 1's alone.
+EXTRACTOR=${EXTRACTOR:-$SRCTREE/ppc64le/audio/gen_interfaces.py}
 JSON="$HERE/interfaces_syscom.json"
 WORK=${WORK:-/tmp/syscom-roster-check}
 
@@ -82,19 +102,17 @@ command -v python3 >/dev/null || skip "need python3"
 # not also block the sabotage controls, which never touch this at all.
 LAYER1_OK=1
 LAYER1_WHY=
-if [ ! -d "$THUNK" ]; then
+if [ ! -f "$EXTRACTOR" ]; then
     LAYER1_OK=0
-    LAYER1_WHY="no generator tree at $THUNK (set THUNK= to point at it)"
-elif [ ! -f "$THUNK/gen_interfaces.py" ]; then
+    LAYER1_WHY="no extractor at $EXTRACTOR"
+elif ! grep -q '"syscom"' "$EXTRACTOR" 2>/dev/null; then
     LAYER1_OK=0
-    LAYER1_WHY="$THUNK has no gen_interfaces.py"
-elif ! grep -q "wine-syscom\|\"syscom\"" "$THUNK/gen_interfaces.py" 2>/dev/null; then
+    LAYER1_WHY="$EXTRACTOR has no syscom surface"
+elif [ ! -f "$BUILD/include/objidl.h" ]; then
     LAYER1_OK=0
-    LAYER1_WHY="$THUNK/gen_interfaces.py has no wine-syscom surface, so it \
-cannot regenerate $JSON.  ppc64le/syscom/gen_syscom_audio.py regenerates \
-only the 12-interface audio family and reuses the other 58 rows verbatim \
-(see its own docstring) -- it is not a substitute for the full extractor \
-layer 1 needs."
+    LAYER1_WHY="$BUILD/include/objidl.h is missing -- nine of this surface's \
+headers are widl OUTPUT and only exist in a built tree, so pass BUILD= or \
+run this from one"
 fi
 
 mkdir -p "$WORK"
@@ -142,19 +160,45 @@ EOF
     else
         say "sabotage(iid): versioned-family mismap failed the check, as it must"
     fi
-    [ $fail -eq 0 ] && say "SABOTAGE PASS (both controls red)"
+    # Layer 1's own control.  Renaming one method is the smallest drift the
+    # comparison claims to catch, so it is the one worth proving it catches:
+    # a comparison that only counted interfaces would pass this.
+    if [ "$LAYER1_OK" = 1 ]; then
+        python3 "$EXTRACTOR" --surface syscom --build "$BUILD" \
+            --json "$WORK/sab_regen.json" >/dev/null 2>&1 \
+            || skip "cannot regenerate for the layer 1 control"
+        python3 - "$WORK/sab_regen.json" "$WORK/sab_regen2.json" <<'EOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["interfaces"]["IStream"]["slots"][3]["name"] = "NotSeek"
+json.dump(d, open(sys.argv[2], "w"))
+EOF
+        if python3 "$HERE/compare_roster.py" "$JSON" "$WORK/sab_regen2.json" \
+               >"$WORK/sab_cmp.log" 2>&1; then
+            bad "a renamed method PASSED the roster comparison -- layer 1 \
+cannot go red"
+        else
+            say "sabotage(roster): a renamed method failed the comparison, as it must"
+        fi
+    else
+        note "sabotage(roster) SKIPPED: $LAYER1_WHY"
+        incomplete=1
+    fi
+
+    [ $fail -eq 0 ] && say "SABOTAGE PASS (all controls red)"
     exit $fail
 fi
 
 # ---- 1: regeneration ------------------------------------------------------
 if [ "$LAYER1_OK" = 1 ]; then
-    python3 "$THUNK/gen_interfaces.py" --surface wine-syscom \
+    python3 "$EXTRACTOR" --surface syscom --build "$BUILD" \
         --json "$WORK/regen.json" >"$WORK/regen.log" 2>&1 \
         || { cat "$WORK/regen.log" >&2; skip "extractor failed"; }
-    if cmp -s "$JSON" "$WORK/regen.json"; then
-        say "regeneration: committed roster is byte-identical"
+    if python3 "$HERE/compare_roster.py" "$JSON" "$WORK/regen.json"; then
+        say "regeneration: the committed roster still matches Wine's headers"
     else
-        bad "committed interfaces_syscom.json differs from regeneration"
+        bad "committed interfaces_syscom.json disagrees with a regeneration \
+from Wine's own headers"
     fi
 else
     note "layer 1 (regeneration) SKIPPED: $LAYER1_WHY"

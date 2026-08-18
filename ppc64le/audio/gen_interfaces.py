@@ -117,6 +117,74 @@ SURFACES = {
               "IXAudio2MasteringVoice",
               "IXAudio2EngineCallback", "IXAudio2VoiceCallback"],
     ),
+    # The WHOLE system-COM surface -- the roster libs/winecom, combase's
+    # syscom.c and every guest COM module are built from.  This is the surface
+    # ppc64le/syscom/check-syscom-roster.sh layer 1 regenerates and compares
+    # against ppc64le/syscom/interfaces_syscom.json, and it is the reason
+    # `headers` may name a dialect and a source per file: this one surface
+    # spans BOTH dialects and both trees.  Nine widl-generated headers come out
+    # of the BUILD tree (they are .idl in include/), four hand-written DirectX
+    # headers come out of the SOURCE tree, and XAudio2's classes come from the
+    # 2_9 module's own widl run -- the same file the xaudio2_9 surface above
+    # reads, and for the same reason.
+    #
+    # IUnknown is not read from a header at all.  unknwn.h does declare it, but
+    # the roster records it as `(builtin)` with no base, because it is the
+    # bottom of every chain and its three slots are the definition rather than
+    # a thing to be parsed.  Kept that way here so the two agree.
+    "syscom": dict(
+        dialect="midl",
+        from_build=True,
+        headers=[
+            ("include/unknwn.h",       "midl",              True),
+            ("include/objidl.h",       "midl",              True),
+            ("include/oaidl.h",        "midl",              True),
+            ("include/ocidl.h",        "midl",              True),
+            ("include/strmif.h",       "midl",              True),
+            ("include/activation.h",   "midl",              True),
+            ("include/inspectable.h",  "midl",              True),
+            ("include/mmdeviceapi.h",  "midl",              True),
+            ("include/audioclient.h",  "midl",              True),
+            # 2_7, not 2_9: the system-COM surface serves the XAudio2 2.7
+            # family (the 2010 DirectX redistributable everything in the
+            # corpus links against), and IXAudio2's IID and its first three
+            # methods are version-conditional -- reading 2_9's header here
+            # produces a roster whose IXAudio2 has a different IID and three
+            # fewer slots, which is exactly what it did the first time.
+            ("dlls/xaudio2_7/xaudio_classes.h", "midl",     True),
+            ("dsound.h",               "declare_interface", False),
+            ("dmusicc.h",              "declare_interface", False),
+            ("dmusici.h",              "declare_interface", False),
+            ("dmplugin.h",             "declare_interface", False),
+        ],
+        builtin=["IUnknown"],
+        keep=[
+            "IActivationFactory", "IAgileObject", "IAudioClient",
+            "IAudioRenderClient", "IBindCtx", "IClassFactory",
+            "IConnectionPoint", "IConnectionPointContainer", "ICreateErrorInfo",
+            "IDirectMusic", "IDirectMusicAudioPath", "IDirectMusicBand",
+            "IDirectMusicBuffer", "IDirectMusicDownloadedInstrument",
+            "IDirectMusicGetLoader", "IDirectMusicGraph",
+            "IDirectMusicInstrument", "IDirectMusicLoader",
+            "IDirectMusicLoader8", "IDirectMusicObject",
+            "IDirectMusicPerformance", "IDirectMusicPerformance8",
+            "IDirectMusicPort", "IDirectMusicSegment", "IDirectMusicSegment8",
+            "IDirectMusicSegmentState", "IDirectMusicTool", "IDirectMusicTrack",
+            "IDirectSound", "IDirectSoundBuffer", "IDispatch",
+            "IEnumConnectionPoints", "IEnumConnections", "IEnumMoniker",
+            "IEnumSTATSTG", "IEnumString", "IEnumUnknown", "IErrorInfo",
+            "IGlobalInterfaceTable", "IInspectable", "ILockBytes", "IMMDevice",
+            "IMMDeviceCollection", "IMMDeviceEnumerator", "IMMNotificationClient",
+            "IMalloc", "IMarshal", "IMoniker", "IMultiQI", "IPersist",
+            "IPersistFile", "IPersistStream", "IPersistStreamInit",
+            "IRecordInfo", "IReferenceClock", "IRunningObjectTable",
+            "ISequentialStream", "IStorage", "IStream", "ISupportErrorInfo",
+            "ITypeComp", "ITypeInfo", "ITypeLib", "IUnknown", "IXAudio2",
+            "IXAudio2EngineCallback", "IXAudio2MasteringVoice",
+            "IXAudio2SourceVoice", "IXAudio2SubmixVoice", "IXAudio2Voice",
+            "IXAudio2VoiceCallback",
+        ],
+    ),
 }
 
 
@@ -362,6 +430,16 @@ def scan_enums(texts):
 # driver
 # --------------------------------------------------------------------------
 
+def header_spec(entry, spec):
+    """A `headers` entry is either a bare name -- taking the surface's own
+    dialect and tree -- or a (name, dialect, from_build) triple.  The triple
+    form exists for the one surface that spans both dialects and both trees;
+    see the syscom entry above."""
+    if isinstance(entry, tuple):
+        return entry
+    return (entry, spec["dialect"], spec["from_build"])
+
+
 def read_header(name, from_build, build):
     """Return (text, path), read verbatim.
 
@@ -382,48 +460,78 @@ def read_header(name, from_build, build):
         return fh.read(), path
 
 
+# The three slots every IUnknown-derived vtable starts with.  Written out
+# rather than parsed: IUnknown is the bottom of every chain, its layout is the
+# definition rather than a thing a header gets to vary, and a surface that
+# rosters IUnknown itself records it as `(builtin)` for the same reason.
+IUNKNOWN_SLOTS = [
+    dict(owner="IUnknown", name="QueryInterface", ret="HRESULT",
+         params=["REFIID riid", "void **ppvObject"]),
+    dict(owner="IUnknown", name="AddRef", ret="ULONG", params=[]),
+    dict(owner="IUnknown", name="Release", ret="ULONG", params=[]),
+]
+IUNKNOWN_IID = "00000000-0000-0000-c000-000000000046"
+
+
 def build_roster(surface, build):
     spec = SURFACES[surface]
-    texts = []
-    for h in spec["headers"]:
-        texts.append(read_header(h, spec["from_build"], build))
-    raw = [t for t, _ in texts]
 
-    ifaces, aliases, synthetic = {}, {}, []
-    if spec["dialect"] == "declare_interface":
-        for text, path in texts:
+    # ONE PASS OVER EVERY HEADER FIRST, then flatten.  A base interface
+    # routinely lives in a different file from the one that derives from it --
+    # IStream's base ISequentialStream shares objidl.h, but IPersistStreamInit
+    # in ocidl.h derives from IPersistStream in objidl.h -- so flattening
+    # cannot start until every header has been read.
+    raw = []
+    midl_pool, decl_ifaces, aliases, guids = {}, {}, {}, {}
+    for entry in spec["headers"]:
+        name, dialect, from_build = header_spec(entry, spec)
+        text, path = read_header(name, from_build, build)
+        raw.append(text)
+        if dialect == "declare_interface":
             got = parse_declare_interface(text, path)
-            guids = parse_guids(text)
-            for name, i in got.items():
-                if name not in guids:
-                    # No IID in the header means nothing can ask for it and
-                    # nothing can vend it; a row with no key is worse than no
-                    # row, so it is dropped and named here.
-                    print("  note: %s has no IID_ in %s -- not rostered"
-                          % (name, os.path.basename(path)), file=sys.stderr)
-                    continue
-                i["uuid"] = guids[name]
-                ifaces[name] = i
+            guids.update(parse_guids(text))
+            for iname, i in got.items():
+                decl_ifaces.setdefault(iname, i)
             aliases.update(parse_aliases(text, set(got)))
-    else:
-        for text, path in texts:
-            got = parse_midl(text, path)
-            keep = spec.get("keep") or list(got)
-            for name in keep:
-                if name not in got:
-                    sys.exit("gen_interfaces: %s asked for %s, which is not in "
-                             "%s" % (surface, name, path))
-            for name in keep:
-                i = got[name]
-                slots = flatten_midl(got, name)
-                uuid = i["uuid"]
-                if uuid is None:
-                    uuid = synth_iid(name)
-                    synthetic.append(name)
-                ifaces[name] = dict(uuid=uuid, base=i.get("base") or "(none)",
-                                    header=i["header"], slots=slots)
-                if uuid == synth_iid(name):
-                    ifaces[name]["synthetic_iid"] = True
+        else:
+            for iname, i in parse_midl(text, path).items():
+                midl_pool.setdefault(iname, i)
+
+    builtin = set(spec.get("builtin") or ())
+    keep = spec.get("keep") or sorted(set(decl_ifaces) | set(midl_pool))
+    ifaces, synthetic = {}, []
+    for name in keep:
+        if name in builtin:
+            ifaces[name] = dict(uuid=IUNKNOWN_IID, base=None, header="(builtin)",
+                                slots=[dict(s) for s in IUNKNOWN_SLOTS])
+            for n, s in enumerate(ifaces[name]["slots"]):
+                s["slot"] = n
+            continue
+        if name in decl_ifaces:
+            i = decl_ifaces[name]
+            if name not in guids:
+                # No IID in the header means nothing can ask for it and nothing
+                # can vend it; a row with no key is worse than no row, so it is
+                # dropped and named here.
+                print("  note: %s has no IID_ in %s -- not rostered"
+                      % (name, i["header"]), file=sys.stderr)
+                continue
+            i["uuid"] = guids[name]
+            ifaces[name] = i
+            continue
+        if name not in midl_pool:
+            sys.exit("gen_interfaces: %s asked for %s, which is in none of its "
+                     "headers" % (surface, name))
+        i = midl_pool[name]
+        slots = flatten_midl(midl_pool, name)
+        uuid = i["uuid"]
+        if uuid is None:
+            uuid = synth_iid(name)
+            synthetic.append(name)
+        ifaces[name] = dict(uuid=uuid, base=i.get("base") or "(none)",
+                            header=i["header"], slots=slots)
+        if uuid == synth_iid(name):
+            ifaces[name]["synthetic_iid"] = True
 
     out = dict(surface="wine-" + surface,
                iface_ptr_aliases=dict(sorted(aliases.items())),
