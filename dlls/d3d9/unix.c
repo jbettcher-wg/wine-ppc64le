@@ -131,7 +131,14 @@ static void *load_dxvk_lib( const char *soname )
  * dlls/d3d11/unix.c says about Wine threads applies here word for word.
  * ====================================================================== */
 
-static __thread int on_wine_thread;
+/* DEFINED IN unix_wsi_window.c -- see the note on the same line of
+ * dlls/d3d11/unix.c.  d3d9.so links its own copy of that file and so gets its
+ * own object, which is what the paragraph above is about. */
+extern __thread int wsi_on_wine_thread;
+
+/* unix_wsi_window.c, the shared win32u WINDOW seam. */
+extern void wsiwin_ops_init( struct dxvk_win32u_wsi_ops *ops );
+extern int  wsiwin_client_size( UINT64 hwnd, unsigned int *width, unsigned int *height );
 
 struct present_surface
 {
@@ -238,7 +245,7 @@ static int w32u_surface_create( UINT64 hwnd, void *instance, void *gipa, UINT64 
     UINT64 out = 0;
     int res;
 
-    if (!on_wine_thread)
+    if (!wsi_on_wine_thread)
     {
         ERR( "refusing to create a client surface for hwnd %p off a Wine "
              "thread: this call ends in win32u, which dereferences a TEB that "
@@ -287,14 +294,14 @@ static void w32u_surface_destroy( UINT64 surface )
     {
         if ((*link)->surface != surface) continue;
         p = *link;
-        if (on_wine_thread) *link = p->next;
+        if (wsi_on_wine_thread) *link = p->next;
         else p->orphaned = 1;
         break;
     }
-    if (p && on_wine_thread) drain_orphans();
+    if (p && wsi_on_wine_thread) drain_orphans();
     pthread_mutex_unlock( &present_lock );
 
-    if (!p || !on_wine_thread) return;
+    if (!p || !wsi_on_wine_thread) return;
     hwndsurf_destroy( p->cookie );
     free( p );
 }
@@ -302,7 +309,19 @@ static void w32u_surface_destroy( UINT64 surface )
 static int w32u_window_size( UINT64 hwnd, UINT32 *width, UINT32 *height )
 {
     struct hwnd_state *s;
+    unsigned int w, h;
     int found = 0;
+
+    /* Ask win32u first, fall back to what the PE side pushed -- verbatim from
+     * dlls/d3d11/unix.c, where the reason is written out.  In short: DXVK can
+     * move this window now, and the pushed size is only as fresh as the last
+     * present. */
+    if (wsiwin_client_size( hwnd, &w, &h ))
+    {
+        *width = w;
+        *height = h;
+        return 1;
+    }
 
     pthread_mutex_lock( &present_lock );
     for (s = hwnd_states; s; s = s->next)
@@ -329,7 +348,10 @@ static int w32u_is_window( UINT64 hwnd )
     return valid;
 }
 
-static const struct dxvk_win32u_wsi_ops win32u_wsi_ops =
+/* NOT const, for the reason dlls/d3d11/unix.c gives at the same place: the
+ * abi-2 half is filled in at registration time, and WINEDXVKNOWINDOWOPS=1
+ * leaves it out. */
+static struct dxvk_win32u_wsi_ops win32u_wsi_ops =
 {
     .abi = DXVK_WIN32U_WSI_ABI,
     .instance_extensions = w32u_instance_extensions,
@@ -411,6 +433,10 @@ static NTSTATUS d3d9_unix_init( void *args )
             return STATUS_ENTRYPOINT_NOT_FOUND;
         }
     }
+    /* Before the library sees the table, and once: the abi-2 half, or the
+     * deliberate absence of it.  See the note on win32u_wsi_ops. */
+    wsiwin_ops_init( &win32u_wsi_ops );
+
     if (!(reg = (dxvk_wsi_win32u_register_fn)(ULONG_PTR)
                 dlsym( dxvk_handle, DXVK_WIN32U_WSI_REGISTER_NAME )) ||
         !reg( &win32u_wsi_ops ))
@@ -498,9 +524,9 @@ static NTSTATUS d3d9_unix_flat( void *args )
     static NTSTATUS name( void *args )                                       \
     {                                                                        \
         NTSTATUS status;                                                     \
-        on_wine_thread++;                                                    \
+        wsi_on_wine_thread++;                                                \
         status = impl( args );                                               \
-        on_wine_thread--;                                                    \
+        wsi_on_wine_thread--;                                                \
         return status;                                                       \
     }
 

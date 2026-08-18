@@ -32,13 +32,35 @@
  * the frame as a dmabuf on the same GPU, and its own screenshooter writes
  * exactly what it composited.  That is what this reads.
  *
- *   present_capture <png> <w> <h> <rr> <gg> <bb>
+ *   present_capture <png> <w> <h> <rr> <gg> <bb> [<x> <y>]
  *
  * with the expected colour as three hex bytes in RGB order -- the order PNG
  * stores, stated in the order it is read rather than converted twice.
  *
- * Exit 0 if the bounding box is exactly <w>x<h> and every pixel in it matches,
- * 1 if not, 2 if the capture could not be read at all -- a skip is not a pass.
+ * WITH <x> <y>, THE RECTANGLE IS ALLOWED TO RUN OFF THE SCREEN, and the check
+ * becomes the intersection of a <w>x<h> rectangle at (<x>,<y>) with the
+ * screen: that box exactly, completely filled.  It is not a relaxation, it is
+ * a different exact statement, and it exists because of one measured fact
+ * about Wayland.
+ *
+ * [MEASURED] 2026-08-18, op4k, headless weston 1024x768: a Wine top-level
+ * window is an xdg_toplevel, and NO Wayland client may place its own
+ * top-levels -- position is the compositor's, always.  This weston placed the
+ * probe's window at (103,198) when it was mapped and never moved it again:
+ * the same origin for a 256x256 window, a 192x144 one, and a 1024x768
+ * fullscreen one.  (It is not a general refusal to place fullscreen surfaces
+ * -- weston's own weston-fullscreen client lands at (0,0) covering the whole
+ * output on the same compositor.  A Wine window that goes fullscreen AFTER
+ * being mapped windowed does not, and that is a winewayland question rather
+ * than a DXVK one.)  So a fullscreen frame is exactly the screen's SIZE and
+ * is clipped by the screen's edges, and what a photograph can show is the
+ * part of it that is on the screen -- which is still a value check with a
+ * real red state, because a 192x144 frame does not reach those edges and a
+ * scaled one does not fill the box.
+ *
+ * Exit 0 if the bounding box is exactly <w>x<h> (or, with an origin, exactly
+ * the on-screen part of it) and every pixel in it matches, 1 if not, 2 if the
+ * capture could not be read at all -- a skip is not a pass.
  *
  * Copyright 2026 the ppc64le port authors
  *
@@ -59,16 +81,25 @@ int main( int argc, char **argv )
     unsigned int want_w, want_h, want_r, want_g, want_b;
     unsigned int x, y, width, height, matched = 0;
     unsigned int minx = ~0u, miny = ~0u, maxx = 0, maxy = 0;
+    unsigned int want_x = 0, want_y = 0, clipped = 0;
+    unsigned int box_w, box_h;
     unsigned long csum = 2166136261u;
     png_bytep *rows;
     png_structp png;
     png_infop info;
     FILE *fh;
 
-    if (argc != 7)
+    if (argc != 7 && argc != 9)
     {
-        fprintf( stderr, "usage: %s <png> <w> <h> <rr> <gg> <bb>\n", argv[0] );
+        fprintf( stderr, "usage: %s <png> <w> <h> <rr> <gg> <bb> [<x> <y>]\n",
+                 argv[0] );
         return 2;
+    }
+    if (argc == 9)
+    {
+        want_x = strtoul( argv[7], NULL, 0 );
+        want_y = strtoul( argv[8], NULL, 0 );
+        clipped = 1;
     }
     want_w = strtoul( argv[2], NULL, 0 );
     want_h = strtoul( argv[3], NULL, 0 );
@@ -156,25 +187,53 @@ int main( int argc, char **argv )
         return 1;
     }
 
+    /* Printed before any verdict, and in a form a shell can read: the gate
+     * measures the compositor's chosen origin from a WINDOWED phase and hands
+     * it back for the fullscreen one.  Nothing derives the origin twice. */
+    printf( "capture: origin=%u,%u\n", minx, miny );
+
+    /* What the box has to be.  Without an origin that is the whole rectangle;
+     * with one it is the part of that rectangle the screen can hold, and the
+     * arithmetic is stated here rather than folded into the comparison so the
+     * numbers are in the output when it fails. */
+    box_w = want_w;
+    box_h = want_h;
+    if (clipped)
+    {
+        box_w = (want_x + want_w > width)  ? width  - want_x : want_w;
+        box_h = (want_y + want_h > height) ? height - want_y : want_h;
+        printf( "capture: a %ux%u rectangle at (%u,%u) on a %ux%u screen shows "
+                "as %ux%u\n", want_w, want_h, want_x, want_y, width, height,
+                box_w, box_h );
+    }
+
     printf( "capture: bounding box (%u,%u)-(%u,%u) = %ux%u, wanted %ux%u\n",
             minx, miny, maxx, maxy, maxx - minx + 1, maxy - miny + 1,
-            want_w, want_h );
+            box_w, box_h );
 
-    if (maxx - minx + 1 != want_w || maxy - miny + 1 != want_h)
+    if (clipped && (minx != want_x || miny != want_y))
+    {
+        printf( "capture: the rectangle starts at (%u,%u) and was expected at "
+                "(%u,%u) -- the compositor moved the window between the phase "
+                "this origin was measured in and this one\n",
+                minx, miny, want_x, want_y );
+        return 1;
+    }
+    if (maxx - minx + 1 != box_w || maxy - miny + 1 != box_h)
     {
         printf( "capture: the presented rectangle is the WRONG SIZE -- the "
                 "frame was scaled or clipped between D3D11 and the screen\n" );
         return 1;
     }
-    if (matched != want_w * want_h)
+    if (matched != box_w * box_h)
     {
         printf( "capture: the rectangle is the right size but only %u of its "
                 "%u pixels hold the colour -- something is drawn over it, or "
-                "it is partly blended\n", matched, want_w * want_h );
+                "it is partly blended\n", matched, box_w * box_h );
         return 1;
     }
 
     printf( "capture: all %u pixels of a %ux%u rectangle hold exactly the "
-            "colour the guest cleared to\n", matched, want_w, want_h );
+            "colour the guest cleared to\n", matched, box_w, box_h );
     return 0;
 }

@@ -29,7 +29,8 @@ runtime IID cross-check, if at all.
 ask each patch in turn whether a reverse-apply would succeed and call that
 already-applied. That question stopped having an answer the moment two patches
 touched the same lines, which `0003` does — it adds a line to the WSI driver
-table `0001` created, so `0001`'s own hunks no longer describe the file.
+table `0001` created, so `0001`'s own hunks no longer describe the file. `0004`
+stacks on `0003` the same way, adding overrides to the class `0003` declared.
 `[MEASURED]` `--check` on a correctly patched tree reported `not applied:
 0001-foreign-wsi-backend.patch`, exactly backwards. Nor can the stack be checked
 in one go: `git apply --check a b c` re-reads each file from disk for every
@@ -487,7 +488,8 @@ rather than dropped quietly.
 ./check-present-smoke.sh --sabotage
 ./check-d3d9-smoke.sh               # the same standard, one API back
 ./check-d3d9-smoke.sh --sabotage
-./check-fullscreen-smoke.sh         # ...and that the frame can CHANGE SIZE
+./check-fullscreen-smoke.sh         # ...that the frame can CHANGE SIZE, go
+                                    # FULLSCREEN, and change the display MODE
 ./check-fullscreen-smoke.sh --sabotage
 ```
 
@@ -525,53 +527,133 @@ child's size must be there and the parent's must not, which is the exact shape
 of "presented to the parent instead". [MEASURED] 2026-08-18: it already worked;
 the leg exists so that it keeps working.
 
-### Resize works; exclusive fullscreen does not, and here is exactly why
+### Resize works, exclusive fullscreen works, and the display mode changes
 
 `check-fullscreen-smoke.sh` drives one swapchain through four phases against a
-headless weston and photographs the screen between them. Three of the four are
-green: 256x256 windowed, 192x144 after `SetWindowPos` + `ResizeBuffers`, and
-192x144 again after leaving fullscreen — checked BOTH on screen and in DXGI's
-own description of the back buffer, because checking only the screen would pass
-a resize that moved the window and left DXVK scaling the old buffer into it.
+headless weston and photographs the screen between them. All four are green now:
+256x256 windowed, 192x144 after `SetWindowPos` + `ResizeBuffers`, **the whole
+1024x768 screen** after `SetFullscreenState(TRUE)`, and 192x144 again after
+leaving — checked BOTH on screen and in DXGI's own description of the back
+buffer, because checking only the screen would pass a resize that moved the
+window and left DXVK scaling the old buffer into it.
 
-The fourth is a **named limitation and it is recorded here rather than fixed**.
-[MEASURED] 2026-08-18: `IDXGISwapChain::SetFullscreenState(TRUE)` returns
-`S_OK`, `GetFullscreenState` agrees, `GetSystemMetrics` reports the
-compositor's 640x480 — and the rectangle on screen is still 192x144. The
-transition reaches DXGI and stops there.
+**Fullscreen was a named limitation until 2026-08-18, and this is what it was.**
+[MEASURED] before the fix: `SetFullscreenState(TRUE)` returned `S_OK`,
+`GetFullscreenState` agreed, `GetSystemMetrics` reported the whole screen — and
+the rectangle on screen was still 192x144. The transition reached DXGI and
+stopped there.
 
-The cause is one inherited method.
+The cause was one inherited method.
 `dxvk-patches/0001-foreign-wsi-backend.patch` makes
 `ForeignWsiDriver::enterFullscreenMode`, `leaveFullscreenMode`, `setWindowMode`
 and `resizeWindow` no-ops that report success, and says why in a comment: *the
 window belongs to somebody else*, so its owner decides its geometry and DXVK
 follows through `VkSurfaceCapabilitiesKHR::currentExtent`. That premise is
 correct for the foreign-X11 backend, which is handed a raw XID belonging to
-another process. **It is not correct for the Win32u backend**, whose window is
-a Wine HWND that Wine can move — and
-`Win32uWsiDriver` (`dxvk-patches/0003-win32u-wsi-backend.patch`) inherits all
-four unchanged. So nothing ever asks Wine to resize the window.
+another process. **It is not correct for the Win32u backend**, whose window is a
+Wine HWND that Wine can move — and `Win32uWsiDriver`
+(`dxvk-patches/0003-win32u-wsi-backend.patch`) inherited all four unchanged. So
+nothing ever asked Wine to resize the window.
 
-The fix is a fourth patch overriding those four methods in `Win32uWsiDriver`,
-and the reason it is not in this pass is that it needs a road that does not
-exist yet: DXVK's WSI runs in the **unix** library, and the callback table it
-reaches Wine through (`dxvk_win32u_wsi.h`) has five entries, none of which can
-move a window. `w32u_window_size` does not call win32u either — the PE side
-pushes the size down. So the fix is: one new op in that table (an ABI bump), a
-Wine-side implementation that reaches `NtUserSetWindowPos`, and the four
-overrides. Doing it in `dlls/d3d11`'s guest-facing shim instead would be
-smaller and wrong: it would serve guests only, and it would paper over a
-premise that is false one layer up rather than correcting it.
+**The road that did not exist has been built.**
+`dxvk-patches/0004-win32u-window-ops.patch` overrides twelve methods in
+`Win32uWsiDriver`, and the callback ABI it reaches Wine through
+(`dxvk_win32u_wsi.h`) is at **abi 2**: six new entries beside the original five.
 
-Until then the gate asserts the current behaviour **positively** — the
-rectangle must still be the windowed size — so it goes red in both directions:
-if the frame ends up some third size (scaled, clipped, half-resized), and also
-if fullscreen starts working, which is the day this section becomes wrong.
+| new entry | lands in | what it is for |
+|---|---|---|
+| `window_rect` | `NtUserGetWindowRect` | what `saveWindowState` remembers and `restoreWindowState` puts back — the OUTER rect, so a decorated window does not walk down the screen by a caption's height per toggle |
+| `window_set_pos` | `NtUserSetWindowPos` | the one the whole bump is for |
+| `window_style` | `NtUserSetWindowLong` / `GetWindowLongW` | strip `WS_OVERLAPPEDWINDOW` on the way in and put it back on the way out; without it a fullscreen window keeps a title bar and its CLIENT area is smaller than the screen by the frame |
+| `display_mode` | `NtUserEnumDisplaySettings` | the output's mode LIST, which is what `FindClosestMatchingMode1` searches |
+| `display_set_mode` | `NtUserChangeDisplaySettings` | `setWindowMode` |
+| `display_restore_mode` | `NtUserChangeDisplaySettings(NULL)` | `restoreDisplayMode`, on the way out of fullscreen |
 
-`ChangeDisplaySettingsExW` is a third case and is **unproven rather than
-broken**: the gate's headless weston reports three modes that are all 640x480,
-so no mode change is ever requested and the call crosses the boundary without
-being asked to do anything. Proving it needs a display with more than one mode.
+**The Wine half is `dlls/d3d11/unix_wsi_window.c`**, compiled by both DXVK lanes
+(`dlls/d3d9/unix_wsi_window.c` is the one-line include, the same arrangement as
+`unix_win32u.c` and for the same reason). It resolves win32u's entry points with
+`dlsym` on the handle a process that owns a window already has open, rather than
+linking `-lwin32u` — the identical measured reason `dlls/d3d12/unix_win32u.c`
+gives, a DT_NEEDED the build-tree layout cannot satisfy in a headless process.
+These are the same entry points `winex11.drv` and `winewayland.drv` call from
+their own unix halves.
+
+Two things are worth knowing about that seam.
+
+* **`NtUserSetWindowPos` sends messages**, so win32u calls back out to a window
+  procedure — which on this port may be GUEST x86-64 code behind an interception
+  trampoline. That road already existed: it is the one winex11 takes on every X
+  event that moves a window, and the one `dlls/user32`'s callback dispatcher
+  already serves for guests. What is new is entering it from inside a unixlib
+  call rather than from inside a message wait, so the Wine-thread rule is
+  asserted rather than assumed, by the same flag surface creation already used.
+* **`w32u_window_size` now ASKS win32u and falls back to the pushed size**, where
+  it used to be pushed-only. It had to change the moment DXVK could move a window
+  itself: `ResizeBuffers(0, 0, ...)` right after a transition — which is what an
+  application actually does there — asks DXVK for the window size, and the PE
+  side has no reason to push a new one until the next present. The back buffer
+  would have come out at the window's PREVIOUS size, and DXVK would have scaled
+  it into the fullscreen window: right size on screen, wrong size in the buffer,
+  which is exactly the half-done resize this gate's first negative control is
+  about.
+
+Doing any of this in `dlls/d3d11`'s guest-facing shim instead would have been
+smaller and wrong: it would serve guests only, and it would paper over a premise
+that is false one layer up rather than correcting it.
+
+**What the ABI bump costs.** The registration entry point checks `abi` for EXACT
+equality, so a `libdxvk` built from the three-patch series refuses a table
+stamped 2 and this tree's DXVK refuses one stamped 1 — in both cases by name,
+with the `bootstrap.sh` line to run. `>=` would be friendlier and would be
+wrong: an older library accepting a newer table cannot know that the entries it
+does not read are the ones the caller is relying on, and the failure would then
+be a swapchain that reports fullscreen and does not go there, which is the exact
+bug the bump exists to fix. In this tree both halves are built by the same
+`make`, so the cost is paid only by an out-of-tree DXVK.
+
+`ChangeDisplaySettingsExW` was a third case, recorded as **unproven rather than
+broken**, and it is proven now. Why nobody could see it work is worth keeping:
+[MEASURED] `win32u` synthesises a virtual mode list for any display whose driver
+reports a single mode (`dlls/win32u/sysparams.c` `get_virtual_modes`), and the
+smallest entry in its table is 640x480 — so on the **640x480** weston this gate
+used to start, the whole list was three modes that were all 640x480 and no mode
+change could ever be requested. The gate starts a **1024x768** one now, the same
+code offers 640x480, 800x600, 960x540 and 1024x768, and a second probe built
+with `-DFS_MODE_SWITCH=1` (so its swapchain carries
+`DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH`, without which DXGI deliberately asks
+for the mode the display is already in) drives a real change through DXGI and
+requires the screen metrics to follow it in and come back out.
+
+That leg takes no photograph, deliberately. Wine EMULATES a mode change on a
+display whose driver has one real mode, so the compositor's own framebuffer
+looks the same either way and the screen METRICS are the only place the change
+is unambiguous. Splitting the two claims across two runs is what keeps each of
+them a single fact.
+
+**The other display driver was checked by hand, once, and it says something
+different about the mode.** The gate has a compositor of its own and never
+touches a display it did not create, so this is a confirmation rather than a
+leg. [MEASURED] 2026-08-18, the same `-DFS_MODE_SWITCH=1` probe against the
+workstation's real X11 session (`winex11`, Xwayland, 1920x1080, **28** modes):
+fullscreen works there too — `winrect=0,0,1920,1080`, back buffer 1920x1080,
+`GetFullscreenState` agreeing, and `SetFullscreenState(FALSE)` putting the
+window back to `32,32,224,176` on its own. The **mode** does not change:
+`asked=320x200 rc=0 after=1920x1080`. So `ChangeDisplaySettingsExW` crossed the
+boundary, winex11 reported `DISP_CHANGE_SUCCESSFUL`, and the X screen stayed
+the size it was — a display answer rather than a boundary one, and an Xwayland
+one specifically, since the root window's size belongs to the Wayland
+compositor rather than to the X client asking. The probe correctly failed its
+own mode assertion there, which is what a strict assertion is for. The display
+was left at 1920x1080, as `FINAL screen=` records on every exit path.
+
+**The negative control is a lever on the fix, not on the gate.**
+`WINEDXVKNOWINDOWOPS=1` makes the Wine side publish the callback table with its
+six abi-2 entries NULL. DXVK's driver checks every one of them before calling it
+and falls back to the no-op it used to inherit, so the port behaves exactly as it
+did before this work — and `--sabotage` requires the main leg to go red on the
+rectangle and the mode leg to go red on the display mode. A gate whose only
+negative control switched off its own assertions would prove nothing about the
+code.
 
 ## Layout
 
@@ -588,7 +670,9 @@ being asked to do anything. Proving it needs a display with more than one mode.
 | `check-d3d9-smoke.sh` | the D3D9 offscreen gate |
 | `probes/present_smoke9.c` | the D3D9 on-screen probe, the present gate's second leg |
 | `dxvk_flat_surface_d3d9.h` | the four D3D9 flat exports Wine declares nowhere |
-| `dxvk_win32u_wsi.h` | the ONE copy of the WSI callback ABI, compiled by both sides |
+| `dxvk_win32u_wsi.h` | the ONE copy of the WSI callback ABI (abi 2), compiled by both sides |
+| `check-fullscreen-smoke.sh` | resize, exclusive fullscreen and the display mode |
+| `probes/fullscreen_smoke.c` | one source, two builds: the plain leg and `-DFS_MODE_SWITCH=1` |
 | `interfaces_d3d9.json` | the D3D9 roster: 21 interfaces, 497 slots |
 | `dxvk-patches/` | our changes to DXVK, as a revertible series |
 | `probes/` | the gates' probes, native and guest from one source |

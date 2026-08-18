@@ -11,11 +11,20 @@
  * a slot that did not cross returns a wrong HRESULT, a window operation that
  * did not reach the driver returns S_OK and leaves the picture the size it was.
  *
- * So this probe drives four PHASES against one window and one swapchain, and
- * the gate photographs the screen between them.  Every phase clears to the
- * same colour and presents continuously; what changes is the SIZE of the
- * rectangle that colour occupies, which is the only thing that can distinguish
- * "the resize happened" from "the call returned S_OK".
+ * THE SECOND FAILURE IS THE ONE THIS PROBE WAS WRITTEN FOR, AND IT IS FIXED.
+ * [MEASURED] 2026-08-18: SetFullscreenState(TRUE) used to return S_OK,
+ * GetFullscreenState used to agree, and the rectangle on screen never moved --
+ * because DXVK's Win32u WSI driver inherited a deliberate no-op
+ * enterFullscreenMode from the foreign driver it derives from, whose premise
+ * ("the window belongs to somebody else") is right for a raw X11 window ID and
+ * wrong for a Wine HWND.  The driver overrides it now, through six new calls in
+ * the WSI callback table (ppc64le/dxvk/dxvk_win32u_wsi.h, abi 2) that land in
+ * NtUserSetWindowPos and NtUserChangeDisplaySettings.  So every claim below is
+ * asserted rather than reported, and this probe's own numbers are only half of
+ * each -- the gate photographs the compositor's framebuffer for the other half.
+ *
+ * FOUR PHASES against one window and one swapchain, with the gate photographing
+ * the screen between them:
  *
  *   1  WINDOWED at PHASE1_W x PHASE1_H -- the control, and the same claim
  *      check-present-smoke.sh makes.
@@ -25,23 +34,31 @@
  *      SetWindowPos alone leaves the back buffer at the old size and DXVK
  *      scales.  The probe re-reads the back buffer's own description
  *      afterwards, so the number it reports is DXGI's and not its own.
- *   3  FULLSCREEN: SetFullscreenState(TRUE).  The HRESULT is reported rather
- *      than asserted, because a display server is entitled to refuse; what is
- *      asserted is that GetFullscreenState AGREES with whatever happened, and
- *      that the rectangle on screen is the size that agreement implies.
- *   4  BACK TO WINDOWED: SetFullscreenState(FALSE), and the rectangle must
- *      return to phase 2's size.  A fullscreen transition that cannot be
- *      undone is worse than one that never happened, because the window is
- *      then stuck over the user's whole screen.
+ *   3  FULLSCREEN: SetFullscreenState(TRUE).  The WINDOW must now be exactly
+ *      the screen, GetFullscreenState must agree that it happened, and
+ *      ResizeBuffers(0, 0, ...) -- which asks DXVK for the window's size rather
+ *      than telling it one -- must produce a back buffer of the screen's size.
+ *      Three numbers from three different places, all of which were the old
+ *      windowed size before this was fixed.
+ *   4  BACK TO WINDOWED: SetFullscreenState(FALSE).  The probe deliberately
+ *      does NOT move the window back itself.  Putting the window where it was
+ *      is DXGI's job (LeaveFullscreenMode -> wsi::restoreWindowState), and a
+ *      probe that re-set the geometry would hide a restore that never happened
+ *      -- which is exactly the shape of "the window is stuck over the user's
+ *      whole screen", the worst outcome available here.  The rectangle, the
+ *      back buffer and the display mode must all come back on their own.
  *
- * IT ALSO ASKS THE DISPLAY MODE QUESTION SEPARATELY, in step 1, because
- * ChangeDisplaySettingsEx has nothing to do with DXGI: it is user32, it is
- * what a pre-DXGI game and every Unreal/Unity settings screen still calls, and
- * on this port it is one more call that crosses the boundary as an ordinary
- * thunk.  The probe enumerates the modes the driver reports, asks for one, and
- * prints what GetSystemMetrics says afterwards -- reporting rather than
- * asserting, because a headless compositor has exactly one mode and refusing
- * is the correct answer there.  The gate reads the numbers.
+ * THE DISPLAY MODE IS A SEPARATE QUESTION AND GETS A SEPARATE BUILD.  Compiled
+ * with -DFS_MODE_SWITCH=1 the swapchain carries
+ * DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH, which is what makes DXGI pick a mode
+ * out of the output's list and ask for it on the way into fullscreen; without
+ * the flag DXGI deliberately asks for the mode the display is already in, and
+ * nothing about ChangeDisplaySettings would be exercised at all.  The two
+ * builds are separate runs because their observables are different: the plain
+ * one is checked against a photograph of the screen, and the mode one against
+ * the screen METRICS, which is the only place an emulated mode change is
+ * unambiguously visible.  It also asks the same question directly through
+ * user32 first, the way a pre-DXGI game and every Unreal settings screen does.
  *
  * PHASES ADVANCE ON A FILE, never on a timer.  The gate creates
  * $FULLSCREEN_GO.N when it has finished photographing phase N, so neither side
@@ -61,6 +78,10 @@
 
 #ifndef FS_BREAK
 #define FS_BREAK 0
+#endif
+
+#ifndef FS_MODE_SWITCH
+#define FS_MODE_SWITCH 0
 #endif
 
 #include <windows.h>
@@ -120,6 +141,12 @@ static void out_dec( ULONG v )
     out( buf + i );
 }
 
+static void out_int( LONG v )
+{
+    if (v < 0) { out( "-" ); out_dec( (ULONG)(-v) ); }
+    else out_dec( (ULONG)v );
+}
+
 static void out_hr( const char *label, HRESULT hr )
 {
     out( label ); out( "=0x" ); out_hex( (ULONG)hr, 8 );
@@ -128,6 +155,12 @@ static void out_hr( const char *label, HRESULT hr )
 static void out_size( const char *label, ULONG w, ULONG h )
 {
     out( label ); out( "=" ); out_dec( w ); out( "x" ); out_dec( h );
+}
+
+static void out_rect( const char *label, const RECT *r )
+{
+    out( label ); out( "=" ); out_int( r->left ); out( "," ); out_int( r->top );
+    out( "," ); out_int( r->right ); out( "," ); out_int( r->bottom );
 }
 
 static int failures;
@@ -249,6 +282,70 @@ static HRESULT rebuild_rtv( ID3D11Device *device, IDXGISwapChain *swapchain,
     return hr;
 }
 
+static BOOL rect_is( const RECT *r, LONG w, LONG h )
+{
+    return r->right - r->left == w && r->bottom - r->top == h;
+}
+
+static BOOL rect_same( const RECT *a, const RECT *b )
+{
+    return a->left == b->left && a->top == b->top &&
+           a->right == b->right && a->bottom == b->bottom;
+}
+
+/* How many DISTINCT sizes the display driver reports, and the first one that
+ * is not the size the screen is in now at the same colour depth.
+ *
+ * The depth matters: EnumDisplaySettings walks depths outermost, so the very
+ * first mode on a Wine display is 8bpp, and asking for that is a request a
+ * driver is entitled to refuse for reasons that have nothing to do with this
+ * port.  A game asks for a different SIZE at the depth it is already running,
+ * and so does this. */
+static DWORD survey_modes( DEVMODEW *want, BOOL *have_want )
+{
+    DEVMODEW cur, dm;
+    DWORD i, sizes = 0;
+    LONG seen_w[32], seen_h[32];
+
+    *have_want = FALSE;
+    zero( &cur, sizeof(cur) );
+    cur.dmSize = sizeof(cur);
+    if (!EnumDisplaySettingsW( NULL, ENUM_CURRENT_SETTINGS, &cur )) return 0;
+
+    for (i = 0; i < 512; i++)
+    {
+        DWORD j;
+
+        zero( &dm, sizeof(dm) );
+        dm.dmSize = sizeof(dm);
+        if (!EnumDisplaySettingsW( NULL, i, &dm )) break;
+
+        for (j = 0; j < sizes; j++)
+            if (seen_w[j] == (LONG)dm.dmPelsWidth && seen_h[j] == (LONG)dm.dmPelsHeight) break;
+        if (j == sizes && sizes < 32)
+        {
+            seen_w[sizes] = dm.dmPelsWidth;
+            seen_h[sizes] = dm.dmPelsHeight;
+            sizes++;
+        }
+
+        if (*have_want) continue;
+        if (dm.dmBitsPerPel != cur.dmBitsPerPel) continue;
+        if (dm.dmPelsWidth == cur.dmPelsWidth && dm.dmPelsHeight == cur.dmPelsHeight) continue;
+
+        /* Field by field rather than `*want = dm`: a struct assignment
+         * compiles to a memcpy, and there is no CRT here. */
+        zero( want, sizeof(*want) );
+        want->dmSize        = sizeof(*want);
+        want->dmFields      = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL;
+        want->dmPelsWidth   = dm.dmPelsWidth;
+        want->dmPelsHeight  = dm.dmPelsHeight;
+        want->dmBitsPerPel  = dm.dmBitsPerPel;
+        *have_want = TRUE;
+    }
+    return sizes;
+}
+
 static int fullscreen_smoke_run( void )
 {
     static const D3D_FEATURE_LEVEL want_fl[] = { D3D_FEATURE_LEVEL_11_0 };
@@ -264,69 +361,70 @@ static int fullscreen_smoke_run( void )
     UINT w, h, frames;
     BOOL fs = FALSE;
     IDXGIOutput *target = NULL;
+    RECT r, windowed_rect;
+    LONG screen0_w, screen0_h;
+    DWORD mode_sizes = 0;
 
     out( "fullscreen_smoke: start\n" );
     go_len = GetEnvironmentVariableA( "FULLSCREEN_GO", go_base, sizeof(go_base) - 4 );
     if (go_len >= sizeof(go_base) - 4) go_len = 0;
 
-    /* ---- step 1: what the driver says the display can do ----------------- */
-    /* Reported, not asserted.  A headless compositor has one mode and saying
-     * so is correct; a real X server has many.  What the gate reads out of
-     * this is whether the port carries the calls at all -- an EnumDisplaySettings
-     * that returned nothing, or a ChangeDisplaySettingsEx that never reached a
-     * driver, would show up here as zeros. */
+    screen0_w = GetSystemMetrics( SM_CXSCREEN );
+    screen0_h = GetSystemMetrics( SM_CYSCREEN );
+    out( "fullscreen_smoke: SCREEN " ); out_dec( screen0_w ); out( "x" );
+    out_dec( screen0_h ); out( "\n" );
+
+    /* ---- step 1: the display's own mode list, through user32 -------------
+     *
+     * ChangeDisplaySettingsEx has nothing to do with DXGI: it is user32, it is
+     * what a pre-DXGI game and every settings screen still calls, and on this
+     * port it is one more call that crosses the boundary as an ordinary thunk.
+     * Asserted rather than reported WHEN THERE IS SOMETHING TO ASSERT: a
+     * display with exactly one mode cannot prove a mode change and saying so is
+     * the honest answer there, which is why the count is in the output. */
     begin( "EnumDisplaySettingsW + ChangeDisplaySettingsExW" );
     {
-        DEVMODEW dm;
-        DWORD i, n = 0;
-        LONG rc = DISP_CHANGE_FAILED;
-        int before_x = GetSystemMetrics( SM_CXSCREEN );
-        int before_y = GetSystemMetrics( SM_CYSCREEN );
         DEVMODEW want;
         BOOL have_want = FALSE;
+        LONG rc = 0, after_w = screen0_w, after_h = screen0_h;
+        LONG back_w = screen0_w, back_h = screen0_h;
+        BOOL ok;
 
-        zero( &want, sizeof(want) );
-        for (i = 0; i < 256; i++)
-        {
-            zero( &dm, sizeof(dm) );
-            dm.dmSize = sizeof(dm);
-            if (!EnumDisplaySettingsW( NULL, i, &dm )) break;
-            n++;
-            /* the first mode that is NOT the current one, so asking for it is
-             * a real request rather than a no-op the driver can shortcut */
-            if (!have_want && ((int)dm.dmPelsWidth != before_x ||
-                               (int)dm.dmPelsHeight != before_y))
-            {
-                /* Field by field rather than `want = dm`: a struct assignment
-                 * compiles to a memcpy, and there is no CRT here. */
-                want.dmPelsWidth  = dm.dmPelsWidth;
-                want.dmPelsHeight = dm.dmPelsHeight;
-                want.dmBitsPerPel = dm.dmBitsPerPel;
-                have_want = TRUE;
-            }
-        }
-        out( "modes=" ); out_dec( n );
-        out( " " ); out_size( "before", before_x, before_y );
+        mode_sizes = survey_modes( &want, &have_want );
+        out( "modes=" ); out_dec( mode_sizes );
+        out( " " ); out_size( "before", screen0_w, screen0_h );
+
         if (have_want)
         {
             out( " " ); out_size( "asked", want.dmPelsWidth, want.dmPelsHeight );
-            want.dmSize = sizeof(want);
-            want.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL;
             rc = ChangeDisplaySettingsExW( NULL, &want, NULL, CDS_FULLSCREEN, NULL );
-            out( " rc=" ); out_dec( (ULONG)rc );
-            out( " " ); out_size( "after", GetSystemMetrics( SM_CXSCREEN ),
-                                  GetSystemMetrics( SM_CYSCREEN ) );
-            /* put it back before anything else happens, whatever it did */
+            out( " rc=" ); out_int( rc );
+            after_w = GetSystemMetrics( SM_CXSCREEN );
+            after_h = GetSystemMetrics( SM_CYSCREEN );
+            out( " " ); out_size( "after", after_w, after_h );
+            /* Put it back before anything else happens, whatever it did.  This
+             * is the same call DXVK's restoreDisplayMode ends in. */
             ChangeDisplaySettingsExW( NULL, NULL, NULL, 0, NULL );
-            out( " " ); out_size( "restored", GetSystemMetrics( SM_CXSCREEN ),
-                                  GetSystemMetrics( SM_CYSCREEN ) );
+            back_w = GetSystemMetrics( SM_CXSCREEN );
+            back_h = GetSystemMetrics( SM_CYSCREEN );
+            out( " " ); out_size( "restored", back_w, back_h );
+
+            /* THE ASSERTION: the driver took it, the screen followed, and the
+             * screen came back.  "rc says success but SM_CXSCREEN did not
+             * move" is the exact shape of a call that crossed the boundary and
+             * reached nothing, and it is what this is here to catch. */
+            ok = rc == DISP_CHANGE_SUCCESSFUL &&
+                 after_w == (LONG)want.dmPelsWidth && after_h == (LONG)want.dmPelsHeight &&
+                 back_w == screen0_w && back_h == screen0_h;
         }
-        else out( " asked=none(one-mode-display)" );
-        /* The claim is only that the calls CROSS and answer coherently: the
-         * driver reported at least one mode, and the screen metrics are not
-         * zero.  Whether a mode change is possible belongs to the display. */
-        verdict( n > 0 && before_x > 0 && before_y > 0,
-                 "the display driver reported no modes at all, or no screen size" );
+        else
+        {
+            out( " asked=none(one-mode-display)" );
+            ok = mode_sizes > 0 && screen0_w > 0 && screen0_h > 0;
+        }
+        verdict( ok, have_want
+                 ? "ChangeDisplaySettingsExW did not change the screen, or did not undo it"
+                 : "the display driver reported no modes at all, or no screen size" );
     }
 
     /* ---- step 2: a window and a swapchain -------------------------------- */
@@ -361,6 +459,14 @@ static int fullscreen_smoke_run( void )
     desc.OutputWindow = hwnd;
     desc.Windowed = TRUE;
     desc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+#if FS_MODE_SWITCH
+    /* Without this flag DXGI deliberately asks for the mode the display is
+     * already in (dxgi_swapchain.cpp ChangeDisplayMode zeroes the preferred
+     * width and height), so no ChangeDisplaySettings ever happens.  With it,
+     * entering fullscreen picks the closest mode to the back buffer out of the
+     * output's list and asks for that. */
+    desc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+#endif
 
     hr = hwnd ? D3D11CreateDeviceAndSwapChain( NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0,
                                                want_fl, 1, D3D11_SDK_VERSION,
@@ -382,11 +488,14 @@ static int fullscreen_smoke_run( void )
     begin( "phase 1: present windowed" );
     backbuffer_size( swapchain, &w, &h );
     out_size( "backbuffer", w, h );
+    GetWindowRect( hwnd, &r );
+    out( " " ); out_rect( "winrect", &r );
     frames = hold_phase( swapchain, context, rtv, 1 );
     out( " frames=" ); out_dec( frames );
-    verdict( frames > 0 && w == PHASE1_W && h == PHASE1_H,
-             "the back buffer is not the size the swapchain was created with, "
-             "or nothing was presented" );
+    verdict( frames > 0 && w == PHASE1_W && h == PHASE1_H &&
+             rect_is( &r, PHASE1_W, PHASE1_H ),
+             "the back buffer or the window is not the size the swapchain was "
+             "created with, or nothing was presented" );
 
     /* ---- phase 2: resize ------------------------------------------------- */
     begin( "phase 2: SetWindowPos + ResizeBuffers" );
@@ -411,7 +520,7 @@ static int fullscreen_smoke_run( void )
         ID3D11DeviceContext_OMSetRenderTargets( context, 0, NULL, NULL );
         ID3D11DeviceContext_Flush( context );
         hr = IDXGISwapChain_ResizeBuffers( swapchain, 0, PHASE2_W, PHASE2_H,
-                                           DXGI_FORMAT_UNKNOWN, 0 );
+                                           DXGI_FORMAT_UNKNOWN, desc.Flags );
         if (SUCCEEDED(hr)) hr = rebuild_rtv( device, swapchain, &rtv );
 #endif
         out( "movewindow=" ); out( moved ? "yes" : "no" ); out( " " );
@@ -423,13 +532,21 @@ static int fullscreen_smoke_run( void )
     }
     if (!rtv) goto done;
     begin( "phase 2: present resized" );
+    /* Remembered here, AFTER the resize and BEFORE the transition: this is the
+     * rectangle phase 4 requires DXGI to put back on its own. */
+    GetWindowRect( hwnd, &windowed_rect );
+    out_rect( "winrect", &windowed_rect );
     frames = hold_phase( swapchain, context, rtv, 2 );
-    out( "frames=" ); out_dec( frames );
-    verdict( frames > 0, "nothing was presented after the resize" );
+    out( " frames=" ); out_dec( frames );
+    verdict( frames > 0 && rect_is( &windowed_rect, PHASE2_W, PHASE2_H ),
+             "nothing was presented after the resize, or the window is not the "
+             "resized size" );
 
     /* ---- phase 3: fullscreen --------------------------------------------- */
     begin( "phase 3: SetFullscreenState(TRUE)" );
     {
+        LONG sw, sh;
+
 #if FS_BREAK == 2
         hr = S_OK;            /* claim it worked without asking for it */
 #else
@@ -442,27 +559,71 @@ static int fullscreen_smoke_run( void )
             fs = FALSE;
         if (target) { IDXGIOutput_Release( target ); target = NULL; }
         out( " getfullscreenstate=" ); out( fs ? "TRUE" : "FALSE" );
-        out( " " ); out_size( "screen", GetSystemMetrics( SM_CXSCREEN ),
-                              GetSystemMetrics( SM_CYSCREEN ) );
-        /* The two must AGREE.  A SetFullscreenState that returned S_OK and a
-         * GetFullscreenState that says FALSE is the shape that leaves a game
-         * rendering into a window it believes covers the screen. */
-        verdict( (SUCCEEDED(hr) && fs) || (FAILED(hr) && !fs),
-                 "SetFullscreenState and GetFullscreenState disagree" );
+
+        sw = GetSystemMetrics( SM_CXSCREEN );
+        sh = GetSystemMetrics( SM_CYSCREEN );
+        GetWindowRect( hwnd, &r );
+        out( " " ); out_size( "screen", sw, sh );
+        out( " " ); out_rect( "winrect", &r );
+
+        /* THE TWO CLAIMS, AND THEY ARE NOT THE SAME CLAIM.
+         *
+         * COHERENCE: Set and Get must agree.  A SetFullscreenState that
+         * returned S_OK and a GetFullscreenState that says FALSE is the shape
+         * that leaves a game rendering into a window it believes covers the
+         * screen.
+         *
+         * AND THE WINDOW MUST ACTUALLY BE THE SCREEN.  This is the claim this
+         * gate was red on until 2026-08-18, and the one the whole abi-2
+         * callback table exists to make true: DXGI accounting for a transition
+         * it never asked anyone to perform returns S_OK from both calls and
+         * leaves the rectangle exactly where it was. */
+        verdict( ((SUCCEEDED(hr) && fs) || (FAILED(hr) && !fs)) &&
+                 (!fs || rect_is( &r, sw, sh )),
+                 "SetFullscreenState and GetFullscreenState disagree, or the "
+                 "window did not become the size of the screen" );
     }
     if (fs)
     {
-        /* The buffers follow the target when the transition really happened. */
+        LONG sw = GetSystemMetrics( SM_CXSCREEN );
+        LONG sh = GetSystemMetrics( SM_CYSCREEN );
+
+        /* ResizeBuffers with 0x0 asks DXVK what size the window is rather than
+         * telling it -- which is what an application does after a transition,
+         * and which only answers correctly if the window really moved. */
         if (rtv) { ID3D11RenderTargetView_Release( rtv ); rtv = NULL; }
         ID3D11DeviceContext_OMSetRenderTargets( context, 0, NULL, NULL );
-        IDXGISwapChain_ResizeBuffers( swapchain, 0, 0, 0, DXGI_FORMAT_UNKNOWN, 0 );
+        IDXGISwapChain_ResizeBuffers( swapchain, 0, 0, 0, DXGI_FORMAT_UNKNOWN, desc.Flags );
         rebuild_rtv( device, swapchain, &rtv );
         begin( "phase 3: present fullscreen" );
         backbuffer_size( swapchain, &w, &h );
         out_size( "backbuffer", w, h );
+        out( " " ); out_size( "screen", sw, sh );
+#if FS_MODE_SWITCH
+        out( " modeswitch=yes" );
+#endif
         frames = rtv ? hold_phase( swapchain, context, rtv, 3 ) : 0;
         out( " frames=" ); out_dec( frames );
-        verdict( frames > 0, "nothing was presented while fullscreen" );
+        verdict( frames > 0 && w == (UINT)sw && h == (UINT)sh,
+                 "nothing was presented while fullscreen, or the back buffer is "
+                 "not the size of the screen" );
+
+#if FS_MODE_SWITCH
+        /* THE MODE CLAIM.  With ALLOW_MODE_SWITCH the transition picks a mode
+         * out of the output's own list, which now comes from Wine rather than
+         * from the foreign driver's single synthetic one -- so on a display
+         * with more than one size the screen must have CHANGED.  On a display
+         * with exactly one it must not have, and saying so is the honest
+         * answer rather than a failure. */
+        begin( "phase 3: the display mode followed the transition" );
+        out_size( "screen", sw, sh );
+        out( " " ); out_size( "before", screen0_w, screen0_h );
+        out( " sizes=" ); out_dec( mode_sizes );
+        verdict( mode_sizes > 1 ? (sw != screen0_w || sh != screen0_h)
+                                : (sw == screen0_w && sh == screen0_h),
+                 "the display offered more than one mode and the fullscreen "
+                 "transition did not change it" );
+#endif
     }
     else
     {
@@ -471,23 +632,37 @@ static int fullscreen_smoke_run( void )
     }
 
     /* ---- phase 4: back to windowed --------------------------------------- */
-    begin( "phase 4: SetFullscreenState(FALSE) and back to the windowed size" );
+    begin( "phase 4: SetFullscreenState(FALSE) puts everything back" );
     {
+        LONG sw, sh;
+
         hr = IDXGISwapChain_SetFullscreenState( swapchain, FALSE, NULL );
         out_hr( "hr", hr );
         pump();
-        SetWindowPos( hwnd, NULL, WIN_X, WIN_Y, PHASE2_W, PHASE2_H,
-                      SWP_NOZORDER | SWP_NOACTIVATE );
-        pump();
+        /* NO SetWindowPos HERE, DELIBERATELY.  Restoring the window is DXGI's
+         * job -- LeaveFullscreenMode calls wsi::restoreWindowState -- and a
+         * probe that put the geometry back itself would pass a restore that
+         * never happened, which is the failure that leaves a window stuck over
+         * the whole screen. */
         if (rtv) { ID3D11RenderTargetView_Release( rtv ); rtv = NULL; }
         ID3D11DeviceContext_OMSetRenderTargets( context, 0, NULL, NULL );
-        hr = IDXGISwapChain_ResizeBuffers( swapchain, 0, PHASE2_W, PHASE2_H,
-                                           DXGI_FORMAT_UNKNOWN, 0 );
+        /* 0x0 again: the size must come from the window DXGI restored. */
+        hr = IDXGISwapChain_ResizeBuffers( swapchain, 0, 0, 0, DXGI_FORMAT_UNKNOWN, desc.Flags );
         if (SUCCEEDED(hr)) hr = rebuild_rtv( device, swapchain, &rtv );
         backbuffer_size( swapchain, &w, &h );
+        GetWindowRect( hwnd, &r );
+        sw = GetSystemMetrics( SM_CXSCREEN );
+        sh = GetSystemMetrics( SM_CYSCREEN );
         out( " " ); out_size( "backbuffer", w, h );
-        verdict( SUCCEEDED(hr) && rtv && w == PHASE2_W && h == PHASE2_H,
-                 "the swapchain did not come back to the windowed size" );
+        out( " " ); out_rect( "winrect", &r );
+        out( " " ); out_rect( "wanted", &windowed_rect );
+        out( " " ); out_size( "screen", sw, sh );
+        verdict( SUCCEEDED(hr) && rtv &&
+                 w == PHASE2_W && h == PHASE2_H &&
+                 rect_same( &r, &windowed_rect ) &&
+                 sw == screen0_w && sh == screen0_h,
+                 "leaving fullscreen did not restore the window rectangle, the "
+                 "back buffer size, or the display mode" );
     }
     if (rtv)
     {
@@ -500,13 +675,21 @@ static int fullscreen_smoke_run( void )
 done:
     /* Leaving a swapchain fullscreen at exit is how a display is left in a
      * mode nobody asked for; DXGI says so and so does everyone who has done
-     * it by accident. */
+     * it by accident.  The explicit ChangeDisplaySettingsExW after it is the
+     * belt to that braces: if this probe died between a mode change and a
+     * transition, the display is still owed its mode back and nothing else in
+     * the process is going to ask. */
     if (swapchain) IDXGISwapChain_SetFullscreenState( swapchain, FALSE, NULL );
     if (rtv) ID3D11RenderTargetView_Release( rtv );
     if (swapchain) IDXGISwapChain_Release( swapchain );
     if (context) ID3D11DeviceContext_Release( context );
     if (device) ID3D11Device_Release( device );
     if (hwnd) DestroyWindow( hwnd );
+    ChangeDisplaySettingsExW( NULL, NULL, NULL, 0, NULL );
+    out( "fullscreen_smoke: FINAL " );
+    out_size( "screen", GetSystemMetrics( SM_CXSCREEN ),
+              GetSystemMetrics( SM_CYSCREEN ) );
+    out( "\n" );
 
     out( "fullscreen_smoke: " );
     if (failures)

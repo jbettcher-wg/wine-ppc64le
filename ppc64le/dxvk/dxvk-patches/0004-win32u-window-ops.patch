@@ -1,0 +1,568 @@
+diff --git a/src/wsi/foreign/wsi_win32u_foreign.cpp b/src/wsi/foreign/wsi_win32u_foreign.cpp
+index 10e057b9..ee000930 100644
+--- a/src/wsi/foreign/wsi_win32u_foreign.cpp
++++ b/src/wsi/foreign/wsi_win32u_foreign.cpp
+@@ -180,6 +180,421 @@ namespace dxvk::wsi {
+   }
+ 
+ 
++
++  /* ========================================================================
++   *                    the window operations (callback abi 2)
++   *
++   * Everything below overrides a ForeignWsiDriver method that is a deliberate
++   * no-op reporting success.  That base class is right about the backend it was
++   * written for -- the foreign-X11 one is handed a raw XID belonging to another
++   * process, and moving somebody else's window is not its business.  It is
++   * wrong about THIS one: the HWND here is a Wine window handle, Wine created
++   * the window, and Wine can move it.  Inheriting the no-ops unchanged is what
++   * made IDXGISwapChain::SetFullscreenState(TRUE) return S_OK, made
++   * GetFullscreenState agree, and left the rectangle on screen exactly the size
++   * it had been.
++   *
++   * EVERY ONE OF THEM FALLS BACK TO THE BASE CLASS when the Wine side did not
++   * publish the operation it needs.  That is not defensiveness: a Wine built
++   * before this ABI, or one run with WINEDXVKNOWINDOWOPS=1, publishes those
++   * entries NULL on purpose, and the port then behaves precisely as it did
++   * before -- which is what the negative control in
++   * ppc64le/dxvk/check-fullscreen-smoke.sh --sabotage requires.
++   * ===================================================================== */
++
++  static uint64_t handleOf(HWND hWindow) {
++    return uint64_t(reinterpret_cast<uintptr_t>(hWindow));
++  }
++
++
++  static void convertMode(const struct dxvk_win32u_wsi_mode& in, WsiMode* out) {
++    out->width                     = in.width;
++    out->height                    = in.height;
++    /* A denominator of 1 and whole Hz: that is what dmDisplayFrequency is, and
++     * what DXVK's own Win32 backend does with it.  Zero would make
++     * dxgi_output.cpp's computeRefreshPeriod divide by nothing, so a driver
++     * that reports no rate is given the 60 the foreign backend has always
++     * synthesised rather than a hole. */
++    out->refreshRate.numerator     = in.refresh_rate ? in.refresh_rate : 60;
++    out->refreshRate.denominator   = 1;
++    out->bitsPerPixel              = in.bits_per_pixel ? in.bits_per_pixel : 32;
++    out->interlaced                = in.interlaced != 0;
++  }
++
++
++  bool Win32uWsiDriver::getDisplayMode(
++          HMONITOR hMonitor,
++          uint32_t modeNumber,
++          WsiMode* pMode) {
++    const struct dxvk_win32u_wsi_ops* o = ops();
++
++    if (!o || !o->display_mode)
++      return ForeignWsiDriver::getDisplayMode(hMonitor, modeNumber, pMode);
++
++    if (hMonitor != getDefaultMonitor())
++      return false;
++
++    /* The wire form reserves negative indices for "current" and "registry", so
++     * an index that would wrap into one of them is refused here rather than
++     * being asked as a different question. */
++    if (modeNumber > 0x7fffffffu)
++      return false;
++
++    struct dxvk_win32u_wsi_mode mode = { };
++
++    if (!o->display_mode(int32_t(modeNumber), &mode))
++      return false;
++
++    convertMode(mode, pMode);
++    return true;
++  }
++
++
++  bool Win32uWsiDriver::getCurrentDisplayMode(
++          HMONITOR hMonitor,
++          WsiMode* pMode) {
++    const struct dxvk_win32u_wsi_ops* o = ops();
++
++    if (!o || !o->display_mode)
++      return ForeignWsiDriver::getCurrentDisplayMode(hMonitor, pMode);
++
++    if (hMonitor != getDefaultMonitor())
++      return false;
++
++    struct dxvk_win32u_wsi_mode mode = { };
++
++    if (!o->display_mode(DXVK_WIN32U_MODE_CURRENT, &mode))
++      return ForeignWsiDriver::getCurrentDisplayMode(hMonitor, pMode);
++
++    convertMode(mode, pMode);
++    return true;
++  }
++
++
++  bool Win32uWsiDriver::getDesktopDisplayMode(
++          HMONITOR hMonitor,
++          WsiMode* pMode) {
++    const struct dxvk_win32u_wsi_ops* o = ops();
++
++    if (!o || !o->display_mode)
++      return ForeignWsiDriver::getDesktopDisplayMode(hMonitor, pMode);
++
++    if (hMonitor != getDefaultMonitor())
++      return false;
++
++    struct dxvk_win32u_wsi_mode mode = { };
++
++    /* The REGISTRY mode, not the current one -- that is what "desktop" means
++     * here, and it is the one a display comes back to.  The base class answers
++     * this with the current mode because a foreign backend has no registry to
++     * consult; asking for a mode nobody stored still falls back to that. */
++    if (!o->display_mode(DXVK_WIN32U_MODE_REGISTRY, &mode))
++      return getCurrentDisplayMode(hMonitor, pMode);
++
++    convertMode(mode, pMode);
++    return true;
++  }
++
++
++  bool Win32uWsiDriver::getDesktopCoordinates(
++          HMONITOR hMonitor,
++          RECT*    pRect) {
++    const struct dxvk_win32u_wsi_ops* o = ops();
++    struct dxvk_win32u_wsi_mode mode = { };
++
++    /* The MONITOR's rectangle is the current display mode's size, and taking it
++     * from there rather than from the base class's synthetic screen is what
++     * makes a display-mode change move the fullscreen window with it.  The base
++     * class answers 1920x1080 (or whatever DXVK_WSI_FOREIGN_SCREEN says) no
++     * matter what the display is actually doing, which was harmless only for as
++     * long as nothing acted on it.
++     *
++     * THE CALLBACK IS ASKED DIRECTLY HERE, NOT THROUGH getCurrentDisplayMode,
++     * AND THE DIFFERENCE IS A CRASH.  The base class's getCurrentDisplayMode is
++     * written in terms of getDesktopCoordinates, and that call is VIRTUAL -- so
++     * a getDesktopCoordinates that reached its answer through
++     * getCurrentDisplayMode would, the moment the callback was missing and the
++     * base class had to answer, land back in this function.  [MEASURED]
++     * 2026-08-18: with WINEDXVKNOWINDOWOPS=1 set, exactly that pair alternated
++     * until the stack ran out -- 5.9 MB of core, every frame in it one of the
++     * two.  ppc64le/dxvk/check-fullscreen-smoke.sh --sabotage is what found it,
++     * which is the entire argument for having a lever on the code rather than
++     * on the gate's assertions. */
++    if (!o || !o->display_mode
++     || hMonitor != getDefaultMonitor()
++     || !o->display_mode(DXVK_WIN32U_MODE_CURRENT, &mode)
++     || !mode.width || !mode.height)
++      return ForeignWsiDriver::getDesktopCoordinates(hMonitor, pRect);
++
++    pRect->left   = 0;
++    pRect->top    = 0;
++    pRect->right  = LONG(mode.width);
++    pRect->bottom = LONG(mode.height);
++    return true;
++  }
++
++
++  void Win32uWsiDriver::resizeWindow(
++          HWND             hWindow,
++          DxvkWindowState* pState,
++          uint32_t         width,
++          uint32_t         height) {
++    const struct dxvk_win32u_wsi_ops* o = ops();
++
++    if (!o || !o->window_set_pos)
++      return ForeignWsiDriver::resizeWindow(hWindow, pState, width, height);
++
++    int32_t rect[4] = { 0, 0, 0, 0 };
++
++    /* Keep the top-left corner where it is and change only the size, which is
++     * what upstream's Win32 backend does and what an application resetting a
++     * windowed D3D9 device expects.  CLIENTSIZE, because `width` and `height`
++     * are the client area the caller asked for and this window may have a
++     * frame around it. */
++    if (o->window_rect)
++      o->window_rect(handleOf(hWindow), rect);
++
++    o->window_set_pos(handleOf(hWindow), rect[0], rect[1],
++      int32_t(width), int32_t(height),
++      DXVK_WIN32U_SWP_NOACTIVATE | DXVK_WIN32U_SWP_NOZORDER |
++      DXVK_WIN32U_SWP_CLIENTSIZE);
++  }
++
++
++  void Win32uWsiDriver::saveWindowState(
++          HWND             hWindow,
++          DxvkWindowState* pState,
++          bool             saveStyle) {
++    const struct dxvk_win32u_wsi_ops* o = ops();
++
++    if (!o || !o->window_rect)
++      return ForeignWsiDriver::saveWindowState(hWindow, pState, saveStyle);
++
++    if (saveStyle && o->window_style) {
++      pState->foreign.style   = o->window_style(handleOf(hWindow), DXVK_WIN32U_STYLE,   0, 0);
++      pState->foreign.exstyle = o->window_style(handleOf(hWindow), DXVK_WIN32U_EXSTYLE, 0, 0);
++    }
++
++    /* The OUTER rectangle, deliberately.  This is what leaveFullscreenMode puts
++     * back, and restoring a client rect onto a decorated window walks the frame
++     * down the screen by the height of its own caption, once per transition --
++     * a bug that only shows up on the third or fourth toggle, by which time
++     * nobody is looking at the fullscreen code any more. */
++    pState->foreign.saved = o->window_rect(handleOf(hWindow), pState->foreign.rect) != 0;
++  }
++
++
++  void Win32uWsiDriver::restoreWindowState(
++          HWND             hWindow,
++          DxvkWindowState* pState,
++          bool             restoreCoordinates) {
++    const struct dxvk_win32u_wsi_ops* o = ops();
++
++    if (!o || !o->window_set_pos)
++      return ForeignWsiDriver::restoreWindowState(hWindow, pState, restoreCoordinates);
++
++    if (!pState->foreign.saved)
++      return;
++
++    uint32_t flags = DXVK_WIN32U_SWP_FRAMECHANGED | DXVK_WIN32U_SWP_NOACTIVATE;
++
++    /* Back to whichever Z band the window was in before, which is not always
++     * "not topmost": an application that asked for WS_EX_TOPMOST itself must
++     * keep it, and dropping it on the way out of fullscreen is how a launcher
++     * that was deliberately always-on-top stops being so. */
++    flags |= (pState->foreign.exstyle & DXVK_WIN32U_WS_EX_TOPMOST)
++      ? DXVK_WIN32U_SWP_TOPMOST
++      : DXVK_WIN32U_SWP_NOTOPMOST;
++
++    if (!restoreCoordinates)
++      flags |= DXVK_WIN32U_SWP_NOSIZE | DXVK_WIN32U_SWP_NOMOVE;
++
++    const int32_t* r = pState->foreign.rect;
++
++    o->window_set_pos(handleOf(hWindow), r[0], r[1], r[2] - r[0], r[3] - r[1], flags);
++  }
++
++
++  bool Win32uWsiDriver::setWindowMode(
++          HMONITOR         hMonitor,
++          HWND             hWindow,
++          DxvkWindowState* pState,
++    const WsiMode&         mode) {
++    const struct dxvk_win32u_wsi_ops* o = ops();
++
++    if (!o || !o->display_set_mode)
++      return ForeignWsiDriver::setWindowMode(hMonitor, hWindow, pState, mode);
++
++    /* Already there is success and must not be a mode change: DXGI asks for a
++     * mode on every fullscreen transition whether or not it differs, and a
++     * display that is bounced through its own current mode blanks for a second
++     * for no reason.  The same short-circuit upstream's Win32 backend makes,
++     * for the same reason. */
++    struct dxvk_win32u_wsi_mode current = { };
++
++    if (o->display_mode && o->display_mode(DXVK_WIN32U_MODE_CURRENT, &current)
++     && current.width  == mode.width
++     && current.height == mode.height
++     && current.bits_per_pixel == mode.bitsPerPixel)
++      return true;
++
++    struct dxvk_win32u_wsi_mode want = { };
++    want.width          = mode.width;
++    want.height         = mode.height;
++    want.bits_per_pixel = mode.bitsPerPixel;
++    want.refresh_rate   = mode.refreshRate.denominator
++      ? mode.refreshRate.numerator / mode.refreshRate.denominator
++      : 0;
++    want.interlaced     = mode.interlaced ? 1u : 0u;
++
++    Logger::info(str::format("win32u WSI: setting display mode ",
++      want.width, "x", want.height, "@", want.refresh_rate, " ",
++      want.bits_per_pixel, "bpp"));
++
++    if (!o->display_set_mode(&want)) {
++      Logger::err(str::format("win32u WSI: Wine refused display mode ",
++        want.width, "x", want.height));
++      return false;
++    }
++
++    return true;
++  }
++
++
++  bool Win32uWsiDriver::enterFullscreenMode(
++          HMONITOR         hMonitor,
++          HWND             hWindow,
++          DxvkWindowState* pState,
++          bool             modeSwitch) {
++    const struct dxvk_win32u_wsi_ops* o = ops();
++
++    if (!o || !o->window_set_pos)
++      return ForeignWsiDriver::enterFullscreenMode(hMonitor, hWindow, pState, modeSwitch);
++
++    RECT rect = { };
++
++    if (!getDesktopCoordinates(hMonitor, &rect)
++     || rect.right <= rect.left || rect.bottom <= rect.top) {
++      Logger::err("win32u WSI: enterFullscreenMode: no desktop rectangle to fill");
++      return false;
++    }
++
++    /* Take the decoration off FIRST, then size the window, so the one
++     * SetWindowPos that follows carries the frame change with it.  A window
++     * that keeps WS_OVERLAPPEDWINDOW while its outer rectangle is the whole
++     * screen has a title bar ON the screen and a CLIENT area smaller than the
++     * screen by exactly the frame -- so the swapchain comes out the wrong size
++     * and the picture is offset, and both of those read as presentation bugs
++     * and are neither. */
++    if (o->window_style) {
++      int64_t style   = o->window_style(handleOf(hWindow), DXVK_WIN32U_STYLE,   0, 0);
++      int64_t exstyle = o->window_style(handleOf(hWindow), DXVK_WIN32U_EXSTYLE, 0, 0);
++
++      o->window_style(handleOf(hWindow), DXVK_WIN32U_STYLE, 1,
++        style   & ~int64_t(DXVK_WIN32U_WS_OVERLAPPEDWINDOW));
++      o->window_style(handleOf(hWindow), DXVK_WIN32U_EXSTYLE, 1,
++        exstyle & ~int64_t(DXVK_WIN32U_WS_EX_OVERLAPPEDWINDOW));
++    }
++
++    if (!o->window_set_pos(handleOf(hWindow),
++          rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top,
++          DXVK_WIN32U_SWP_TOPMOST | DXVK_WIN32U_SWP_FRAMECHANGED |
++          DXVK_WIN32U_SWP_SHOWWINDOW | DXVK_WIN32U_SWP_NOACTIVATE)) {
++      Logger::err(str::format("win32u WSI: enterFullscreenMode: Wine refused to "
++        "move HWND ", hWindow, " to ", rect.right - rect.left, "x",
++        rect.bottom - rect.top));
++      return false;
++    }
++
++    Logger::info(str::format("win32u WSI: fullscreen, ",
++      rect.right - rect.left, "x", rect.bottom - rect.top,
++      modeSwitch ? " with a mode switch" : " at the current mode"));
++    return true;
++  }
++
++
++  bool Win32uWsiDriver::leaveFullscreenMode(
++          HWND             hWindow,
++          DxvkWindowState* pState) {
++    const struct dxvk_win32u_wsi_ops* o = ops();
++
++    if (!o || !o->window_style)
++      return ForeignWsiDriver::leaveFullscreenMode(hWindow, pState);
++
++    if (!pState->foreign.saved)
++      return true;
++
++    /* Only put the styles back if the application has not changed them itself
++     * since, which is what native DXGI does and what upstream's Win32 backend
++     * copies.  A game that went borderless on its own while fullscreen means
++     * it, and handing it back the decoration it removed would be this layer
++     * overruling the application about its own window. */
++    int64_t curStyle   = o->window_style(handleOf(hWindow), DXVK_WIN32U_STYLE,   0, 0)
++                       & ~int64_t(DXVK_WIN32U_WS_VISIBLE);
++    int64_t curExstyle = o->window_style(handleOf(hWindow), DXVK_WIN32U_EXSTYLE, 0, 0)
++                       & ~int64_t(DXVK_WIN32U_WS_EX_TOPMOST);
++
++    if (curStyle   == (pState->foreign.style   & ~int64_t(DXVK_WIN32U_WS_VISIBLE |
++                                                          DXVK_WIN32U_WS_OVERLAPPEDWINDOW))
++     && curExstyle == (pState->foreign.exstyle & ~int64_t(DXVK_WIN32U_WS_EX_TOPMOST |
++                                                          DXVK_WIN32U_WS_EX_OVERLAPPEDWINDOW))) {
++      o->window_style(handleOf(hWindow), DXVK_WIN32U_STYLE,   1, pState->foreign.style);
++      o->window_style(handleOf(hWindow), DXVK_WIN32U_EXSTYLE, 1, pState->foreign.exstyle);
++    }
++
++    /* The geometry is NOT put back here.  DxgiSwapChain::LeaveFullscreenMode
++     * calls restoreWindowState immediately after this, which is where it
++     * belongs and where D3D9 reaches it too. */
++    return true;
++  }
++
++
++  bool Win32uWsiDriver::restoreDisplayMode() {
++    const struct dxvk_win32u_wsi_ops* o = ops();
++
++    if (!o || !o->display_restore_mode)
++      return ForeignWsiDriver::restoreDisplayMode();
++
++    if (!o->display_restore_mode()) {
++      Logger::warn("win32u WSI: Wine could not restore the display mode");
++      return false;
++    }
++
++    return true;
++  }
++
++
++  void Win32uWsiDriver::updateFullscreenWindow(
++          HMONITOR hMonitor,
++          HWND     hWindow,
++          bool     forceTopmost) {
++    const struct dxvk_win32u_wsi_ops* o = ops();
++
++    if (!o || !o->window_set_pos)
++      return ForeignWsiDriver::updateFullscreenWindow(hMonitor, hWindow, forceTopmost);
++
++    RECT bounds = { };
++
++    if (!getDesktopCoordinates(hMonitor, &bounds)
++     || bounds.right <= bounds.left || bounds.bottom <= bounds.top)
++      return;
++
++    /* forceTopmost is D3D9's rule and not DXGI's: changing the display mode on
++     * a D3D9 device re-forces the window to the top, and on DXGI it does not.
++     * The distinction is upstream's and is preserved rather than flattened. */
++    uint32_t flags = DXVK_WIN32U_SWP_FRAMECHANGED | DXVK_WIN32U_SWP_SHOWWINDOW
++                   | DXVK_WIN32U_SWP_NOACTIVATE;
++
++    if (forceTopmost)
++      flags |= DXVK_WIN32U_SWP_TOPMOST;
++    else
++      flags |= DXVK_WIN32U_SWP_NOZORDER;
++
++    o->window_set_pos(handleOf(hWindow), bounds.left, bounds.top,
++      bounds.right - bounds.left, bounds.bottom - bounds.top, flags);
++  }
++
++
+   static bool createWin32uWsiDriver(WsiDriver **driver) {
+     try {
+       *driver = new Win32uWsiDriver();
+diff --git a/src/wsi/foreign/wsi_win32u_foreign.h b/src/wsi/foreign/wsi_win32u_foreign.h
+index c4fe0333..45b5b561 100644
+--- a/src/wsi/foreign/wsi_win32u_foreign.h
++++ b/src/wsi/foreign/wsi_win32u_foreign.h
+@@ -29,11 +29,18 @@ namespace dxvk::wsi {
+    * which is the fact that lets DXGI_SWAP_CHAIN_DESC::OutputWindow cross
+    * unconverted.
+    *
+-   * Everything the base class does for monitors and window geometry is
+-   * inherited unchanged: one synthetic monitor, and every call that would
+-   * move, restyle or restack somebody else's window is a no-op that reports
+-   * success, because the owner of the window decides its geometry and DXVK
+-   * follows through VkSurfaceCapabilitiesKHR::currentExtent.
++   * The base class's one synthetic monitor is inherited. Its deliberate no-ops
++   * on window geometry are NOT, and that is what callback abi 2 is for: the
++   * base class is a driver for windows belonging to somebody else, and this
++   * one's window belongs to Wine. Moving it, restyling it and changing the
++   * display mode all go back through the callback table, so a fullscreen
++   * transition ends in NtUserSetWindowPos on the application's own thread.
++   * Where the table does not carry an operation -- which in practice means
++   * WINEDXVKNOWINDOWOPS=1, the negative control -- the inherited no-op is
++   * used and the port behaves exactly as it did before.  A Wine from BEFORE
++   * abi 2 never reaches that fallback: it stamps abi 1 and the equality check
++   * in 0003 refuses the whole table, by design, because a library cannot know
++   * that the entries it does not read are the ones its caller depends on.
+    */
+   class Win32uWsiDriver : public ForeignWsiDriver {
+ 
+@@ -60,6 +64,76 @@ namespace dxvk::wsi {
+ 
+     void destroySurface(VkSurfaceKHR surface) override;
+ 
++    /* --------------------------------------------------------------- abi 2
++     *
++     * The window and display-mode operations, overriding the base class's
++     * deliberate no-ops.  Its premise -- the window belongs to somebody else --
++     * is true for the foreign-X11 backend and FALSE here: this HWND is a Wine
++     * window handle, Wine created the window, and Wine can move it.  Every one
++     * of these falls back to the inherited no-op when the Wine side did not
++     * publish the callback it needs.  That is what makes the
++     * WINEDXVKNOWINDOWOPS=1 negative control possible -- it publishes the six
++     * entries NULL inside a table still stamped abi 2.  It is NOT a
++     * compatibility path for an older Wine: an abi-1 table is refused whole in
++     * 0003 and no op of it is ever consulted.
++     */
++
++    bool getDisplayMode(
++            HMONITOR         hMonitor,
++            uint32_t         modeNumber,
++            WsiMode*         pMode) override;
++
++    bool getCurrentDisplayMode(
++            HMONITOR         hMonitor,
++            WsiMode*         pMode) override;
++
++    bool getDesktopDisplayMode(
++            HMONITOR         hMonitor,
++            WsiMode*         pMode) override;
++
++    bool getDesktopCoordinates(
++            HMONITOR         hMonitor,
++            RECT*            pRect) override;
++
++    void resizeWindow(
++            HWND             hWindow,
++            DxvkWindowState* pState,
++            uint32_t         width,
++            uint32_t         height) override;
++
++    void saveWindowState(
++            HWND             hWindow,
++            DxvkWindowState* pState,
++            bool             saveStyle) override;
++
++    void restoreWindowState(
++            HWND             hWindow,
++            DxvkWindowState* pState,
++            bool             restoreCoordinates) override;
++
++    bool setWindowMode(
++            HMONITOR         hMonitor,
++            HWND             hWindow,
++            DxvkWindowState* pState,
++      const WsiMode&         mode) override;
++
++    bool enterFullscreenMode(
++            HMONITOR         hMonitor,
++            HWND             hWindow,
++            DxvkWindowState* pState,
++            bool             modeSwitch) override;
++
++    bool leaveFullscreenMode(
++            HWND             hWindow,
++            DxvkWindowState* pState) override;
++
++    bool restoreDisplayMode() override;
++
++    void updateFullscreenWindow(
++            HMONITOR         hMonitor,
++            HWND             hWindow,
++            bool             forceTopmost) override;
++
+   };
+ 
+ }
+diff --git a/src/wsi/wsi_window.h b/src/wsi/wsi_window.h
+index 70bbb8fe..9f16006c 100644
+--- a/src/wsi/wsi_window.h
++++ b/src/wsi/wsi_window.h
+@@ -1,5 +1,7 @@
+ #pragma once
+ 
++#include <cstdint>
++
+ #include <windows.h>
+ 
+ #include "wsi_monitor.h"
+@@ -12,6 +14,24 @@ namespace dxvk::wsi {
+     * \brief Impl-dependent state
+     */
+   struct DxvkWindowState {
++#if defined(DXVK_WSI_FOREIGN)
++    /* What the win32u driver has to put back when a swapchain leaves
++       fullscreen.  The foreign family had nothing here because none of its
++       drivers ever moved a window; the win32u one does, and the state belongs
++       to the SWAPCHAIN rather than to the driver -- two swapchains on two
++       windows go fullscreen independently, and a driver-side table keyed by
++       HWND would be a second place for that to be true.
++
++       `rect` is the OUTER rectangle, four ints in the order left, top, right,
++       bottom -- the same order and meaning as ppc64le/dxvk/dxvk_win32u_wsi.h's
++       window_rect, so nothing converts on the way through. */
++    struct {
++      int64_t style   = 0;
++      int64_t exstyle = 0;
++      int32_t rect[4] = { 0, 0, 0, 0 };
++      bool    saved   = false;
++    } foreign;
++#endif
+ #if defined(DXVK_WSI_WIN32)
+     struct {
+       LONG style   = 0;

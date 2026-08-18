@@ -167,8 +167,19 @@ static void *load_dxvk_lib( const char *soname )
  * thread, is handled by deferring rather than by refusing.
  * ====================================================================== */
 
-/* Set for the duration of any unixlib entry point.  See the banner. */
-static __thread int on_wine_thread;
+/* Set for the duration of any unixlib entry point.  See the banner.
+ *
+ * DEFINED IN unix_wsi_window.c, not here.  That file's window and display-mode
+ * operations need the same flag for the same reason, and it is the one that
+ * carries the whole argument for it now; two definitions of one rule is how a
+ * rule stops being one.  There is a copy of the object per .so, which is what
+ * each unixlib wants -- d3d11.so's threads are not d3d9.so's. */
+extern __thread int wsi_on_wine_thread;
+
+/* unix_wsi_window.c, the shared win32u WINDOW seam.  Integer-typed across, for
+ * the reason its banner and dxvk_win32u_wsi.h both give. */
+extern void wsiwin_ops_init( struct dxvk_win32u_wsi_ops *ops );
+extern int  wsiwin_client_size( UINT64 hwnd, unsigned int *width, unsigned int *height );
 
 struct present_surface
 {
@@ -297,7 +308,7 @@ static int w32u_surface_create( UINT64 hwnd, void *instance, void *gipa, UINT64 
     UINT64 out = 0;
     int res;
 
-    if (!on_wine_thread)
+    if (!wsi_on_wine_thread)
     {
         ERR( "refusing to create a client surface for hwnd %p off a Wine "
              "thread: this call ends in win32u, which dereferences a TEB that "
@@ -353,15 +364,15 @@ static void w32u_surface_destroy( UINT64 surface )
          * Marking it is not a leak: drain_orphans() takes it on the next call
          * that IS on a Wine thread, and there is always one, because a process
          * that has stopped presenting entirely is a process on its way out. */
-        if (on_wine_thread) *link = p->next;
+        if (wsi_on_wine_thread) *link = p->next;
         else p->orphaned = 1;
         break;
     }
-    if (p && on_wine_thread) drain_orphans();
+    if (p && wsi_on_wine_thread) drain_orphans();
     pthread_mutex_unlock( &present_lock );
 
     if (!p) return;
-    if (!on_wine_thread)
+    if (!wsi_on_wine_thread)
     {
         TRACE( "deferring release of the client surface for hwnd %p: DXVK "
                "destroyed surface 0x%s off a Wine thread\n",
@@ -375,7 +386,26 @@ static void w32u_surface_destroy( UINT64 surface )
 static int w32u_window_size( UINT64 hwnd, UINT32 *width, UINT32 *height )
 {
     struct hwnd_state *s;
+    unsigned int w, h;
     int found = 0;
+
+    /* ASK win32u FIRST, and fall back to what the PE side pushed.
+     *
+     * The pushed size used to be the only answer there was, because the unix
+     * side could not reach user32.  It can now (unix_wsi_window.c), and asking
+     * matters because DXVK can now MOVE this window: a fullscreen transition
+     * changes the size inside one call the application made, and the PE side
+     * has no reason to push again until the next present -- so an application's
+     * ResizeBuffers(0, 0, ...) right after the transition, which is the normal
+     * thing to do there, would size its back buffer from the window's previous
+     * size.  The push stays as the fallback for the case that cannot ask: a
+     * query arriving on a thread DXVK made, where win32u may not be entered. */
+    if (wsiwin_client_size( hwnd, &w, &h ))
+    {
+        *width = w;
+        *height = h;
+        return 1;
+    }
 
     pthread_mutex_lock( &present_lock );
     for (s = hwnd_states; s; s = s->next)
@@ -406,7 +436,18 @@ static int w32u_is_window( UINT64 hwnd )
     return valid;
 }
 
-static const struct dxvk_win32u_wsi_ops win32u_wsi_ops =
+/* NOT const any more, and the reason is the abi-2 half.
+ *
+ * The six window and display-mode operations are filled in by
+ * wsiwin_ops_init() at registration time rather than here, because whether
+ * they are published at all is a RUNTIME decision: WINEDXVKNOWINDOWOPS=1
+ * leaves them NULL and the port behaves exactly as it did before abi 2, which
+ * is the negative control ppc64le/dxvk/check-fullscreen-smoke.sh --sabotage
+ * runs.  A static initialiser cannot express that, and putting the lever on the
+ * DXVK side instead would have put it in the half of the boundary this tree
+ * carries as a patch series rather than as source.  The table is still written
+ * exactly once, on the loader's thread, before any DXVK entry point has run. */
+static struct dxvk_win32u_wsi_ops win32u_wsi_ops =
 {
     .abi = DXVK_WIN32U_WSI_ABI,
     .instance_extensions = w32u_instance_extensions,
@@ -424,6 +465,10 @@ static const struct dxvk_win32u_wsi_ops win32u_wsi_ops =
 static void register_wsi_ops( void *const *handles, unsigned int count )
 {
     unsigned int i, done = 0;
+
+    /* Before the first library sees the table, and once: the abi-2 half, or
+     * the deliberate absence of it.  See the note on win32u_wsi_ops. */
+    wsiwin_ops_init( &win32u_wsi_ops );
 
     for (i = 0; i < count; i++)
     {
@@ -643,9 +688,9 @@ static NTSTATUS d3d11_unix_flat( void *args )
     static NTSTATUS name( void *args )                                       \
     {                                                                        \
         NTSTATUS status;                                                     \
-        on_wine_thread++;                                                    \
+        wsi_on_wine_thread++;                                                \
         status = impl( args );                                               \
-        on_wine_thread--;                                                    \
+        wsi_on_wine_thread--;                                                \
         return status;                                                       \
     }
 

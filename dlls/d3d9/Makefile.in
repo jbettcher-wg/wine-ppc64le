@@ -25,7 +25,8 @@ SOURCES = \
 	d3d9.thunks \
 	main.c \
 	unix.c \
-	unix_win32u.c
+	unix_win32u.c \
+	unix_wsi_window.c
 
 EXTRAINCL   = -I$(srcdir)/../../ppc64le/dxvk
 UNIX_CFLAGS = -I$(srcdir)/../../ppc64le/dxvk

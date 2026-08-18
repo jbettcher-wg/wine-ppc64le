@@ -46,7 +46,7 @@ Honest, and in progress.
 | OpenGL on **both** drivers | **works** — X11 and Wayland legs, native and guest byte-identical on each; `ppc64le/opengl/check-gl-smoke.sh` |
 | A swapchain on a **child** window | **works** — the child leg of `ppc64le/dxvk/check-present-smoke.sh` |
 | Swapchain **resize** | **works** — on screen and in the back buffer; `ppc64le/dxvk/check-fullscreen-smoke.sh` |
-| Exclusive **fullscreen** | **no** — reaches DXGI and stops there; cause named in `ppc64le/dxvk/README.md` |
+| Exclusive **fullscreen** | **works** — the window becomes the screen, the display mode follows, and leaving puts both back; same gate |
 | Media Foundation for guests | **works** — measured end to end on `mfplat`/`mf`/`mfreadwrite` |
 | `mfmediaengine`, `evr`, `wmvcore` | **surface built, unexercised** — same roster, same instance; no title has driven one, and `ppc64le/mf/README.md` says so |
 | **A commercial game** | **no** — see "Where real games stop" |
@@ -170,14 +170,14 @@ things it was claimed to cover turned out not to be covered by it at all.
   framebuffer to hold a rectangle of the CHILD's size — and, against the same
   photograph, requires it *not* to hold one of the parent's, which is the exact
   shape of "presented to the parent instead".
-* **Resize works. Exclusive fullscreen does not, and the boundary was never
-  the problem in either case.** `dlls/d3d11/d3d11_marshal.h` already carried
-  complete plans for `SetFullscreenState`, `GetFullscreenState`,
-  `ResizeBuffers`, `ResizeTarget` and `GetContainingOutput` on every
-  `IDXGISwapChain` version the roster covers — they are ordinary integer slots
-  and the generator never refused them. What was unproven was whether they
-  *did* anything, since a window operation that never reaches the display
-  server returns `S_OK` and leaves the picture exactly the size it was.
+* **Resize works, exclusive fullscreen works, and the display mode changes —
+  and the boundary was never the problem in any of the three.**
+  `dlls/d3d11/d3d11_marshal.h` already carried complete plans for
+  `SetFullscreenState`, `GetFullscreenState`, `ResizeBuffers`, `ResizeTarget`
+  and `GetContainingOutput` on every `IDXGISwapChain` version the roster covers
+  — ordinary integer slots the generator never refused. What was unproven was
+  whether they *did* anything, since a window operation that never reaches the
+  display server returns `S_OK` and leaves the picture exactly the size it was.
 
   `ppc64le/dxvk/check-fullscreen-smoke.sh` drives one swapchain through four
   phases and photographs the screen between them, checking DXGI's own
@@ -187,19 +187,67 @@ things it was claimed to cover turned out not to be covered by it at all.
   get this wrong and is the gate's first negative control. Resize passes both
   ways: 256x256 → 192x144 → 192x144 again after leaving fullscreen.
 
-  Fullscreen does not, and the gate is what found it. [MEASURED]
-  `SetFullscreenState(TRUE)` returns `S_OK`, `GetFullscreenState` agrees,
-  `GetSystemMetrics` reports the whole screen — and the rectangle on screen is
-  still the window's. The cause is one inherited method:
-  `ForeignWsiDriver::enterFullscreenMode` is a deliberate no-op that reports
-  success because *the window belongs to somebody else*, which is right for the
-  foreign-X11 backend and wrong for the Win32u one, whose window is a Wine HWND
-  Wine can move — and `Win32uWsiDriver` inherits it unchanged. It is **recorded
-  as incomplete** in `ppc64le/dxvk/README.md`, with the reason it was not fixed
-  in this pass: the fix needs a road that does not exist yet, because DXVK's WSI
-  runs in the unix library and the five-entry callback table it reaches Wine
-  through cannot move a window. The gate asserts the current behaviour
-  positively, so it goes red the day somebody fixes it.
+  **Fullscreen did not, and the gate is what found it.** [MEASURED] 2026-08-18,
+  before the fix: `SetFullscreenState(TRUE)` returned `S_OK`,
+  `GetFullscreenState` agreed, `GetSystemMetrics` reported the whole screen —
+  and the rectangle on screen was still the window's. The cause was one
+  inherited method: `ForeignWsiDriver::enterFullscreenMode` is a deliberate
+  no-op that reports success because *the window belongs to somebody else*,
+  which is right for the foreign-X11 backend and wrong for the Win32u one,
+  whose window is a Wine HWND Wine can move — and `Win32uWsiDriver` inherited
+  it unchanged.
+
+  The road it needed did not exist: DXVK's WSI runs in the unix library, and
+  the five-entry callback table it reaches Wine through could not move a
+  window. That table has **six more entries and an ABI bump** now
+  (`ppc64le/dxvk/dxvk_win32u_wsi.h` at abi 2), a Wine half in
+  `dlls/d3d11/unix_wsi_window.c` that lands in `NtUserSetWindowPos` and
+  `NtUserChangeDisplaySettings`, and twelve overrides in `Win32uWsiDriver`
+  (`dxvk-patches/0004-win32u-window-ops.patch`). [MEASURED] the same gate now:
+  from 192x144 the window becomes `0,0,1024,768`, `GetFullscreenState` agrees,
+  the back buffer follows to 1024x768, the compositor's own framebuffer holds
+  524,970 pixels of the cleared colour where it held 27,648, and
+  `SetFullscreenState(FALSE)` puts the rectangle, the buffer and the display
+  mode back **without the probe touching the window**. Doing it in
+  `dlls/d3d11`'s guest-facing shim instead would have been smaller and wrong:
+  it would serve guests only, and it would paper over a premise that is false
+  one layer up.
+
+  `ChangeDisplaySettingsExW` was recorded as *unproven rather than broken*, and
+  it is proven now. [MEASURED] why nobody could see it: `win32u` synthesises the
+  mode list for a display whose driver reports one mode, and the smallest entry
+  in its table is 640x480 — so on the 640x480 compositor this gate used to
+  start, the whole list was three modes that were all 640x480 and no change
+  could ever be asked for. At 1024x768 the same code offers four sizes, and a
+  second probe build whose swapchain carries
+  `DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH` drives a real one: 1024x768 →
+  640x480 on the way into fullscreen, and back on the way out.
+
+  Two crashes fell out of doing it, both the port's own and neither in the new
+  code. `dlls/win32u/vulkan.c` had **two `pthread_once` controls for one
+  initialiser** — upstream's, and the one this fork's HWND-surface seam added —
+  so `vulkan_init_once` could run twice, and its second run reset
+  `driver_funcs` back to the lazy Vulkan driver after that driver's own
+  once-control had already been consumed, leaving every `lazydrv_*` entry point
+  calling itself until the stack ran out. Any process that changed a display
+  mode and then built a swapchain died on it, in either order; nothing in this
+  tree changed a display mode until this gate did. The second was found by the
+  gate's own `--sabotage` lever: a mutual recursion between
+  `getDesktopCoordinates` and `getCurrentDisplayMode` in the new WSI driver,
+  reachable only when Wine publishes the table without the new entries. That is
+  the whole argument for a negative control that turns off the **code** rather
+  than the gate's own assertions.
+
+  What could **not** be shown on screen is the fullscreen window's POSITION,
+  and it is not this port's to show: no Wayland client may place its own
+  top-levels. This compositor put the window where it wanted when it was mapped
+  and never moved it again, so a screen-sized frame is clipped by the screen's
+  edges rather than starting at `0,0`. The gate reads the origin out of a
+  windowed phase's own photograph and requires the fullscreen one to be exactly
+  the on-screen part of a screen-sized rectangle there, completely filled —
+  every number checked, none a tolerance. (Weston's own `weston-fullscreen`
+  client does land at `0,0` on the same compositor, so this is a winewayland
+  question rather than a DXVK one, and it is recorded rather than fixed.)
 
 ### Where real games stop
 

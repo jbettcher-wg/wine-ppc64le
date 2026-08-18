@@ -14,6 +14,12 @@
 # own thread and pushes the answers down.  The unixlib deliberately does NOT
 # link -lwin32u -- see the note in ../d3d12/unix_win32u.c about the DT_NEEDED a
 # headless build tree cannot satisfy.
+#
+# unix_wsi_window.c is the other half of that arrangement and keeps the same
+# rule: the window OPERATIONS (move, restyle, display mode) cannot be pushed,
+# because DXVK asks for them in the middle of a call the application made, so
+# they resolve win32u's own entry points with dlsym on the handle a process
+# that owns a window already has open.  Still no DT_NEEDED.
 MODULE    = d3d11.dll
 UNIXLIB   = d3d11.so
 IMPORTLIB = d3d11
@@ -41,4 +47,5 @@ SOURCES = \
 	d3d11.thunks \
 	main.c \
 	unix.c \
-	unix_win32u.c
+	unix_win32u.c \
+	unix_wsi_window.c
