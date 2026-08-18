@@ -309,6 +309,32 @@ SURFACES = {
         refusals={},
         flat_refusals={},
     ),
+    # Mechanical repeat of the xaudio2_9 entry above (see xaudio2_9.thunks'
+    # banner for why 2_8 needs its own roster and not a shared one): same
+    # hand slots, same notable slot, same shape.  Reads
+    # dlls/xaudio2_8/xaudio_classes.h, which is build output -- widl's
+    # translation of xaudio2_7/xaudio_classes.idl (shared via PARENTSRC) at
+    # -DXAUDIO2_VER=8 -- so this entry cannot run until that exists.
+    "xaudio2_8": dict(
+        prefix="xaudio2",
+        roster="interfaces_xaudio2_8.json",
+        headers=["dlls/xaudio2_8/xaudio_classes.h"],
+        headers_from_build=True,
+        extra_headers=["windef.h", "minwindef.h", "winnt.h", "guiddef.h", "mmreg.h",
+                       "basetsd.h"],
+        locals_claimed=True,
+        void_pp_is_memory=frozenset(),
+        hand_slots=[
+            ("IXAudio2::CreateSourceVoice",      "hand_create_source_voice"),
+            ("IXAudio2::CreateSubmixVoice",      "hand_create_submix_voice"),
+            ("IXAudio2::CreateMasteringVoice",   "hand_create_mastering_voice"),
+            ("IXAudio2Voice::SetOutputVoices",   "hand_set_output_voices"),
+            ("IXAudio2Voice::SetEffectChain",    "hand_set_effect_chain"),
+        ],
+        notable_slots=["IXAudio2Voice::DestroyVoice"],
+        refusals={},
+        flat_refusals={},
+    ),
 }
 
 

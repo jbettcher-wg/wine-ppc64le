@@ -211,12 +211,24 @@ MAX_FP_ARG_POS = 8
 #   SIZE            struct { LONG cx, cy; }                  8 bytes, 2x int32
 #   LARGE_INTEGER   union of { DWORD,LONG } and LONGLONG     8 bytes, integer
 #   ULARGE_INTEGER  union of { DWORD,DWORD } and ULONGLONG   8 bytes, integer
+#   ldiv_t          struct { __msvcrt_long quot, rem; }      8 bytes, 2x int32
+#                   (include/msvcrt/stdlib.h; __msvcrt_long is always 32-bit,
+#                   unlike the host's `long`, so this is 8 bytes on every
+#                   build host this oracle runs on).  msvcrt/ucrtbase's ldiv
+#                   RETURNS this by value (lldiv_t's two __int64 members make
+#                   it 16 bytes, over the limit, and it is correctly refused
+#                   without help).
+#   CY              union of { struct{ULONG,LONG}, LONGLONG } (include/
+#                   wtypes.idl) -- 8 bytes, integer both ways.  oleaut32's
+#                   whole Var*FromCy / VarCyFrom* / VarCy{Add,Mul,Abs,...}
+#                   family takes or returns this BY VALUE.
 #
 # The generated probe still asserts sizeof <= 8 AND that the type really is a
 # struct or union, so a type that changes shape under this list fails the build
 # rather than silently passing in the wrong register file.
 AGGREGATE_SLOT_TYPES = frozenset((
     'POINT', 'POINTS', 'SIZE', 'LARGE_INTEGER', 'ULARGE_INTEGER',
+    'ldiv_t', 'CY',
 ))
 
 

@@ -57,10 +57,11 @@
 #       host's ppc64 handler, which cannot resume x86-64 code -- a silent wrong
 #       answer where the hole is a named, diagnosable sentinel.  Needs a real
 #       guest-side EH personality.
-#   api-ms-win-crt-utility-l1-1-0.ldiv   returns ldiv_t BY VALUE; the
-#       descriptor has one 64-bit return slot or a refusal.
-#   OLEAUT32.#113 (VarBstrFromCy)     takes CY by value, an 8-byte aggregate;
-#       same rule, on an argument.
+#
+#   CLOSED 2026-08-18 (kept for the record): ldiv (ldiv_t returned BY VALUE)
+#       and OLEAUT32.#113/VarBstrFromCy (CY taken by value) -- both 8-byte
+#       integer aggregates, now classified in wine_sig.py's
+#       AGGREGATE_SLOT_TYPES and served through a single 64-bit slot.
 #
 # --sabotage runs the negative controls instead and requires each to go red.  A
 # gate that cannot go red proves nothing.
@@ -96,8 +97,6 @@ holes_expected() {
     [ "$SABOTAGE" = 1 ] && return 0     # sabotage 1: the empty list
     cat <<'EOF'
 vcruntime140.dll	__CxxFrameHandler3
-ucrtbase.dll	ldiv
-oleaut32.dll	#113
 EOF
 }
 

@@ -102,6 +102,21 @@ SURFACES = {
               "IXAudio2MasteringVoice",
               "IXAudio2EngineCallback", "IXAudio2VoiceCallback"],
     ),
+    # The mechanical repeat xaudio2_9.thunks describes: SAME roster shape as
+    # 2_9 (IXAudio2's IID and the first three methods are version-conditional,
+    # which is exactly why this needs its OWN widl run rather than sharing
+    # 2_9's table), built from dlls/xaudio2_8/xaudio_classes.h -- the header
+    # widl emits when dlls/xaudio2_8 compiles xaudio2_7/xaudio_classes.idl
+    # (shared via PARENTSRC) with -DXAUDIO2_VER=8.  Requires a build tree.
+    "xaudio2_8": dict(
+        dialect="midl",
+        headers=["dlls/xaudio2_8/xaudio_classes.h"],
+        from_build=True,
+        keep=["IXAudio2", "IXAudio2Extension", "IXAudio2Voice",
+              "IXAudio2SourceVoice", "IXAudio2SubmixVoice",
+              "IXAudio2MasteringVoice",
+              "IXAudio2EngineCallback", "IXAudio2VoiceCallback"],
+    ),
 }
 
 
