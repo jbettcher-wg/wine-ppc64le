@@ -35,6 +35,8 @@
 #include "ntdll_misc.h"
 #include "wine/exception.h"
 
+WINE_DEFAULT_DEBUG_CHANNEL(process);
+
 
 /******************************************************************************
  *  RtlGetCurrentPeb  [NTDLL.@]
@@ -729,6 +731,120 @@ NTSTATUS WINAPI DbgUiConvertStateChangeStructure( DBGUI_WAIT_STATE_CHANGE *state
 }
 
 /***********************************************************************
+ *      remote_breakin_routine
+ *
+ * DbgUiRemoteBreakin, expressed as an address in the TARGET process.
+ *
+ * The caller below hands its OWN DbgUiRemoteBreakin to NtCreateThreadEx, and
+ * that is only meaningful because every Wine process normally maps ntdll.dll
+ * at the same address: it is a PE with a fixed image base, so the debugger's
+ * copy and the debuggee's copy agree.
+ *
+ * On the ppc64le port they do not.  ntdll's PE side is the one module that
+ * cannot be a PE at all -- its TEB lives in an initial-exec __thread and a PE
+ * image has nowhere to put a static TLS block, so it is built as an ELF
+ * builtin (configure.ac's SO_BUILTIN_SUBDIRS) and the system dynamic linker
+ * chooses where to put it.  [MEASURED] 2026-08-18, op4k: three concurrent
+ * processes of the same binary mapped dlls/ntdll/ntdll.dll.so at
+ * 0x3fff881ed000, 0x3fffb9a1d000 and 0x3fff91a0d000.  So the address handed
+ * across is an address in the DEBUGGER, pointing at nothing in particular in
+ * the debuggee -- and the port's own thread-start classifier says exactly
+ * that and refuses the thread:
+ *
+ *   err:seh:RtlUserThreadStart thread start 00003FFFB7F11280 is in no loaded
+ *   image; refusing to run it either way
+ *
+ * which is the correct answer to the question it was asked.  The debugger
+ * then waits forever for a breakin that never happens, and every attach hangs
+ * until something else in the debuggee faults.  (README recorded this as the
+ * breakin routine living outside any PE the loader has a record of.  It does
+ * not: ntdll's ELF text is inside ntdll's own loader entry, and
+ * RtlPcToFileHeader finds it.  The address was simply the wrong process's.)
+ *
+ * So translate: both processes map the same FILE, so the routine's offset
+ * within ntdll is identical and only the base differs.  Read the debuggee's
+ * ntdll base out of its own loader data and add the offset.  Everything is
+ * cross-checked before it is used -- the module must be named ntdll.dll and
+ * must be the same size as ours -- and any failure falls back to the address
+ * this function was already passing, which is exactly right on every build
+ * where ntdll is a PE, because there base_remote == base_local and the
+ * translation is the identity.
+ */
+static void *remote_breakin_routine( HANDLE process )
+{
+    PROCESS_BASIC_INFORMATION pbi;
+    const IMAGE_NT_HEADERS *nt;
+    LDR_DATA_TABLE_ENTRY mod;
+    PEB_LDR_DATA ldr;
+    LIST_ENTRY *head, *entry;
+    WCHAR name[16];
+    void *base_local = NULL, *ldr_addr;
+    ULONG_PTR offset;
+    unsigned int i;
+
+    /* WINEEMUNODBGATTACH=1 hands over our own address again, which is what
+     * this function did before it existed.  The negative control for
+     * ppc64le/winedbg/check-guest-debug.sh: with it set, an attach to a guest
+     * process must fail to stop it. */
+    {
+        static int disabled = -1;
+        if (disabled == -1)
+        {
+            UNICODE_STRING name = RTL_CONSTANT_STRING( L"WINEEMUNODBGATTACH" );
+            WCHAR buf[8];
+            UNICODE_STRING value = { 0, sizeof(buf), buf };
+
+            disabled = (!RtlQueryEnvironmentVariable_U( NULL, &name, &value ) &&
+                        value.Length == sizeof(WCHAR) && buf[0] == '1');
+        }
+        if (disabled) return DbgUiRemoteBreakin;
+    }
+
+    if (!RtlPcToFileHeader( DbgUiRemoteBreakin, &base_local ) || !base_local)
+        return DbgUiRemoteBreakin;
+    if (!(nt = RtlImageNtHeader( base_local ))) return DbgUiRemoteBreakin;
+    offset = (const char *)DbgUiRemoteBreakin - (const char *)base_local;
+
+    if (NtQueryInformationProcess( process, ProcessBasicInformation, &pbi, sizeof(pbi), NULL ))
+        return DbgUiRemoteBreakin;
+    if (!pbi.PebBaseAddress) return DbgUiRemoteBreakin;
+    if (NtReadVirtualMemory( process, &pbi.PebBaseAddress->LdrData,
+                             &ldr_addr, sizeof(ldr_addr), NULL ) || !ldr_addr)
+        return DbgUiRemoteBreakin;
+    if (NtReadVirtualMemory( process, ldr_addr, &ldr, sizeof(ldr), NULL )) return DbgUiRemoteBreakin;
+
+    /* Walk the debuggee's load-order list rather than trusting a position in
+     * it.  ntdll is first on Windows and on Wine both, but "first" is a fact
+     * about today's loader and the module NAME is a fact about the module. */
+    head = &((PEB_LDR_DATA *)ldr_addr)->InLoadOrderModuleList;
+    entry = ldr.InLoadOrderModuleList.Flink;
+    for (i = 0; i < 64 && entry != head; i++)
+    {
+        if (NtReadVirtualMemory( process, CONTAINING_RECORD( entry, LDR_DATA_TABLE_ENTRY, InLoadOrderLinks ),
+                                 &mod, sizeof(mod), NULL ))
+            break;
+        entry = mod.InLoadOrderLinks.Flink;
+        if (mod.BaseDllName.Length != sizeof(L"ntdll.dll") - sizeof(WCHAR)) continue;
+        if (NtReadVirtualMemory( process, mod.BaseDllName.Buffer, name,
+                                 mod.BaseDllName.Length, NULL ))
+            continue;
+        name[mod.BaseDllName.Length / sizeof(WCHAR)] = 0;
+        if (wcsicmp( name, L"ntdll.dll" )) continue;
+        /* Same file, therefore same size.  A mismatch means the debuggee is
+         * running some other ntdll, and an offset into ours would land in the
+         * middle of one of its functions -- refuse rather than guess. */
+        if (mod.SizeOfImage != nt->OptionalHeader.SizeOfImage)
+        {
+            WARN( "debuggee ntdll is %x bytes and ours is %x; not translating the breakin address\n",
+                  (UINT)mod.SizeOfImage, (UINT)nt->OptionalHeader.SizeOfImage );
+            break;
+        }
+        return (char *)mod.DllBase + offset;
+    }
+    return DbgUiRemoteBreakin;
+}
+
+/***********************************************************************
  *      DbgUiIssueRemoteBreakin (NTDLL.@)
  */
 NTSTATUS WINAPI DbgUiIssueRemoteBreakin( HANDLE process )
@@ -738,7 +854,7 @@ NTSTATUS WINAPI DbgUiIssueRemoteBreakin( HANDLE process )
     OBJECT_ATTRIBUTES attr = { sizeof(attr) };
 
     status = NtCreateThreadEx( &handle, THREAD_ALL_ACCESS, &attr, process,
-                               DbgUiRemoteBreakin, NULL, 0, 0, 0, 0, NULL );
+                               remote_breakin_routine( process ), NULL, 0, 0, 0, 0, NULL );
 #ifdef _WIN64
     /* FIXME: hack for debugging 32-bit wow64 process without a 64-bit ntdll */
     if (status == STATUS_INVALID_PARAMETER)

@@ -720,6 +720,13 @@ union ctx
 {
     CONTEXT ctx;
     WOW64_CONTEXT x86;
+#ifndef __x86_64__
+    /* the debuggee's machine when it is x86-64 and this one is not -- an
+     * ordinary case on the ppc64le port, where an x86-64 PE runs as a guest
+     * under an embedded emulator.  WOW64_CONTEXT is not it: that name means
+     * i386 by definition. */
+    AMD64_CONTEXT amd64;
+#endif
 };
 
 enum cpu_addr {cpu_addr_pc, cpu_addr_stack, cpu_addr_frame};

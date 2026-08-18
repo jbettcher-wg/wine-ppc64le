@@ -206,6 +206,14 @@ typedef union dbg_ctx
 {
     CONTEXT ctx;
     WOW64_CONTEXT x86;
+#ifndef __x86_64__
+    /* The debuggee's machine, when it is x86-64 and this one is not.  On the
+     * ppc64le port that is an ordinary case rather than an exotic one: an
+     * x86-64 PE runs as a guest under an embedded emulator, so `ctx` above is
+     * the emulator's registers and this is the program's.  WOW64_CONTEXT is
+     * not it -- that name means i386 by definition. */
+    AMD64_CONTEXT amd64;
+#endif
 } dbg_ctx_t;
 
 struct dbg_thread
@@ -280,6 +288,10 @@ struct dbg_process
     HANDLE                      event_on_first_exception;
     BOOL                        active_debuggee;
     BOOL                        is_wow64;
+    /* the debuggee's own program is x86-64 code executed by an emulator
+     * embedded in it, so SOME of its threads are of a different machine than
+     * this one -- see dbg_fetch_thread_context() */
+    BOOL                        is_guest;
     struct dbg_breakpoint       bp[MAX_BREAKPOINTS];
     unsigned                    next_bp;
     struct dbg_delayed_bp*      delayed_bp;
@@ -310,6 +322,7 @@ extern	DWORD	                dbg_curr_pid;
 extern	struct dbg_thread*	dbg_curr_thread;
 extern	DWORD	                dbg_curr_tid;
 extern  dbg_ctx_t               dbg_context;
+extern  BOOL                    dbg_fetch_thread_context(struct dbg_thread *thread, dbg_ctx_t *ctx);
 extern  BOOL                    dbg_interactiveP;
 extern  HANDLE                  dbg_houtput;
 extern  BOOL                    dbg_output_to_diag;

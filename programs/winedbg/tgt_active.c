@@ -99,7 +99,7 @@ BOOL dbg_attach_debuggee(DWORD pid, BOOL verbose)
 
 static unsigned dbg_fetch_context(void)
 {
-    if (!dbg_curr_process->be_cpu->get_context(dbg_curr_thread->handle, &dbg_context))
+    if (!dbg_fetch_thread_context(dbg_curr_thread, &dbg_context))
     {
         WINE_WARN("Can't get thread's context\n");
         return FALSE;

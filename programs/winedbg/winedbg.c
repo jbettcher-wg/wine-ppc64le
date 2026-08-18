@@ -266,9 +266,86 @@ extern struct backend_cpu be_arm;
 extern struct backend_cpu be_arm64;
 #elif defined(__powerpc64__)
 extern struct backend_cpu be_ppc64;
+extern struct backend_cpu be_x86_64;
 #else
 # error CPU unknown
 #endif
+
+#ifdef __powerpc64__
+/***********************************************************************
+ *           dbg_process_is_amd64_guest
+ *
+ * Whether this debuggee's own program is x86-64 code.
+ *
+ * On the ppc64le port an x86-64 PE runs as the MAIN IMAGE, executed by an
+ * emulator embedded in the process, so a debuggee's machine is a property of
+ * the debuggee and not of this build.  Everything winedbg does at a stop --
+ * which registers exist, where the program counter is, which instruction set
+ * to disassemble -- follows from that one answer, so it is asked once, here,
+ * when the process is first seen.
+ *
+ * ProcessImageInformation is the question in its narrowest form: the machine
+ * of the image the process was created from.  IsWow64Process is not, and
+ * neither is anything about the emulator: a process whose main image is an
+ * AMD64 PE has an AMD64 program in it whether or not it has reached any of
+ * its own code yet.
+ */
+static BOOL dbg_process_is_amd64_guest( HANDLE h )
+{
+    SECTION_IMAGE_INFORMATION info;
+
+    if (NtQueryInformationProcess( h, ProcessImageInformation, &info, sizeof(info), NULL ))
+        return FALSE;
+    return info.Machine == IMAGE_FILE_MACHINE_AMD64;
+}
+#endif
+
+/***********************************************************************
+ *           dbg_fetch_thread_context
+ *
+ * Read a thread's registers, and settle which machine's they are.
+ *
+ * A process running an x86-64 guest has threads of BOTH machines in it, and
+ * that is structural rather than incidental: the guest's own threads execute
+ * x86-64 under the emulator, while the debugger's injected breakin thread,
+ * every Wine service thread and every worker the port creates are native
+ * ppc64 and have never run a guest instruction.  Asking one question per
+ * PROCESS therefore cannot be right -- and getting it wrong is not cosmetic:
+ * winedbg gates the whole stop on this fetch succeeding
+ * (dbg_exception_prolog), so a backend that failed on the breakin thread made
+ * the attach land and then be silently continued, which looks from outside
+ * exactly like the attach that never landed at all.
+ *
+ * So the question is asked per THREAD, at the moment its registers are read,
+ * by the only authority there is: the port answers with the guest register
+ * file or says it has none.  Whichever answers becomes the backend for as
+ * long as this thread is the current one, which is the granularity winedbg's
+ * whole interface already works at.
+ *
+ * A guest thread that is executing inside the emulator's JIT right now also
+ * says it has none -- the port refuses to report where the guest WAS as if it
+ * were where the guest IS -- so such a thread falls back here and the user
+ * sees the emulator's ppc64 registers.  That is a true statement about that
+ * thread and it is said out loud, rather than being dressed up as the guest's.
+ */
+BOOL dbg_fetch_thread_context( struct dbg_thread *thread, dbg_ctx_t *ctx )
+{
+#ifdef __powerpc64__
+    if (thread->process->is_guest)
+    {
+        if (be_x86_64.get_context( thread->handle, ctx ))
+        {
+            thread->process->be_cpu = &be_x86_64;
+            return TRUE;
+        }
+        if (thread->process->be_cpu != &be_ppc64)
+            dbg_printf( "Thread %04lx is not running guest code; the registers below are "
+                        "the host's.\n", thread->tid );
+        thread->process->be_cpu = &be_ppc64;
+    }
+#endif
+    return thread->process->be_cpu->get_context( thread->handle, ctx );
+}
 
 struct dbg_process*	dbg_add_process(const struct be_process_io* pio, DWORD pid, HANDLE h)
 {
@@ -294,6 +371,7 @@ struct dbg_process*	dbg_add_process(const struct be_process_io* pio, DWORD pid, 
     p->event_on_first_exception = NULL;
     p->active_debuggee = FALSE;
     p->is_wow64 = wow64;
+    p->is_guest = FALSE;
     p->next_bp = 1;  /* breakpoint 0 is reserved for step-over */
     memset(p->bp, 0, sizeof(p->bp));
     p->delayed_bp = NULL;
@@ -318,7 +396,13 @@ struct dbg_process*	dbg_add_process(const struct be_process_io* pio, DWORD pid, 
 #elif defined(__aarch64__) && !defined(__AARCH64EB__)
     p->be_cpu = &be_arm64;
 #elif defined(__powerpc64__)
-    p->be_cpu = &be_ppc64;
+    /* The backend describes the DEBUGGEE, which upstream already relies on
+     * one line up: an x86-64 build debugging a WoW64 process picks be_i386.
+     * Here the same rule picks the x86-64 backend for a process whose program
+     * is an x86-64 PE running under the emulator -- otherwise `info regs` on
+     * a game prints the emulator's ppc64 registers and calls them the game's. */
+    p->is_guest = dbg_process_is_amd64_guest( h );
+    p->be_cpu = p->is_guest ? &be_x86_64 : &be_ppc64;
 #else
 # error CPU unknown
 #endif

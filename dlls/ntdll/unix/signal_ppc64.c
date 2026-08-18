@@ -532,8 +532,72 @@ NTSTATUS signal_set_full_context( CONTEXT *context )
 }
 
 
+/* The AMD64 half of get_thread_wow64_context below, lifted out so that
+ * function keeps its declarations at the top of its block: the two lanes
+ * share an entry point and nothing else. */
+static NTSTATUS get_guest_amd64_context( HANDLE handle, AMD64_CONTEXT *context )
+{
+    BOOL self = FALSE;
+    NTSTATUS ret;
+
+    /* No check on THIS process's main image, deliberately.  A debugger is a
+     * native ppc64 program asking about somebody else's guest, so the machine
+     * that has to be AMD64 belongs to the TARGET -- and the only component
+     * that knows the target's machine is the server, which refuses a context
+     * request naming a machine the target process does not have.  Letting it
+     * make that call is one authority rather than two; testing
+     * main_image_info here instead answered STATUS_INVALID_INFO_CLASS to
+     * every debugger on the machine, because a debugger's own main image is
+     * of course not AMD64. */
+    context->SegCs = 0;
+    ret = get_thread_context( handle, context, &self, IMAGE_FILE_MACHINE_AMD64 );
+    if (ret) return ret;
+    if (self)
+    {
+        AMD64_CONTEXT guest;
+        DWORD needed = context->ContextFlags & ~CONTEXT_AMD64;
+
+        if (main_image_info.Machine != IMAGE_FILE_MACHINE_AMD64) return STATUS_INVALID_INFO_CLASS;
+        if (!emu_get_guest_context( &guest )) return STATUS_UNSUCCESSFUL;
+        guest.ContextFlags = context->ContextFlags;
+        if (!(needed & CONTEXT_AMD64_FLOATING_POINT)) memset( &guest.FltSave, 0, sizeof(guest.FltSave) );
+        *context = guest;
+        return STATUS_SUCCESS;
+    }
+    if (!context->SegCs) return STATUS_UNSUCCESSFUL;
+    return STATUS_SUCCESS;
+}
+
+
 /***********************************************************************
  *              get_thread_wow64_context
+ *
+ * The AMD64 register file of a thread running an x86-64 GUEST on this port.
+ *
+ * ThreadWow64Context is the information class that already means "the context
+ * of this thread in the machine it is actually executing, which is not the
+ * machine this ntdll is built for".  That is exactly the question here, so it
+ * is the class this answers, and the width of the caller's buffer says which
+ * machine is being asked about -- sizeof(AMD64_CONTEXT) here, the way
+ * sizeof(I386_CONTEXT) says i386 on x86-64 and sizeof(ARM_CONTEXT) says arm
+ * on arm64.  RtlWow64GetThreadContext is NOT the entry point for it: that one
+ * takes a WOW64_CONTEXT, which is i386 by definition.  A caller wanting the
+ * guest asks NtQueryInformationThread directly, which is what winedbg does.
+ *
+ * A cross-thread request goes out to the server and comes back through
+ * context_to_server()'s POWERPC64->AMD64 arm, which is the single place that
+ * knows how to produce a guest context; the server short-circuits a request
+ * about the CALLING thread (it cannot ask a thread to stop itself), so that
+ * one reads the same publication directly.  Both arms end at
+ * emu_get_guest_context(), so there are not two answers to keep agreeing.
+ *
+ * STATUS_UNSUCCESSFUL means the thread has no EXACT guest state to report --
+ * it is a native thread, or it is a guest thread currently inside the JIT.
+ * The two are told apart from an all-zero reply by CS, which this port fills
+ * with the 0x33 every user-mode x86-64 thread has and which a block nobody
+ * filled cannot contain.  Answering "no" is deliberate: the last-published
+ * registers of a running guest are where it WAS, and a debugger printing
+ * those as where it IS is a wrong number.
  */
 NTSTATUS get_thread_wow64_context( HANDLE handle, void *ctx, ULONG size )
 {
@@ -541,6 +605,16 @@ NTSTATUS get_thread_wow64_context( HANDLE handle, void *ctx, ULONG size )
     struct thread_data *data = get_thread_data();
     I386_CONTEXT *wow_frame, *context = ctx;
     DWORD needed_flags;
+
+    /* TWO MACHINES, ONE ENTRY POINT, told apart by the caller's buffer
+     * width exactly as the banner above says: an AMD64_CONTEXT asks about
+     * an x86-64 GUEST of this native process, an I386_CONTEXT asks about
+     * the 32-bit side of a WoW64 pair.  They are different lanes -- the
+     * guest lane's register file lives inside the emulator and is
+     * published on every stop, the WoW64 lane's lives in this thread's own
+     * cpu area and is the CPU backend's single source of truth -- and
+     * neither can be reached through the other. */
+    if (size == sizeof(AMD64_CONTEXT)) return get_guest_amd64_context( handle, ctx );
 
     /* The one WoW64 machine this host serves is i386 (server/registry.c);
      * the copy below is the signal_arm64.c i386 arm, which is the reference
@@ -614,6 +688,24 @@ NTSTATUS get_thread_wow64_context( HANDLE handle, void *ctx, ULONG size )
 
 /***********************************************************************
  *              set_thread_wow64_context
+ *
+ * Refused, by name, and this is a design refusal rather than a gap waiting to
+ * be filled in.
+ *
+ * Writing a guest register back means writing into the emulator's own thread
+ * state, and the only handle this port has on that state is the AMD64_CONTEXT
+ * the run loop passes to fexbridge_run().  A write is safe exactly when the
+ * guest is stopped at a trap or a fault and the run loop is about to resume
+ * from that structure -- and unsafe, silently, at every other instant,
+ * because the bridge has its own copy while a run is live.  A debugger that
+ * could set a guest register two thirds of the time and corrupt one the other
+ * third is worse than one that cannot set them at all, so this says no until
+ * there is a bridge entry point that makes the safe window checkable rather
+ * than assumed.
+ *
+ * The practical cost is bounded and worth naming: a guest breakpoint cannot
+ * be installed by editing the guest RIP or by patching guest code through the
+ * CONTEXT, so winedbg can read a guest and cannot steer one.
  */
 NTSTATUS set_thread_wow64_context( HANDLE handle, const void *ctx, ULONG size )
 {
@@ -622,6 +714,19 @@ NTSTATUS set_thread_wow64_context( HANDLE handle, const void *ctx, ULONG size )
     const I386_CONTEXT *context = ctx;
     I386_CONTEXT *wow_frame;
     DWORD flags;
+
+    /* The AMD64 GUEST half is refused; the i386 WoW64 half is not, and the
+     * difference is where the register file lives.  A guest's is inside the
+     * emulator, which owns it whenever a run is live, so a write is safe only
+     * in windows this side cannot check.  A WoW64 thread's is this thread's
+     * own cpu area, which the bounded-run backend reloads at the top of every
+     * iteration -- writing it is how NtContinue, APC delivery and exception
+     * dispatch already work on that lane. */
+    if (size == sizeof(AMD64_CONTEXT))
+    {
+        FIXME( "cannot write a guest register file: the emulator owns it while a run is live\n" );
+        return STATUS_NOT_IMPLEMENTED;
+    }
 
     if (size != sizeof(I386_CONTEXT)) return STATUS_INFO_LENGTH_MISMATCH;
 

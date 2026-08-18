@@ -22,7 +22,28 @@
 #include "debugger.h"
 #include "wine/debug.h"
 
+/* Built on a host that IS x86-64, where this is the native backend -- and on
+ * ppc64le, where it is not.  There an x86-64 PE runs as a GUEST under an
+ * embedded emulator, so the debuggee's CPU and the debugger's CPU are
+ * genuinely different machines, and winedbg's per-process backend is exactly
+ * the abstraction for that.  Upstream already picks a backend by debuggee
+ * rather than by host for WoW64 (be_i386 on an x86-64 build); this is the
+ * same move for an emulated guest.
+ *
+ * Everything below is written against the AMD64 context, which IS `CONTEXT`
+ * on an x86-64 host and is not on any other, hence the two names.  Only the
+ * context-facing operations differ between the two hosts; the code
+ * inspection, the disassembler and the breakpoint bytes are properties of the
+ * INSTRUCTION SET, which is x86-64 either way. */
+#if defined(__x86_64__) || defined(__powerpc64__)
+
 #if defined(__x86_64__)
+# define X64CONTEXT   CONTEXT
+# define X64CTX(c)    ((c)->ctx)
+#else
+# define X64CONTEXT   AMD64_CONTEXT
+# define X64CTX(c)    ((c)->amd64)
+#endif
 
 WINE_DEFAULT_DEBUG_CHANNEL(winedbg);
 
@@ -35,16 +56,16 @@ static BOOL be_x86_64_get_addr(HANDLE hThread, const dbg_ctx_t *ctx,
     switch (bca)
     {
     case be_cpu_addr_pc:
-        addr->Segment = ctx->ctx.SegCs;
-        addr->Offset = ctx->ctx.Rip;
+        addr->Segment = X64CTX(ctx).SegCs;
+        addr->Offset = X64CTX(ctx).Rip;
         return TRUE;
     case be_cpu_addr_stack:
-        addr->Segment = ctx->ctx.SegSs;
-        addr->Offset = ctx->ctx.Rsp;
+        addr->Segment = X64CTX(ctx).SegSs;
+        addr->Offset = X64CTX(ctx).Rsp;
         return TRUE;
     case be_cpu_addr_frame:
-        addr->Segment = ctx->ctx.SegSs;
-        addr->Offset = ctx->ctx.Rbp;
+        addr->Segment = X64CTX(ctx).SegSs;
+        addr->Offset = X64CTX(ctx).Rbp;
         return TRUE;
     default:
         addr->Mode = -1;
@@ -66,8 +87,8 @@ static BOOL be_x86_64_get_register_info(int regno, enum be_cpu_addr* kind)
 
 static void be_x86_64_single_step(dbg_ctx_t *ctx, BOOL enable)
 {
-    if (enable) ctx->ctx.EFlags |= STEP_FLAG;
-    else ctx->ctx.EFlags &= ~STEP_FLAG;
+    if (enable) X64CTX(ctx).EFlags |= STEP_FLAG;
+    else X64CTX(ctx).EFlags &= ~STEP_FLAG;
 }
 
 static void be_x86_64_print_context(HANDLE hThread, const dbg_ctx_t *pctx,
@@ -76,7 +97,7 @@ static void be_x86_64_print_context(HANDLE hThread, const dbg_ctx_t *pctx,
     static const char mxcsr_flags[16][4] = { "IE", "DE", "ZE", "OE", "UE", "PE", "DAZ", "IM",
                                              "DM", "ZM", "OM", "UM", "PM", "R-", "R+", "FZ" };
     static const char flags[] = "aVR-N--ODITSZ-A-P-C";
-    const CONTEXT *ctx = &pctx->ctx;
+    const X64CONTEXT *ctx = &X64CTX(pctx);
     char buf[33];
     int i;
 
@@ -176,79 +197,79 @@ static void be_x86_64_print_segment_info(HANDLE hThread, const dbg_ctx_t *ctx)
 
 static struct dbg_internal_var be_x86_64_ctx[] =
 {
-    {CV_AMD64_AL,       "AL",           (void*)FIELD_OFFSET(CONTEXT, Rax),     dbg_itype_unsigned_int8},
-    {CV_AMD64_BL,       "BL",           (void*)FIELD_OFFSET(CONTEXT, Rbx),     dbg_itype_unsigned_int8},
-    {CV_AMD64_CL,       "CL",           (void*)FIELD_OFFSET(CONTEXT, Rcx),     dbg_itype_unsigned_int8},
-    {CV_AMD64_DL,       "DL",           (void*)FIELD_OFFSET(CONTEXT, Rdx),     dbg_itype_unsigned_int8},
-    {CV_AMD64_AH,       "AH",           (void*)(FIELD_OFFSET(CONTEXT, Rax)+1), dbg_itype_unsigned_int8},
-    {CV_AMD64_BH,       "BH",           (void*)(FIELD_OFFSET(CONTEXT, Rbx)+1), dbg_itype_unsigned_int8},
-    {CV_AMD64_CH,       "CH",           (void*)(FIELD_OFFSET(CONTEXT, Rcx)+1), dbg_itype_unsigned_int8},
-    {CV_AMD64_DH,       "DH",           (void*)(FIELD_OFFSET(CONTEXT, Rdx)+1), dbg_itype_unsigned_int8},
-    {CV_AMD64_AX,       "AX",           (void*)FIELD_OFFSET(CONTEXT, Rax),     dbg_itype_unsigned_int16},
-    {CV_AMD64_BX,       "BX",           (void*)FIELD_OFFSET(CONTEXT, Rbx),     dbg_itype_unsigned_int16},
-    {CV_AMD64_CX,       "CX",           (void*)FIELD_OFFSET(CONTEXT, Rcx),     dbg_itype_unsigned_int16},
-    {CV_AMD64_DX,       "DX",           (void*)FIELD_OFFSET(CONTEXT, Rdx),     dbg_itype_unsigned_int16},
-    {CV_AMD64_SP,       "SP",           (void*)FIELD_OFFSET(CONTEXT, Rsp),     dbg_itype_unsigned_int16},
-    {CV_AMD64_BP,       "BP",           (void*)FIELD_OFFSET(CONTEXT, Rbp),     dbg_itype_unsigned_int16},
-    {CV_AMD64_SI,       "SI",           (void*)FIELD_OFFSET(CONTEXT, Rsi),     dbg_itype_unsigned_int16},
-    {CV_AMD64_DI,       "DI",           (void*)FIELD_OFFSET(CONTEXT, Rdi),     dbg_itype_unsigned_int16},
-    {CV_AMD64_EAX,      "EAX",          (void*)FIELD_OFFSET(CONTEXT, Rax),     dbg_itype_unsigned_int32},
-    {CV_AMD64_EBX,      "EBX",          (void*)FIELD_OFFSET(CONTEXT, Rbx),     dbg_itype_unsigned_int32},
-    {CV_AMD64_ECX,      "ECX",          (void*)FIELD_OFFSET(CONTEXT, Rcx),     dbg_itype_unsigned_int32},
-    {CV_AMD64_EDX,      "EDX",          (void*)FIELD_OFFSET(CONTEXT, Rdx),     dbg_itype_unsigned_int32},
-    {CV_AMD64_ESP,      "ESP",          (void*)FIELD_OFFSET(CONTEXT, Rsp),     dbg_itype_unsigned_int32},
-    {CV_AMD64_EBP,      "EBP",          (void*)FIELD_OFFSET(CONTEXT, Rbp),     dbg_itype_unsigned_int32},
-    {CV_AMD64_ESI,      "ESI",          (void*)FIELD_OFFSET(CONTEXT, Rsi),     dbg_itype_unsigned_int32},
-    {CV_AMD64_EDI,      "EDI",          (void*)FIELD_OFFSET(CONTEXT, Rdi),     dbg_itype_unsigned_int32},
-    {CV_AMD64_ES,       "ES",           (void*)FIELD_OFFSET(CONTEXT, SegEs),   dbg_itype_unsigned_int16},
-    {CV_AMD64_CS,       "CS",           (void*)FIELD_OFFSET(CONTEXT, SegCs),   dbg_itype_unsigned_int16},
-    {CV_AMD64_SS,       "SS",           (void*)FIELD_OFFSET(CONTEXT, SegSs),   dbg_itype_unsigned_int16},
-    {CV_AMD64_DS,       "DS",           (void*)FIELD_OFFSET(CONTEXT, SegDs),   dbg_itype_unsigned_int16},
-    {CV_AMD64_FS,       "FS",           (void*)FIELD_OFFSET(CONTEXT, SegFs),   dbg_itype_unsigned_int16},
-    {CV_AMD64_GS,       "GS",           (void*)FIELD_OFFSET(CONTEXT, SegGs),   dbg_itype_unsigned_int16},
-    {CV_AMD64_FLAGS,    "FLAGS",        (void*)FIELD_OFFSET(CONTEXT, EFlags),  dbg_itype_unsigned_int16},
-    {CV_AMD64_EFLAGS,   "EFLAGS",       (void*)FIELD_OFFSET(CONTEXT, EFlags),  dbg_itype_unsigned_int32},
-    {CV_AMD64_RIP,      "RIP",          (void*)FIELD_OFFSET(CONTEXT, Rip),     dbg_itype_unsigned_int64},
-    {CV_AMD64_RAX,      "RAX",          (void*)FIELD_OFFSET(CONTEXT, Rax),     dbg_itype_unsigned_int64},
-    {CV_AMD64_RBX,      "RBX",          (void*)FIELD_OFFSET(CONTEXT, Rbx),     dbg_itype_unsigned_int64},
-    {CV_AMD64_RCX,      "RCX",          (void*)FIELD_OFFSET(CONTEXT, Rcx),     dbg_itype_unsigned_int64},
-    {CV_AMD64_RDX,      "RDX",          (void*)FIELD_OFFSET(CONTEXT, Rdx),     dbg_itype_unsigned_int64},
-    {CV_AMD64_RSP,      "RSP",          (void*)FIELD_OFFSET(CONTEXT, Rsp),     dbg_itype_unsigned_int64},
-    {CV_AMD64_RBP,      "RBP",          (void*)FIELD_OFFSET(CONTEXT, Rbp),     dbg_itype_unsigned_int64},
-    {CV_AMD64_RSI,      "RSI",          (void*)FIELD_OFFSET(CONTEXT, Rsi),     dbg_itype_unsigned_int64},
-    {CV_AMD64_RDI,      "RDI",          (void*)FIELD_OFFSET(CONTEXT, Rdi),     dbg_itype_unsigned_int64},
-    {CV_AMD64_R8,       "R8",           (void*)FIELD_OFFSET(CONTEXT, R8),      dbg_itype_unsigned_int64},
-    {CV_AMD64_R9,       "R9",           (void*)FIELD_OFFSET(CONTEXT, R9),      dbg_itype_unsigned_int64},
-    {CV_AMD64_R10,      "R10",          (void*)FIELD_OFFSET(CONTEXT, R10),     dbg_itype_unsigned_int64},
-    {CV_AMD64_R11,      "R11",          (void*)FIELD_OFFSET(CONTEXT, R11),     dbg_itype_unsigned_int64},
-    {CV_AMD64_R12,      "R12",          (void*)FIELD_OFFSET(CONTEXT, R12),     dbg_itype_unsigned_int64},
-    {CV_AMD64_R13,      "R13",          (void*)FIELD_OFFSET(CONTEXT, R13),     dbg_itype_unsigned_int64},
-    {CV_AMD64_R14,      "R14",          (void*)FIELD_OFFSET(CONTEXT, R14),     dbg_itype_unsigned_int64},
-    {CV_AMD64_R15,      "R15",          (void*)FIELD_OFFSET(CONTEXT, R15),     dbg_itype_unsigned_int64},
-    {CV_AMD64_ST0,      "ST0",          (void*)FIELD_OFFSET(CONTEXT, FltSave.FloatRegisters[0]), dbg_itype_long_real},
-    {CV_AMD64_ST0+1,    "ST1",          (void*)FIELD_OFFSET(CONTEXT, FltSave.FloatRegisters[1]), dbg_itype_long_real},
-    {CV_AMD64_ST0+2,    "ST2",          (void*)FIELD_OFFSET(CONTEXT, FltSave.FloatRegisters[2]), dbg_itype_long_real},
-    {CV_AMD64_ST0+3,    "ST3",          (void*)FIELD_OFFSET(CONTEXT, FltSave.FloatRegisters[3]), dbg_itype_long_real},
-    {CV_AMD64_ST0+4,    "ST4",          (void*)FIELD_OFFSET(CONTEXT, FltSave.FloatRegisters[4]), dbg_itype_long_real},
-    {CV_AMD64_ST0+5,    "ST5",          (void*)FIELD_OFFSET(CONTEXT, FltSave.FloatRegisters[5]), dbg_itype_long_real},
-    {CV_AMD64_ST0+6,    "ST6",          (void*)FIELD_OFFSET(CONTEXT, FltSave.FloatRegisters[6]), dbg_itype_long_real},
-    {CV_AMD64_ST0+7,    "ST7",          (void*)FIELD_OFFSET(CONTEXT, FltSave.FloatRegisters[7]), dbg_itype_long_real},
-    {CV_AMD64_XMM0,     "XMM0",         (void*)FIELD_OFFSET(CONTEXT, Xmm0),  dbg_itype_m128a},
-    {CV_AMD64_XMM0+1,   "XMM1",         (void*)FIELD_OFFSET(CONTEXT, Xmm1),  dbg_itype_m128a},
-    {CV_AMD64_XMM0+2,   "XMM2",         (void*)FIELD_OFFSET(CONTEXT, Xmm2),  dbg_itype_m128a},
-    {CV_AMD64_XMM0+3,   "XMM3",         (void*)FIELD_OFFSET(CONTEXT, Xmm3),  dbg_itype_m128a},
-    {CV_AMD64_XMM0+4,   "XMM4",         (void*)FIELD_OFFSET(CONTEXT, Xmm4),  dbg_itype_m128a},
-    {CV_AMD64_XMM0+5,   "XMM5",         (void*)FIELD_OFFSET(CONTEXT, Xmm5),  dbg_itype_m128a},
-    {CV_AMD64_XMM0+6,   "XMM6",         (void*)FIELD_OFFSET(CONTEXT, Xmm6),  dbg_itype_m128a},
-    {CV_AMD64_XMM0+7,   "XMM7",         (void*)FIELD_OFFSET(CONTEXT, Xmm7),  dbg_itype_m128a},
-    {CV_AMD64_XMM8,     "XMM8",         (void*)FIELD_OFFSET(CONTEXT, Xmm8),  dbg_itype_m128a},
-    {CV_AMD64_XMM8+1,   "XMM9",         (void*)FIELD_OFFSET(CONTEXT, Xmm9),  dbg_itype_m128a},
-    {CV_AMD64_XMM8+2,   "XMM10",        (void*)FIELD_OFFSET(CONTEXT, Xmm10), dbg_itype_m128a},
-    {CV_AMD64_XMM8+3,   "XMM11",        (void*)FIELD_OFFSET(CONTEXT, Xmm11), dbg_itype_m128a},
-    {CV_AMD64_XMM8+4,   "XMM12",        (void*)FIELD_OFFSET(CONTEXT, Xmm12), dbg_itype_m128a},
-    {CV_AMD64_XMM8+5,   "XMM13",        (void*)FIELD_OFFSET(CONTEXT, Xmm13), dbg_itype_m128a},
-    {CV_AMD64_XMM8+6,   "XMM14",        (void*)FIELD_OFFSET(CONTEXT, Xmm14), dbg_itype_m128a},
-    {CV_AMD64_XMM8+7,   "XMM15",        (void*)FIELD_OFFSET(CONTEXT, Xmm15), dbg_itype_m128a},
+    {CV_AMD64_AL,       "AL",           (void*)FIELD_OFFSET(X64CONTEXT, Rax),     dbg_itype_unsigned_int8},
+    {CV_AMD64_BL,       "BL",           (void*)FIELD_OFFSET(X64CONTEXT, Rbx),     dbg_itype_unsigned_int8},
+    {CV_AMD64_CL,       "CL",           (void*)FIELD_OFFSET(X64CONTEXT, Rcx),     dbg_itype_unsigned_int8},
+    {CV_AMD64_DL,       "DL",           (void*)FIELD_OFFSET(X64CONTEXT, Rdx),     dbg_itype_unsigned_int8},
+    {CV_AMD64_AH,       "AH",           (void*)(FIELD_OFFSET(X64CONTEXT, Rax)+1), dbg_itype_unsigned_int8},
+    {CV_AMD64_BH,       "BH",           (void*)(FIELD_OFFSET(X64CONTEXT, Rbx)+1), dbg_itype_unsigned_int8},
+    {CV_AMD64_CH,       "CH",           (void*)(FIELD_OFFSET(X64CONTEXT, Rcx)+1), dbg_itype_unsigned_int8},
+    {CV_AMD64_DH,       "DH",           (void*)(FIELD_OFFSET(X64CONTEXT, Rdx)+1), dbg_itype_unsigned_int8},
+    {CV_AMD64_AX,       "AX",           (void*)FIELD_OFFSET(X64CONTEXT, Rax),     dbg_itype_unsigned_int16},
+    {CV_AMD64_BX,       "BX",           (void*)FIELD_OFFSET(X64CONTEXT, Rbx),     dbg_itype_unsigned_int16},
+    {CV_AMD64_CX,       "CX",           (void*)FIELD_OFFSET(X64CONTEXT, Rcx),     dbg_itype_unsigned_int16},
+    {CV_AMD64_DX,       "DX",           (void*)FIELD_OFFSET(X64CONTEXT, Rdx),     dbg_itype_unsigned_int16},
+    {CV_AMD64_SP,       "SP",           (void*)FIELD_OFFSET(X64CONTEXT, Rsp),     dbg_itype_unsigned_int16},
+    {CV_AMD64_BP,       "BP",           (void*)FIELD_OFFSET(X64CONTEXT, Rbp),     dbg_itype_unsigned_int16},
+    {CV_AMD64_SI,       "SI",           (void*)FIELD_OFFSET(X64CONTEXT, Rsi),     dbg_itype_unsigned_int16},
+    {CV_AMD64_DI,       "DI",           (void*)FIELD_OFFSET(X64CONTEXT, Rdi),     dbg_itype_unsigned_int16},
+    {CV_AMD64_EAX,      "EAX",          (void*)FIELD_OFFSET(X64CONTEXT, Rax),     dbg_itype_unsigned_int32},
+    {CV_AMD64_EBX,      "EBX",          (void*)FIELD_OFFSET(X64CONTEXT, Rbx),     dbg_itype_unsigned_int32},
+    {CV_AMD64_ECX,      "ECX",          (void*)FIELD_OFFSET(X64CONTEXT, Rcx),     dbg_itype_unsigned_int32},
+    {CV_AMD64_EDX,      "EDX",          (void*)FIELD_OFFSET(X64CONTEXT, Rdx),     dbg_itype_unsigned_int32},
+    {CV_AMD64_ESP,      "ESP",          (void*)FIELD_OFFSET(X64CONTEXT, Rsp),     dbg_itype_unsigned_int32},
+    {CV_AMD64_EBP,      "EBP",          (void*)FIELD_OFFSET(X64CONTEXT, Rbp),     dbg_itype_unsigned_int32},
+    {CV_AMD64_ESI,      "ESI",          (void*)FIELD_OFFSET(X64CONTEXT, Rsi),     dbg_itype_unsigned_int32},
+    {CV_AMD64_EDI,      "EDI",          (void*)FIELD_OFFSET(X64CONTEXT, Rdi),     dbg_itype_unsigned_int32},
+    {CV_AMD64_ES,       "ES",           (void*)FIELD_OFFSET(X64CONTEXT, SegEs),   dbg_itype_unsigned_int16},
+    {CV_AMD64_CS,       "CS",           (void*)FIELD_OFFSET(X64CONTEXT, SegCs),   dbg_itype_unsigned_int16},
+    {CV_AMD64_SS,       "SS",           (void*)FIELD_OFFSET(X64CONTEXT, SegSs),   dbg_itype_unsigned_int16},
+    {CV_AMD64_DS,       "DS",           (void*)FIELD_OFFSET(X64CONTEXT, SegDs),   dbg_itype_unsigned_int16},
+    {CV_AMD64_FS,       "FS",           (void*)FIELD_OFFSET(X64CONTEXT, SegFs),   dbg_itype_unsigned_int16},
+    {CV_AMD64_GS,       "GS",           (void*)FIELD_OFFSET(X64CONTEXT, SegGs),   dbg_itype_unsigned_int16},
+    {CV_AMD64_FLAGS,    "FLAGS",        (void*)FIELD_OFFSET(X64CONTEXT, EFlags),  dbg_itype_unsigned_int16},
+    {CV_AMD64_EFLAGS,   "EFLAGS",       (void*)FIELD_OFFSET(X64CONTEXT, EFlags),  dbg_itype_unsigned_int32},
+    {CV_AMD64_RIP,      "RIP",          (void*)FIELD_OFFSET(X64CONTEXT, Rip),     dbg_itype_unsigned_int64},
+    {CV_AMD64_RAX,      "RAX",          (void*)FIELD_OFFSET(X64CONTEXT, Rax),     dbg_itype_unsigned_int64},
+    {CV_AMD64_RBX,      "RBX",          (void*)FIELD_OFFSET(X64CONTEXT, Rbx),     dbg_itype_unsigned_int64},
+    {CV_AMD64_RCX,      "RCX",          (void*)FIELD_OFFSET(X64CONTEXT, Rcx),     dbg_itype_unsigned_int64},
+    {CV_AMD64_RDX,      "RDX",          (void*)FIELD_OFFSET(X64CONTEXT, Rdx),     dbg_itype_unsigned_int64},
+    {CV_AMD64_RSP,      "RSP",          (void*)FIELD_OFFSET(X64CONTEXT, Rsp),     dbg_itype_unsigned_int64},
+    {CV_AMD64_RBP,      "RBP",          (void*)FIELD_OFFSET(X64CONTEXT, Rbp),     dbg_itype_unsigned_int64},
+    {CV_AMD64_RSI,      "RSI",          (void*)FIELD_OFFSET(X64CONTEXT, Rsi),     dbg_itype_unsigned_int64},
+    {CV_AMD64_RDI,      "RDI",          (void*)FIELD_OFFSET(X64CONTEXT, Rdi),     dbg_itype_unsigned_int64},
+    {CV_AMD64_R8,       "R8",           (void*)FIELD_OFFSET(X64CONTEXT, R8),      dbg_itype_unsigned_int64},
+    {CV_AMD64_R9,       "R9",           (void*)FIELD_OFFSET(X64CONTEXT, R9),      dbg_itype_unsigned_int64},
+    {CV_AMD64_R10,      "R10",          (void*)FIELD_OFFSET(X64CONTEXT, R10),     dbg_itype_unsigned_int64},
+    {CV_AMD64_R11,      "R11",          (void*)FIELD_OFFSET(X64CONTEXT, R11),     dbg_itype_unsigned_int64},
+    {CV_AMD64_R12,      "R12",          (void*)FIELD_OFFSET(X64CONTEXT, R12),     dbg_itype_unsigned_int64},
+    {CV_AMD64_R13,      "R13",          (void*)FIELD_OFFSET(X64CONTEXT, R13),     dbg_itype_unsigned_int64},
+    {CV_AMD64_R14,      "R14",          (void*)FIELD_OFFSET(X64CONTEXT, R14),     dbg_itype_unsigned_int64},
+    {CV_AMD64_R15,      "R15",          (void*)FIELD_OFFSET(X64CONTEXT, R15),     dbg_itype_unsigned_int64},
+    {CV_AMD64_ST0,      "ST0",          (void*)FIELD_OFFSET(X64CONTEXT, FltSave.FloatRegisters[0]), dbg_itype_long_real},
+    {CV_AMD64_ST0+1,    "ST1",          (void*)FIELD_OFFSET(X64CONTEXT, FltSave.FloatRegisters[1]), dbg_itype_long_real},
+    {CV_AMD64_ST0+2,    "ST2",          (void*)FIELD_OFFSET(X64CONTEXT, FltSave.FloatRegisters[2]), dbg_itype_long_real},
+    {CV_AMD64_ST0+3,    "ST3",          (void*)FIELD_OFFSET(X64CONTEXT, FltSave.FloatRegisters[3]), dbg_itype_long_real},
+    {CV_AMD64_ST0+4,    "ST4",          (void*)FIELD_OFFSET(X64CONTEXT, FltSave.FloatRegisters[4]), dbg_itype_long_real},
+    {CV_AMD64_ST0+5,    "ST5",          (void*)FIELD_OFFSET(X64CONTEXT, FltSave.FloatRegisters[5]), dbg_itype_long_real},
+    {CV_AMD64_ST0+6,    "ST6",          (void*)FIELD_OFFSET(X64CONTEXT, FltSave.FloatRegisters[6]), dbg_itype_long_real},
+    {CV_AMD64_ST0+7,    "ST7",          (void*)FIELD_OFFSET(X64CONTEXT, FltSave.FloatRegisters[7]), dbg_itype_long_real},
+    {CV_AMD64_XMM0,     "XMM0",         (void*)FIELD_OFFSET(X64CONTEXT, Xmm0),  dbg_itype_m128a},
+    {CV_AMD64_XMM0+1,   "XMM1",         (void*)FIELD_OFFSET(X64CONTEXT, Xmm1),  dbg_itype_m128a},
+    {CV_AMD64_XMM0+2,   "XMM2",         (void*)FIELD_OFFSET(X64CONTEXT, Xmm2),  dbg_itype_m128a},
+    {CV_AMD64_XMM0+3,   "XMM3",         (void*)FIELD_OFFSET(X64CONTEXT, Xmm3),  dbg_itype_m128a},
+    {CV_AMD64_XMM0+4,   "XMM4",         (void*)FIELD_OFFSET(X64CONTEXT, Xmm4),  dbg_itype_m128a},
+    {CV_AMD64_XMM0+5,   "XMM5",         (void*)FIELD_OFFSET(X64CONTEXT, Xmm5),  dbg_itype_m128a},
+    {CV_AMD64_XMM0+6,   "XMM6",         (void*)FIELD_OFFSET(X64CONTEXT, Xmm6),  dbg_itype_m128a},
+    {CV_AMD64_XMM0+7,   "XMM7",         (void*)FIELD_OFFSET(X64CONTEXT, Xmm7),  dbg_itype_m128a},
+    {CV_AMD64_XMM8,     "XMM8",         (void*)FIELD_OFFSET(X64CONTEXT, Xmm8),  dbg_itype_m128a},
+    {CV_AMD64_XMM8+1,   "XMM9",         (void*)FIELD_OFFSET(X64CONTEXT, Xmm9),  dbg_itype_m128a},
+    {CV_AMD64_XMM8+2,   "XMM10",        (void*)FIELD_OFFSET(X64CONTEXT, Xmm10), dbg_itype_m128a},
+    {CV_AMD64_XMM8+3,   "XMM11",        (void*)FIELD_OFFSET(X64CONTEXT, Xmm11), dbg_itype_m128a},
+    {CV_AMD64_XMM8+4,   "XMM12",        (void*)FIELD_OFFSET(X64CONTEXT, Xmm12), dbg_itype_m128a},
+    {CV_AMD64_XMM8+5,   "XMM13",        (void*)FIELD_OFFSET(X64CONTEXT, Xmm13), dbg_itype_m128a},
+    {CV_AMD64_XMM8+6,   "XMM14",        (void*)FIELD_OFFSET(X64CONTEXT, Xmm14), dbg_itype_m128a},
+    {CV_AMD64_XMM8+7,   "XMM15",        (void*)FIELD_OFFSET(X64CONTEXT, Xmm15), dbg_itype_m128a},
     {0,                 NULL,           0,                                   dbg_itype_none}
 };
 
@@ -389,34 +410,34 @@ static BOOL evaluate_sib_address(const void* insn, BYTE mod, DWORD64* addr)
 
     switch (f_sib_b(ch))
     {
-    case 0x00: loc = dbg_context.ctx.Rax; break;
-    case 0x01: loc = dbg_context.ctx.Rcx; break;
-    case 0x02: loc = dbg_context.ctx.Rdx; break;
-    case 0x03: loc = dbg_context.ctx.Rbx; break;
-    case 0x04: loc = dbg_context.ctx.Rsp; break;
+    case 0x00: loc = X64CTX(&dbg_context).Rax; break;
+    case 0x01: loc = X64CTX(&dbg_context).Rcx; break;
+    case 0x02: loc = X64CTX(&dbg_context).Rdx; break;
+    case 0x03: loc = X64CTX(&dbg_context).Rbx; break;
+    case 0x04: loc = X64CTX(&dbg_context).Rsp; break;
     case 0x05:
-        loc = dbg_context.ctx.Rbp;
+        loc = X64CTX(&dbg_context).Rbp;
         if (mod == 0)
         {
             loc = 0;
             mod = 2;
         }
         break;
-    case 0x06: loc = dbg_context.ctx.Rsi; break;
-    case 0x07: loc = dbg_context.ctx.Rdi; break;
+    case 0x06: loc = X64CTX(&dbg_context).Rsi; break;
+    case 0x07: loc = X64CTX(&dbg_context).Rdi; break;
     }
 
     scale = f_sib_s(ch);
     switch (f_sib_i(ch))
     {
-    case 0x00: loc += dbg_context.ctx.Rax << scale; break;
-    case 0x01: loc += dbg_context.ctx.Rcx << scale; break;
-    case 0x02: loc += dbg_context.ctx.Rdx << scale; break;
-    case 0x03: loc += dbg_context.ctx.Rbx << scale; break;
+    case 0x00: loc += X64CTX(&dbg_context).Rax << scale; break;
+    case 0x01: loc += X64CTX(&dbg_context).Rcx << scale; break;
+    case 0x02: loc += X64CTX(&dbg_context).Rdx << scale; break;
+    case 0x03: loc += X64CTX(&dbg_context).Rbx << scale; break;
     case 0x04: break;
-    case 0x05: loc += dbg_context.ctx.Rbp << scale; break;
-    case 0x06: loc += dbg_context.ctx.Rsi << scale; break;
-    case 0x07: loc += dbg_context.ctx.Rdi << scale; break;
+    case 0x05: loc += X64CTX(&dbg_context).Rbp << scale; break;
+    case 0x06: loc += X64CTX(&dbg_context).Rsi << scale; break;
+    case 0x07: loc += X64CTX(&dbg_context).Rdi << scale; break;
     }
 
     if (!add_fixed_displacement((const char*)insn + 1, mod, &loc))
@@ -431,7 +452,7 @@ static BOOL load_indirect_target(DWORD64* dst)
     ADDRESS64 addr;
 
     addr.Mode = AddrModeFlat;
-    addr.Segment = dbg_context.ctx.SegDs;
+    addr.Segment = X64CTX(&dbg_context).SegDs;
     addr.Offset = *dst;
     return dbg_read_memory(memory_to_linear_addr(&addr), &dst, sizeof(dst));
 }
@@ -456,7 +477,7 @@ static BOOL be_x86_64_is_func_call(const void* insn, ADDRESS64* callee)
 
     /* that's the only mode we support anyway */
     callee->Mode = AddrModeFlat;
-    callee->Segment = dbg_context.ctx.SegCs;
+    callee->Segment = X64CTX(&dbg_context).SegCs;
 
     switch (ch)
     {
@@ -505,14 +526,14 @@ static BOOL be_x86_64_is_func_call(const void* insn, ADDRESS64* callee)
         default:
             switch (f_rm(ch))
             {
-            case 0x00: dst = dbg_context.ctx.Rax; break;
-            case 0x01: dst = dbg_context.ctx.Rcx; break;
-            case 0x02: dst = dbg_context.ctx.Rdx; break;
-            case 0x03: dst = dbg_context.ctx.Rbx; break;
-            case 0x04: dst = dbg_context.ctx.Rsp; break;
-            case 0x05: dst = dbg_context.ctx.Rbp; break;
-            case 0x06: dst = dbg_context.ctx.Rsi; break;
-            case 0x07: dst = dbg_context.ctx.Rdi; break;
+            case 0x00: dst = X64CTX(&dbg_context).Rax; break;
+            case 0x01: dst = X64CTX(&dbg_context).Rcx; break;
+            case 0x02: dst = X64CTX(&dbg_context).Rdx; break;
+            case 0x03: dst = X64CTX(&dbg_context).Rbx; break;
+            case 0x04: dst = X64CTX(&dbg_context).Rsp; break;
+            case 0x05: dst = X64CTX(&dbg_context).Rbp; break;
+            case 0x06: dst = X64CTX(&dbg_context).Rsi; break;
+            case 0x07: dst = X64CTX(&dbg_context).Rdi; break;
             }
             if (f_mod(ch) != 0x03)
             {
@@ -565,7 +586,7 @@ static BOOL be_x86_64_is_jump(const void* insn, ADDRESS64* jumpee)
 
 static inline int be_x86_64_get_unused_DR(dbg_ctx_t *pctx, DWORD64** r)
 {
-    CONTEXT *ctx = &pctx->ctx;
+    X64CONTEXT *ctx = &X64CTX(pctx);
 
     if (!IS_DR7_SET(ctx->Dr7, 0))
     {
@@ -632,10 +653,10 @@ static BOOL be_x86_64_insert_Xpoint(HANDLE hProcess, const struct be_process_io*
         }
         *val = reg;
         /* clear old values */
-        ctx->ctx.Dr7 &= ~(0x0F << (DR7_CONTROL_SHIFT + DR7_CONTROL_SIZE * reg));
+        X64CTX(ctx).Dr7 &= ~(0x0F << (DR7_CONTROL_SHIFT + DR7_CONTROL_SIZE * reg));
         /* set the correct ones */
-        ctx->ctx.Dr7 |= bits << (DR7_CONTROL_SHIFT + DR7_CONTROL_SIZE * reg);
-        ctx->ctx.Dr7 |= DR7_ENABLE_MASK(reg) | DR7_LOCAL_SLOWDOWN;
+        X64CTX(ctx).Dr7 |= bits << (DR7_CONTROL_SHIFT + DR7_CONTROL_SIZE * reg);
+        X64CTX(ctx).Dr7 |= DR7_ENABLE_MASK(reg) | DR7_LOCAL_SLOWDOWN;
         break;
     default:
         dbg_printf("Unknown bp type %c\n", type);
@@ -665,7 +686,7 @@ static BOOL be_x86_64_remove_Xpoint(HANDLE hProcess, const struct be_process_io*
     case be_xpoint_watch_read:
     case be_xpoint_watch_write:
         /* simply disable the entry */
-        ctx->ctx.Dr7 &= ~DR7_ENABLE_MASK(val);
+        X64CTX(ctx).Dr7 &= ~DR7_ENABLE_MASK(val);
         break;
     default:
         dbg_printf("Unknown bp type %c\n", type);
@@ -676,37 +697,67 @@ static BOOL be_x86_64_remove_Xpoint(HANDLE hProcess, const struct be_process_io*
 
 static BOOL be_x86_64_is_watchpoint_set(const dbg_ctx_t *ctx, unsigned idx)
 {
-    return ctx->ctx.Dr6 & (1 << idx);
+    return X64CTX(ctx).Dr6 & (1 << idx);
 }
 
 static void be_x86_64_clear_watchpoint(dbg_ctx_t *ctx, unsigned idx)
 {
-    ctx->ctx.Dr6 &= ~(1 << idx);
+    X64CTX(ctx).Dr6 &= ~(1 << idx);
 }
 
 static int be_x86_64_adjust_pc_for_break(dbg_ctx_t *ctx, BOOL way)
 {
     if (way)
     {
-        ctx->ctx.Rip--;
+        X64CTX(ctx).Rip--;
         return -1;
     }
-    ctx->ctx.Rip++;
+    X64CTX(ctx).Rip++;
     return 1;
 }
 
 static BOOL be_x86_64_get_context(HANDLE thread, dbg_ctx_t *ctx)
 {
-    ctx->ctx.ContextFlags = CONTEXT_ALL;
+    X64CTX(ctx).ContextFlags = CONTEXT_AMD64_ALL;
+#ifdef __x86_64__
     return GetThreadContext(thread, &ctx->ctx);
+#else
+    /* The debuggee's x86-64 registers are not this machine's registers, so
+     * GetThreadContext would hand back the HOST's -- the emulator's, on the
+     * ppc64le port, which is the whole reason a guest crash used to be
+     * unreadable.  ThreadWow64Context is the information class that already
+     * means "this thread's context in the machine it is really executing",
+     * and the buffer width says which machine that is.  See
+     * get_thread_wow64_context() in dlls/ntdll/unix/signal_ppc64.c for what
+     * the port can and cannot answer, and why a thread that is inside the
+     * emulator's JIT is reported as having no context rather than as having
+     * the registers it last stopped with. */
+    {
+        NTSTATUS status = NtQueryInformationThread( thread, ThreadWow64Context,
+                                                    &X64CTX(ctx), sizeof(X64CTX(ctx)), NULL );
+        if (!status) return TRUE;
+        SetLastError( RtlNtStatusToDosError( status ) );
+        return FALSE;
+    }
+#endif
 }
 
 static BOOL be_x86_64_set_context(HANDLE thread, const dbg_ctx_t *ctx)
 {
+#ifdef __x86_64__
     return SetThreadContext(thread, &ctx->ctx);
+#else
+    /* Refused by the port, by name: writing a guest register means writing
+     * into the emulator's own thread state, which is only safe while the
+     * guest is stopped and is not checkable from here.  The consequence is
+     * that a guest can be read and not steered -- no guest single-step, no
+     * resuming from an edited RIP. */
+    return !NtSetInformationThread( thread, ThreadWow64Context,
+                                    (void *)&X64CTX(ctx), sizeof(X64CTX(ctx)) );
+#endif
 }
 
-#define REG(f,n,t,r)  {f, n, t, FIELD_OFFSET(CONTEXT, r), sizeof(((CONTEXT*)NULL)->r)}
+#define REG(f,n,t,r)  {f, n, t, FIELD_OFFSET(X64CONTEXT, r), sizeof(((X64CONTEXT*)NULL)->r)}
 
 static struct gdb_register be_x86_64_gdb_register_map[] = {
     REG("core", "rax",    NULL,          Rax),
@@ -733,14 +784,14 @@ static struct gdb_register be_x86_64_gdb_register_map[] = {
     REG(NULL,   "es",     NULL,          SegEs),
     REG(NULL,   "fs",     NULL,          SegFs),
     REG(NULL,   "gs",     NULL,          SegGs),
-    { NULL,     "st0",    "i387_ext",    FIELD_OFFSET(CONTEXT, FltSave.FloatRegisters[ 0]), 10},
-    { NULL,     "st1",    "i387_ext",    FIELD_OFFSET(CONTEXT, FltSave.FloatRegisters[ 1]), 10},
-    { NULL,     "st2",    "i387_ext",    FIELD_OFFSET(CONTEXT, FltSave.FloatRegisters[ 2]), 10},
-    { NULL,     "st3",    "i387_ext",    FIELD_OFFSET(CONTEXT, FltSave.FloatRegisters[ 3]), 10},
-    { NULL,     "st4",    "i387_ext",    FIELD_OFFSET(CONTEXT, FltSave.FloatRegisters[ 4]), 10},
-    { NULL,     "st5",    "i387_ext",    FIELD_OFFSET(CONTEXT, FltSave.FloatRegisters[ 5]), 10},
-    { NULL,     "st6",    "i387_ext",    FIELD_OFFSET(CONTEXT, FltSave.FloatRegisters[ 6]), 10},
-    { NULL,     "st7",    "i387_ext",    FIELD_OFFSET(CONTEXT, FltSave.FloatRegisters[ 7]), 10},
+    { NULL,     "st0",    "i387_ext",    FIELD_OFFSET(X64CONTEXT, FltSave.FloatRegisters[ 0]), 10},
+    { NULL,     "st1",    "i387_ext",    FIELD_OFFSET(X64CONTEXT, FltSave.FloatRegisters[ 1]), 10},
+    { NULL,     "st2",    "i387_ext",    FIELD_OFFSET(X64CONTEXT, FltSave.FloatRegisters[ 2]), 10},
+    { NULL,     "st3",    "i387_ext",    FIELD_OFFSET(X64CONTEXT, FltSave.FloatRegisters[ 3]), 10},
+    { NULL,     "st4",    "i387_ext",    FIELD_OFFSET(X64CONTEXT, FltSave.FloatRegisters[ 4]), 10},
+    { NULL,     "st5",    "i387_ext",    FIELD_OFFSET(X64CONTEXT, FltSave.FloatRegisters[ 5]), 10},
+    { NULL,     "st6",    "i387_ext",    FIELD_OFFSET(X64CONTEXT, FltSave.FloatRegisters[ 6]), 10},
+    { NULL,     "st7",    "i387_ext",    FIELD_OFFSET(X64CONTEXT, FltSave.FloatRegisters[ 7]), 10},
     REG(NULL,   "fctrl",  NULL,          FltSave.ControlWord),
     REG(NULL,   "fstat",  NULL,          FltSave.StatusWord),
     REG(NULL,   "ftag",   NULL,          FltSave.TagWord),

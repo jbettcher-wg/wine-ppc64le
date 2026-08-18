@@ -28,6 +28,35 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(dbghelp);
 
+/* The x86-64 stack walk, on a host that may not be x86-64.
+ *
+ * On the ppc64le port an x86-64 PE runs as a guest under an embedded
+ * emulator, so a debugger on this machine has to unwind x86-64 frames it
+ * cannot execute.  Everything below is arch-neutral C over CONTEXT fields and
+ * little-endian .xdata bytes read out of the debuggee with sw_read_mem(), so
+ * the only thing that has to change is which types the names CONTEXT and
+ * RUNTIME_FUNCTION mean -- exactly the methodology dlls/ntdll/unwind.c's
+ * x86-64 block already uses to serve guest SEH, and the one Wine itself uses
+ * to make one ntdll unwind two instruction sets for ARM64EC.
+ *
+ * The two entry points whose SIGNATURES belong to `struct cpu` keep the host's
+ * CONTEXT in their prototypes and cast at the boundary: the pointer they are
+ * handed is always the base of a `union ctx`, so the two views are the same
+ * address. */
+#if defined(__x86_64__)
+# define X64CONTEXT           CONTEXT
+# define X64RUNTIME_FUNCTION  RUNTIME_FUNCTION
+# define X64CTX(c)            ((c)->ctx)
+#else
+# define X64CONTEXT           AMD64_CONTEXT
+# define X64RUNTIME_FUNCTION  IMAGE_AMD64_RUNTIME_FUNCTION_ENTRY
+# define X64CTX(c)            ((c)->amd64)
+/* an x86-64 UNWIND_INFO flag, which winnt.h declares only for an x86-64 host.
+ * Chained unwind info is a property of the DATA being read, not of the cpu
+ * doing the reading -- the same line dlls/ntdll/unwind.c has to carry. */
+# define UNW_FLAG_CHAININFO   4
+#endif
+
 /* x86-64 unwind information, for PE modules, as described on MSDN */
 
 typedef enum _UNWIND_OP_CODES
@@ -74,23 +103,26 @@ typedef struct _UNWIND_INFO
  */
 } UNWIND_INFO, *PUNWIND_INFO;
 
-static BOOL x86_64_get_addr(HANDLE hThread, const CONTEXT* ctx,
+static BOOL x86_64_get_addr(HANDLE hThread, const CONTEXT* pctx,
                             enum cpu_addr ca, ADDRESS64* addr)
 {
+    /* The prototype is `struct cpu`'s and therefore names the HOST's CONTEXT;
+     * what arrives is the base of a union ctx, so the guest's view of it is
+     * the same address.  See the alias block at the top of this file. */
+    const X64CONTEXT *ctx = (const X64CONTEXT *)pctx;
+
     addr->Mode = AddrModeFlat;
     switch (ca)
     {
-#ifdef __x86_64__
     case cpu_addr_pc:    addr->Segment = ctx->SegCs; addr->Offset = ctx->Rip; return TRUE;
     case cpu_addr_stack: addr->Segment = ctx->SegSs; addr->Offset = ctx->Rsp; return TRUE;
     case cpu_addr_frame: addr->Segment = ctx->SegSs; addr->Offset = ctx->Rbp; return TRUE;
-#endif
     default: addr->Mode = -1;
         return FALSE;
     }
 }
 
-#ifdef __x86_64__
+#if defined(__x86_64__) || defined(__powerpc64__)
 
 enum st_mode {stm_start, stm_64bit, stm_done};
 
@@ -105,11 +137,11 @@ enum st_mode {stm_start, stm_64bit, stm_done};
 
 union handler_data
 {
-    RUNTIME_FUNCTION chain;
+    X64RUNTIME_FUNCTION chain;
     ULONG handler;
 };
 
-static void dump_unwind_info(struct cpu_stack_walk* csw, ULONG64 base, RUNTIME_FUNCTION *function)
+static void dump_unwind_info(struct cpu_stack_walk* csw, ULONG64 base, X64RUNTIME_FUNCTION *function)
 {
     static const char * const reg_names[16] =
         { "rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi",
@@ -119,7 +151,7 @@ static void dump_unwind_info(struct cpu_stack_walk* csw, ULONG64 base, RUNTIME_F
     char buffer[sizeof(UNWIND_INFO) + 256 * sizeof(UNWIND_CODE)];
     UNWIND_INFO* info = (UNWIND_INFO*)buffer;
     unsigned int i, count;
-    RUNTIME_FUNCTION snext;
+    X64RUNTIME_FUNCTION snext;
     ULONG64 addr;
 
     TRACE("**** func %lx-%lx\n", function->BeginAddress, function->EndAddress);
@@ -255,17 +287,17 @@ static void dump_unwind_info(struct cpu_stack_walk* csw, ULONG64 base, RUNTIME_F
 }
 
 /* highly derived from dlls/ntdll/signal_x86_64.c */
-static ULONG64 get_int_reg(CONTEXT *context, int reg)
+static ULONG64 get_int_reg(X64CONTEXT *context, int reg)
 {
     return *(&context->Rax + reg);
 }
 
-static void set_int_reg(CONTEXT *context, int reg, ULONG64 val)
+static void set_int_reg(X64CONTEXT *context, int reg, ULONG64 val)
 {
     *(&context->Rax + reg) = val;
 }
 
-static void set_float_reg(CONTEXT *context, int reg, M128A val)
+static void set_float_reg(X64CONTEXT *context, int reg, M128A val)
 {
     *(&context->Xmm0 + reg) = val;
 }
@@ -289,7 +321,7 @@ static int get_opcode_size(UNWIND_CODE op)
 }
 
 static BOOL is_inside_epilog(struct cpu_stack_walk* csw, DWORD64 pc,
-                             DWORD64 base, const RUNTIME_FUNCTION *function )
+                             DWORD64 base, const X64RUNTIME_FUNCTION *function )
 {
     BYTE op0, op1, op2;
     LONG val32;
@@ -381,7 +413,7 @@ static BOOL is_inside_epilog(struct cpu_stack_walk* csw, DWORD64 pc,
     }
 }
 
-static BOOL interpret_epilog(struct cpu_stack_walk* csw, ULONG64 pc, CONTEXT *context )
+static BOOL interpret_epilog(struct cpu_stack_walk* csw, ULONG64 pc, X64CONTEXT *context )
 {
     BYTE        insn, val8;
     WORD        val16;
@@ -465,7 +497,7 @@ static BOOL interpret_epilog(struct cpu_stack_walk* csw, ULONG64 pc, CONTEXT *co
     }
 }
 
-static BOOL default_unwind(struct cpu_stack_walk* csw, CONTEXT* context)
+static BOOL default_unwind(struct cpu_stack_walk* csw, X64CONTEXT* context)
 {
     if (!sw_read_mem(csw, context->Rsp, &context->Rip, sizeof(DWORD64)))
     {
@@ -477,7 +509,7 @@ static BOOL default_unwind(struct cpu_stack_walk* csw, CONTEXT* context)
 }
 
 static BOOL interpret_function_table_entry(struct cpu_stack_walk* csw,
-                                           CONTEXT* context, RUNTIME_FUNCTION* function, DWORD64 base)
+                                           X64CONTEXT* context, X64RUNTIME_FUNCTION* function, DWORD64 base)
 {
     char                buffer[sizeof(UNWIND_INFO) + 256 * sizeof(UNWIND_CODE)];
     UNWIND_INFO*        info = (UNWIND_INFO*)buffer;
@@ -612,9 +644,9 @@ static BOOL fetch_next_frame(struct cpu_stack_walk *csw, union ctx *pcontext,
                              DWORD_PTR curr_pc, void** prtf)
 {
     DWORD64 cfa;
-    RUNTIME_FUNCTION*       rtf;
+    X64RUNTIME_FUNCTION*       rtf;
     DWORD64                 base;
-    CONTEXT                *context = &pcontext->ctx;
+    X64CONTEXT                *context = &X64CTX(pcontext);
     DWORD64                 input_Rip = context->Rip;
 
     if (!curr_pc || !(base = sw_module_base(csw, curr_pc))) return FALSE;
@@ -678,8 +710,8 @@ static BOOL x86_64_stack_walk(struct cpu_stack_walk *csw, STACKFRAME64 *frame,
     }
     else
     {
-        if (context->ctx.Rsp != frame->AddrStack.Offset) FIXME("inconsistent Stack Pointer\n");
-        if (context->ctx.Rip != frame->AddrPC.Offset) FIXME("inconsistent Instruction Pointer\n");
+        if (X64CTX(context).Rsp != frame->AddrStack.Offset) FIXME("inconsistent Stack Pointer\n");
+        if (X64CTX(context).Rip != frame->AddrPC.Offset) FIXME("inconsistent Instruction Pointer\n");
 
         if (frame->AddrReturn.Offset == 0) goto done_err;
         if (!fetch_next_frame(csw, context, frame->AddrPC.Offset - deltapc, &frame->FuncTableEntry))
@@ -690,9 +722,9 @@ static BOOL x86_64_stack_walk(struct cpu_stack_walk *csw, STACKFRAME64 *frame,
     memset(&frame->Params, 0, sizeof(frame->Params));
 
     /* set frame information */
-    frame->AddrStack.Offset = context->ctx.Rsp;
-    frame->AddrFrame.Offset = context->ctx.Rbp;
-    frame->AddrPC.Offset = context->ctx.Rip;
+    frame->AddrStack.Offset = X64CTX(context).Rsp;
+    frame->AddrFrame.Offset = X64CTX(context).Rbp;
+    frame->AddrPC.Offset = X64CTX(context).Rip;
     if (1)
     {
         union ctx newctx = *context;
@@ -700,7 +732,7 @@ static BOOL x86_64_stack_walk(struct cpu_stack_walk *csw, STACKFRAME64 *frame,
         if (!fetch_next_frame(csw, &newctx, frame->AddrPC.Offset - deltapc, NULL))
             goto done_err;
         frame->AddrReturn.Mode = AddrModeFlat;
-        frame->AddrReturn.Offset = newctx.ctx.Rip;
+        frame->AddrReturn.Offset = X64CTX(&newctx).Rip;
     }
 
     frame->Far = TRUE;
@@ -731,12 +763,12 @@ static BOOL x86_64_stack_walk(struct cpu_stack_walk *csw, STACKFRAME64 *frame,
 
 static void*    x86_64_find_runtime_function(struct module* module, DWORD64 addr)
 {
-#ifdef __x86_64__
-    RUNTIME_FUNCTION       *func = NULL;
-    const RUNTIME_FUNCTION *rtf;
+#if defined(__x86_64__) || defined(__powerpc64__)
+    X64RUNTIME_FUNCTION       *func = NULL;
+    const X64RUNTIME_FUNCTION *rtf;
     ULONG                   size;
 
-    rtf = (const RUNTIME_FUNCTION*)pe_map_directory(module, IMAGE_DIRECTORY_ENTRY_EXCEPTION, &size);
+    rtf = (const X64RUNTIME_FUNCTION*)pe_map_directory(module, IMAGE_DIRECTORY_ENTRY_EXCEPTION, &size);
     if (rtf)
     {
         int   lo, hi;
@@ -754,7 +786,7 @@ static void*    x86_64_find_runtime_function(struct module* module, DWORD64 addr
                     const BYTE *next = pe_lock_region_from_rva(module, func->UnwindData & ~1, sizeof(*func), NULL);
                     if (next)
                     {
-                        *func = *(const RUNTIME_FUNCTION *)next;
+                        *func = *(const X64RUNTIME_FUNCTION *)next;
                         pe_unlock_region(module, next);
                     }
                     else
@@ -830,8 +862,8 @@ static unsigned x86_64_map_dwarf_register(unsigned regno, const struct module* m
 
 static void *x86_64_fetch_context_reg(union ctx *pctx, unsigned regno, unsigned *size)
 {
-#ifdef __x86_64__
-    CONTEXT *ctx = &pctx->ctx;
+#if defined(__x86_64__) || defined(__powerpc64__)
+    X64CONTEXT *ctx = &X64CTX(pctx);
 
     switch (regno)
     {

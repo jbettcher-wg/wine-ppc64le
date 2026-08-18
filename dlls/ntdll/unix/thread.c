@@ -704,9 +704,72 @@ static NTSTATUS context_to_server( struct context_data *to, USHORT to_machine, c
      * main_image_info.Machine differing from native_machine is. */
     case MAKELONG( IMAGE_FILE_MACHINE_ARM64, IMAGE_FILE_MACHINE_I386 ):
     case MAKELONG( IMAGE_FILE_MACHINE_I386, IMAGE_FILE_MACHINE_ARM64 ):
-    case MAKELONG( IMAGE_FILE_MACHINE_POWERPC64, IMAGE_FILE_MACHINE_AMD64 ):
     case MAKELONG( IMAGE_FILE_MACHINE_AMD64, IMAGE_FILE_MACHINE_POWERPC64 ):
         return STATUS_SUCCESS;
+
+    /* ...except that this one, the direction a DEBUGGER asks in, is now
+     * fillable.  Reached from contexts_to_server() on the thread's own behalf
+     * while it sits in wait_suspend(), which is the one moment the server has
+     * it stopped and the one place the guest register file is readable at
+     * all.  What goes on the wire is not a relabelling of `src` -- src is the
+     * host's registers and is ignored here -- it is the snapshot the emulator
+     * run loop published, and only when that snapshot is EXACT (see
+     * emu_get_guest_context() in unix/loader.c for the four states and why
+     * one of them refuses).
+     *
+     * A thread with no exact guest state sends a block with flags 0, i.e. all
+     * zeros, and the reader tells the two apart by CS: this fills 0x33 and an
+     * unfilled block has 0, which is not a value a user-mode x86-64 thread
+     * can have.  That distinction is what keeps "the guest is inside the JIT
+     * and I will not guess" from arriving at a debugger as sixteen zeroed
+     * registers and an RIP of zero. */
+    case MAKELONG( IMAGE_FILE_MACHINE_POWERPC64, IMAGE_FILE_MACHINE_AMD64 ):
+    {
+        AMD64_CONTEXT guest;
+        C_ASSERT( sizeof(to->fp.x86_64_regs.fpregs) == sizeof(guest.FltSave) );
+
+        if (!emu_get_guest_context( &guest )) return STATUS_SUCCESS;
+
+        to->flags |= SERVER_CTX_CONTROL;
+        to->ctl.x86_64_regs.rip   = guest.Rip;
+        to->ctl.x86_64_regs.rsp   = guest.Rsp;
+        to->ctl.x86_64_regs.cs    = guest.SegCs;
+        to->ctl.x86_64_regs.ss    = guest.SegSs;
+        to->ctl.x86_64_regs.flags = guest.EFlags;
+
+        to->flags |= SERVER_CTX_INTEGER;
+        to->integer.x86_64_regs.rax = guest.Rax;
+        to->integer.x86_64_regs.rbx = guest.Rbx;
+        to->integer.x86_64_regs.rcx = guest.Rcx;
+        to->integer.x86_64_regs.rdx = guest.Rdx;
+        to->integer.x86_64_regs.rbp = guest.Rbp;
+        to->integer.x86_64_regs.rsi = guest.Rsi;
+        to->integer.x86_64_regs.rdi = guest.Rdi;
+        to->integer.x86_64_regs.r8  = guest.R8;
+        to->integer.x86_64_regs.r9  = guest.R9;
+        to->integer.x86_64_regs.r10 = guest.R10;
+        to->integer.x86_64_regs.r11 = guest.R11;
+        to->integer.x86_64_regs.r12 = guest.R12;
+        to->integer.x86_64_regs.r13 = guest.R13;
+        to->integer.x86_64_regs.r14 = guest.R14;
+        to->integer.x86_64_regs.r15 = guest.R15;
+
+        to->flags |= SERVER_CTX_SEGMENTS;
+        to->seg.x86_64_regs.ds = guest.SegDs;
+        to->seg.x86_64_regs.es = guest.SegEs;
+        to->seg.x86_64_regs.fs = guest.SegFs;
+        to->seg.x86_64_regs.gs = guest.SegGs;
+
+        /* The SSE registers.  Not decoration: a guest's floating-point
+         * arguments live here, and this port has already been bitten once by
+         * an FP argument arriving in the wrong register file entirely -- so a
+         * debugger that could not show XMM0 could not see that whole class of
+         * bug, which is the class that produces wrong numbers rather than
+         * crashes. */
+        to->flags |= SERVER_CTX_FLOATING_POINT;
+        memcpy( to->fp.x86_64_regs.fpregs, &guest.FltSave, sizeof(guest.FltSave) );
+        return STATUS_SUCCESS;
+    }
 
     default:
         return STATUS_INVALID_PARAMETER;

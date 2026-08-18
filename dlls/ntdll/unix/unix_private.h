@@ -125,6 +125,22 @@ struct thread_data
      * as a guest exception.  See docs/guest-seh.md section 5.2. */
     EXCEPTION_RECORD emu_fault_rec; /* guest fault record (guest SEH S2) */
     BOOL         emu_fault_rec_valid;
+    /* ppc64le emulator: the guest register file as it was the last time this
+     * thread stopped executing guest code, and how it stopped -- what a
+     * debugger asking NtQueryInformationThread(ThreadWow64Context) gets back.
+     * Written and read only by this thread, so no lock; see
+     * emu_get_guest_context() in unix/loader.c for the states and why one of
+     * them refuses to answer.
+     *
+     * Here rather than in a __thread of its own for a reason worth recording:
+     * ntdll's PE side is an ELF builtin and owns the only PT_TLS in the tree,
+     * so its initial-exec block is sized against glibc's static TLS surplus.
+     * [MEASURED] adding a 1232-byte AMD64_CONTEXT as `static __thread` made
+     * every process die at startup with `cannot allocate memory in static TLS
+     * block` out of dlopen.  thread_data has room and is already where the
+     * per-thread guest fault record lives. */
+    int          emu_guest_ctx_state;
+    AMD64_CONTEXT emu_guest_ctx;
     struct list  entry;             /* entry in TEB list */
     char         debug_info[0x800]; /* debug_info structure */
     char         signal_stack[];    /* signal stack */
@@ -434,6 +450,7 @@ extern void call_raise_user_exception_dispatcher( struct thread_data *data );
 #ifdef __powerpc64__
 extern NTSTATUS call_emu_trap_dispatcher( void *func, void *ctx );
 extern BOOL emu_handle_fault( void *sigcontext, EXCEPTION_RECORD *rec );
+extern BOOL emu_get_guest_context( AMD64_CONTEXT *ctx );
 #endif
 
 #define IMAGE_DLLCHARACTERISTICS_PREFER_NATIVE 0x0010 /* Wine extension */

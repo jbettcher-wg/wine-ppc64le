@@ -1222,6 +1222,155 @@ static __thread UINT emu_run_depth;
 
 
 /***********************************************************************
+ *           the guest register file, for a debugger
+ *
+ * A debugger looking at this process sees native ppc64 threads whose CONTEXT
+ * is the emulator's, and the guest register file it wants is the emulator's
+ * private property.  Every piece of it this port needs, it already
+ * reconstructs -- the run loop's own AMD64_CONTEXT below, the one the bridge
+ * fills at every trap, and the one it fills at every fault -- but all three
+ * live in a stack frame that is gone by the time anybody outside asks.  So
+ * the last one is COPIED here, where it outlives the run, and served through
+ * NtQueryInformationThread(ThreadWow64Context) like any other machine's
+ * context (see get_thread_wow64_context() in unix/signal_ppc64.c).
+ *
+ * THE STATE MATTERS AS MUCH AS THE REGISTERS.  A snapshot is only worth
+ * anything if the reader can tell whether it is where the guest IS or where
+ * the guest last WAS:
+ *
+ *   EMU_GUEST_TRAP   the guest called out (an import thunk, a COM slot) and
+ *                    native code is running on its behalf.  The bridge handed
+ *                    us the register file at the trapping instruction; it is
+ *                    exact, and it stays exact for as long as the native call
+ *                    takes -- which for a thread blocked in a Wine API is the
+ *                    whole time a debugger is likely to look.
+ *   EMU_GUEST_FAULT  the guest faulted.  Exact, at the faulting instruction,
+ *                    and this is the state a crash is read from.
+ *   EMU_GUEST_ENDED  the run returned or exited.  Exact, at the HLT.
+ *   EMU_GUEST_RUNNING  the bridge is executing guest code right now.  The
+ *                    registers are inside the JIT and the copy below is where
+ *                    this run last resumed from, which is NOT where the guest
+ *                    is.  Reported as "no context" rather than as registers,
+ *                    because a debugger printing a stale RIP as the current
+ *                    one is a wrong number, and a wrong number is worse than
+ *                    a refusal -- the same rule the FP marshalling gate is
+ *                    built on.  There is no way to do better without a bridge
+ *                    entry point that reads the register file out of a
+ *                    running thread; fexbridge_fault_unwind() reconstructs it
+ *                    but ENDS the run doing so, which is not something a mere
+ *                    suspend may do.
+ *
+ * Nested runs (a guest callback entered from inside a trap) save and restore
+ * this the way they save every other per-run variable here, so what is
+ * published is always the innermost live run.  The one exception is a run
+ * that ended on an unhandled guest exception: that state is deliberately left
+ * standing, because the thread is on its way to reporting it and the report
+ * is the only reason anybody is looking.
+ */
+enum emu_guest_state
+{
+    EMU_GUEST_NONE = 0,
+    EMU_GUEST_RUNNING,
+    EMU_GUEST_TRAP,
+    EMU_GUEST_FAULT,
+    EMU_GUEST_ENDED,
+};
+
+/* WINEEMUNODBGCTX=1: publish nothing, which is exactly the state this file was
+ * in before a debugger could see a guest at all.  The negative control for
+ * ppc64le/winedbg/check-guest-debug.sh; read once, outside signal context,
+ * like every other lever here. */
+static int emu_no_dbg_ctx = -1;
+
+/* WINEEMUNODBGSTACK=1: free the guest stack of a thread that died on an
+ * unhandled guest exception even when a debugger is attached, which is what
+ * this file did before.  The debugger then has a valid guest RSP pointing at
+ * unmapped memory -- registers without a stack.  The second negative control
+ * for ppc64le/winedbg/check-guest-debug.sh. */
+static int emu_no_dbg_stack = -1;
+
+/* The state alone -- the registers already published are still this thread's,
+ * only the claim about how exact they are has changed.
+ *
+ * emu_no_dbg_ctx still being -1 means no context has ever been published on
+ * this thread, so there are no registers for a state to describe and writing
+ * one would say "the guest is stopped here" about a zeroed block.  Every
+ * caller publishes a context first and this is unreachable; it is written down
+ * because the alternative to being unreachable is being wrong. */
+static void emu_publish_guest_state( int state )
+{
+    struct thread_data *data = get_thread_data();
+
+    if (emu_no_dbg_ctx != 0 || !data) return;
+    data->emu_guest_ctx_state = state;
+}
+
+static void emu_publish_guest_context( const AMD64_CONTEXT *ctx, int state )
+{
+    struct thread_data *data = get_thread_data();
+
+    if (emu_no_dbg_ctx == -1)
+    {
+        const char *str = getenv( "WINEEMUNODBGCTX" );
+        emu_no_dbg_ctx = (str && *str == '1');
+        if (emu_no_dbg_ctx)
+            ERR( "WINEEMUNODBGCTX: the guest register file will not be published; "
+                 "a debugger attaching to this process sees the emulator's registers only\n" );
+    }
+    if (emu_no_dbg_ctx || !data) return;
+    data->emu_guest_ctx_state = state;
+    if (ctx) data->emu_guest_ctx = *ctx;
+}
+
+/***********************************************************************
+ *           emu_get_guest_context
+ *
+ * The calling thread's guest register file, if it has one that is exact.
+ *
+ * Called from context_to_server() on the thread's own behalf -- always the
+ * thread itself, never a peer, because the server's context machinery works
+ * by asking a thread for its own registers (a SIGUSR1 into wait_suspend).
+ * That is what makes this safe to read without a lock: the only writer is
+ * this thread, and the only reader is this thread.
+ */
+BOOL emu_get_guest_context( AMD64_CONTEXT *ctx )
+{
+    struct thread_data *data = get_thread_data();
+
+    if (!data) return FALSE;
+    switch (data->emu_guest_ctx_state)
+    {
+    case EMU_GUEST_TRAP:
+    case EMU_GUEST_FAULT:
+    case EMU_GUEST_ENDED:
+        *ctx = data->emu_guest_ctx;
+        /* The segment selectors, SYNTHESISED rather than reported, and that
+         * distinction is the point: the bridge's CONTEXT does not carry them
+         * because guest code never changes them, so there is nothing to copy
+         * and these are the fixed values every user-mode x86-64 Windows thread
+         * has.  (The GS *base* is real and is this thread's TEB -- the run
+         * installs it; it is the selector that is a constant, because on x86-64
+         * the base comes from an MSR and not from the descriptor.)
+         *
+         * CS is load-bearing beyond being right.  A context block this port
+         * never filled arrives as all zeros, and CS 0 is a value no user-mode
+         * x86-64 thread can have -- so CS is how a reader tells "no guest
+         * context" from "a guest context that happens to be zero", which is
+         * the difference between a refusal and sixteen invented registers. */
+        ctx->SegCs = 0x33;
+        ctx->SegSs = 0x2b;
+        ctx->SegDs = 0x2b;
+        ctx->SegEs = 0x2b;
+        ctx->SegFs = 0x53;
+        ctx->SegGs = 0x2b;
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+
+
+/***********************************************************************
  *           the TEB's stack description across the machine boundary
  *
  * A thread that runs guest code has TWO stacks: the native ppc64 one Wine
@@ -1321,10 +1470,23 @@ static int emu_trap_thunk( void *thread, void *ctx, void *user )
     struct emu_teb_stack guest_saved;
     NTSTATUS status;
 
+    /* The register file the bridge handed us IS the guest's, at the trapping
+     * instruction -- the whole marshalling layer is built on that.  Publish it
+     * for the duration of the native call, so a debugger looking at a thread
+     * that is inside a Wine API sees where the guest is rather than where the
+     * emulator is.  Nothing is saved here: a nested run started from inside
+     * this trap saves and restores it for itself, and the moment this returns
+     * the guest is executing again -- which is what the second publication
+     * below says, because a TRAP state left standing over running guest code
+     * would name the last trap's RIP as the current one. */
+    emu_publish_guest_context( ctx, EMU_GUEST_TRAP );
+
     /* everything below this line is native code on the native stack */
     emu_teb_stack_switch( &emu_native_teb_stack, &guest_saved );
     status = call_emu_trap_dispatcher( p_emu_trap_dispatcher, ctx );
     emu_teb_stack_switch( &guest_saved, NULL );
+
+    emu_publish_guest_state( EMU_GUEST_RUNNING );
 
     if (status == STATUS_THREAD_IS_TERMINATING) emu_thread_exit_requested = TRUE;
     else if (status == STATUS_EMU_GUEST_EXCEPTION) emu_thread_exc_pending = TRUE;
@@ -1476,12 +1638,13 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
 {
     struct thread_data *data = get_thread_data();
     struct emu_teb_stack prev_teb_stack, native_saved;
-    AMD64_CONTEXT ctx = { 0 };
+    AMD64_CONTEXT ctx = { 0 }, prev_guest_ctx;
     EXCEPTION_RECORD rec;
     INITIAL_TEB stack;
     NTSTATUS status;
     void *prev_base, *prev_limit, *stack_addr;
     SIZE_T free_size = 0, reserve_size;
+    int prev_guest_state;
     ULONG_PTR rsp;
     int r;
 
@@ -1576,6 +1739,11 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
     emu_guest_teb_stack.limit   = stack.StackLimit;
     emu_guest_teb_stack.dealloc = stack.DeallocationStack;
 
+    /* ...and the guest register file a debugger reads, for the same reason */
+    prev_guest_state = data ? data->emu_guest_ctx_state : EMU_GUEST_NONE;
+    if (data) prev_guest_ctx = data->emu_guest_ctx;
+    else memset( &prev_guest_ctx, 0, sizeof(prev_guest_ctx) );
+
     for (;;)
     {
         /* only a stash written during THIS run may be consumed below; a
@@ -1586,10 +1754,13 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
         /* guest code is about to execute: the TEB describes its stack until
          * it stops, whether it stops by trapping, faulting or returning */
         emu_teb_stack_switch( &emu_guest_teb_stack, &native_saved );
+        emu_publish_guest_context( &ctx, EMU_GUEST_RUNNING );
         emu_run_depth++;
         r = p_fexbridge_run( thread, &ctx );
         emu_run_depth--;
         emu_teb_stack_switch( &native_saved, &emu_guest_teb_stack );
+        /* the bridge filled ctx on the way out, whichever way it came out */
+        emu_publish_guest_context( &ctx, r == EMU_RUN_FAULT ? EMU_GUEST_FAULT : EMU_GUEST_ENDED );
 
         if (r == EMU_RUN_HLT)
         {
@@ -1665,8 +1836,37 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
     emu_guest_stack_base  = prev_base;
     emu_guest_stack_limit = prev_limit;
     emu_guest_teb_stack   = prev_teb_stack;
+
+    /* A run that ended on an unhandled guest exception keeps its published
+     * state: the thread is on its way up to raise_pending_guest_exception(),
+     * where the record is reported natively and a debugger stops on it, and
+     * the guest RIP and registers of the fault are the whole content of that
+     * report.  Restoring the caller's state here would hand the debugger the
+     * state of whatever ran BEFORE the fault, which is a wrong answer wearing
+     * a right answer's clothes.  Every other ending restores. */
+    if (status != STATUS_EMU_GUEST_EXCEPTION)
+        emu_publish_guest_context( &prev_guest_ctx, prev_guest_state );
+
     stack_addr = stack.DeallocationStack;
-    NtFreeVirtualMemory( NtCurrentProcess(), &stack_addr, &free_size, MEM_RELEASE );
+    /* ...and it keeps its STACK, but only while somebody is debugging.  The
+     * registers alone answer "where did it die"; the stack is what answers
+     * "how did it get there", and freeing it here is why a debugger attached
+     * to a guest crash used to see a valid RSP pointing at unmapped memory.
+     * Held rather than freed, so it is a leak of one stack on a thread that
+     * is about to die reporting, in a process that has a debugger on it --
+     * and byte-for-byte the old behaviour in every process that does not. */
+    if (emu_no_dbg_stack == -1)
+    {
+        const char *str = getenv( "WINEEMUNODBGSTACK" );
+        emu_no_dbg_stack = (str && *str == '1');
+    }
+    if (status == STATUS_EMU_GUEST_EXCEPTION && !emu_no_dbg_stack &&
+        NtCurrentTeb()->Peb->BeingDebugged)
+        TRACE( "guest stack %p-%p kept mapped for the debugger; the run ended on an "
+               "unhandled guest exception at rip=%p\n",
+               stack.DeallocationStack, stack.StackBase, (void *)(ULONG_PTR)ctx.Rip );
+    else
+        NtFreeVirtualMemory( NtCurrentProcess(), &stack_addr, &free_size, MEM_RELEASE );
     return status;
 }
 
