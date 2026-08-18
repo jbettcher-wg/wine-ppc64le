@@ -73,10 +73,37 @@ skip() { echo "check-wow64-smoke: $*" >&2; exit 2; }
     skip "no i386 ntdll; build with --enable-archs=ppc64,i386 first"
 [ -f "$BUILD/programs/winepath/i386-windows/winepath.exe" ] || \
     skip "no i386 winepath.exe; build with --enable-archs=ppc64,i386 first"
+# THE BRIDGE IS CHECKED BEFORE THE PREFIX, because getting this order wrong
+# costs an afternoon.  A bridge without 32-bit support does not fail loudly at
+# wineboot time -- wineboot's own Wow64Install pass starts
+# syswow64\rundll32.exe as an i386 process, that process dies in
+# BTCpuProcessInit with c0000139, and wineboot carries on and reports success.
+# What you are left with is an EMPTY syswow64 and a gate that says "run
+# wineboot -u", which is a symptom pointing at the wrong thing: running it
+# again produces exactly the same empty directory.
+#
+# [MEASURED] 2026-08-18, op4k: the bridge built beside the binfmt-registered
+# FEX was ABI 3 and had no fexbridge_process_init32, so four Wow64Install
+# passes ran and staged nothing.  Rebuilt at ABI 4, one wineboot -u staged 890
+# entries and this gate went green first try.
+if command -v nm >/dev/null && [ -f "$WINEFEXBRIDGE" ]; then
+    nm -D --defined-only "$WINEFEXBRIDGE" 2>/dev/null |
+        grep -q fexbridge_process_init32 || \
+        skip "the bridge at $WINEFEXBRIDGE has no fexbridge_process_init32, so \
+it cannot run a 32-bit guest (needs ABI 4).  Rebuild it -- 'ninja fexbridge' in \
+the FEX build directory -- and boot the prefix again; nothing downstream of this \
+will work until that symbol is there"
+fi
+
 # The prefix must have been updated since the server learned I386: syswow64
-# and the Wow6432Node only appear on a wineboot -u against the new server.
+# and the Wow6432Node only appear on a wineboot -u against the new server, AND
+# that wineboot must have had a 32-bit-capable bridge (see above).
 [ -d "$WINEPREFIX/drive_c/windows/syswow64" ] || \
     skip "prefix has no syswow64; run 'wineboot -u' against this build first"
+[ -n "$(ls -A "$WINEPREFIX/drive_c/windows/syswow64" 2>/dev/null)" ] || \
+    skip "prefix has an EMPTY syswow64, which means wineboot's Wow64Install \
+pass ran and staged nothing -- almost always a bridge that cannot start a \
+32-bit process.  Check the bridge first, then re-run 'wineboot -u'"
 command -v clang >/dev/null || skip "need clang for the guest build"
 command -v llvm-readobj >/dev/null || skip "need llvm-readobj to read the built image"
 
