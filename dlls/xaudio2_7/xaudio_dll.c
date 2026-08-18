@@ -1497,6 +1497,12 @@ static ULONG WINAPI IXAudio2Impl_Release(IXAudio2 *iface)
         This->lock.DebugInfo->Spare[0] = 0;
         DeleteCriticalSection(&This->lock);
 
+        /* Give the MTA back.  The process keeps it only while some engine (or
+         * some other holder) still wants it, which is the same rule Windows
+         * applies and the reason this is a cookie rather than a leak. */
+        if (This->mta_cookie)
+            CoDecrementMTAUsage(This->mta_cookie);
+
         free(This);
     }
     return ref;
@@ -1951,6 +1957,41 @@ static HRESULT WINAPI XAudio2CF_CreateInstance(IClassFactory *iface, IUnknown *p
     object = calloc(1, sizeof(*object));
     if(!object)
         return E_OUTOFMEMORY;
+
+    /* AN AUDIO ENGINE KEEPS THE PROCESS MTA ALIVE, and this is not a
+     * convenience -- it is what the engine's own worker threads require and
+     * what an application is entitled to assume.
+     *
+     * XAudio2 reaches the endpoint through WASAPI, which is COM, so the
+     * threads that do the mixing have to live in an apartment.  They are not
+     * message-pumping threads, so that apartment is the MTA, and on Windows
+     * creating an engine is therefore enough to make an MTA exist in the
+     * process.  Applications rely on that far beyond audio: once ANY thread
+     * has established the MTA, a thread that never called CoInitializeEx at
+     * all still reaches it (the "implicit MTA" -- combase's
+     * apartment_get_current_or_mta falls back to it), so an ordinary worker
+     * thread can call CoCreateInstance and have it work.
+     *
+     * Here the mixing threads belong to FAudio, which is a native library and
+     * calls no COM at all, so nothing in this process ever established the
+     * MTA.  An application whose main thread had already entered an STA --
+     * and which therefore got RPC_E_CHANGED_MODE when it asked for
+     * COINIT_MULTITHREADED, exactly as it would on Windows -- was left with
+     * NO MTA anywhere, and every one of its uninitialised worker threads got
+     * CO_E_NOTINITIALIZED forever.  DOOM (2016) is the measured case: it spins
+     * on CoCreateInstance(CLSID_MMDeviceEnumerator) and never finishes loading.
+     *
+     * CoIncrementMTAUsage is the documented way to hold the MTA up without
+     * joining it from this thread, which is what we want: the cookie belongs
+     * to the ENGINE's lifetime, not to whichever thread happened to construct
+     * it.  dlls/rtworkq/queue.c holds one for the same reason, for the same
+     * kind of pool.  Failure is not fatal -- an engine that cannot get the MTA
+     * still mixes -- so it warns and carries on. */
+    if (FAILED(hr = CoIncrementMTAUsage(&object->mta_cookie)))
+    {
+        WARN("Failed to hold the MTA for this engine, hr %#lx.\n", hr);
+        object->mta_cookie = NULL;
+    }
 
     object->IXAudio2_iface.lpVtbl = &XAudio2_Vtbl;
     object->mst.IXAudio2MasteringVoice_iface.lpVtbl = &XAudio2MasteringVoice_Vtbl;

@@ -101,6 +101,10 @@ typedef struct _IXAudio2Impl {
 
     UINT32 ncbs;
     IXAudio2EngineCallback **cbs;
+
+    /* An MTA usage cookie held for the engine's whole life.  See
+     * XAudio2CF_CreateInstance for why an audio engine owns one. */
+    CO_MTA_USAGE_COOKIE mta_cookie;
 } IXAudio2Impl;
 
 /* xaudio_dll.c */
