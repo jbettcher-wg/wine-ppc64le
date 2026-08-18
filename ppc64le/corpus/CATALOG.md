@@ -564,9 +564,23 @@ that failed here, twice, in two titles.
 > (`dlls/ntdll/loader.c:3004`) has no guest guard, and both callers of
 > `load_builtin` (`dlls/ntdll/unix/virtual.c:3546` and `:3863`) do handle
 > `STATUS_IMAGE_ALREADY_LOADED` by mapping the real image — so the refusal is
-> inside `load_builtin` itself (`dlls/ntdll/unix/loader.c:2092`), whose only two
-> `LO_NATIVE` exits to `STATUS_DLL_NOT_FOUND` are the `wine_builtin` and
-> `wine_fakedll` arms. One trace of which arm it takes closes this.
+> inside `load_builtin` itself (`dlls/ntdll/unix/loader.c:2092`). **Traced, with
+> a temporary WARN at the top of that function:**
+>
+> ```
+> load_builtin L"\??\C:\windows\sysx8664\MSVCP100.dll"
+>              order=2 builtin=1 fakedll=0 machine=0000 search=8664 sysdir=1/8664
+> load_dll Failed to load module L"MSVCP100.dll"; status=c0000135
+> ```
+>
+> `order=2` is `LO_NATIVE` and `builtin=1`, so it takes the first of the two
+> exits — `if (pe_mapping->image.wine_builtin) { if (loadorder == LO_NATIVE)
+> return STATUS_DLL_NOT_FOUND; }`. The open question the next pass starts from is
+> why `image.wine_builtin` is set at all for a 1.7 MB Microsoft DLL: either the
+> flag describes the NAME rather than the file, or the section under examination
+> is already the builtin by the time `load_builtin` sees it (`machine=0000` on
+> that line is a hint that this call is not the one carrying the guest's demanded
+> machine). Answer that and the C++ runtime loads.
 
 
 `msvcp100.dll` is a C++ ABI, and translating the MSVC C++ ABI is exactly what
