@@ -159,3 +159,92 @@ _malloc_crt                   0x0000A110  1  int   msvcr100.spec:1243
 # from a guest, makes native CRT code call each one, and checks the VALUES
 # each callback received and returned against a native control; it goes red
 # under WINEEMUNOCBWRAP=1.
+
+# ---------------------------------------------------------------------------
+# THE FOUR C++ MEMORY OPERATORS, and why these four and not the rest of the
+# mangled surface.
+#
+# The blanket refusal above -- "the C++ mangled names, which are not flat
+# prototypes at all" -- is right about the CLASS and wrong about these four.
+# `void *operator new(size_t)` and `void operator delete(void *)` are flat
+# prototypes with a mangled NAME: one integer-class argument, a pointer or
+# nothing back, no `this`, no EH state, no language runtime.  What refused them
+# is the signature oracle, which resolves a NAME against the translation unit
+# it compiles and finds no header declaring `??2@YAPEAX_K@Z` -- a tooling gap,
+# exactly the class ppc64le/corpus/CATALOG.md's psapi/wldap32 handoff names,
+# and not an ABI fact.  msvcr100.spec declares all four with their arity and
+# their implementation, so the .spec location column is the documented
+# downgrade for precisely this: the <int|void> column becomes a human
+# assertion, checked against the .spec line's own argument list.
+#
+# [MEASURED] This is what Styx: Master of Shadows stops on.  With Proton's
+# x86-64 msvcp100.dll staged into C:\windows\sysx8664 (ppc64le/steamtool/proton)
+# every one of its 65 std:: imports binds for real and the
+# "No implementation for MSVCP100.dll..." warnings go to ZERO -- and the game
+# still dies in the same place, because the sentinel it calls was never
+# msvcp100's:
+#
+#   No implementation for MSVCR100.dll.??2@YAPEAX_K@Z imported from
+#     wxmsw28u_vc_custom_64.dll, setting to 00000000DEAD000B
+#   guest called through a wild pointer: 00000000DEAD000B ... from
+#     L"wxmsw28u_vc_custom_64.dll"+5d580
+#
+# operator new, called from wxWidgets' PROCESS_ATTACH.  ppc64le/corpus/CATALOG.md
+# read that same 0xDEAD000B as msvcp100's; the sentinel numbering is per
+# IMPORTING module, so the index says nothing about which DLL owns the name.
+#
+# WHAT IS DELIBERATELY NOT HERE.  __CxxFrameHandler3 and _CxxThrowException
+# stay refused: they are the guest image's own language personality and must
+# not be sent into the host unwinder, exactly as the banner above says and
+# exactly as vcruntime140.__CxxFrameHandler3 is a documented hole in
+# ppc64le/thunks/check-import-chain.sh.  _HUGE and _encoded_null are `@ extern`
+# DATA exports, and a trap stub cannot serve data -- there is no call to trap
+# on -- which is the design item ppc64le/corpus/CATALOG.md already records.
+??2@YAPEAX_K@Z    0x00000C01  1  int   msvcr100.spec:297
+??_U@YAPEAX_K@Z   0x00000C02  1  int   msvcr100.spec:347
+??3@YAXPEAX@Z     0x00000C03  1  void  msvcr100.spec:301
+??_V@YAXPEAX@Z    0x00000C04  1  void  msvcr100.spec:351
+
+# THE OTHER TWO NAMES msvcp100's DllMain LOOKS UP, and they belong with the
+# four above because they arrive by the same route: a staged x86-64 msvcp100
+# (ppc64le/steamtool/proton provisions one) runs GetProcAddress over msvcr100
+# at PROCESS_ATTACH for four mangled names -- operator new, operator delete,
+# and these two.  The first two are served by the rows above (their array
+# siblings came along because they are the same shape).  Leaving these two
+# refused would have been the quiet kind of wrong: GetProcAddress answers
+# NULL, msvcp100 carries on, and what the guest loses is not a crash but a
+# capability.
+#
+#   ?IsCurrentTaskCollectionCanceling@Context@Concurrency@@SA_NXZ
+#       No arguments, returns `bool`.  A static member with no `this`, so it
+#       is a flat prototype with a mangled name exactly as operator new is,
+#       and dlls/msvcrt/concurrency.c:877 is the implementation
+#       msvcr100.spec:386 forwards to.  `bool` is integer class; the int
+#       column is the human assertion the .spec downgrade asks for.
+#
+#   ?_set_new_handler@@YAP6AH_K@ZP6AH0@Z@Z
+#       One argument, and it is a GUEST FUNCTION POINTER -- `int (*)(size_t)`,
+#       which native operator new calls when an allocation fails -- so the row
+#       here is only half of it.  The other half is the registration-
+#       interception entry in dlls/ntdll/signal_ppc64.c: without one, the raw
+#       guest address goes to native msvcrt, whose LOCK_HEAP'd global keeps it
+#       until the day an allocation fails and dlls/msvcrt/heap.c bctrl's into
+#       x86-64 bytes -- at the worst possible moment, under memory pressure,
+#       nowhere near the registration that caused it.
+#
+#       NOTE the -arch=win64 line.  msvcr100.spec declares this name four
+#       times: a win32 and a win64 STUB (the `H` forms, taking an int) and a
+#       win32 and a win64 real forward (the `P6AH...@Z` forms, taking the
+#       handler).  Citing a line inside an -arch= group used to be refused
+#       outright for exactly that reason; it is accepted now only because
+#       spec2thunk re-runs winebuild's own -arch= filter over the whole .spec
+#       and checks that line 598 IS the line this machine's export table keeps
+#       for this name.  Cite the win32 line instead and it still refuses.
+#
+# Everything else on msvcr100's mangled surface stays refused, for the reason
+# the banner above already gives: those are real member functions with a
+# `this`, which is the MSVC C++ ABI this port does not translate.  What puts
+# these two on the served side is not that they are wanted -- it is that they
+# have no `this`, the same test the four operators passed.
+?IsCurrentTaskCollectionCanceling@Context@Concurrency@@SA_NXZ  0x00000C05  0  int   msvcr100.spec:386
+?_set_new_handler@@YAP6AH_K@ZP6AH0@Z@Z                         0x00000C06  1  int   msvcr100.spec:598

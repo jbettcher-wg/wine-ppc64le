@@ -5035,6 +5035,29 @@ static const struct thunk_override thunk_overrides[] =
      * imported to avoid conflicts with Mingw"), so those two have no row
      * here; there is nothing for them to intercept. */
     { L"msvcr100.dll", "_onexit",           1, emu_onexit },
+    /* The C++ new-handler, `int (*)(size_t)`, which native operator new calls
+     * when an allocation fails.  A plain cb_mask row rather than a handler,
+     * and the shape it shares with SetUnhandledExceptionFilter below is the
+     * reason: both are a SET rather than a queue, and both RETURN THE ONE
+     * THEY REPLACED, so the guest's save-and-restore idiom
+     *
+     *     _PNH old = _set_new_handler( mine );  ...  _set_new_handler( old );
+     *
+     * hands our trampoline back in -- which wrap_guest_callback recognises and
+     * returns unchanged, the idempotence case documented there.  A guest that
+     * CALLS the returned pointer instead of restoring it would run ppc64 bytes
+     * as x86-64; that is the same accepted limit the exception-filter row has
+     * carried, and no corpus title does it.
+     *
+     * Why it needs a row at all: dlls/msvcrt/heap.c keeps the pointer in a
+     * LOCK_HEAP'd global and calls it from operator new's failure path, so an
+     * unwrapped guest address does not fault at registration -- it faults the
+     * first time an allocation fails, under memory pressure, arbitrarily far
+     * from the call that installed it.  msvcp100.dll's DllMain looks this name
+     * up (see dlls/msvcr100/msvcr100.thunks), so any guest carrying the VC++
+     * 2010 C++ runtime reaches it.  One argument, `int` back: the default
+     * four-slot, sign-extended-32-bit trampoline is the right one. */
+    { L"msvcr100.dll", "?_set_new_handler@@YAP6AH_K@ZP6AH0@Z@Z", 1, NULL, 1u << 0 },
     { L"kernel32.dll", "ExitThread",        1, emu_ExitThread },
     { L"kernelbase.dll", "ExitThread",      1, emu_ExitThread },
     /* native->guest WITH identity: these thunks receive a guest function

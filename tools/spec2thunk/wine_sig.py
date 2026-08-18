@@ -1222,7 +1222,8 @@ class WineSpecs:
             raise Refused('no %s under %s/dlls' % (specname, self.root))
         raise Refused('ambiguous %s: %s' % (specname, ', '.join(sorted(hits))))
 
-    def signature(self, name, specname, lineno, asserted_returns_void):
+    def signature(self, name, specname, lineno, asserted_returns_void,
+                  arch_verified=False):
         path = self._find(specname)
         with open(path) as f:
             lines = f.readlines()
@@ -1242,7 +1243,17 @@ class WineSpecs:
         if decl_name != name:
             raise Refused('%s:%d declares %r, not %r'
                           % (specname, lineno, decl_name, name))
-        if ' -arch=' in head or head.endswith('-arch'):
+        if (' -arch=' in head or head.endswith('-arch')) and not arch_verified:
+            # An -arch= line is one of SEVERAL declarations of the same name --
+            # ?_type_info_dtor_internal_method@type_info@@Q*XZ has an arm, an
+            # i386 and a win64 form on three consecutive lines -- so a cited
+            # line number alone does not say the cited line is the one this
+            # thunk's machine actually exports.  The caller can prove that,
+            # because it has already run winebuild's own -arch= filter over the
+            # whole .spec (spec2thunk's _spec_cpus) and knows which line
+            # survived for this name; when it has checked that the cited line
+            # IS that line, it passes arch_verified and this refusal does not
+            # apply.  Nothing is assumed here -- the default is still to refuse.
             raise Refused('%s:%d is architecture-conditional (-arch=), so the '
                           'line cited may not be the one that applies'
                           % (specname, lineno))
