@@ -105,13 +105,44 @@ XVFB_PID=
 XVFB_DISPLAY=
 SINK_MODULE=
 SINK_NAME=wine_audio_gate_$$
+DEFAULT_SINK_SAVED=
+
+# Never trust the captured module id alone: look it up and refuse to unload
+# unless its own arguments name OUR sink.  This is what keeps a gate from ever
+# unloading a module -- null sink or otherwise -- that belongs to the person
+# using the machine (a real regression: a gate once tore down the user's own
+# Sunshine streaming sink this way).
+unload_own_sink() {
+    [ -n "$SINK_MODULE" ] || return 0
+    args=$(pactl list short modules 2>/dev/null \
+        | awk -F'\t' -v id="$SINK_MODULE" '$1==id{print $3}')
+    case "$args" in
+        *"sink_name=$SINK_NAME"*) pactl unload-module "$SINK_MODULE" 2>/dev/null ;;
+        "") ;;  # already gone -- nothing to unload
+        *) echo "check-audio-smoke: refusing to unload module $SINK_MODULE: its \
+arguments do not name sink $SINK_NAME (got: $args)" >&2 ;;
+    esac
+    SINK_MODULE=
+}
+
+# The default sink is never meant to change here, but restore it defensively
+# in case some other layer (pipewire-pulse's own default-sink policy, e.g.)
+# moved it out from under this gate when the null sink appeared.
+restore_default_sink() {
+    [ -n "$DEFAULT_SINK_SAVED" ] || return 0
+    cur=$(pactl get-default-sink 2>/dev/null)
+    [ "$cur" = "$DEFAULT_SINK_SAVED" ] && return 0
+    pactl set-default-sink "$DEFAULT_SINK_SAVED" 2>/dev/null
+}
+
 cleanup() {
     [ -n "$XVFB_PID" ] && kill "$XVFB_PID" 2>/dev/null
     XVFB_PID=
-    [ -n "$SINK_MODULE" ] && pactl unload-module "$SINK_MODULE" 2>/dev/null
-    SINK_MODULE=
+    unload_own_sink
+    restore_default_sink
 }
 trap 'cleanup' EXIT INT TERM
+DEFAULT_SINK_SAVED=$(pactl get-default-sink 2>/dev/null)
 
 [ -x "$BUILD/wine" ] || skip "no wine loader at $BUILD/wine"
 [ -n "${WINEPREFIX:-}" ] || skip "set WINEPREFIX to a prefix wineboot has run in"
