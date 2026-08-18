@@ -5508,6 +5508,7 @@ static BOOL thunk_rip_cache_get( ULONG_PTR rip, struct thunk_rip_cache_entry *ou
  */
 void dump_guest_thunk_profile(void)
 {
+    static int profile_all = -1;
     UINT order[THUNK_RIP_CACHE_SIZE];
     UINT i, j, n = 0;
     ULONG total = 0;
@@ -5532,7 +5533,15 @@ void dump_guest_thunk_profile(void)
 
     ERR( "WINEEMUPROFILE: %u guest->native crossings served from %u cache slots\n",
          (UINT)total, n );
-    for (i = 0; i < n && i < 40; i++)
+    /* Forty rows is the right default: it is the working set, it fits on a
+     * screen, and it answers "what is this program spending its crossings
+     * on".  It is the wrong list for "what could have corrupted memory",
+     * because the call that writes past the end of a buffer is as likely to
+     * be made once as a million times -- and everything called once sorts to
+     * the bottom, below the cut, invisible.  WINEEMUPROFILEALL=1 prints every
+     * live slot so the tail can be read too. */
+    if (profile_all == -1) profile_all = emu_env_flag( L"WINEEMUPROFILEALL" );
+    for (i = 0; i < n && (profile_all || i < 40); i++)
     {
         struct thunk_rip_cache_entry volatile *e = &thunk_rip_cache[order[i]];
         void *proc = e->proc;

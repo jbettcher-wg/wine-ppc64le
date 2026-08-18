@@ -1406,6 +1406,52 @@ static inline struct block *unsafe_block_from_ptr( struct heap *heap, ULONG flag
         err = "invalid block type";
     }
 
+    /* THE TAIL IS FILLED BUT NOTHING EVER LOOKED AT IT.
+     *
+     * mark_block_tail() writes BLOCK_ALIGN bytes of BLOCK_FILL_TAIL after
+     * every allocation as soon as FLG_HEAP_ENABLE_TAIL_CHECK is on, but the
+     * only code that compares them again is heap_validate_block(), and that
+     * runs solely under FLG_HEAP_VALIDATE_ALL -- which walks the entire heap
+     * on every single heap call.  On a program that frees a couple of million
+     * blocks during startup that is not an instrument, it is a way of never
+     * finishing.  So the cheap half of the flag did nothing at all: the tail
+     * was painted and then ignored.
+     *
+     * Checking just this block's own tail here is O(1) and runs on the paths
+     * that already have the block in hand -- free, realloc, size, validate --
+     * so a write that ran off the end of an allocation is named at the next
+     * touch of that allocation rather than whenever something else happens to
+     * notice its heap is broken.  The bytes are dumped because they are the
+     * fingerprint of whoever wrote them: a pointer, a handle, a float, ASCII
+     * text all look like themselves, and knowing what was written is most of
+     * knowing who wrote it.
+     *
+     * Costs nothing when the flag is off, which is every ordinary run. */
+    if (!err && (flags & HEAP_TAIL_CHECKING_ENABLED) && block_get_type( block ) == BLOCK_TYPE_USED &&
+        !(block_get_flags( block ) & BLOCK_FLAG_FREE))
+    {
+        const unsigned char *tail = (unsigned char *)block + block_get_size( block ) - block->tail_size;
+        UINT i;
+
+        for (i = 0; i < BLOCK_ALIGN; i++)
+        {
+            char dump[BLOCK_ALIGN * 3 + 1];
+            UINT j;
+
+            if (tail[i] == BLOCK_FILL_TAIL) continue;
+            /* built rather than passed as sixteen arguments: BLOCK_ALIGN is
+             * two pointers wide, so a fixed sixteen-way format would read
+             * eight bytes past the tail the day this file is compiled for a
+             * 32-bit ntdll -- which is exactly what the WoW64 work adds. */
+            for (j = 0; j < BLOCK_ALIGN; j++)
+                sprintf( dump + j * 3, "%02x ", tail[j] );
+            ERR( "heap %p, block %p: tail overwritten at +%u -- user data %p, %u bytes; tail now %s\n",
+                 heap, block, i, ptr,
+                 (UINT)(block_get_size( block ) - sizeof(*block) - block->tail_size), dump );
+            break;
+        }
+    }
+
     if (err) WARN( "heap %p, block %p: %s\n", heap, block, err );
     return err ? NULL : block;
 }
