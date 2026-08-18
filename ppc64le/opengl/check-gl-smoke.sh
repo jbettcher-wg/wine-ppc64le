@@ -28,11 +28,28 @@
 #   C  DISPLAY: an Xvfb of this gate's own, on a display number nobody is
 #      using.  winex11 needs an X server; the person at this machine is on
 #      the real ones and this gate never touches them.
+#   C2 COMPOSITOR: a headless weston of this gate's own, GL renderer, on a
+#      private socket in a runtime directory of its own -- the arrangement
+#      check-present-smoke.sh already uses, for the same isolation reasons.
 #   D  NATIVE: the probe built as a ppc64 PE (winegcc), run under this wine
 #      with no guest anywhere in the process, reports PASS.
 #   E  GUEST: the same source built as an x86-64 PE, run under the same wine
 #      as a guest, reports PASS.
 #   F  IDENTITY: cmp(native stdout, guest stdout) is empty.
+#   D2/E2/F2  THE SAME THREE, ON THE WAYLAND DRIVER.  The README argues that
+#      presentation is served on both drivers "by construction" because it
+#      goes through win32u's client-surface layer.  That argument does not
+#      reach OpenGL: context creation, pixel formats and SwapBuffers belong to
+#      the DRIVER, and winex11's GLX and winewayland's EGL are two
+#      implementations rather than one served twice.  So this is run rather
+#      than argued -- and it is also the only leg here that reaches real
+#      hardware, because an Xvfb has no DRI3 and its GL is llvmpipe.
+#      [MEASURED] 2026-08-18, op4k: X11 leg renderer "llvmpipe", Wayland leg
+#      "Radeon Pro V620", both 15/15, both byte-identical native-vs-guest.
+#      A layer re-runs the guest leg at trace+waylanddrv and requires the
+#      driver's own trace, so a leg that quietly ran on X11 cannot pass.
+#      These legs end the wineserver session first, because a Wine desktop has
+#      exactly one graphics driver -- see the comment where they do it.
 #   G  VENDING: the guest's own count of what wglGetProcAddress answered, and
 #      the ONE refusal this port makes by name -- glDebugMessageCallback,
 #      whose first argument is a guest function pointer native GL would call
@@ -48,7 +65,9 @@
 #   1  WINEEMUNOGLVEND=1 makes wglGetProcAddress hand the guest the NATIVE
 #      ppc64 address -- the exact defect this module exists to prevent, and
 #      the one a game cannot diagnose because it looks like a valid pointer.
-#      The guest run must not PASS.
+#      The guest run must not PASS.  Run on BOTH drivers: a negative control
+#      that only ever fires on one of them leaves the other leg unable to go
+#      red, which is the state a newly added leg would otherwise sit in.
 #   2  WINEEMUFPNOSTACK=1 restores the host's floating-point path as it was
 #      before an argument was allowed to travel anywhere but a register: every
 #      FP argument read out of XMMi however far along it is, and every
@@ -61,6 +80,14 @@
 #
 # Exit 0 = pass, 1 = a check failed, 2 = could not run at all (a skip is NOT
 # a pass).
+#
+# THIS GATE IS NOT SAFE TO RUN CONCURRENTLY WITH ANOTHER GATE IN THE SAME
+# PREFIX, and that is new.  Switching graphics drivers means ending the
+# wineserver session (see the comment where it does it), and `wineserver -k`
+# ends every process in the prefix -- including another gate's.  It reaches
+# nothing outside $WINEPREFIX, so a per-agent prefix is enough isolation
+# between people; it is not enough between two gates sharing one.  Run the
+# suite sequentially, which is how it is run.
 #
 # WHY EVERY WINE RUN DISABLES winedbg, verbatim from check-d3d11-smoke.sh
 # because the hazard is identical: the bringup prefix has AeDebug configured
@@ -86,9 +113,21 @@ skip() { echo "check-gl-smoke: $*" >&2; cleanup; exit 2; }
 
 XVFB_PID=
 XVFB_DISPLAY=
+WESTON_PID=
+WL_SOCKET=wine-gl-smoke
+WL_RUNDIR=
+# Kill by PID first and by PATTERN second, and never by a pattern that could
+# match anything but ours -- verbatim the arrangement check-present-smoke.sh
+# arrived at, because the hazard is identical: a shell FUNCTION backgrounded
+# with & runs in a subshell, so $! names the subshell rather than the
+# compositor, and a compositor is left behind per red run.  The pattern below
+# names this gate's own socket, which nothing else on the machine uses.
 cleanup() {
     [ -n "$XVFB_PID" ] && kill "$XVFB_PID" 2>/dev/null
+    [ -n "$WESTON_PID" ] && kill "$WESTON_PID" 2>/dev/null
+    pkill -f "socket=$WL_SOCKET" 2>/dev/null
     XVFB_PID=
+    WESTON_PID=
 }
 trap 'cleanup' EXIT INT TERM
 
@@ -174,10 +213,81 @@ fi
 say "display: Xvfb on $XVFB_DISPLAY (pid $XVFB_PID); the user's :0 and :1 are \
 untouched"
 
+# ---- C2: a Wayland compositor of this gate's own ---------------------------
+# The README argues that presentation is served on both drivers "by
+# construction", because it goes through win32u's client-surface layer.  That
+# argument does not reach OpenGL: context creation, pixel formats and buffer
+# swaps are the DRIVER's, and winex11's GLX and winewayland's EGL are two
+# implementations, not one served two ways.  So the Wayland leg is run rather
+# than argued.
+#
+# A headless weston with the GL renderer, on a private socket in a runtime
+# directory of its own, exactly as check-present-smoke.sh starts one and for
+# the same reasons -- it is MORE isolated than an Xvfb, not less.
+#
+# It is also the only leg here that reaches real hardware.  [MEASURED]
+# 2026-08-18, op4k: the Xvfb leg has no DRI3, so its GL is llvmpipe; the weston
+# leg imports on the same GPU the compositor is running on and reports
+# "Radeon Pro V620 ... Mesa 26.1.2".  The two legs therefore exercise two
+# drivers AND two GL implementations, which is why leg F2 compares native
+# against guest WITHIN each leg rather than comparing the legs to each other.
+WL_LEG=1
+if ! command -v weston >/dev/null; then
+    WL_LEG=0
+    note "no weston; the WAYLAND leg will not run.  The X11 leg below still \
+means what it says, but the driver this gate was extended to cover is not \
+being covered on this machine"
+else
+    WL_RUNDIR=$OUT/wlruntime
+    rm -rf "$WL_RUNDIR" && mkdir -p "$WL_RUNDIR" && chmod 700 "$WL_RUNDIR" || \
+        skip "cannot create a private Wayland runtime directory at $WL_RUNDIR"
+    # Spelled out rather than run through a helper, because a shell function
+    # started with & becomes a subshell and $! would name that instead of
+    # weston.  `env` execs its argument, so this PID really is the compositor's.
+    env -u DISPLAY -u WAYLAND_DISPLAY XDG_RUNTIME_DIR="$WL_RUNDIR" \
+        weston --backend=headless --renderer=gl \
+        --width=640 --height=480 --socket="$WL_SOCKET" \
+        > "$OUT/weston.log" 2>&1 &
+    WESTON_PID=$!
+    n=0
+    while [ $n -lt 200 ]; do
+        [ -S "$WL_RUNDIR/$WL_SOCKET" ] && break
+        kill -0 "$WESTON_PID" 2>/dev/null || break
+        n=$((n + 1)); sleep 0.1
+    done
+    if [ ! -S "$WL_RUNDIR/$WL_SOCKET" ]; then
+        sed 's/^/  weston| /' "$OUT/weston.log" >&2
+        skip "weston did not come up on a private socket"
+    fi
+    if ! grep -q "Using GL renderer" "$OUT/weston.log"; then
+        sed 's/^/  weston| /' "$OUT/weston.log" >&2
+        skip "weston came up without the GL renderer; a pixman-rendered \
+compositor has no EGL for winewayland to build a context on, so this leg would \
+be measuring the compositor and not the driver"
+    fi
+    say "compositor: headless weston 640x480, GL renderer on $(grep -m1 \
+'GL renderer:' "$OUT/weston.log" | sed 's/.*GL renderer: //'), socket \
+$WL_RUNDIR/$WL_SOCKET"
+fi
+
 WDBG=${WINEDEBUG:--all}
 run_wine() {   # run_wine <exe> <extra env assignments...>
     exe=$1; shift
     timeout -k 5 "$TIMEOUT" env DISPLAY="$XVFB_DISPLAY" WINEDEBUG="$WDBG" \
+        WINEDLLOVERRIDES="winedbg.exe=d" "$@" "$BUILD/wine" "$exe"
+}
+
+# The same run against the WAYLAND driver instead.  -u DISPLAY is load-bearing
+# twice over: it makes winex11 unselectable, so a Wayland leg that quietly ran
+# on X11 is impossible rather than merely unlikely, and it keeps the probe off
+# whatever display the person at this machine is on.  XDG_RUNTIME_DIR is
+# replaced too, because a Wayland client finds the caller's compositor through
+# the default socket name even with WAYLAND_DISPLAY unset -- which is exactly
+# how a gate ends up drawing on somebody's desktop.
+run_wine_wl() {   # run_wine_wl <exe> <extra env assignments...>
+    exe=$1; shift
+    timeout -k 5 "$TIMEOUT" env -u DISPLAY XDG_RUNTIME_DIR="$WL_RUNDIR" \
+        WAYLAND_DISPLAY="$WL_SOCKET" WINEDEBUG="$WDBG" \
         WINEDLLOVERRIDES="winedbg.exe=d" "$@" "$BUILD/wine" "$exe"
 }
 
@@ -323,6 +433,33 @@ cannot go red" >&2; ok=0
             "$OUT/sab_vend.out" | cut -c1-70)', as it must"
     fi
 
+    # 1w: the same lever on the WAYLAND leg.  A negative control that only ever
+    # runs on one driver leaves the other driver's leg unable to fail, which is
+    # the state the Wayland leg would otherwise be added in.
+    if [ "$WL_LEG" = 1 ]; then
+        # Same session rule as the positive leg: without this the run dies at
+        # CreateWindow and "went red" would mean "never got a window", which is
+        # a control that proves nothing about vending.
+        "$BUILD/server/wineserver" -k >/dev/null 2>&1 || true
+        sleep 1
+        run_wine_wl "$OUT/guest.exe" WINEEMUNOGLVEND=1 \
+            > "$OUT/sab_wl_vend.out" 2>"$OUT/sab_wl_vend.err"
+        if grep -q "gl_smoke: PASS" "$OUT/sab_wl_vend.out"; then
+            echo "check-gl-smoke: FAIL WINEEMUNOGLVEND=1 still PASSED on the \
+Wayland driver -- that leg cannot go red" >&2; ok=0
+        elif grep -q "step 6 wglCreateContext" "$OUT/sab_wl_vend.out"; then
+            say "sabotage: WINEEMUNOGLVEND=1 killed the guest run on the Wayland \
+driver too, AFTER it had a real context -- at '$(tail -1 "$OUT/sab_wl_vend.out" \
+| cut -c1-70)'"
+        else
+            echo "check-gl-smoke: FAIL the Wayland WINEEMUNOGLVEND=1 run failed \
+before it ever had a GL context, so it went red for a reason that has nothing \
+to do with the lever" >&2
+            sed 's/^/  sab_wl| /' "$OUT/sab_wl_vend.out" >&2
+            ok=0
+        fi
+    fi
+
     # 2: an argument that is not in a register, back to not being an argument.
     run_wine "$OUT/guest.exe" WINEEMUFPNOSTACK=1 \
         > "$OUT/sab_fp.out" 2>"$OUT/sab_fp.err"
@@ -446,6 +583,98 @@ else
     bad "the port returned NULL for glDebugMessageCallback without saying so; a \
 silent NULL is a bug report nobody can file"
     grep -m5 "wglGetProcAddress" "$OUT/loud.err" | sed 's/^/  loud| /' >&2
+fi
+
+# ---- D2/E2/F2: the same three legs, on the WAYLAND driver -------------------
+# The identical binaries.  Only the driver underneath differs, which is the
+# whole claim: a guest that reaches native GL through winex11's GLX and one
+# that reaches it through winewayland's EGL must get the same answers as the
+# native ppc64 build sitting beside it on the same driver.
+if [ "$WL_LEG" = 1 ]; then
+    # A WINE SESSION SERVES ONE GRAPHICS DRIVER, and this is the finding this
+    # leg produced before it produced anything about OpenGL.  The X11 legs
+    # above leave a wineserver running with an explorer whose desktop belongs
+    # to winex11; a process joining that session with DISPLAY unset gets no
+    # driver at all and dies at CreateWindow:
+    #
+    #   err:winediag:nodrv_CreateWindow Application tried to create a window,
+    #     but no driver could be loaded.
+    #   err:winediag:nodrv_CreateWindow L"The explorer process failed to start."
+    #
+    # [MEASURED] 2026-08-18, op4k: identical binary, identical environment,
+    # 15/15 in a session of its own and 1/2 in a session the X11 legs had
+    # already started.  It is not a defect in either driver -- the desktop
+    # window is per session and it has one owner -- but it is a fact anyone
+    # switching drivers has to know, and it is why this gate ends the session
+    # rather than merely unsetting DISPLAY.  Only this gate's own prefix is
+    # touched: WINEPREFIX is the caller's and wineserver -k reaches nothing
+    # outside it.
+    "$BUILD/server/wineserver" -k >/dev/null 2>&1 || true
+    sleep 1
+    say "wayland session: ended the X11 session first -- a Wine desktop has one \
+graphics driver and the second one needs a session of its own"
+    run_wine_wl "$OUT/native.exe" > "$OUT/wl_native.out" 2>"$OUT/wl_native.err"
+    nst=$?
+    if [ $nst -eq 124 ] || [ $nst -eq 137 ]; then
+        bad "the native run on the Wayland driver timed out after ${TIMEOUT}s"
+    elif grep -q "gl_smoke: PASS" "$OUT/wl_native.out"; then
+        say "wayland native: $(tail -1 "$OUT/wl_native.out")"
+    else
+        sed 's/^/  wl_native| /' "$OUT/wl_native.out" >&2
+        tail -20 "$OUT/wl_native.err" >&2
+        bad "the native ppc64 build did not pass on the Wayland driver -- there \
+is no working GL on this compositor at all, so nothing below could mean anything"
+    fi
+
+    run_wine_wl "$OUT/guest.exe" > "$OUT/wl_guest.out" 2>"$OUT/wl_guest.err"
+    gst=$?
+    if [ $gst -eq 124 ] || [ $gst -eq 137 ]; then
+        bad "the guest run on the Wayland driver timed out after ${TIMEOUT}s"
+    elif grep -q "gl_smoke: PASS" "$OUT/wl_guest.out"; then
+        say "wayland guest:  $(tail -1 "$OUT/wl_guest.out")"
+    else
+        sed 's/^/  wl_guest| /' "$OUT/wl_guest.out" >&2
+        tail -20 "$OUT/wl_guest.err" >&2
+        bad "the x86-64 guest build did not pass on the Wayland driver"
+    fi
+
+    if cmp -s "$OUT/wl_native.out" "$OUT/wl_guest.out"; then
+        say "wayland identity: native and guest output is byte-identical on the \
+Wayland driver too ($(wc -l < "$OUT/wl_native.out") lines)"
+    else
+        bad "native and guest output differ on the Wayland driver; first \
+difference: $(diff "$OUT/wl_native.out" "$OUT/wl_guest.out" | head -1)"
+        diff "$OUT/wl_native.out" "$OUT/wl_guest.out" | sed 's/^/  /' | head -20 >&2
+    fi
+
+    # It really was the Wayland driver.  Without this the leg would pass on a
+    # machine where DISPLAY leaked back in and winex11 served it, which is a
+    # green light for a driver nobody tested.  The driver's own trace names its
+    # own surfaces; nothing else in the process produces that channel.
+    run_wine_wl "$OUT/guest.exe" WINEDEBUG=-all,trace+waylanddrv \
+        > "$OUT/wl_loud.out" 2>"$OUT/wl_loud.err"
+    if grep -q "waylanddrv" "$OUT/wl_loud.err"; then
+        say "wayland driver: winewayland.drv really served this leg: $(grep -m1 \
+'waylanddrv' "$OUT/wl_loud.err" | cut -c1-110)"
+    else
+        bad "the Wayland leg produced no waylanddrv trace at all; something \
+other than winewayland.drv served those runs and this leg proves nothing"
+    fi
+
+    # The two legs are two GL implementations, not one seen twice.  Said out
+    # loud rather than asserted, because which implementation an X server and a
+    # compositor hand out is the machine's business and not this gate's -- but
+    # a reader has to be able to tell whether the Wayland leg added coverage or
+    # repeated the X11 leg.
+    _x11r=$(sed -n 's/.*renderer="\([^"]*\)".*/\1/p' "$OUT/native.out" | head -1)
+    _wlr=$(sed -n 's/.*renderer="\([^"]*\)".*/\1/p' "$OUT/wl_native.out" | head -1)
+    if [ "$_x11r" != "$_wlr" ]; then
+        say "coverage: the two legs ran on different GL implementations -- X11 \
+'$_x11r', Wayland '$_wlr'"
+    else
+        note "both legs report the same GL renderer '$_x11r', so the Wayland leg \
+covers a second DRIVER but not a second GL implementation on this machine"
+    fi
 fi
 
 # ---- H: ordinals ------------------------------------------------------------
