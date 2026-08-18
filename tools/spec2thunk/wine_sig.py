@@ -1056,6 +1056,78 @@ class WineHeaders:
             result[k] = sizes
         return result
 
+    def signs(self, requests):
+        """-> {key: [0 or 1, ...]}: is each requested type SIGNED?
+
+        Only ever asked about types widths() already measured at 1 or 2 bytes,
+        because the probe is an integer comparison and a pointer or a struct
+        would not compile -- and a failed compile here costs the caller its
+        answer for the whole batch.
+
+        Measured, not spelled: `(T)-1 < (T)0` is true exactly when T is a
+        signed integer type, and the two operands promote to int so the
+        comparison means what it says for every sub-word width.  A bool is
+        answered `unsigned`, which is right: `(bool)-1` is 1.
+
+        This exists for the same reason widths() does, one step further on.
+        Width alone says how many bits of the guest's register are real; it
+        does not say what the missing bits should become.  ELFv2 requires the
+        CALLER to extend a sub-word argument as its type demands -- sign for a
+        SHORT, zero for a WORD -- and a ppc64 callee compiled at -O2 is
+        entitled to skip re-extending.  Zero-extending everything would hand
+        `SHORT nCmdShow = -1` to native code as 65535: a wrong number, not a
+        crash.  libs/winecom carries the same bit for COM vtable slots
+        (winecom_slot::narrowsign); this is the flat-surface half.
+        """
+        items = [(k, list(ts)) for k, ts in requests if ts]
+        if not items:
+            return {}
+        return self._sign_batch(items)
+
+    def _sign_batch(self, items):
+        """One compile for `items`; on failure, bisect -- as _fp_batch does,
+        and for the same reason: one unprobeable type must not cost every
+        other export in the batch its answer."""
+        got = self._sign_compile(items)
+        if got is not None:
+            return got
+        if len(items) == 1:
+            return {}          # caller publishes no signedness for this export
+        mid = len(items) // 2
+        out = self._sign_batch(items[:mid])
+        out.update(self._sign_batch(items[mid:]))
+        return out
+
+    def _sign_compile(self, items):
+        """-> {key: [0|1, ...]} or None if the probe did not compile."""
+        lines = [self.probe_src]
+        for n, (k, types) in enumerate(items):
+            for i, t in enumerate(types):
+                lines.append('char wt_sg_%d_%d[1 + ((%s)-1 < (%s)0)];\n'
+                             % (n, i, t, t))
+        path = os.path.join(self.workdir, 'wt_signs.c')
+        with open(path, 'w') as f:
+            f.write(''.join(lines))
+        out = os.path.join(self.workdir, 'wt_signs.ll')
+        cmd = [c for c in self._base() if c != '-fsyntax-only']
+        r = subprocess.run(cmd + ['-S', '-emit-llvm', '-o', out, path],
+                           capture_output=True, text=True)
+        self.stats['probe_compiles'] += 1
+        if r.returncode != 0:
+            return None
+        found = {}
+        with open(out) as f:
+            for m in re.finditer(r'@wt_sg_(\d+)_(\d+)\s*=[^\[]*\[(\d+) x i8\]',
+                                 f.read()):
+                found[(int(m.group(1)), int(m.group(2)))] = int(m.group(3))
+        result = {}
+        for n, (k, types) in enumerate(items):
+            lens = [found.get((n, i)) for i in range(len(types))]
+            if None in lens or any(l not in (1, 2) for l in lens):
+                continue
+            result[k] = [l - 1 for l in lens]
+        return result
+
     def fp_classes(self, requests):
         """-> {key: [code, ...]} where code is 0 not-FP, 1 double, 2 float.
 

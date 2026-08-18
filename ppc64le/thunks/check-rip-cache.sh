@@ -61,6 +61,10 @@
 #                    being used" assertion fail.  A lever that had quietly
 #                    stopped working would leave every other leg of this gate
 #                    passing for the wrong reason.
+#   sabotage(argsign) WINEEMUNOARGSIGN=1 leaves the widths alone and
+#                     zero-extends the signed ones, so it reds only if
+#                     SIGNEDNESS is what carries a negative sub-word argument
+#                     -- which turning narrowing off altogether cannot show.
 #   sabotage(argwidth) WINEEMUNOARGWIDTH=1 puts back the rule that cut every
 #                    argument narrower than a pointer to 32 bits rather than
 #                    to its own width, and the probe must fail.  Neither of the
@@ -98,7 +102,7 @@ skip() { echo "check-rip-cache: $*" >&2; exit 2; }
 [ -x "$BUILD/wine" ] || skip "no wine loader at $BUILD/wine"
 [ -n "${WINEPREFIX:-}" ] || skip "set WINEPREFIX to a prefix wineboot has run in"
 [ -n "${WINEFEXBRIDGE:-}" ] || skip "set WINEFEXBRIDGE to the emulator bridge"
-for m in kernel32 user32 ole32; do
+for m in kernel32 user32 ole32 oleaut32; do
     [ -f "$BUILD/dlls/$m/x86_64-windows/$m.dll" ] || \
         skip "no guest $m thunk; build it first"
 done
@@ -144,7 +148,16 @@ CoInitializeEx
 CoUninitialize
 CoGetMalloc
 EOF
-for m in kernel32 user32 ole32; do
+# oleaut32 is here for the SIGNED sub-word crossing and nothing else.  Its
+# VarI4From* conversions are a single assignment natively, so the answer is
+# the argument -- see the block in thunk_cache.c that calls them.
+cat > "$OUT/oleaut32.def" <<'EOF'
+LIBRARY oleaut32.dll
+EXPORTS
+VarI4FromBool
+VarI4FromI2
+EOF
+for m in kernel32 user32 ole32 oleaut32; do
     llvm-dlltool -m i386:x86-64 -d "$OUT/$m.def" -l "$OUT/lib$m.a" \
         || skip "llvm-dlltool failed for $m"
 done
@@ -158,6 +171,7 @@ $GUESTCC -c -o "$OUT/thunk_cache.o" "$HERE/probes/thunk_cache.c" \
     || skip "guest compile failed"
 $GUESTLD -o "$OUT/thunk_cache.exe" "$OUT/thunk_cache.o" \
     "$OUT/libkernel32.a" "$OUT/libuser32.a" "$OUT/libole32.a" \
+    "$OUT/liboleaut32.a" \
     || skip "guest link failed"
 
 EXE="$OUT/thunk_cache.exe"
@@ -168,13 +182,13 @@ EXE="$OUT/thunk_cache.exe"
 # PASS, having quietly skipped exactly the crossings this cache serves worst.
 imports=$(llvm-readobj --coff-imports "$EXE" 2>/dev/null | \
           sed -n 's/^ *Name: \(.*\)$/\1/p' | tr 'A-Z' 'a-z' | sort -u)
-for m in kernel32.dll user32.dll ole32.dll; do
+for m in kernel32.dll user32.dll ole32.dll oleaut32.dll; do
     case "$imports" in
         *"$m"*) ;;
         *) bad "layer 1: $EXE does not import $m (got: $(echo $imports))" ;;
     esac
 done
-[ "$fail" = 0 ] && say "layer 1: imports kernel32, user32 and ole32"
+[ "$fail" = 0 ] && say "layer 1: imports kernel32, user32, ole32 and oleaut32"
 
 run_probe() {   # run_probe <logfile> [env assignments...]
     _log=$1; shift
@@ -223,7 +237,24 @@ marshaller, or nothing in the probe depends on it" >&2
         say "sabotage(argwidth): the probe failed with sub-word arguments cut to 32 bits, as it must (rc=$rc)"
     fi
 
-    [ $sfail -eq 0 ] && say "SABOTAGE PASS (all three controls red)"
+    # The fourth control, and the one WINEEMUNOARGWIDTH cannot stand in for:
+    # turning narrowing off entirely would hide a signedness bug behind a
+    # width bug.  WINEEMUNOARGSIGN leaves every width alone and zero-extends
+    # the signed ones, so this leg reds if and only if the SIGN bit is what
+    # carries a negative sub-word argument across.  Measured: without it
+    # VarI4FromBool(VARIANT_TRUE) answers 65535 instead of -1.
+    rc=$(run_probe "$OUT/sign.out" WINEEMUNOARGSIGN=1 TC_ITERATIONS=5)
+    if [ "$rc" = 0 ] && grep -q '^PASS$' "$OUT/sign.out"; then
+        echo "check-rip-cache: SABOTAGE FAIL argsign: the probe still passed with \
+signed sub-word arguments zero-extended -- the sign word is not reaching the \
+marshaller, or nothing in the probe depends on it" >&2
+        sfail=1
+    else
+        say "sabotage(argsign): the probe failed with signed sub-word arguments \
+zero-extended, as it must (rc=$rc)"
+    fi
+
+    [ $sfail -eq 0 ] && say "SABOTAGE PASS (all four controls red)"
     exit $sfail
 fi
 

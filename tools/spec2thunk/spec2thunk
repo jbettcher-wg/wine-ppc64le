@@ -179,7 +179,7 @@ import wine_sig
 from wine_sig import Refused
 
 STRIDE = 16
-INFO_VERSION = 6
+INFO_VERSION = 7
 # Byte offset of the trapping instruction inside a stub, per body mode.
 TRAP_OFF = {'direct': 0, 'trap': 3}
 BUILTIN_SIG = b"Wine builtin DLL\x00"   # 17 bytes, must sit at file offset 0x40
@@ -1385,6 +1385,40 @@ def resolve_signatures(exports, headers, specs=None):
         code = {8: 0, 4: 1, 2: 2, 1: 3}
         e['widths'] = sum(code.get(sz, 0) << (j * 2) for j, sz in enumerate(sizes))
 
+    # AND WHICH OF THOSE SUB-WORD ARGUMENTS ARE SIGNED.
+    #
+    # Width says how many of the guest's bits are real; it does not say what
+    # the rest should become.  ELFv2 makes extension the CALLER's job and ties
+    # the kind of extension to the argument's TYPE -- sign for a SHORT, zero
+    # for a WORD -- and a ppc64 callee compiled at -O2 is entitled not to
+    # re-extend.  Zero-extending everything, which is what this tool published
+    # before, turns a SHORT of -1 into 65535 on the way in: the same wrong-
+    # number class as the GetActiveProcessorCount case above, and just as
+    # invisible to a check that only asks whether the call returned.
+    #
+    # Only 1- and 2-byte arguments are asked about.  Four-byte ones need
+    # nothing whichever way they are signed, because the host narrows them
+    # with a cast to UINT and the ppc64 callee re-reads 32 bits; eight-byte
+    # ones are not narrowed at all.  Restricting the probe to sub-word types
+    # is also what keeps it compilable -- `(ptr)-1 < (ptr)0` is not C.
+    #
+    # libs/winecom carries this same bit per COM vtable slot
+    # (winecom_slot::narrowsign).  This is the flat-surface half of it, and
+    # the two were deliberately brought into line rather than left to differ
+    # by surface.
+    sign_req = []
+    for i, e in enumerate(accepted):
+        sizes = widths.get(i)
+        if not sizes or len(sizes) != e['sig']['nargs'] or spec_cited(e):
+            continue
+        params = e['sig'].get('params') or []
+        sub = [(j, params[j]) for j, sz in enumerate(sizes)
+               if sz in (1, 2) and j < len(params)]
+        if sub:
+            sign_req.append(((i, tuple(j for j, _ in sub)),
+                             [t for _, t in sub]))
+    for (i, idx), flags in headers.signs(sign_req).items():
+        accepted[i]['signs'] = sum(1 << j for j, f in zip(idx, flags) if f)
 
     # ------------------------------------------------------------------
     # Which arguments, and the return, are FLOATING POINT.
@@ -1612,6 +1646,20 @@ def emit_asm(dll, exports, mode, com_ifaces=None):
     a('\t.long\twine_thunk_implv@IMGREL\t# impl_names_rva  (version 4)')
     a('\t.long\twine_thunk_fpv@IMGREL\t# fp_rva  (version 5)')
     a('\t.long\twine_thunk_widthv@IMGREL\t# widths_rva  (version 6)')
+    a('\t.long\twine_thunk_signv@IMGREL\t# signs_rva   (version 7)')
+    a('')
+    # One signedness descriptor per export, ONE bit per argument: set means
+    # that argument is a SIGNED sub-word integer and the host must sign-extend
+    # it rather than zero-extend it.  Only bits whose width descriptor says 1
+    # or 2 bytes can be set; every other bit is zero and the host ignores it.
+    #
+    # Zero is the safe default and also the old behaviour, so an export the
+    # sign oracle could not measure keeps exactly the treatment it had.
+    a('\t.balign\t4')
+    a('wine_thunk_signv:')
+    for e in exports:
+        a('\t.long\t0x%08X\t\t# %s' % (e.get('signs', 0), e['name']))
+    a('')
     # One argument-width descriptor per export, two bits per argument.  Zero
     # for an export whose arguments are all pointer-width, which is most of
     # them, and zero is also the honest answer for an entry the width oracle

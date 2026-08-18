@@ -51,6 +51,7 @@
 
 #include <windows.h>
 #include <objbase.h>
+#include <oleauto.h>
 
 #define TC_THREADS         4
 #define TC_ITERATIONS      200
@@ -138,6 +139,33 @@ static ULONG tc_checks( IMalloc *imalloc )
         DWORD one = GetActiveProcessorCount( 0 );
 
         if (!all || all != one) bad++;
+    }
+
+    /* SIGNED sub-word arguments, which the width word alone gets wrong.
+     *
+     * ELFv2 makes extending a sub-word argument the CALLER's job AND ties the
+     * kind of extension to the argument's type; MS-x64 leaves the upper bits
+     * undefined and makes ignoring them the callee's job.  So the host has to
+     * know not just how wide the guest's value is but whether it is signed --
+     * and zero-extending everything, which is what this port did when the
+     * width word was first added, turns a negative sub-word argument into a
+     * large positive one.
+     *
+     * These two exports were chosen because their native implementations are
+     * a single assignment (dlls/oleaut32/vartype.c: `*plOut = sIn;`), so the
+     * answer is the argument and nothing else can explain a wrong one.
+     *
+     * VARIANT_TRUE IS -1, not 1 -- a VARIANT_BOOL is a SHORT and OLE's true
+     * is all-bits-set.  Zero-extended it arrives as 65535, which is the exact
+     * wrong answer this checks for rather than merely checking "not equal".
+     * VarI4FromI2 does the same for an ordinary negative SHORT, so a host
+     * that special-cased 0xFFFF would still be caught. */
+    {
+        LONG l = 0;
+
+        if (VarI4FromBool( VARIANT_TRUE, &l ) != S_OK || l != -1) bad++;
+        l = 0;
+        if (VarI4FromI2( -12345, &l ) != S_OK || l != -12345) bad++;
     }
 
     /* COM vtable slots: three of them, with a relationship between the
@@ -242,17 +270,18 @@ void thunk_cache_entry(void)
         CloseHandle( threads[i] );
     }
 
-    /* FIFTEEN CROSSINGS per pass -- lstrlenA twice, lstrcmpA twice, MulDiv,
+    /* SEVENTEEN CROSSINGS per pass -- lstrlenA twice, lstrcmpA twice, MulDiv,
      * SetLastError, GetLastError, IsCharAlphaA twice, CharUpperA,
-     * GetActiveProcessorGroupCount, GetActiveProcessorCount twice, and
-     * IMalloc's Alloc/GetSize/Free -- of which twelve are value checks
+     * GetActiveProcessorGroupCount, GetActiveProcessorCount twice,
+     * VarI4FromBool, VarI4FromI2, and IMalloc's Alloc/GetSize/Free -- of
+     * which fourteen are value checks
      * (SetLastError and Free have no answer of their own; they set up and tear
      * down the two that do).  CROSSINGS rather than checks is the number
      * printed, because it is the number the gate's cache-hit floor is actually
      * about, and it is printed rather than left implicit so that floor comes
      * from this probe's own transcript instead of a constant in the script
      * that would rot the moment a call is added here. */
-    crossings = 15 * (1 + TC_THREADS * iterations);
+    crossings = 17 * (1 + TC_THREADS * iterations);
     out( "threads=" ); out_dec( TC_THREADS );
     out( " iterations=" ); out_dec( iterations );
     out( " crossings=" ); out_dec( crossings );
