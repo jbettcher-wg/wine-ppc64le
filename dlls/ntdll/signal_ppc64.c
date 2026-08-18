@@ -5299,27 +5299,74 @@ static BOOL find_guest_com_target( LDR_DATA_TABLE_ENTRY *mod, ULONG_PTR rip,
     return FALSE;
 }
 
-/* A direct-mapped cache of the FLAT half of find_guest_thunk_target, keyed by
- * the trapping RIP.  Same idiom as find_guest_com_target's per-module
- * __wine_com_dispatch cache just above (a fixed array, filled and read only
- * while the caller holds the loader lock, never explicitly invalidated) --
- * this is the same risk this port already accepts for that cache, applied to
- * the path that actually needs it: a flat guest thunk resolves through
- * LdrGetDllHandle/LdrLoadDll AND LdrGetProcedureAddress -- two name lookups,
- * each walking a loaded-module hash table under the loader lock -- and does
- * that on EVERY trap, including the two or more GL entry points (bind a
- * buffer, then draw) a single frame's inner loop calls thousands of times.
- * A guest CALL site's RIP is a fixed address for as long as its module stays
- * mapped there, so the resolution is loop-invariant; only the lookup was not
- * being treated as one.
+/* A direct-mapped cache of find_guest_thunk_target's answer, keyed by the
+ * trapping RIP, AND READ WITHOUT THE LOADER LOCK.  Both halves of that
+ * sentence are load-bearing, and the second one is the point.
+ *
+ * WHAT THE LOOKUP COSTS.  A flat guest thunk resolves through LdrGetDllHandle
+ * (or LdrLoadDll) AND LdrGetProcedureAddress -- two name lookups, each walking
+ * a loaded-module hash table -- and a COM slot walks the module list to find
+ * the image the RIP lies in.  That happened on EVERY trap, including the two
+ * or more GL entry points a single frame's inner loop calls thousands of
+ * times.  A guest CALL site's RIP is a fixed address for as long as its
+ * module stays mapped there, so the resolution is loop-invariant; only the
+ * lookup was not being treated as one.
+ *
+ * WHAT THE LOCK COSTS, WHICH IS MORE.  find_guest_thunk_target takes the
+ * LOADER LOCK, and it has to for the resolving path: that path can call
+ * LdrLoadDll, and it reads the module list while another thread may be
+ * splicing it.  But the loader lock is PROCESS-WIDE and shared with every
+ * LoadLibrary, GetProcAddress and module walk in the process -- and this
+ * function is on the path of EVERY SINGLE guest-to-native call.  A game with
+ * eight worker threads all calling into Win32 does not have eight threads: it
+ * has one, and seven waiting to make a hash-table lookup they have already
+ * made.  Caching under the lock shortened the hold; it did not remove the
+ * serialization, which is the thing that was actually costing the cores.
+ * (Measured shape: DOOM 2016 uses ~2.5 cores natively against 7-9 fully
+ * emulated on the same box -- the emulated stack has no such choke point.)
+ *
+ * SO THE HIT PATH TAKES NO LOCK AT ALL, and the entry is published with a
+ * SEQLOCK.  Writers are already serialized against each other by the loader
+ * lock they hold for the resolve, so one sequence number per slot is enough:
+ * odd means "being written", even means stable, and a reader that sees the
+ * same even value before and after copying the payload knows no writer
+ * overlapped its read.  The alternative -- comparing only the key before and
+ * after -- is not sound, because a slot can be evicted to some other RIP and
+ * back again while a reader is inside it, and the reader would then splice
+ * two different entries' fields together and match the key at both ends.
+ * That is a wrong answer rather than a crash, which is the failure mode this
+ * whole port is most careful about.  (The sequence number is 32 bits, so the
+ * protocol has a seqlock's usual theoretical hole: 2^32 writes to ONE slot
+ * inside ONE reader's ten-field copy.  Writers are serialized by the loader
+ * lock and the copy is a dozen loads.)
+ *
+ * The fences are the explicit compiler builtins rather than MemoryBarrier():
+ * this file is ppc64-only, the two orderings needed are store-store on the
+ * write side and load-load on the read side, and both are `lwsync` on POWER
+ * where MemoryBarrier() is the far heavier full `sync`.  Paying a full
+ * barrier per crossing would give back some of what removing the lock buys.
  *
  * ONE slot per hash bucket, like a CPU cache: a collision simply evicts,
  * which only costs a lookup on the next hit for that RIP, never a wrong
- * answer -- the slot is keyed by the exact RIP the entry was resolved for,
- * so a stale or colliding entry is a MISS (`.rip != rip`), not a wrong HIT.
- * Not invalidated on module unload, same as the COM cache beside it: nothing
- * in this port unloads and reloads a guest DLL at a reused base address
- * today, and if that ever changes, both caches need the same fix together.
+ * answer -- the slot carries the exact RIP it was resolved for, so a stale or
+ * colliding entry is a MISS, not a wrong hit.
+ *
+ * COM SLOTS ARE CACHED HERE TOO, and that is a change from the first version
+ * of this cache, which skipped them on the grounds that find_guest_com_target
+ * has its own per-module dispatch cache.  It does -- but that cache only
+ * saves the __wine_com_dispatch lookup, not the module-list walk, and not the
+ * loader lock, which was the whole cost.  A COM-heavy guest (Direct3D 12,
+ * XAudio2 -- which is to say a game) crosses the boundary through vtable
+ * slots far more often than through flat imports.
+ *
+ * INVALIDATION.  free_modref() calls flush_guest_thunk_cache() when a module
+ * is unmapped, so an entry can never outlive the image it names.  The first
+ * version relied on nothing in this port unloading and reloading a guest DLL
+ * at a reused base address; that was true of the corpus on the day it was
+ * written and is not a property anything enforces -- a game that FreeLibrary's
+ * a plugin and loads another one is ordinary, and mmap reuses addresses.
+ * Flushing costs one pass over 1024 slots on an event that already unmaps a
+ * view.
  *
  * WINEEMUNORIPCACHE=1 is the negative control: it forces every lookup to
  * miss, so a bug that only the cached path has (or only the uncached path
@@ -5330,11 +5377,13 @@ static BOOL find_guest_com_target( LDR_DATA_TABLE_ENTRY *mod, ULONG_PTR rip,
 
 struct thunk_rip_cache_entry
 {
-    ULONG_PTR rip;
+    LONG seq;                    /* odd while written; see the seqlock note */
+    ULONG_PTR rip;               /* 0 = empty; otherwise the exact key */
     void *proc;
     UINT sig;
     thunk_override_func override;
     UINT cb_mask, cb_wide, fp;
+    struct com_thunk_hit com;    /* com.dispatch NULL unless this RIP is a slot */
 };
 
 static struct thunk_rip_cache_entry thunk_rip_cache[THUNK_RIP_CACHE_SIZE];
@@ -5350,6 +5399,143 @@ static UINT thunk_rip_cache_slot( ULONG_PTR rip )
     return (UINT)(h & (THUNK_RIP_CACHE_SIZE - 1));
 }
 
+/* Sabotage lever, read once.  Both halves of the cache have to honour it or
+ * it proves nothing: a reader forced to slot zero while the writer still
+ * files by hash would simply find that slot empty and miss forever, which
+ * looks exactly like a gate passing. */
+static int thunk_rip_cache_blind(void)
+{
+    static int blind = -1;
+
+    if (blind == -1)
+    {
+        blind = emu_env_flag( L"WINEEMURIPCACHEBLIND" );
+        if (blind)
+            ERR( "WINEEMURIPCACHEBLIND: the thunk cache will answer from one "
+                 "slot without comparing the trapping address; every crossing "
+                 "past the first is liable to reach the wrong function\n" );
+    }
+    return blind;
+}
+
+/* -> TRUE with *out filled when this RIP is cached.  No lock: see above.
+ *
+ * WINEEMURIPCACHEBLIND=1 is the second negative control, and it is the one
+ * that has something to prove.  WINEEMUNORIPCACHE only turns the cache OFF,
+ * which can only ever make the port slower, never wrong -- a gate built on it
+ * alone would go red for a mechanism that was never at risk.  BLIND instead
+ * keeps the cache and removes the two things that make it SAFE: every RIP is
+ * forced into slot zero and the key is not compared.  The second distinct
+ * call site then gets the first one's function, which is a wrong answer of
+ * exactly the class this cache could produce if the key check were ever
+ * dropped, and it is deterministic rather than a race a gate would have to
+ * get lucky to catch. */
+static BOOL thunk_rip_cache_get( ULONG_PTR rip, struct thunk_rip_cache_entry *out )
+{
+    const struct thunk_rip_cache_entry volatile *e;
+    int blind = thunk_rip_cache_blind();
+    LONG s1, s2;
+
+    e = &thunk_rip_cache[blind ? 0 : thunk_rip_cache_slot( rip )];
+
+    s1 = ReadAcquire( (LONG const volatile *)&e->seq );
+    if (s1 & 1) return FALSE;                 /* a writer is inside this slot */
+
+    /* Field by field through a volatile pointer so the compiler really loads
+     * each one between the two sequence reads rather than sinking a struct
+     * copy past the fence below. */
+    out->rip          = e->rip;
+    out->proc         = e->proc;
+    out->sig          = e->sig;
+    out->override     = e->override;
+    out->cb_mask      = e->cb_mask;
+    out->cb_wide      = e->cb_wide;
+    out->fp           = e->fp;
+    out->com.dispatch = e->com.dispatch;
+    out->com.iface    = e->com.iface;
+    out->com.slot     = e->com.slot;
+
+    __atomic_thread_fence( __ATOMIC_ACQUIRE );   /* payload loads, THEN the recheck */
+    s2 = ReadNoFence( (LONG const volatile *)&e->seq );
+    if (s1 != s2) return FALSE;
+    if (!blind && out->rip != rip) return FALSE;
+    if (!out->rip) return FALSE;                /* an empty slot answers nothing */
+
+    /* Traced because a cache is otherwise invisible: "did the fast path run"
+     * has no other answer from outside the process, and ppc64le/thunks/
+     * check-rip-cache.sh asserts an exact count of these against a probe that
+     * controls exactly how many crossings it makes. */
+    TRACE( "thunk cache hit for %p -> proc %p com %p\n",
+           (void *)rip, out->proc, out->com.dispatch );
+    return TRUE;
+}
+
+/* Publish an answer.  CALLER HOLDS THE LOADER LOCK, which is what serializes
+ * writers against each other and is why one sequence number is enough. */
+static void thunk_rip_cache_put( ULONG_PTR rip, const struct thunk_rip_cache_entry *val )
+{
+    struct thunk_rip_cache_entry volatile *e =
+        &thunk_rip_cache[thunk_rip_cache_blind() ? 0 : thunk_rip_cache_slot( rip )];
+    LONG s = e->seq;
+
+    /* An ODD sequence here means a writer is already inside this slot, and
+     * since the loader lock serializes writers ACROSS threads the only way to
+     * see it is a write nested inside another write ON THIS ONE -- a resolve
+     * that re-entered find_guest_thunk_target while filling a slot.  Nothing
+     * in the port does that today; the point is that if anything ever does,
+     * the inner write would restart the sequence from an odd value and leave
+     * the slot looking stable while it was not, which is a wrong answer.
+     * Skipping the fill instead costs one lookup next time. */
+    if (s & 1) return;
+
+    WriteRelease( (LONG volatile *)&e->seq, s + 1 );   /* odd: writing */
+    __atomic_thread_fence( __ATOMIC_RELEASE );         /* ...before any payload store */
+
+    e->rip          = rip;
+    e->proc         = val->proc;
+    e->sig          = val->sig;
+    e->override     = val->override;
+    e->cb_mask      = val->cb_mask;
+    e->cb_wide      = val->cb_wide;
+    e->fp           = val->fp;
+    e->com.dispatch = val->com.dispatch;
+    e->com.iface    = val->com.iface;
+    e->com.slot     = val->com.slot;
+
+    WriteRelease( (LONG volatile *)&e->seq, s + 2 );   /* even: stable again */
+}
+
+/***********************************************************************
+ *           flush_guest_thunk_cache
+ *
+ * Every cached answer names an address inside some mapped image, so every one
+ * of them stops being an answer the moment a module is unmapped.  Called from
+ * free_modref() in dlls/ntdll/loader.c, which holds the loader section -- the
+ * same lock thunk_rip_cache_put() writes under, so this cannot race a writer
+ * and only has to be safe against concurrent READERS, which the sequence
+ * protocol already makes it.
+ */
+void flush_guest_thunk_cache(void)
+{
+    UINT i;
+
+    for (i = 0; i < THUNK_RIP_CACHE_SIZE; i++)
+    {
+        struct thunk_rip_cache_entry volatile *e = &thunk_rip_cache[i];
+        LONG s;
+
+        if (!e->rip) continue;
+        s = e->seq;
+        WriteRelease( (LONG volatile *)&e->seq, s + 1 );
+        __atomic_thread_fence( __ATOMIC_RELEASE );
+        e->rip          = 0;
+        e->proc         = NULL;
+        e->override     = NULL;
+        e->com.dispatch = NULL;
+        WriteRelease( (LONG volatile *)&e->seq, s + 2 );
+    }
+}
+
 /***********************************************************************
  *           find_guest_thunk_target
  *
@@ -5362,14 +5548,33 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
                                       UINT *fp )
 {
     static int no_cache = -1;
+    struct thunk_rip_cache_entry hit;
     LIST_ENTRY *mark, *entry;
     void *ret = NULL;
     ULONG_PTR magic;
-    UINT cache_slot;
 
     if (no_cache == -1) no_cache = emu_env_flag( L"WINEEMUNORIPCACHE" );
 
     *fp = 0;
+
+    /* BEFORE THE LOCK, deliberately.  This is the whole reason the cache
+     * exists: a warm trap site answers out of one cache line and never enters
+     * the process-wide loader lock at all, so N guest threads crossing the
+     * boundary are N threads crossing it rather than one at a time.  See the
+     * seqlock note above thunk_rip_cache_get for why this is safe without a
+     * lock and why comparing the key alone would not have been. */
+    if (!no_cache && thunk_rip_cache_get( rip, &hit ))
+    {
+        *sig_out  = hit.sig;
+        *override = hit.override;
+        *cb_mask  = hit.cb_mask;
+        *cb_wide  = hit.cb_wide;
+        *fp       = hit.fp;
+        /* a COM entry carries a dispatch and a NULL proc; a flat one the
+         * reverse, and must leave the caller's zeroed *com alone */
+        if (com && hit.com.dispatch) *com = hit.com;
+        return hit.proc;
+    }
 
     /* The loader lock, not a private one: this walk calls LdrLoadDll below when
      * a guest module's native counterpart is not loaded yet, and that takes the
@@ -5377,23 +5582,6 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
      * resolving while another guest thread is inside LoadLibrary reads a list
      * that is being spliced. */
     LdrLockLoaderLock( 0, NULL, &magic );
-
-    /* COM slots are not cached here: find_guest_com_target's own per-module
-     * cache already turns their resolution into a hash lookup plus one
-     * subtraction, and this cache would only add a second table answering
-     * the same question. */
-    cache_slot = thunk_rip_cache_slot( rip );
-    if (!no_cache && thunk_rip_cache[cache_slot].rip == rip)
-    {
-        *sig_out  = thunk_rip_cache[cache_slot].sig;
-        *override = thunk_rip_cache[cache_slot].override;
-        *cb_mask  = thunk_rip_cache[cache_slot].cb_mask;
-        *cb_wide  = thunk_rip_cache[cache_slot].cb_wide;
-        *fp       = thunk_rip_cache[cache_slot].fp;
-        ret = thunk_rip_cache[cache_slot].proc;
-        LdrUnlockLoaderLock( 0, magic );
-        return ret;
-    }
 
     mark = &NtCurrentTeb()->Peb->LdrData->InMemoryOrderModuleList;
     for (entry = mark->Flink; entry != mark; entry = entry->Flink)
@@ -5504,18 +5692,33 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
         ret = proc;
         if (!no_cache)
         {
-            thunk_rip_cache[cache_slot].rip      = rip;
-            thunk_rip_cache[cache_slot].proc     = proc;
-            thunk_rip_cache[cache_slot].sig      = *sig_out;
-            thunk_rip_cache[cache_slot].override = *override;
-            thunk_rip_cache[cache_slot].cb_mask  = *cb_mask;
-            thunk_rip_cache[cache_slot].cb_wide  = *cb_wide;
-            thunk_rip_cache[cache_slot].fp       = *fp;
+            struct thunk_rip_cache_entry val = { 0 };
+
+            val.proc     = proc;
+            val.sig      = *sig_out;
+            val.override = *override;
+            val.cb_mask  = *cb_mask;
+            val.cb_wide  = *cb_wide;
+            val.fp       = *fp;
+            thunk_rip_cache_put( rip, &val );
         }
         goto done;
 
     try_com:
-        if (com) find_guest_com_target( mod, rip, com );
+        /* Cached on the same terms as a flat answer, and for a stronger
+         * reason: resolving a COM slot walked the whole module list to get
+         * here.  find_guest_com_target's per-module dispatch cache saves the
+         * __wine_com_dispatch lookup and nothing else -- not the walk, and
+         * not the loader lock, which is what the crossing was actually
+         * paying.  A Direct3D 12 or XAudio2 guest crosses through vtable
+         * slots far more often than through flat imports. */
+        if (com && find_guest_com_target( mod, rip, com ) && !no_cache)
+        {
+            struct thunk_rip_cache_entry val = { 0 };
+
+            val.com = *com;
+            thunk_rip_cache_put( rip, &val );
+        }
         goto done;
     }
 done:

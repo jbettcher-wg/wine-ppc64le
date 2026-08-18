@@ -4363,6 +4363,19 @@ static void free_modref( WINE_MODREF *wm )
 
     free_tls_slot( &wm->ldr );
     RtlReleaseActivationContext( wm->ldr.ActivationContext );
+#ifdef __powerpc64__
+    /* The guest-thunk cache in signal_ppc64.c answers by trapping ADDRESS, so
+     * every entry in it names a place inside some mapped image.  The unmap
+     * below ends that, and the next mapping is free to land on the same
+     * addresses -- a game unloading one plugin and loading another does
+     * exactly this -- so a surviving entry would answer a new module's trap
+     * with an old module's function.  Dropped here rather than filtered by
+     * range because the cache is deliberately not indexed by module: it costs
+     * one pass over a small table on an event that is already unmapping a
+     * view, and this is the one place that knows the unmap is happening.
+     * Called with the loader section held, which is what makes it safe. */
+    flush_guest_thunk_cache();
+#endif
     NtUnmapViewOfSection( NtCurrentProcess(), wm->ldr.DllBase );
     if (cached_modref == wm) cached_modref = NULL;
     RtlFreeUnicodeString( &wm->ldr.FullDllName );
