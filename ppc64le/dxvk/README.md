@@ -487,6 +487,8 @@ rather than dropped quietly.
 ./check-present-smoke.sh --sabotage
 ./check-d3d9-smoke.sh               # the same standard, one API back
 ./check-d3d9-smoke.sh --sabotage
+./check-fullscreen-smoke.sh         # ...and that the frame can CHANGE SIZE
+./check-fullscreen-smoke.sh --sabotage
 ```
 
 `probes/d3d11_smoke.c` is ONE source compiled twice — natively for ppc64le
@@ -507,9 +509,69 @@ frames, whose own back-buffer readback still passes and whose capture must
 fail — because a gate that proves rendering and calls it presentation is the
 specific mistake available in this area.
 
-Neither gate ever touches a display it did not create: `$DISPLAY`,
+No gate here ever touches a display it did not create: `$DISPLAY`,
 `$WAYLAND_DISPLAY` and `$XDG_RUNTIME_DIR` are unset for every process the
-present gate starts, and replaced by a runtime directory of its own.
+present and fullscreen gates start, and replaced by a runtime directory of
+their own. That matters most for `check-fullscreen-smoke.sh`, which is the one
+gate in this tree that asks a program to go fullscreen and to change a display
+mode — neither of which is a thing to do to somebody's desktop.
+
+`check-present-smoke.sh` also owns the **child-window** claim. A launcher, an
+in-game UI panel and an embedded video view all present into a child of their
+own frame, and a child HWND is a different object to the driver — winex11 gives
+it its own X window and winewayland a subsurface. The leg creates a 128x96
+`WS_CHILD` inside a 256x256 parent and asks the same photograph twice: the
+child's size must be there and the parent's must not, which is the exact shape
+of "presented to the parent instead". [MEASURED] 2026-08-18: it already worked;
+the leg exists so that it keeps working.
+
+### Resize works; exclusive fullscreen does not, and here is exactly why
+
+`check-fullscreen-smoke.sh` drives one swapchain through four phases against a
+headless weston and photographs the screen between them. Three of the four are
+green: 256x256 windowed, 192x144 after `SetWindowPos` + `ResizeBuffers`, and
+192x144 again after leaving fullscreen — checked BOTH on screen and in DXGI's
+own description of the back buffer, because checking only the screen would pass
+a resize that moved the window and left DXVK scaling the old buffer into it.
+
+The fourth is a **named limitation and it is recorded here rather than fixed**.
+[MEASURED] 2026-08-18: `IDXGISwapChain::SetFullscreenState(TRUE)` returns
+`S_OK`, `GetFullscreenState` agrees, `GetSystemMetrics` reports the
+compositor's 640x480 — and the rectangle on screen is still 192x144. The
+transition reaches DXGI and stops there.
+
+The cause is one inherited method.
+`dxvk-patches/0001-foreign-wsi-backend.patch` makes
+`ForeignWsiDriver::enterFullscreenMode`, `leaveFullscreenMode`, `setWindowMode`
+and `resizeWindow` no-ops that report success, and says why in a comment: *the
+window belongs to somebody else*, so its owner decides its geometry and DXVK
+follows through `VkSurfaceCapabilitiesKHR::currentExtent`. That premise is
+correct for the foreign-X11 backend, which is handed a raw XID belonging to
+another process. **It is not correct for the Win32u backend**, whose window is
+a Wine HWND that Wine can move — and
+`Win32uWsiDriver` (`dxvk-patches/0003-win32u-wsi-backend.patch`) inherits all
+four unchanged. So nothing ever asks Wine to resize the window.
+
+The fix is a fourth patch overriding those four methods in `Win32uWsiDriver`,
+and the reason it is not in this pass is that it needs a road that does not
+exist yet: DXVK's WSI runs in the **unix** library, and the callback table it
+reaches Wine through (`dxvk_win32u_wsi.h`) has five entries, none of which can
+move a window. `w32u_window_size` does not call win32u either — the PE side
+pushes the size down. So the fix is: one new op in that table (an ABI bump), a
+Wine-side implementation that reaches `NtUserSetWindowPos`, and the four
+overrides. Doing it in `dlls/d3d11`'s guest-facing shim instead would be
+smaller and wrong: it would serve guests only, and it would paper over a
+premise that is false one layer up rather than correcting it.
+
+Until then the gate asserts the current behaviour **positively** — the
+rectangle must still be the windowed size — so it goes red in both directions:
+if the frame ends up some third size (scaled, clipped, half-resized), and also
+if fullscreen starts working, which is the day this section becomes wrong.
+
+`ChangeDisplaySettingsExW` is a third case and is **unproven rather than
+broken**: the gate's headless weston reports three modes that are all 640x480,
+so no mode change is ever requested and the call crosses the boundary without
+being asked to do anything. Proving it needs a display with more than one mode.
 
 ## Layout
 

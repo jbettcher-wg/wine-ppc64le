@@ -89,6 +89,10 @@
 #define SMOKE_BREAK 0
 #endif
 
+#ifndef PRESENT_CHILD
+#define PRESENT_CHILD 0
+#endif
+
 #include <windows.h>
 #include <d3d11.h>
 #include <dxgi.h>
@@ -102,6 +106,40 @@
 #define WIN_Y       32
 #define WIN_W       256
 #define WIN_H       256
+
+/* PRESENT_CHILD: put the swapchain on a CHILD window instead of on the
+ * top-level one.
+ *
+ * This is not a variation for completeness.  A launcher renders into a child
+ * of its own frame; an in-game UI, a video panel and an embedded browser view
+ * all do the same; and a child HWND is a different object to the driver --
+ * winex11 gives it its own X window and winewayland a subsurface, and DXVK's
+ * WSI backend has to be handed the child rather than its parent for the frame
+ * to land in the right rectangle.  Presenting to the PARENT instead is the
+ * failure this shape produces, and it is invisible from inside the process:
+ * every call succeeds, the back buffer holds the right texels, and the picture
+ * is simply in the wrong place and the wrong size.
+ *
+ * So the child is deliberately a DIFFERENT SIZE from the parent.  The capture
+ * side requires the colour to fill a rectangle of exactly the child's size,
+ * which a frame that went to the parent cannot do -- it would fill the
+ * parent's.  Size is the discriminator rather than position because the
+ * capture reads the compositor's own framebuffer and a compositor is entitled
+ * to place a top-level window where it likes; the child's size relative to its
+ * parent is the application's business and nobody else's.
+ */
+#define CHILD_X     64          /* within the parent's client area */
+#define CHILD_Y     48
+#define CHILD_W     128
+#define CHILD_H     96
+
+#if PRESENT_CHILD
+#define SC_W        CHILD_W
+#define SC_H        CHILD_H
+#else
+#define SC_W        WIN_W
+#define SC_H        WIN_H
+#endif
 
 /* Long enough for the capture to happen, short enough that a wedged run ends
  * as a timeout instead of a window left on a display.  At the 60 Hz a FIFO
@@ -219,14 +257,18 @@ static int present_smoke_run( void )
     D3D_FEATURE_LEVEL got_fl = (D3D_FEATURE_LEVEL)0;
     DXGI_SWAP_CHAIN_DESC desc;
     WNDCLASSA wc;
-    HWND hwnd = NULL;
+    HWND hwnd = NULL, parent = NULL;
     HRESULT hr;
     UINT i, total, frames = 0, presented_ok = 0;
 
     out( "present_smoke: start\n" );
 
     /* ---- step 1: a real window ------------------------------------------ */
+#if PRESENT_CHILD
+    begin( "RegisterClassA + a 256x256 parent and a 128x96 WS_CHILD inside it" );
+#else
     begin( "RegisterClassA + CreateWindowExA(256x256 at 32,32)" );
+#endif
     {
         static const char cls[] = "present_smoke";
         DWORD n = 0;
@@ -249,18 +291,41 @@ static int present_smoke_run( void )
         hwnd = CreateWindowExA( 0, cls, cls, WS_POPUP | WS_VISIBLE,
                                 WIN_X, WIN_Y, WIN_W, WIN_H,
                                 NULL, NULL, wc.hInstance, NULL );
+#if PRESENT_CHILD
+        /* The swapchain goes on THIS one.  A child window is created with the
+         * parent's HWND and WS_CHILD, so its coordinates are the parent's
+         * client area and its lifetime is the parent's -- which is what makes
+         * it a different object to the graphics driver rather than just a
+         * smaller rectangle. */
+        if (hwnd)
+        {
+            parent = hwnd;
+            hwnd = CreateWindowExA( 0, cls, cls, WS_CHILD | WS_VISIBLE,
+                                    CHILD_X, CHILD_Y, CHILD_W, CHILD_H,
+                                    parent, NULL, wc.hInstance, NULL );
+        }
+#endif
     }
     out( "hwnd=0x" ); out_hex( (ULONG)(ULONG_PTR)hwnd, 8 );
+#if PRESENT_CHILD
+    out( " parent=0x" ); out_hex( (ULONG)(ULONG_PTR)parent, 8 );
+    verdict( hwnd != NULL && parent != NULL,
+             "CreateWindowExA returned no window, or no child of it" );
+    if (!hwnd || !parent) goto done;
+    ShowWindow( parent, SW_SHOW );
+    UpdateWindow( parent );
+#else
     verdict( hwnd != NULL, "CreateWindowExA returned no window" );
     if (!hwnd) goto done;
+#endif
     ShowWindow( hwnd, SW_SHOW );
     UpdateWindow( hwnd );
     pump();
 
     /* ---- step 2: device + swapchain on that window ----------------------- */
     begin( "D3D11CreateDeviceAndSwapChain(OutputWindow = that HWND)" );
-    desc.BufferDesc.Width = WIN_W;
-    desc.BufferDesc.Height = WIN_H;
+    desc.BufferDesc.Width = SC_W;
+    desc.BufferDesc.Height = SC_H;
     desc.BufferDesc.RefreshRate.Numerator = 0;
     desc.BufferDesc.RefreshRate.Denominator = 0;
     desc.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
@@ -387,10 +452,10 @@ static int present_smoke_run( void )
         {
             UINT y, x;
 
-            for (y = 0; y < WIN_H; y++)
+            for (y = 0; y < SC_H; y++)
             {
                 const BYTE *row = (const BYTE *)map.pData + (size_t)y * map.RowPitch;
-                for (x = 0; x < WIN_W; x++)
+                for (x = 0; x < SC_W; x++)
                 {
                     const BYTE *texel = row + (size_t)x * 4;
                     /* B8G8R8A8_UNORM: blue first in memory. */
@@ -409,7 +474,7 @@ static int present_smoke_run( void )
         }
         out( " checked=" ); out_dec( checked );
         out( " mismatches=" ); out_dec( mismatches );
-        verdict( SUCCEEDED(hr) && checked == WIN_W * WIN_H && mismatches == 0,
+        verdict( SUCCEEDED(hr) && checked == SC_W * SC_H && mismatches == 0,
                  "did not confirm every texel of the presented colour" );
 
         /* The line the capture side compares against.  Printed unconditionally
@@ -434,6 +499,7 @@ done:
     if (context) ID3D11DeviceContext_Release( context );
     if (device) ID3D11Device_Release( device );
     if (hwnd) DestroyWindow( hwnd );
+    if (parent) DestroyWindow( parent );
 
     out( failures ? "present_smoke: FAIL " : "present_smoke: PASS " );
     out_dec( (ULONG)(step - failures) );

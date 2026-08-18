@@ -122,6 +122,8 @@ WANT_R=00
 WANT_G=40
 WANT_B=80
 WANT_G3=41          # the SMOKE_BREAK=3 colour, one step of green
+CHILD_W=128         # the WS_CHILD leg's swapchain, from probes/present_smoke.c
+CHILD_H=96
 
 RUNDIR=$OUT/runtime
 SOCKET=wine-present-smoke
@@ -329,7 +331,12 @@ run_probe() {   # $1 = exe basename, $2.. = extra env assignments
 # Ask the compositor for what it composited.  weston-screenshooter writes into
 # its working directory with a name it chooses, so it gets a directory of its
 # own and the newest file in it is the answer.
-capture() {     # $1 = r, $2 = g, $3 = b
+# $4/$5 are the rectangle's expected size and default to the top-level window's.
+# The child-window leg passes the CHILD's size for one question and the
+# parent's for the other, against the SAME screenshot -- so it must be possible
+# to ask twice without taking a second picture in between, which is why the
+# screenshot is only retaken when a size is not supplied for it.
+capture() {     # $1 = r, $2 = g, $3 = b, [$4 = w, $5 = h]
     rm -rf "$OUT/shot" && mkdir -p "$OUT/shot" || return 2
     ( cd "$OUT/shot" && iso timeout 20 env WAYLAND_DISPLAY="$SOCKET" \
         weston-screenshooter ) >"$OUT/shot.log" 2>&1
@@ -338,7 +345,15 @@ capture() {     # $1 = r, $2 = g, $3 = b
         sed 's/^/  shot| /' "$OUT/shot.log" >&2
         return 2
     fi
-    "$OUT/capture" "$_png" "$WIN_W" "$WIN_H" "$1" "$2" "$3" >"$OUT/capture.out" 2>&1
+    LAST_PNG=$_png
+    "$OUT/capture" "$_png" "${4:-$WIN_W}" "${5:-$WIN_H}" "$1" "$2" "$3" \
+        >"$OUT/capture.out" 2>&1
+}
+
+# ...and this asks a different question of the picture already taken.
+recapture() {   # $1 = r, $2 = g, $3 = b, $4 = w, $5 = h
+    [ -n "${LAST_PNG:-}" ] || return 2
+    "$OUT/capture" "$LAST_PNG" "$4" "$5" "$1" "$2" "$3" >"$OUT/capture.out" 2>&1
 }
 
 wait_probe() {
@@ -556,6 +571,69 @@ gate asked the capture about '$WANT_R $WANT_G $WANT_B'"
         bad "the guest D3D9 probe never reached READY (CreateDevice got no \
 implicit swapchain, so win32u gave it no surface)"
     fi
+fi
+
+# ---- CH: the swapchain on a CHILD window ------------------------------------
+# A launcher renders into a child of its own frame, and so does every in-game
+# UI panel and every embedded video view.  A child HWND is a different object
+# to the graphics driver -- winex11 gives it its own X window, winewayland a
+# subsurface -- so "the swapchain is on the child" is a claim about which
+# window DXVK's WSI backend was handed, and getting it wrong is INVISIBLE from
+# inside the process: every call succeeds, the back buffer holds the right
+# texels, and the picture is merely in the wrong place at the wrong size.
+#
+# So the child is a different size from its parent (128x96 inside 256x256) and
+# this leg asks the capture TWICE: the child's size must be found, and the
+# parent's must not.  The second question is the one that does the work -- it
+# is the exact shape of "presented to the parent instead", and it is checked
+# rather than assumed because it is the failure this shape produces.
+#
+# [MEASURED] 2026-08-18, op4k: it already works.  DXVK reports "Buffer size:
+# 128x96", and the compositor's own framebuffer holds a 128x96 rectangle of
+# exactly the cleared colour.  This leg exists so that it keeps working.
+if build_probe child -DPRESENT_CHILD=1; then
+    if run_probe child; then
+        say "child: reached READY with the swapchain on a WS_CHILD window"
+        capture "$WANT_R" "$WANT_G" "$WANT_B" "$CHILD_W" "$CHILD_H"
+        ch_rc=$?
+        sed 's/^/  /' "$OUT/capture.out" 2>/dev/null
+        case $ch_rc in
+            0) say "capture-child: the compositor's own framebuffer holds a \
+${CHILD_W}x${CHILD_H} rectangle of exactly RGB $WANT_R $WANT_G $WANT_B -- the \
+CHILD's size, presented by a swapchain created on the child" ;;
+            1) bad "the rectangle on screen is not the child's size; the frame \
+went somewhere other than the child window" ;;
+            *) bad "the child capture could not be made at all" ;;
+        esac
+        # ...and it is NOT the parent's size.  Same screenshot, different
+        # question; a frame that had gone to the parent would answer this one
+        # instead of the one above.
+        recapture "$WANT_R" "$WANT_G" "$WANT_B" "$WIN_W" "$WIN_H"
+        if [ $? -eq 0 ]; then
+            bad "the same frame ALSO fills a ${WIN_W}x${WIN_H} rectangle, which \
+is the PARENT's size -- the swapchain is presenting to the parent"
+        else
+            say "capture-child: the same frame does NOT fill the parent's \
+${WIN_W}x${WIN_H}, so the child is where it went"
+        fi
+        wait_probe
+        if grep -q "present_smoke: PASS" "$OUT/child.out"; then
+            say "child:  $(tail -1 "$OUT/child.out")"
+        else
+            sed 's/^/  child| /' "$OUT/child.out" >&2
+            tail -20 "$OUT/child.err" >&2
+            bad "the child-window probe did not pass its own back-buffer readback"
+        fi
+    else
+        wait_probe
+        sed 's/^/  child| /' "$OUT/child.out" >&2
+        tail -20 "$OUT/child.err" >&2
+        bad "the child-window probe never reached READY (no swapchain on a child \
+HWND)"
+    fi
+else
+    sed 's/^/  child| /' "$OUT/child.build.err" >&2
+    bad "the child-window probe did not build; this leg cannot run"
 fi
 
 # ---- F: nothing left behind --------------------------------------------------
