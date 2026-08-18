@@ -5639,7 +5639,18 @@ void WINAPI RtlUserThreadStart( PRTL_THREAD_START_ROUTINE entry, void *arg )
                            entry, (void *)(ULONG_PTR)params.retval, (UINT)status );
             if (status)
             {
-                ERR( "failed to emulate AMD64 entry point %p, status %08x\n", entry, (UINT)status );
+                /* `entry` is where this run STARTED, not where the guest
+                 * died -- any failure that named a faulting guest RIP was
+                 * already ERR'd (with that RIP) on the unix side of
+                 * unix_emu_run_entry, and any unhandled guest exception was
+                 * already reported, with its own address, by
+                 * raise_pending_guest_exception() above.  Reaching here means
+                 * neither happened: say plainly that this message names the
+                 * run's start, not its fault, so it is not misread as "the
+                 * entry point itself is bad" (see CATALOG.md item 2). */
+                ERR( "guest run started at AMD64 entry point %p ended without completing, status %08x "
+                     "(entry is the run's start address, not necessarily where the guest faulted)\n",
+                     entry, (UINT)status );
                 /* Killing the process is right only for the initial thread,
                  * where nothing else can be running.  A guest worker thread
                  * that fails to start must take down itself, not everything. */
