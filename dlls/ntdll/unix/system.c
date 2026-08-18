@@ -1232,6 +1232,36 @@ static NTSTATUS create_logical_proc_info(void)
                 max_cpus, MAXIMUM_PROCESSORS);
     }
 
+    /* AND ON A SPARSE ONLINE SET IT IS WORSE THAN THAT MESSAGE SAYS, which is
+     * why this note is here rather than left to be rediscovered.
+     *
+     * The loop below stops at a CPU whose INDEX reaches the width of an
+     * ULONG_PTR, because that is the widest affinity mask one processor group
+     * can hold.  Where CPU numbering is dense -- every x86 box -- index and
+     * count are the same thing and the cap costs you the cores past 64.
+     *
+     * POWER numbering is not dense.  A POWER8 running SMT4 out of an SMT8
+     * part reports `present` as 0-159 and `online` as
+     * 0-3,8-11,16-19,... -- four online out of every eight slots.  Index 64 is
+     * therefore reached after only 33 ONLINE cpus, so a machine with 80 of
+     * them tells a guest it has 32.
+     *
+     * [MEASURED] 2026-08-18, op4k (2 sockets x 10 cores x SMT4 = 80 online):
+     * GetSystemInfo said 80 -- it comes from sysconf(), not from here -- while
+     * GetActiveProcessorCount(ALL_PROCESSOR_GROUPS) said 32 and
+     * GetActiveProcessorGroupCount said 1.  A guest sizing a worker pool from
+     * the second gets 40%% of the machine, and the two answers disagreeing is
+     * itself a bug a program can trip over.
+     *
+     * Fixing it properly means giving up the assumption that Windows CPU i IS
+     * Linux CPU i, which is not local to this function: server/thread.c's
+     * set_thread_affinity() maps affinity bit i straight to CPU_SET(i), so the
+     * renumbering has to happen in both, from the same table, or threads get
+     * pinned to offline CPUs.  Past 64 it needs real processor groups, which
+     * upstream hard-codes to 1 (see the comment above).  Recorded rather than
+     * half-done.
+     */
+
     fill_performance_core_info();
 
     fcpu_list = fopen("/sys/devices/system/cpu/online", "r");
