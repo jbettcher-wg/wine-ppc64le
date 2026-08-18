@@ -114,6 +114,32 @@ static ULONG tc_checks( IMalloc *imalloc )
     CharUpperA( buf );
     if (buf[0] != 'A' || buf[1] != 'B' || buf[2] != 'C' || buf[3] != 0) bad++;
 
+    /* A SUB-WORD ARGUMENT, whose upper bits are the caller's leftovers.
+     *
+     * MS-x64 requires only the low sixteen bits of a WORD argument to be
+     * meaningful, and clang emits a sixteen-bit `mov cx, 0xffff` for one --
+     * so RCX keeps whatever the previous call left above it.  The lstrlenA
+     * immediately above is not decoration: it puts a pointer in RCX, whose
+     * upper half is emphatically not zero, which is what makes the leftovers
+     * observable here rather than accidentally zero.
+     *
+     * ALL_PROCESSOR_GROUPS is 0xffff, and the native implementation compares
+     * the whole argument against it: with the upper bits still set the test
+     * fails, control falls to the arm that reads the argument as a group
+     * INDEX, and the call answers 0.  Measured before the fix: native
+     * kernel32 saw group = 0xffbdffff.  So this checks the two calls against
+     * EACH OTHER rather than against a constant -- the processor count is a
+     * property of the machine and not of this file -- and against zero, which
+     * is the specific wrong answer the bug produced. */
+    if (lstrlenA( "a-pointer-lives-in-rcx-for-this-call" ) != 36) bad++;
+    if (GetActiveProcessorGroupCount() == 1)
+    {
+        DWORD all = GetActiveProcessorCount( ALL_PROCESSOR_GROUPS );
+        DWORD one = GetActiveProcessorCount( 0 );
+
+        if (!all || all != one) bad++;
+    }
+
     /* COM vtable slots: three of them, with a relationship between the
      * answers rather than three independent constants */
     if (imalloc)
@@ -216,16 +242,17 @@ void thunk_cache_entry(void)
         CloseHandle( threads[i] );
     }
 
-    /* TWELVE CROSSINGS per pass -- lstrlenA, lstrcmpA twice, MulDiv,
-     * SetLastError, GetLastError, IsCharAlphaA twice, CharUpperA, and
-     * IMalloc's Alloc/GetSize/Free -- of which ten are value checks
+    /* FIFTEEN CROSSINGS per pass -- lstrlenA twice, lstrcmpA twice, MulDiv,
+     * SetLastError, GetLastError, IsCharAlphaA twice, CharUpperA,
+     * GetActiveProcessorGroupCount, GetActiveProcessorCount twice, and
+     * IMalloc's Alloc/GetSize/Free -- of which twelve are value checks
      * (SetLastError and Free have no answer of their own; they set up and tear
      * down the two that do).  CROSSINGS rather than checks is the number
      * printed, because it is the number the gate's cache-hit floor is actually
      * about, and it is printed rather than left implicit so that floor comes
      * from this probe's own transcript instead of a constant in the script
      * that would rot the moment a call is added here. */
-    crossings = 12 * (1 + TC_THREADS * iterations);
+    crossings = 15 * (1 + TC_THREADS * iterations);
     out( "threads=" ); out_dec( TC_THREADS );
     out( " iterations=" ); out_dec( iterations );
     out( " crossings=" ); out_dec( crossings );

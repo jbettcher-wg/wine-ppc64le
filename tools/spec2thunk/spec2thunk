@@ -179,7 +179,7 @@ import wine_sig
 from wine_sig import Refused
 
 STRIDE = 16
-INFO_VERSION = 5
+INFO_VERSION = 6
 # Byte offset of the trapping instruction inside a stub, per body mode.
 TRAP_OFF = {'direct': 0, 'trap': 3}
 BUILTIN_SIG = b"Wine builtin DLL\x00"   # 17 bytes, must sit at file offset 0x40
@@ -1336,6 +1336,26 @@ def resolve_signatures(exports, headers, specs=None):
             sig['narrow_mask'] = mask
             e['sig'] = sig
             e['desc'] = wine_sig.descriptor(sig)
+        # THE SAME MEASUREMENT, KEPT AT FULL RESOLUTION.  The mask above says
+        # only "narrower than eight bytes", which the host then reads as
+        # "narrow to four" -- and that is wrong for a WORD, a BYTE, a BOOLEAN
+        # or a WCHAR.  MS-x64 requires only the low bits of a sub-word
+        # argument to be meaningful and real compilers leave the rest alone:
+        # clang emits `mov cx, 0xffff` for a WORD, so RCX's upper 48 bits are
+        # whatever the last thing to use that register left there.  MEASURED
+        # end to end: a guest calling GetActiveProcessorCount(
+        # ALL_PROCESSOR_GROUPS) reached native kernel32 as group=0xffbdffff,
+        # the `group == ALL_PROCESSOR_GROUPS` test failed, control fell to the
+        # else arm and the call answered 0 where Windows answers the processor
+        # count.  A wrong number, not a crash, which is the class this port
+        # cares about most.
+        #
+        # Two bits per argument, so sixteen arguments fill one word exactly:
+        # 0 = eight bytes (leave it alone), 1 = four, 2 = two, 3 = one.  An
+        # unexpected size takes 0 and is left alone, which is what the host did
+        # before this word existed.  See THUNK_WIDTH in signal_ppc64.c.
+        code = {8: 0, 4: 1, 2: 2, 1: 3}
+        e['widths'] = sum(code.get(sz, 0) << (j * 2) for j, sz in enumerate(sizes))
 
     # ------------------------------------------------------------------
     # Which arguments, and the return, are FLOATING POINT.
@@ -1562,6 +1582,16 @@ def emit_asm(dll, exports, mode, com_ifaces=None):
     a('\t.long\t%d\t\t\t# trap_off' % TRAP_OFF[mode])
     a('\t.long\twine_thunk_implv@IMGREL\t# impl_names_rva  (version 4)')
     a('\t.long\twine_thunk_fpv@IMGREL\t# fp_rva  (version 5)')
+    a('\t.long\twine_thunk_widthv@IMGREL\t# widths_rva  (version 6)')
+    a('')
+    # One argument-width descriptor per export, two bits per argument.  Zero
+    # for an export whose arguments are all pointer-width, which is most of
+    # them, and zero is also the honest answer for an entry the width oracle
+    # could not measure -- that is the behaviour those entries already had.
+    a('\t.balign\t4')
+    a('wine_thunk_widthv:')
+    for e in exports:
+        a('\t.long\t0x%08X\t\t# %s' % (e.get('widths', 0), e['name']))
     a('')
     # One floating-point descriptor per export; 0 for the overwhelming
     # majority, which keeps them on the integer path unchanged.  See

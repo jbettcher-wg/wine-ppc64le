@@ -12,7 +12,10 @@ this checker does a plain regex scan of the header TEXT.  Two unrelated
 readings of the same headers having to agree is the point -- a shared helper
 module would have made the cross-check worthless.
 
-VARIADICS.  __wine_thunk_info version 5 added fp_rva, one floating-point
+VARIADICS.  Version 6 added widths_rva, one two-bits-per-argument width word
+per export -- the narrow mask says only "narrower than eight bytes", and a
+WORD or a BYTE argument has to be narrowed to ITS width or the caller's stale
+upper bits reach native code.  __wine_thunk_info version 5 added fp_rva, one floating-point
 descriptor per export: which arguments are float or double, which of those are
 single precision, and what the return is.  MS-x64 indexes its FP argument
 registers by position and ELFv2 indexes its by order, so neither side can
@@ -48,8 +51,8 @@ import struct
 import sys
 
 STRIDE = 16
-INFO_VERSION = 5
-INFO_FIELDS = 9                 # version..fp_rva
+INFO_VERSION = 6
+INFO_FIELDS = 10                # version..widths_rva
 DESC_VOID = 0x100               # bit 8
 DESC_VARIADIC = 0x200           # bit 9
 DESC_RESERVED = 0x0000fc00      # bits 10..15, must be zero
@@ -1272,10 +1275,11 @@ def main():
         return 1
 
     (version, count, stubs_rva, stride, names_rva, sigs_rva, trap_off,
-     impl_names_rva, fp_rva) = fields
+     impl_names_rva, fp_rva, widths_rva) = fields
     r.note('__wine_thunk_info',
            'ver=%d count=%d stubs_rva=0x%x stride=%d names_rva=0x%x '
-           'sigs_rva=0x%x trap_off=%d impl_names_rva=0x%x fp_rva=0x%x' % fields)
+           'sigs_rva=0x%x trap_off=%d impl_names_rva=0x%x fp_rva=0x%x '
+           'widths_rva=0x%x' % fields)
     r.check(version == INFO_VERSION,
             '8b __wine_thunk_info.version == %d' % INFO_VERSION, str(version))
     # Against the EXPORT DIRECTORY, not against the list: the image is allowed
@@ -1287,6 +1291,8 @@ def main():
     r.check(stride == STRIDE, '8d stride == 16', str(stride))
     r.check(impl_names_rva != 0, '8i impl_names_rva present (version 4)',
             '0x%x' % impl_names_rva)
+    r.check(widths_rva != 0, '8k widths_rva present (version 6)',
+            '0x%x' % widths_rva)
     for tag, rva in (('__wine_thunk_info', info_rva), ('names_rva', names_rva),
                      ('sigs_rva', sigs_rva), ('impl_names_rva', impl_names_rva)):
         s = pe.section_of(rva)

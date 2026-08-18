@@ -61,6 +61,14 @@
 #                    being used" assertion fail.  A lever that had quietly
 #                    stopped working would leave every other leg of this gate
 #                    passing for the wrong reason.
+#   sabotage(argwidth) WINEEMUNOARGWIDTH=1 puts back the rule that cut every
+#                    argument narrower than a pointer to 32 bits rather than
+#                    to its own width, and the probe must fail.  Neither of the
+#                    controls above can reach this: they are about whether the
+#                    cache answers and which address it answers for, and this
+#                    is about what a correct answer CONTAINS -- the width word
+#                    rides the cached entry, so it is also the leg that proves
+#                    the entry carries it across a cache HIT.
 #
 # A gate that cannot go red proves nothing.
 #
@@ -120,6 +128,8 @@ CloseHandle
 lstrlenA
 lstrcmpA
 MulDiv
+GetActiveProcessorCount
+GetActiveProcessorGroupCount
 EOF
 cat > "$OUT/user32.def" <<'EOF'
 LIBRARY user32.dll
@@ -196,7 +206,24 @@ produced $hits cache hits -- the negative control does not control anything" >&2
         say "sabotage(lever): the lever silenced every cache hit, as it must"
     fi
 
-    [ $sfail -eq 0 ] && say "SABOTAGE PASS (both controls red)"
+    # The third control, and the one the other two cannot stand in for.
+    # WINEEMUNORIPCACHE turns the cache OFF and WINEEMURIPCACHEBLIND makes it
+    # answer for the wrong address; neither touches what a correct answer
+    # CONTAINS.  WINEEMUNOARGWIDTH puts back the rule that cut every sub-word
+    # argument to 32 bits, so the probe's WORD argument arrives with the
+    # caller's leftovers still above its own width -- which is the live bug
+    # this leg was added for, reproduced on demand.
+    rc=$(run_probe "$OUT/width.out" WINEEMUNOARGWIDTH=1 TC_ITERATIONS=5)
+    if [ "$rc" = 0 ] && grep -q '^PASS$' "$OUT/width.out"; then
+        echo "check-rip-cache: SABOTAGE FAIL argwidth: the probe still passed with \
+sub-word arguments cut to 32 bits -- the width word is not reaching the \
+marshaller, or nothing in the probe depends on it" >&2
+        sfail=1
+    else
+        say "sabotage(argwidth): the probe failed with sub-word arguments cut to 32 bits, as it must (rc=$rc)"
+    fi
+
+    [ $sfail -eq 0 ] && say "SABOTAGE PASS (all three controls red)"
     exit $sfail
 fi
 

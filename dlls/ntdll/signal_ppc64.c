@@ -1101,9 +1101,12 @@ struct thunk_info
                              an exact match, so a module either has this field
                              or is rejected outright -- there is no mixed
                              build to be compatible with. */
+    UINT widths_rva;      /* count argument-width descriptors, two bits per
+                             argument, see THUNK_WIDTH below.  Added at
+                             version 6, by the same rule as fp_rva. */
 };
 
-#define THUNK_INFO_VERSION   5
+#define THUNK_INFO_VERSION   6
 #define THUNK_SIG_ARGC(sig)  ((sig) & 0xff)   /* for a variadic, the FIXED count */
 #define THUNK_SIG_VOID       0x100u           /* returns void */
 #define THUNK_SIG_VARIADIC   0x200u           /* synthesise a va_list, see below */
@@ -1124,6 +1127,58 @@ struct thunk_info
  * `long` parameter zero- rather than sign-extended -- a known limitation of
  * the LP64 PE side, not of this mask. */
 #define THUNK_SIG_NARROW(sig) (((sig) >> 16) & 0xffffu)
+
+/* ---------------------------------------------------------------------------
+ * The argument-width descriptor (version 6), one UINT per export.
+ * ---------------------------------------------------------------------------
+ * THE MASK ABOVE SAYS ONLY "NARROWER THAN EIGHT BYTES", and the host read that
+ * as "narrow to four".  For a DWORD that is exactly right and it is what the
+ * mask was written for.  For a WORD, a BYTE, a BOOLEAN or a WCHAR it is not:
+ * MS-x64 requires only the low bits of a sub-word argument to be meaningful,
+ * and real compilers leave the rest alone -- clang emits `mov cx, 0xffff` for
+ * a WORD argument, so RCX keeps whatever its upper 48 bits held before.
+ *
+ * MEASURED, end to end, and it was live: a guest calling
+ * GetActiveProcessorCount(ALL_PROCESSOR_GROUPS) reached native kernel32 with
+ * group = 0xffbdffff.  The `group == ALL_PROCESSOR_GROUPS` test therefore
+ * failed, control fell through to the arm that treats the argument as a group
+ * INDEX, and the call answered 0 where Windows answers the processor count.
+ * A program sizing an array from that gets a zero-length allocation.  Nothing
+ * crashes; a number is simply wrong, which is the failure class this port
+ * exists to keep out.  GetActiveProcessorCount(0) was correct throughout,
+ * which is why this hid: only the all-bits-set argument exposed it.
+ *
+ * Two bits per argument, so sixteen arguments fill the word exactly:
+ *
+ *   0  eight bytes -- leave it alone (a pointer, a HANDLE, a 64-bit integer)
+ *   1  four bytes
+ *   2  two bytes
+ *   3  one byte
+ *
+ * Zero is therefore also "no narrowing anywhere", which is what an export
+ * whose widths the generator's oracle could not measure gets -- exactly the
+ * behaviour those entries had before this word existed.  The narrow mask
+ * stays as it is and stays checked: it is the same measurement at lower
+ * resolution, and keeping both lets the generator's own checker cross the
+ * two against each other. */
+#define THUNK_WIDTH(w, i)    (((w) >> ((i) * 2u)) & 3u)
+
+/* -> the argument as its declared width, zero-extended.  Signedness is not
+ * carried here for the same reason the narrow mask does not carry it: the
+ * PE side is LP64 and a negative 32-bit value already reached an LP64 `long`
+ * zero-extended before this existed.  Widening the fix to signedness would
+ * change behaviour this port has never had, and would need the oracle to
+ * report it. */
+static inline ULONG_PTR narrow_thunk_arg( ULONG_PTR v, UINT width )
+{
+    switch (width)
+    {
+    case 1: return (UINT)v;
+    case 2: return (USHORT)v;
+    case 3: return (BYTE)v;
+    default: return v;
+    }
+}
 
 /* ---------------------------------------------------------------------------
  * The floating-point descriptor (version 5), one UINT per export.
@@ -5521,7 +5576,7 @@ struct thunk_rip_cache_entry
     void *proc;
     UINT sig;
     thunk_override_func override;
-    UINT cb_mask, cb_wide, cb_argc, fp;
+    UINT cb_mask, cb_wide, cb_argc, fp, widths;
     struct com_thunk_hit com;    /* com.dispatch NULL unless this RIP is a slot */
 };
 
@@ -5619,6 +5674,7 @@ static BOOL thunk_rip_cache_get( ULONG_PTR rip, struct thunk_rip_cache_entry *ou
     out->cb_wide      = e->cb_wide;
     out->cb_argc      = e->cb_argc;
     out->fp           = e->fp;
+    out->widths       = e->widths;
     out->com.dispatch = e->com.dispatch;
     out->com.iface    = e->com.iface;
     out->com.slot     = e->com.slot;
@@ -5741,6 +5797,7 @@ static void thunk_rip_cache_put( ULONG_PTR rip, const struct thunk_rip_cache_ent
     e->cb_wide      = val->cb_wide;
     e->cb_argc      = val->cb_argc;
     e->fp           = val->fp;
+    e->widths       = val->widths;
     e->com.dispatch = val->com.dispatch;
     e->com.iface    = val->com.iface;
     e->com.slot     = val->com.slot;
@@ -5788,7 +5845,7 @@ void flush_guest_thunk_cache(void)
  */
 static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_override_func *override,
                                       struct com_thunk_hit *com, UINT *cb_mask, UINT *cb_wide,
-                                      UINT *cb_argc, UINT *fp )
+                                      UINT *cb_argc, UINT *fp, UINT *widths )
 {
     static int no_cache = -1;
     struct thunk_rip_cache_entry hit;
@@ -5817,6 +5874,7 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
     }
 
     *fp = 0;
+    *widths = 0;
 
     /* BEFORE THE LOCK, deliberately.  This is the whole reason the cache
      * exists: a warm trap site answers out of one cache line and never enters
@@ -5832,6 +5890,7 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
         *cb_wide  = hit.cb_wide;
         *cb_argc  = hit.cb_argc;
         *fp       = hit.fp;
+        *widths   = hit.widths;
         /* a COM entry carries a dispatch and a NULL proc; a flat one the
          * reverse, and must leave the caller's zeroed *com alone */
         if (com && hit.com.dispatch) *com = hit.com;
@@ -5890,6 +5949,7 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
         sigs  = (const UINT *)(base + info->sigs_rva);
         impl_names = (const UINT *)(base + info->impl_names_rva);
         *fp = ((const UINT *)(base + info->fp_rva))[idx];
+        *widths = ((const UINT *)(base + info->widths_rva))[idx];
         sig = sigs[idx];
         /* a variadic needs one slot beyond its fixed arguments for the va_list */
         if ((sig & THUNK_SIG_RESERVED) ||
@@ -5966,6 +6026,7 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
             val.cb_wide  = *cb_wide;
             val.cb_argc  = *cb_argc;
             val.fp       = *fp;
+            val.widths   = *widths;
             thunk_rip_cache_put( rip, &val );
         }
         goto done;
@@ -6009,9 +6070,32 @@ done:
  * not touch it.  Both RCX and R11 are volatile under MS-x64, so the guest
  * cannot observe the damage after the call returns.
  */
-static void marshal_thunk_args( const AMD64_CONTEXT *ctx, UINT argc, UINT narrow, ULONG_PTR *a )
+/* WINEEMUNOARGWIDTH=1 puts the old one-bit rule back: every argument the
+ * generator measured as narrower than a pointer is cut to 32 bits and no
+ * further, which is what this port did before the width word existed.  The
+ * negative control for ppc64le/thunks/check-rip-cache.sh's sub-word leg, and
+ * the only lever that can make it fail -- turning the CACHE off cannot,
+ * because the bug was in what the cache carried rather than in the caching. */
+static BOOL thunk_arg_width_off(void)
+{
+    static int off = -1;
+
+    if (off == -1)
+    {
+        off = emu_env_flag( L"WINEEMUNOARGWIDTH" );
+        if (off)
+            ERR( "WINEEMUNOARGWIDTH: sub-word arguments will be cut to 32 bits "
+                 "and keep the caller's leftovers above their own width\n" );
+    }
+    return off;
+}
+
+static void marshal_thunk_args( const AMD64_CONTEXT *ctx, UINT argc, UINT narrow,
+                                UINT widths, ULONG_PTR *a )
 {
     UINT i;
+
+    if (thunk_arg_width_off()) widths = 0;
 
     for (i = 0; i < argc; i++)
     {
@@ -6025,9 +6109,15 @@ static void marshal_thunk_args( const AMD64_CONTEXT *ctx, UINT argc, UINT narrow
          * the 32 bytes of shadow space MS-x64 reserves for the register ones */
         default: a[i] = *(ULONG_PTR *)(ULONG_PTR)(ctx->Rsp + 8 + i * 8); break;
         }
-        /* a 32-bit argument's slot carries stack garbage above bit 31, and
-         * LP64-built native code reads all 64 bits; see THUNK_SIG_NARROW */
-        if (narrow & (1u << i)) a[i] = (UINT)a[i];
+        /* An argument narrower than a pointer carries the caller's leftovers
+         * above its own width, and LP64-built native code reads all 64 bits.
+         * The width word says how far down to cut; the narrow mask is the same
+         * measurement at one-bit resolution and is what this used to use, which
+         * cut a WORD or a BYTE to 32 bits and left half its garbage in place.
+         * See THUNK_WIDTH.  An export the oracle could not measure has width 0
+         * everywhere, so the mask still decides for it, exactly as before. */
+        if (widths) a[i] = narrow_thunk_arg( a[i], THUNK_WIDTH( widths, i ) );
+        else if (narrow & (1u << i)) a[i] = (UINT)a[i];
     }
 }
 
@@ -6197,7 +6287,8 @@ __ASM_GLOBAL_FUNC( call_native_thunk_fp,
  * gives: the trap opcode is SYSCALL and it destroys RCX.  An FP argument 0 is
  * unaffected -- it was never in RCX to begin with.
  */
-static void marshal_thunk_args_fp( const AMD64_CONTEXT *ctx, UINT argc, UINT narrow, UINT fp,
+static void marshal_thunk_args_fp( const AMD64_CONTEXT *ctx, UINT argc, UINT narrow,
+                                   UINT widths, UINT fp,
                                    ULONG_PTR *gpr, double *fpr )
 {
     const UINT fp_mask = THUNK_FP_MASK( fp ), single = THUNK_FP_SINGLE( fp );
@@ -6213,6 +6304,7 @@ static void marshal_thunk_args_fp( const AMD64_CONTEXT *ctx, UINT argc, UINT nar
     UINT i, nfpr = 0;
 
     if (nostack == -1) nostack = emu_env_flag( L"WINEEMUFPNOSTACK" );
+    if (thunk_arg_width_off()) widths = 0;
 
     memset( gpr, 0, THUNK_MAX_ARGS * sizeof(*gpr) );
     memset( fpr, 0, THUNK_MAX_FP_ARGS * sizeof(*fpr) );
@@ -6260,7 +6352,10 @@ static void marshal_thunk_args_fp( const AMD64_CONTEXT *ctx, UINT argc, UINT nar
         case 3: gpr[i] = ctx->R9;  break;
         default: gpr[i] = *(ULONG_PTR *)(ULONG_PTR)(ctx->Rsp + 8 + i * 8); break;
         }
-        if (narrow & (1u << i)) gpr[i] = (UINT)gpr[i];
+        /* the same cut to the argument's own width as the integer path;
+         * see marshal_thunk_args() and THUNK_WIDTH */
+        if (widths) gpr[i] = narrow_thunk_arg( gpr[i], THUNK_WIDTH( widths, i ) );
+        else if (narrow & (1u << i)) gpr[i] = (UINT)gpr[i];
     }
 }
 
@@ -6299,7 +6394,7 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
     struct com_thunk_hit com = { 0 };
     NTSTATUS status = STATUS_SUCCESS;
     ULONG_PTR a[THUNK_MAX_ARGS] = { 0 };
-    UINT sig = 0, argc, cb_mask = 0, cb_wide = 0, cb_argc = 0, fp = 0;
+    UINT sig = 0, argc, cb_mask = 0, cb_wide = 0, cb_argc = 0, fp = 0, widths = 0;
     ULONG_PTR ret;
     void *proc;
 
@@ -6309,7 +6404,7 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
     emu_current_trap_ctx = ctx;
     emu_trap_ctx_rewritten = FALSE;
 
-    proc = find_guest_thunk_target( ctx->Rip, &sig, &override, &com, &cb_mask, &cb_wide, &cb_argc, &fp );
+    proc = find_guest_thunk_target( ctx->Rip, &sig, &override, &com, &cb_mask, &cb_wide, &cb_argc, &fp, &widths );
     argc = THUNK_SIG_ARGC(sig);
     if (com.dispatch)
     {
@@ -6349,7 +6444,7 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
             ULONG_PTR gpr[THUNK_MAX_ARGS];
             double fpr[THUNK_MAX_FP_ARGS], fp_ret = 0.0;
 
-            marshal_thunk_args_fp( ctx, argc, THUNK_SIG_NARROW(sig), fp, gpr, fpr );
+            marshal_thunk_args_fp( ctx, argc, THUNK_SIG_NARROW(sig), widths, fp, gpr, fpr );
             ret = call_native_thunk_fp( proc, gpr, fpr, &fp_ret );
 
             /* MS-x64 returns a float or double in XMM0, not RAX.  Write the
@@ -6370,7 +6465,7 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
         }
         else
         {
-            marshal_thunk_args( ctx, argc, THUNK_SIG_NARROW(sig), a );
+            marshal_thunk_args( ctx, argc, THUNK_SIG_NARROW(sig), widths, a );
             /* registration-side interception of guest callbacks: swap each
              * declared callback argument for a native trampoline BEFORE the
              * native callee ever sees the pointer */
