@@ -20,6 +20,7 @@ COM-JSON  ../../ppc64le/syscom/interfaces_syscom.json
 # vending wrappers: translate/wrap interface pointers at the boundary
 GUEST-IMPL   CoCreateInstance                 __wine_guest_CoCreateInstance
 GUEST-IMPL   CoGetClassObject                 __wine_guest_CoGetClassObject
+GUEST-IMPL   CoGetMalloc                      __wine_guest_CoGetMalloc
 GUEST-IMPL   CreateStreamOnHGlobal            __wine_guest_CreateStreamOnHGlobal
 GUEST-IMPL   GetHGlobalFromStream             __wine_guest_GetHGlobalFromStream
 
@@ -34,7 +35,6 @@ GUEST-REFUSE CoGetCallContext
 GUEST-REFUSE CoGetInstanceFromFile
 GUEST-REFUSE CoGetInstanceFromIStorage
 GUEST-REFUSE CoGetInterfaceAndReleaseStream
-GUEST-REFUSE CoGetMalloc
 GUEST-REFUSE CoGetMarshalSizeMax
 GUEST-REFUSE CoGetObjectContext
 GUEST-REFUSE CoGetStandardMarshal

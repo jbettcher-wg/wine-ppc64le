@@ -950,6 +950,27 @@ HRESULT WINAPI __wine_guest_CoCreateInstance( REFCLSID rclsid, IUnknown *outer,
     return __wine_com_wrap_out_iface( hr, riid, ppv );
 }
 
+/* The task allocator, which a guest reaches as an INTERFACE rather than as the
+ * flat CoTaskMemAlloc/Free pair beside it -- so it has to come back wrapped
+ * like any other out-interface, and until now it did not: CoGetMalloc was on
+ * the GUEST-REFUSE list, and a guest asking for IMalloc got
+ * __wine_com_refuse's "interface-bearing flat export with no wrapper yet".
+ *
+ * It needs no riid argument to decide what to wrap, which is the only way it
+ * differs from CoCreateInstance above: the interface is IMalloc by definition
+ * of the call, so the IID is named here rather than taken from the caller.
+ * IMalloc is already on the roster (SYSCOM_IFACE_IMalloc), so the vtable this
+ * builds is the same generated slot table every other interface gets.
+ */
+HRESULT WINAPI __wine_guest_CoGetMalloc( DWORD context, IMalloc **ppMalloc )
+{
+    HRESULT hr;
+
+    if (!syscom_ready()) return E_FAIL;
+    hr = CoGetMalloc( context, ppMalloc );
+    return __wine_com_wrap_out_iface( hr, &IID_IMalloc, (void **)ppMalloc );
+}
+
 HRESULT WINAPI __wine_guest_CoGetClassObject( REFCLSID rclsid, DWORD ctx,
                                               COSERVERINFO *info, REFIID riid,
                                               void **ppv )

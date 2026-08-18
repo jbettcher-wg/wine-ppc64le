@@ -366,5 +366,6 @@
 @ stdcall __wine_com_refuse()
 @ stdcall __wine_guest_CoCreateInstance(ptr ptr long ptr ptr)
 @ stdcall __wine_guest_CoGetClassObject(ptr long ptr ptr ptr)
+@ stdcall __wine_guest_CoGetMalloc(long ptr)
 @ stdcall __wine_guest_CreateStreamOnHGlobal(ptr long ptr)
 @ stdcall __wine_guest_GetHGlobalFromStream(ptr ptr)
