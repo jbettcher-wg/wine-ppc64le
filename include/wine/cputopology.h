@@ -227,6 +227,31 @@ static inline void wine_cpu_topology_build( struct wine_cpu_topology *t )
         return;
     }
 
+    /* WINE_PPC64LE_CPU_LIMIT: present at most N processors.  This is a CAP,
+     * not a redirection -- unlike an overridable sysfs root, it can only
+     * shrink the derived set to a PREFIX of the same derivation order, so
+     * every processor it presents is a real one and the to_unix map is
+     * untouched.  It exists because a machine with more than 64 logical
+     * processors is presented to Windows as processor GROUPS, and a title
+     * that predates groups can refuse the machine outright: Cyberpunk 2077
+     * dies in engine init on the 2x40 view of this POWER8 and boots on the
+     * emulated lane's classic 1x64 view of the same box.  A cap of 64 here
+     * reproduces that view -- node 0's processors plus what fits of the
+     * next node fuse into a single group -- and ships per-title via
+     * appconfig, never as a default.  Both wineserver and every ntdll
+     * derive this independently, so the variable must reach BOTH; a
+     * wineserver surviving from a run without it would disagree with a
+     * client that has it.  run-native starts a fresh server per session,
+     * which is the environment this lever is for. */
+    {
+        const char *lim_env = getenv( "WINE_PPC64LE_CPU_LIMIT" );
+        if (lim_env)
+        {
+            unsigned long lim = strtoul( lim_env, NULL, 10 );
+            if (lim >= 1 && lim < oc.count) oc.count = (unsigned int)lim;
+        }
+    }
+
     nc.values = nodes; nc.count = 0; nc.max = sizeof(nodes) / sizeof(nodes[0]);
     if (wine_cpu_parse_list( nodes_path, &nc, wine_cpu_list_collect ) <= 0 || !nc.count)
     {

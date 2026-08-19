@@ -209,6 +209,35 @@ export WINEPREFIX
 say "WINEPREFIX=$WINEPREFIX"
 say "WINEFEXBRIDGE=${WINEFEXBRIDGE:-<unset>}"
 
+# Per-game settings, protonfixes-style: <tool>/appconfig/<appid>.env is
+# applied if present, one NAME=VALUE per line, comments allowed.  A value
+# the caller already set (a Steam launch option) is kept, so the file is
+# a default rather than an override.
+#
+# Applied HERE, before the first wine invocation of the run, not in the
+# launch verb where it used to live: the first `$wine` call (wineboot on a
+# fresh prefix, the steam bridge's reg writes on every run) starts the
+# WINESERVER, the server inherits its environment from that first call and
+# outlives it, and some of these settings are ones the server itself must
+# see -- WINE_PPC64LE_CPU_LIMIT is derived independently by wineserver and
+# every client, and the two views must agree bit for bit.  A game whose
+# .env was applied after the server was already up got a server on one
+# topology and a game on another.
+appcfg=$selfdir/appconfig/${SteamAppId:-none}.env
+if [ -f "$appcfg" ]; then
+    say "applying $appcfg"
+    while IFS= read -r line; do
+        case $line in ''|\#*) continue ;; esac
+        name=${line%%=*}
+        if eval "[ -z \"\${$name:-}\" ]"; then
+            export "$line"
+            say "  $line"
+        else
+            say "  keeping caller's $name"
+        fi
+    done < "$appcfg"
+fi
+
 echo
 echo "===== environment handed to the native wine ====="
 env | sort
@@ -658,24 +687,10 @@ run|runinprefix|waitforexitandrun)
     else
         bridge_start || say "continuing without a steam bridge"
     fi
-    # Per-game settings, protonfixes-style: <tool>/appconfig/<appid>.env is
-    # applied if present, one NAME=VALUE per line, comments allowed.  A value
-    # the caller already set (a Steam launch option) is kept, so the file is
-    # a default rather than an override.
-    appcfg=$selfdir/appconfig/${SteamAppId:-none}.env
-    if [ -f "$appcfg" ]; then
-        say "applying $appcfg"
-        while IFS= read -r line; do
-            case $line in ''|\#*) continue ;; esac
-            name=${line%%=*}
-            if eval "[ -z \"\${$name:-}\" ]"; then
-                export "$line"
-                say "  $line"
-            else
-                say "  keeping caller's $name"
-            fi
-        done < "$appcfg"
-    fi
+    # Per-game appconfig/<appid>.env is applied much earlier, before the
+    # first wine invocation of the run -- see the block above the
+    # environment dump for why (the wineserver inherits from the FIRST
+    # client, and some settings must reach the server itself).
     # Some games ship more than one binary and Steam's launch config picks the
     # wrong one for this port -- DOOM (2016) defaults to the OpenGL DOOMx64.exe
     # where only the Vulkan DOOMx64vk.exe is served.  WINE_PPC64LE_RUN_EXE in a
