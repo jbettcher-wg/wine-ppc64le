@@ -118,14 +118,47 @@ The tools exist and are not yet joined up:
   from failed launches is the difference between this working for other people
   and working for its author.
 
-## 6. Performance: the ~2.5-core ceiling
+## 6. Performance: the ceiling re-measured (2026-08-19) — it is one thread
 
-Unchanged and unexplained: latency-bound, ~54,000 wakeups/s, while an emulated
-GE-Proton on the same machine uses 7-9 cores.  DOOM at 500%+ CPU during load
-suggests the ceiling is not where it was measured, so **re-measure before
-theorising**.  The NUMA lever (`WINE_PPC64LE_NUMA_NODE`) is in place and
-unmeasured: bound and unbound runs of the same scene, frame times compared, is
-an afternoon's work and would settle whether it is worth a default.
+The ~2.5-core story is DEAD.  Measured mid-flythrough on the Cyberpunk
+`-benchmark` harness: the game process pulls **~15 cores** (1498%),
+**GameThread is pinned at 92%** — the frame rate is that one thread's
+JIT throughput — ~25 redDispatcher workers idle-spin at ~50% each, the
+process context-switches 45k/s, and wineserver is a NON-factor (4.5%,
+2k switches/s).  Whatever produced the old 2.5-core measurement, the
+current tree does not reproduce it.
+
+The lever matrix, one `-benchmark` run each (avg fps; noise ±0.1 on
+back-to-back runs):
+
+| config                                   | avg fps |
+|------------------------------------------|--------:|
+| as found (ondemand gov, SMT4, node0)     | 15.04 / 14.94 |
+| performance gov, SMT4, node0             | 15.45 |
+| performance gov, SMT4, unbound           | 16.05 |
+| + FEX_SPINCOLLAPSE=128 (SMT4, node0)     | 15.72 |
+| performance gov, **SMT2, node0**         | **7.47 — never do this** |
+| performance gov, **SMT2, unbound**       | **17.56** |
+| performance gov, SMT2, unbound, +spin128 | **17.75** (best; min 13.0) |
+| FEX_X87REDUCEDPRECISION=1 (any)          | no delta (correctness lever, not perf) |
+
+So: **performance governor + SMT2 + NO numa bind (+ FEX_SPINCOLLAPSE=128
+if you like the min-fps bump) = +18%** over as-found,
+and the node-0 bind must never be combined with SMT2 (node 0 then has 20
+threads against the game's ~15-thread appetite; it halves the frame
+rate).  SMT2's win is exactly what the thread profile predicts: the
+fatter per-thread core feeds the one thread that matters.  FEX_* knobs
+reach the native lane since fastppcx86 `54df357cb` (the bridge
+environment layer).
+
+What remains: the GameThread itself.  Next instrument is a perf profile
+of that one tid mid-benchmark (`FEX_GLOBALJITNAMING=1` writes
+/tmp/perf-<pid>.map, and the bridge honors it now) to split its 92%
+between JIT'd guest code, bridge helpers, and TSO barrier overhead —
+the last one matters because HWTSO/PROT_SAO is still
+FEXInterpreter-only (the bridge never runs SetupTSOEmulation, so
+FEX_HWTSO is safely inert on this lane; wiring SAO through the bridge
+is the known heavy lift if barriers turn out to dominate).
 
 ## 7. Smaller, known, and written down
 
