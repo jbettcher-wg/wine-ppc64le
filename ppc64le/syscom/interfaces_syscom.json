@@ -102,6 +102,7 @@
     "CALLCONV",
     "CALLTYPE",
     "CHANGEKIND",
+    "CIMTYPE_ENUMERATION",
     "CTRLINFO",
     "DATADIR",
     "DCOM_CALL_STATE",
@@ -120,6 +121,7 @@
     "DMUS_STYLET_TYPES",
     "DMUS_TIME_RESOLVE_FLAGS",
     "DMUS_TRACKF_FLAGS",
+    "DVASPECT",
     "DVASPECT2",
     "DVASPECTINFOFLAG",
     "DVD_AUDIO_APPMODE",
@@ -165,6 +167,15 @@
     "LOCKTYPE",
     "MKRREDUCE",
     "MKSYS",
+    "NLM_CONNECTION_COST",
+    "NLM_CONNECTION_PROPERTY_CHANGE",
+    "NLM_CONNECTIVITY",
+    "NLM_DOMAIN_TYPE",
+    "NLM_ENUM_NETWORK",
+    "NLM_INTERNET_CONNECTIVITY",
+    "NLM_NETWORK_CATEGORY",
+    "NLM_NETWORK_CLASS",
+    "NLM_NETWORK_PROPERTY_CHANGE",
     "OLEDCFLAGS",
     "PENDINGMSG",
     "PENDINGTYPE",
@@ -177,6 +188,9 @@
     "READYSTATE",
     "SERVERCALL",
     "SF_TYPE",
+    "STATFLAG",
+    "STGC",
+    "STGMOVE",
     "STGTY",
     "STREAM_SEEK",
     "SYSKIND",
@@ -184,10 +198,12 @@
     "TYMED",
     "TYPEFLAGS",
     "TYPEKIND",
+    "TYSPEC",
     "TrustLevel",
     "TunerInputType",
     "UASFLAGS",
     "VALID_UOP_FLAG",
+    "VARENUM",
     "VARFLAGS",
     "VARKIND",
     "VIEWSTATUS",
@@ -201,6 +217,14 @@
     "VMR_ASPECT_RATIO_MODE",
     "VideoProcAmpFlags",
     "VideoProcAmpProperty",
+    "WBEM_CONDITION_FLAG_TYPE",
+    "WBEM_FLAVOR_TYPE",
+    "WBEM_GENERIC_FLAG_TYPE",
+    "WBEM_GENUS_TYPE",
+    "WBEM_REFRESHER_FLAGS",
+    "WBEM_STATUS_TYPE",
+    "WBEM_TIMEOUT_TYPE",
+    "WBEM_UNSECAPP_FLAG_TYPE",
     "XAUDIO2_DEVICE_ROLE",
     "XAUDIO2_FILTER_TYPE",
     "XAUDIO2_PROCESSOR",
@@ -213,7 +237,35 @@
     "_AudioSessionState",
     "_EDataFlow",
     "_ERole",
-    "_EndpointFormFactor"
+    "_EndpointFormFactor",
+    "tagCALLCONV",
+    "tagCHANGEKIND",
+    "tagDESCKIND",
+    "tagDVASPECT",
+    "tagFUNCFLAGS",
+    "tagFUNCKIND",
+    "tagINVOKEKIND",
+    "tagLIBFLAGS",
+    "tagSF_TYPE",
+    "tagSTATFLAG",
+    "tagSTGC",
+    "tagSTGMOVE",
+    "tagSYSKIND",
+    "tagTYPEFLAGS",
+    "tagTYPEKIND",
+    "tagTYSPEC",
+    "tagVARFLAGS",
+    "tagVARKIND",
+    "tag_CIMTYPE_ENUMERATION",
+    "tag_WBEMSTATUS",
+    "tag_WBEM_CONDITION_FLAG_TYPE",
+    "tag_WBEM_FLAVOR_TYPE",
+    "tag_WBEM_GENERIC_FLAG_TYPE",
+    "tag_WBEM_GENUS_TYPE",
+    "tag_WBEM_REFRESHER_FLAGS",
+    "tag_WBEM_STATUS_TYPE",
+    "tag_WBEM_TIMEOUT_TYPE",
+    "tag_WBEM_UNSECAPP_FLAG_TYPE"
   ],
   "unresolved_params": {},
   "synthetic_iid_interfaces": [
@@ -4512,6 +4564,256 @@
         }
       ]
     },
+    "IEnumNetworkConnections": {
+      "uuid": "dcb00006-570f-4a9b-8d69-199fdba5723b",
+      "base": "IDispatch",
+      "header": "netlistmgr.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDispatch",
+          "name": "GetTypeInfoCount",
+          "ret": "HRESULT",
+          "params": [
+            "UINT *pctinfo"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDispatch",
+          "name": "GetTypeInfo",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iTInfo",
+            "LCID lcid",
+            "ITypeInfo **ppTInfo"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDispatch",
+          "name": "GetIDsOfNames",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "LPOLESTR *rgszNames",
+            "UINT cNames",
+            "LCID lcid",
+            "DISPID *rgDispId"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDispatch",
+          "name": "Invoke",
+          "ret": "HRESULT",
+          "params": [
+            "DISPID dispIdMember",
+            "REFIID riid",
+            "LCID lcid",
+            "WORD wFlags",
+            "DISPPARAMS *pDispParams",
+            "VARIANT *pVarResult",
+            "EXCEPINFO *pExcepInfo",
+            "UINT *puArgErr"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IEnumNetworkConnections",
+          "name": "get__NewEnum",
+          "ret": "HRESULT",
+          "params": [
+            "IEnumVARIANT **ppEnumVar"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IEnumNetworkConnections",
+          "name": "Next",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG celt",
+            "INetworkConnection **rgelt",
+            "ULONG *pceltFetched"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IEnumNetworkConnections",
+          "name": "Skip",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG celt"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IEnumNetworkConnections",
+          "name": "Reset",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 11,
+          "owner": "IEnumNetworkConnections",
+          "name": "Clone",
+          "ret": "HRESULT",
+          "params": [
+            "IEnumNetworkConnections **ppEnumNetwork"
+          ]
+        }
+      ]
+    },
+    "IEnumNetworks": {
+      "uuid": "dcb00003-570f-4a9b-8d69-199fdba5723b",
+      "base": "IDispatch",
+      "header": "netlistmgr.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDispatch",
+          "name": "GetTypeInfoCount",
+          "ret": "HRESULT",
+          "params": [
+            "UINT *pctinfo"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDispatch",
+          "name": "GetTypeInfo",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iTInfo",
+            "LCID lcid",
+            "ITypeInfo **ppTInfo"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDispatch",
+          "name": "GetIDsOfNames",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "LPOLESTR *rgszNames",
+            "UINT cNames",
+            "LCID lcid",
+            "DISPID *rgDispId"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDispatch",
+          "name": "Invoke",
+          "ret": "HRESULT",
+          "params": [
+            "DISPID dispIdMember",
+            "REFIID riid",
+            "LCID lcid",
+            "WORD wFlags",
+            "DISPPARAMS *pDispParams",
+            "VARIANT *pVarResult",
+            "EXCEPINFO *pExcepInfo",
+            "UINT *puArgErr"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IEnumNetworks",
+          "name": "get__NewEnum",
+          "ret": "HRESULT",
+          "params": [
+            "IEnumVARIANT **ppEnumVar"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IEnumNetworks",
+          "name": "Next",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG celt",
+            "INetwork **rgelt",
+            "ULONG *pceltFetched"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IEnumNetworks",
+          "name": "Skip",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG celt"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IEnumNetworks",
+          "name": "Reset",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 11,
+          "owner": "IEnumNetworks",
+          "name": "Clone",
+          "ret": "HRESULT",
+          "params": [
+            "IEnumNetworks **ppEnumNetwork"
+          ]
+        }
+      ]
+    },
     "IEnumSTATSTG": {
       "uuid": "0000000d-0000-0000-c000-000000000046",
       "base": "IUnknown",
@@ -4709,6 +5011,85 @@
           "ret": "HRESULT",
           "params": [
             "IEnumUnknown **ppenum"
+          ]
+        }
+      ]
+    },
+    "IEnumWbemClassObject": {
+      "uuid": "027947e1-d731-11ce-a357-000000000001",
+      "base": "IUnknown",
+      "header": "wbemcli.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IEnumWbemClassObject",
+          "name": "Reset",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 4,
+          "owner": "IEnumWbemClassObject",
+          "name": "Next",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lTimeout",
+            "ULONG uCount",
+            "IWbemClassObject **apObjects",
+            "ULONG *puReturned"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IEnumWbemClassObject",
+          "name": "NextAsync",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG uCount",
+            "IWbemObjectSink *pSink"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IEnumWbemClassObject",
+          "name": "Clone",
+          "ret": "HRESULT",
+          "params": [
+            "IEnumWbemClassObject **ppEnum"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IEnumWbemClassObject",
+          "name": "Skip",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lTimeout",
+            "ULONG nCount"
           ]
         }
       ]
@@ -5752,6 +6133,495 @@
           "params": [
             "ULONG cMQIs",
             "MULTI_QI *pMQIs"
+          ]
+        }
+      ]
+    },
+    "INetwork": {
+      "uuid": "dcb00002-570f-4a9b-8d69-199fdba5723b",
+      "base": "IDispatch",
+      "header": "netlistmgr.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDispatch",
+          "name": "GetTypeInfoCount",
+          "ret": "HRESULT",
+          "params": [
+            "UINT *pctinfo"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDispatch",
+          "name": "GetTypeInfo",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iTInfo",
+            "LCID lcid",
+            "ITypeInfo **ppTInfo"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDispatch",
+          "name": "GetIDsOfNames",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "LPOLESTR *rgszNames",
+            "UINT cNames",
+            "LCID lcid",
+            "DISPID *rgDispId"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDispatch",
+          "name": "Invoke",
+          "ret": "HRESULT",
+          "params": [
+            "DISPID dispIdMember",
+            "REFIID riid",
+            "LCID lcid",
+            "WORD wFlags",
+            "DISPPARAMS *pDispParams",
+            "VARIANT *pVarResult",
+            "EXCEPINFO *pExcepInfo",
+            "UINT *puArgErr"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "INetwork",
+          "name": "GetName",
+          "ret": "HRESULT",
+          "params": [
+            "BSTR *pszNetworkName"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "INetwork",
+          "name": "SetName",
+          "ret": "HRESULT",
+          "params": [
+            "BSTR szNetworkNewName"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "INetwork",
+          "name": "GetDescription",
+          "ret": "HRESULT",
+          "params": [
+            "BSTR *pszDescription"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "INetwork",
+          "name": "SetDescription",
+          "ret": "HRESULT",
+          "params": [
+            "BSTR szDescription"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "INetwork",
+          "name": "GetNetworkId",
+          "ret": "HRESULT",
+          "params": [
+            "GUID *pgdGuidNetworkId"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "INetwork",
+          "name": "GetDomainType",
+          "ret": "HRESULT",
+          "params": [
+            "NLM_DOMAIN_TYPE *pNetworkType"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "INetwork",
+          "name": "GetNetworkConnections",
+          "ret": "HRESULT",
+          "params": [
+            "IEnumNetworkConnections **ppEnumNetworkConnection"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "INetwork",
+          "name": "GetTimeCreatedAndConnected",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *pdwLowDateTimeCreated",
+            "DWORD *pdwHighDateTimeCreated",
+            "DWORD *pdwLowDateTimeConnected",
+            "DWORD *pdwHighDateTimeConnected"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "INetwork",
+          "name": "get_IsConnectedToInternet",
+          "ret": "HRESULT",
+          "params": [
+            "VARIANT_BOOL *pbIsConnected"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "INetwork",
+          "name": "get_IsConnected",
+          "ret": "HRESULT",
+          "params": [
+            "VARIANT_BOOL *pbIsConnected"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "INetwork",
+          "name": "GetConnectivity",
+          "ret": "HRESULT",
+          "params": [
+            "NLM_CONNECTIVITY *pConnectivity"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "INetwork",
+          "name": "GetCategory",
+          "ret": "HRESULT",
+          "params": [
+            "NLM_NETWORK_CATEGORY *pCategory"
+          ]
+        },
+        {
+          "slot": 19,
+          "owner": "INetwork",
+          "name": "SetCategory",
+          "ret": "HRESULT",
+          "params": [
+            "NLM_NETWORK_CATEGORY NewCategory"
+          ]
+        }
+      ]
+    },
+    "INetworkConnection": {
+      "uuid": "dcb00005-570f-4a9b-8d69-199fdba5723b",
+      "base": "IDispatch",
+      "header": "netlistmgr.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDispatch",
+          "name": "GetTypeInfoCount",
+          "ret": "HRESULT",
+          "params": [
+            "UINT *pctinfo"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDispatch",
+          "name": "GetTypeInfo",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iTInfo",
+            "LCID lcid",
+            "ITypeInfo **ppTInfo"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDispatch",
+          "name": "GetIDsOfNames",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "LPOLESTR *rgszNames",
+            "UINT cNames",
+            "LCID lcid",
+            "DISPID *rgDispId"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDispatch",
+          "name": "Invoke",
+          "ret": "HRESULT",
+          "params": [
+            "DISPID dispIdMember",
+            "REFIID riid",
+            "LCID lcid",
+            "WORD wFlags",
+            "DISPPARAMS *pDispParams",
+            "VARIANT *pVarResult",
+            "EXCEPINFO *pExcepInfo",
+            "UINT *puArgErr"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "INetworkConnection",
+          "name": "GetNetwork",
+          "ret": "HRESULT",
+          "params": [
+            "INetwork **ppNetwork"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "INetworkConnection",
+          "name": "get_IsConnectedToInternet",
+          "ret": "HRESULT",
+          "params": [
+            "VARIANT_BOOL *pbIsConnected"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "INetworkConnection",
+          "name": "get_IsConnected",
+          "ret": "HRESULT",
+          "params": [
+            "VARIANT_BOOL *pbIsConnected"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "INetworkConnection",
+          "name": "GetConnectivity",
+          "ret": "HRESULT",
+          "params": [
+            "NLM_CONNECTIVITY *pConnectivity"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "INetworkConnection",
+          "name": "GetConnectionId",
+          "ret": "HRESULT",
+          "params": [
+            "GUID *pgdConnectionId"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "INetworkConnection",
+          "name": "GetAdapterId",
+          "ret": "HRESULT",
+          "params": [
+            "GUID *pgdAdapterId"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "INetworkConnection",
+          "name": "GetDomainType",
+          "ret": "HRESULT",
+          "params": [
+            "NLM_DOMAIN_TYPE *pDomainType"
+          ]
+        }
+      ]
+    },
+    "INetworkListManager": {
+      "uuid": "dcb00000-570f-4a9b-8d69-199fdba5723b",
+      "base": "IDispatch",
+      "header": "netlistmgr.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IDispatch",
+          "name": "GetTypeInfoCount",
+          "ret": "HRESULT",
+          "params": [
+            "UINT *pctinfo"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IDispatch",
+          "name": "GetTypeInfo",
+          "ret": "HRESULT",
+          "params": [
+            "UINT iTInfo",
+            "LCID lcid",
+            "ITypeInfo **ppTInfo"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IDispatch",
+          "name": "GetIDsOfNames",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "LPOLESTR *rgszNames",
+            "UINT cNames",
+            "LCID lcid",
+            "DISPID *rgDispId"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IDispatch",
+          "name": "Invoke",
+          "ret": "HRESULT",
+          "params": [
+            "DISPID dispIdMember",
+            "REFIID riid",
+            "LCID lcid",
+            "WORD wFlags",
+            "DISPPARAMS *pDispParams",
+            "VARIANT *pVarResult",
+            "EXCEPINFO *pExcepInfo",
+            "UINT *puArgErr"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "INetworkListManager",
+          "name": "GetNetworks",
+          "ret": "HRESULT",
+          "params": [
+            "NLM_ENUM_NETWORK Flags",
+            "IEnumNetworks **ppEnumNetwork"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "INetworkListManager",
+          "name": "GetNetwork",
+          "ret": "HRESULT",
+          "params": [
+            "GUID gdNetworkId",
+            "INetwork **ppNetwork"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "INetworkListManager",
+          "name": "GetNetworkConnections",
+          "ret": "HRESULT",
+          "params": [
+            "IEnumNetworkConnections **ppEnum"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "INetworkListManager",
+          "name": "GetNetworkConnection",
+          "ret": "HRESULT",
+          "params": [
+            "GUID gdNetworkConnectionId",
+            "INetworkConnection **ppNetworkConnection"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "INetworkListManager",
+          "name": "IsConnectedToInternet",
+          "ret": "HRESULT",
+          "params": [
+            "VARIANT_BOOL *pbIsConnected"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "INetworkListManager",
+          "name": "IsConnected",
+          "ret": "HRESULT",
+          "params": [
+            "VARIANT_BOOL *pbIsConnected"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "INetworkListManager",
+          "name": "GetConnectivity",
+          "ret": "HRESULT",
+          "params": [
+            "NLM_CONNECTIVITY *pConnectivity"
           ]
         }
       ]
@@ -7278,6 +8148,756 @@
           "name": "Release",
           "ret": "ULONG",
           "params": []
+        }
+      ]
+    },
+    "IWbemClassObject": {
+      "uuid": "dc12a681-737f-11cf-884d-00aa004b2e24",
+      "base": "IUnknown",
+      "header": "wbemcli.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IWbemClassObject",
+          "name": "GetQualifierSet",
+          "ret": "HRESULT",
+          "params": [
+            "IWbemQualifierSet **ppQualSet"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IWbemClassObject",
+          "name": "Get",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR wszName",
+            "LONG lFlags",
+            "VARIANT *pVal",
+            "CIMTYPE *pType",
+            "LONG *plFlavor"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IWbemClassObject",
+          "name": "Put",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR wszName",
+            "LONG lFlags",
+            "VARIANT *pVal",
+            "CIMTYPE Type"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IWbemClassObject",
+          "name": "Delete",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR wszName"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IWbemClassObject",
+          "name": "GetNames",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR wszQualifierName",
+            "LONG lFlags",
+            "VARIANT *pQualifierVal",
+            "SAFEARRAY **pNames"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IWbemClassObject",
+          "name": "BeginEnumeration",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lEnumFlags"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IWbemClassObject",
+          "name": "Next",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lFlags",
+            "BSTR *strName",
+            "VARIANT *pVal",
+            "CIMTYPE *pType",
+            "LONG *plFlavor"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IWbemClassObject",
+          "name": "EndEnumeration",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 11,
+          "owner": "IWbemClassObject",
+          "name": "GetPropertyQualifierSet",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR wszProperty",
+            "IWbemQualifierSet **ppQualSet"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IWbemClassObject",
+          "name": "Clone",
+          "ret": "HRESULT",
+          "params": [
+            "IWbemClassObject **ppCopy"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IWbemClassObject",
+          "name": "GetObjectText",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lFlags",
+            "BSTR *pstrObjectText"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IWbemClassObject",
+          "name": "SpawnDerivedClass",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lFlags",
+            "IWbemClassObject **ppNewClass"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IWbemClassObject",
+          "name": "SpawnInstance",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lFlags",
+            "IWbemClassObject **ppNewInstance"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IWbemClassObject",
+          "name": "CompareTo",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lFlags",
+            "IWbemClassObject *pCompareTo"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IWbemClassObject",
+          "name": "GetPropertyOrigin",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR wszName",
+            "BSTR *pstrClassName"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IWbemClassObject",
+          "name": "InheritsFrom",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR strAncestor"
+          ]
+        },
+        {
+          "slot": 19,
+          "owner": "IWbemClassObject",
+          "name": "GetMethod",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR wszName",
+            "LONG lFlags",
+            "IWbemClassObject **ppInSignature",
+            "IWbemClassObject **ppOutSignature"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "IWbemClassObject",
+          "name": "PutMethod",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR wszName",
+            "LONG lFlags",
+            "IWbemClassObject *pInSignature",
+            "IWbemClassObject *pOutSignature"
+          ]
+        },
+        {
+          "slot": 21,
+          "owner": "IWbemClassObject",
+          "name": "DeleteMethod",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR wszName"
+          ]
+        },
+        {
+          "slot": 22,
+          "owner": "IWbemClassObject",
+          "name": "BeginMethodEnumeration",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lEnumFlags"
+          ]
+        },
+        {
+          "slot": 23,
+          "owner": "IWbemClassObject",
+          "name": "NextMethod",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lFlags",
+            "BSTR *pstrName",
+            "IWbemClassObject **ppInSignature",
+            "IWbemClassObject **ppOutSignature"
+          ]
+        },
+        {
+          "slot": 24,
+          "owner": "IWbemClassObject",
+          "name": "EndMethodEnumeration",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 25,
+          "owner": "IWbemClassObject",
+          "name": "GetMethodQualifierSet",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR wszMethod",
+            "IWbemQualifierSet **ppQualSet"
+          ]
+        },
+        {
+          "slot": 26,
+          "owner": "IWbemClassObject",
+          "name": "GetMethodOrigin",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR wszMethodName",
+            "BSTR *pstrClassName"
+          ]
+        }
+      ]
+    },
+    "IWbemContext": {
+      "uuid": "44aca674-e8fc-11d0-a07c-00c04fb68820",
+      "base": "IUnknown",
+      "header": "wbemcli.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IWbemContext",
+          "name": "Clone",
+          "ret": "HRESULT",
+          "params": [
+            "IWbemContext **ppNewCopy"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IWbemContext",
+          "name": "GetNames",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lFlags",
+            "SAFEARRAY **pNames"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IWbemContext",
+          "name": "BeginEnumeration",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lFlags"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IWbemContext",
+          "name": "Next",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lFlags",
+            "BSTR *pstrName",
+            "VARIANT *pValue"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IWbemContext",
+          "name": "EndEnumeration",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 8,
+          "owner": "IWbemContext",
+          "name": "SetValue",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR wszName",
+            "LONG lFlags",
+            "VARIANT *pValue"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IWbemContext",
+          "name": "GetValue",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR wszName",
+            "LONG lFlags",
+            "VARIANT *pValue"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IWbemContext",
+          "name": "DeleteValue",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR wszName",
+            "LONG lFlags"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IWbemContext",
+          "name": "DeleteAll",
+          "ret": "HRESULT",
+          "params": []
+        }
+      ]
+    },
+    "IWbemLocator": {
+      "uuid": "dc12a687-737f-11cf-884d-00aa004b2e24",
+      "base": "IUnknown",
+      "header": "wbemcli.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IWbemLocator",
+          "name": "ConnectServer",
+          "ret": "HRESULT",
+          "params": [
+            "const BSTR strNetworkResource",
+            "const BSTR strUser",
+            "const BSTR strPassword",
+            "const BSTR strLocale",
+            "LONG lSecurityFlags",
+            "const BSTR strAuthority",
+            "IWbemContext *pCtx",
+            "IWbemServices **ppNamespace"
+          ]
+        }
+      ]
+    },
+    "IWbemServices": {
+      "uuid": "9556dc99-828c-11cf-a37e-00aa003240c7",
+      "base": "IUnknown",
+      "header": "wbemcli.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IWbemServices",
+          "name": "OpenNamespace",
+          "ret": "HRESULT",
+          "params": [
+            "const BSTR strNamespace",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IWbemServices **ppWorkingNamespace",
+            "IWbemCallResult **ppResult"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IWbemServices",
+          "name": "CancelAsyncCall",
+          "ret": "HRESULT",
+          "params": [
+            "IWbemObjectSink *pSink"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IWbemServices",
+          "name": "QueryObjectSink",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lFlags",
+            "IWbemObjectSink **ppResponseHandler"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IWbemServices",
+          "name": "GetObject",
+          "ret": "HRESULT",
+          "params": [
+            "const BSTR strObjectPath",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IWbemClassObject **ppObject",
+            "IWbemCallResult **ppCallResult"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IWbemServices",
+          "name": "GetObjectAsync",
+          "ret": "HRESULT",
+          "params": [
+            "const BSTR strObjectPath",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IWbemObjectSink *pResponseHandler"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IWbemServices",
+          "name": "PutClass",
+          "ret": "HRESULT",
+          "params": [
+            "IWbemClassObject *pObject",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IWbemCallResult **ppCallResult"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IWbemServices",
+          "name": "PutClassAsync",
+          "ret": "HRESULT",
+          "params": [
+            "IWbemClassObject *pObject",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IWbemObjectSink *pResponseHandler"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IWbemServices",
+          "name": "DeleteClass",
+          "ret": "HRESULT",
+          "params": [
+            "const BSTR strClass",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IWbemCallResult **ppCallResult"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IWbemServices",
+          "name": "DeleteClassAsync",
+          "ret": "HRESULT",
+          "params": [
+            "const BSTR strClass",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IWbemObjectSink *pResponseHandler"
+          ]
+        },
+        {
+          "slot": 12,
+          "owner": "IWbemServices",
+          "name": "CreateClassEnum",
+          "ret": "HRESULT",
+          "params": [
+            "const BSTR strSuperclass",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IEnumWbemClassObject **ppEnum"
+          ]
+        },
+        {
+          "slot": 13,
+          "owner": "IWbemServices",
+          "name": "CreateClassEnumAsync",
+          "ret": "HRESULT",
+          "params": [
+            "const BSTR strSuperclass",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IWbemObjectSink *pResponseHandler"
+          ]
+        },
+        {
+          "slot": 14,
+          "owner": "IWbemServices",
+          "name": "PutInstance",
+          "ret": "HRESULT",
+          "params": [
+            "IWbemClassObject *pInst",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IWbemCallResult **ppCallResult"
+          ]
+        },
+        {
+          "slot": 15,
+          "owner": "IWbemServices",
+          "name": "PutInstanceAsync",
+          "ret": "HRESULT",
+          "params": [
+            "IWbemClassObject *pInst",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IWbemObjectSink *pResponseHandler"
+          ]
+        },
+        {
+          "slot": 16,
+          "owner": "IWbemServices",
+          "name": "DeleteInstance",
+          "ret": "HRESULT",
+          "params": [
+            "const BSTR strObjectPath",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IWbemCallResult **ppCallResult"
+          ]
+        },
+        {
+          "slot": 17,
+          "owner": "IWbemServices",
+          "name": "DeleteInstanceAsync",
+          "ret": "HRESULT",
+          "params": [
+            "const BSTR strObjectPath",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IWbemObjectSink *pResponseHandler"
+          ]
+        },
+        {
+          "slot": 18,
+          "owner": "IWbemServices",
+          "name": "CreateInstanceEnum",
+          "ret": "HRESULT",
+          "params": [
+            "const BSTR strFilter",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IEnumWbemClassObject **ppEnum"
+          ]
+        },
+        {
+          "slot": 19,
+          "owner": "IWbemServices",
+          "name": "CreateInstanceEnumAsync",
+          "ret": "HRESULT",
+          "params": [
+            "const BSTR strFilter",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IWbemObjectSink *pResponseHandler"
+          ]
+        },
+        {
+          "slot": 20,
+          "owner": "IWbemServices",
+          "name": "ExecQuery",
+          "ret": "HRESULT",
+          "params": [
+            "const BSTR strQueryLanguage",
+            "const BSTR strQuery",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IEnumWbemClassObject **ppEnum"
+          ]
+        },
+        {
+          "slot": 21,
+          "owner": "IWbemServices",
+          "name": "ExecQueryAsync",
+          "ret": "HRESULT",
+          "params": [
+            "const BSTR strQueryLanguage",
+            "const BSTR strQuery",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IWbemObjectSink *pResponseHandler"
+          ]
+        },
+        {
+          "slot": 22,
+          "owner": "IWbemServices",
+          "name": "ExecNotificationQuery",
+          "ret": "HRESULT",
+          "params": [
+            "const BSTR strQueryLanguage",
+            "const BSTR strQuery",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IEnumWbemClassObject **ppEnum"
+          ]
+        },
+        {
+          "slot": 23,
+          "owner": "IWbemServices",
+          "name": "ExecNotificationQueryAsync",
+          "ret": "HRESULT",
+          "params": [
+            "const BSTR strQueryLanguage",
+            "const BSTR strQuery",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IWbemObjectSink *pResponseHandler"
+          ]
+        },
+        {
+          "slot": 24,
+          "owner": "IWbemServices",
+          "name": "ExecMethod",
+          "ret": "HRESULT",
+          "params": [
+            "const BSTR strObjectPath",
+            "const BSTR strMethodName",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IWbemClassObject *pInParams",
+            "IWbemClassObject **ppOutParams",
+            "IWbemCallResult **ppCallResult"
+          ]
+        },
+        {
+          "slot": 25,
+          "owner": "IWbemServices",
+          "name": "ExecMethodAsync",
+          "ret": "HRESULT",
+          "params": [
+            "const BSTR strObjectPath",
+            "const BSTR strMethodName",
+            "LONG lFlags",
+            "IWbemContext *pCtx",
+            "IWbemClassObject *pInParams",
+            "IWbemObjectSink *pResponseHandler"
+          ]
         }
       ]
     },

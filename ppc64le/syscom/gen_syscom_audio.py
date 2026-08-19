@@ -183,6 +183,60 @@ MMDEV_IFACES = ["IMMDeviceEnumerator", "IMMDeviceCollection", "IMMDevice",
 
 AUDIO_IFACES = XAUDIO2_IFACES + MMDEV_IFACES
 
+# --------------------------------------------------------------------------
+# THE SYSTEM-INFORMATION FAMILY: WMI and the NetworkListManager.
+#
+# Cyberpunk 2077's boot asks combase for both before it ever loads d3d12:
+# CoCreateInstance( WbemLocator ) for its hardware survey and
+# CoCreateInstance( NetworkListManager ) for connectivity -- and it calls
+# INetworkListManager::GetNetworks on the result WITHOUT checking the HRESULT,
+# because on Windows that creation cannot fail.  With neither family on the
+# roster, winecom's fail-closed choke point answered E_NOINTERFACE and NULLed
+# the out-pointer, and the game dereferenced it (measured: c0000005 at
+# Cyberpunk2077.exe+7e5fd4, `mov rax,[rcx]; call [rax+0x38]` with rcx = 0 --
+# slot 7 of an IDispatch-based vtable, which is GetNetworks).  So the honest
+# refusal is not survivable here; the family must be SERVED.
+#
+# Slot coverage is deliberately partial, and that is the design working:
+# every method whose parameter types this generator cannot license refuses BY
+# SLOT (IWbemServices' IWbemObjectSink asynchrony, IWbemCallResult
+# semisynchrony), while the walked path -- ConnectServer, ExecQuery,
+# IEnumWbemClassObject::Next, IWbemClassObject::Get, GetNetworks,
+# IEnumNetworks::Next, INetwork's property reads -- is plain pointers, BSTRs
+# and enums in shared memory.  VARIANT out-parameters pass as plain pointers:
+# a VARIANT holding a BSTR or an integer is data in the one address space both
+# sides share.  A VARIANT holding VT_UNKNOWN would carry a native vtable; WMI
+# property reads on the game's path (strings and integers about the machine)
+# do not produce one.
+#
+# oaidl.h joins the PARSE set only for base-chain flattening: the NLM
+# interfaces derive from IDispatch, whose seven slots must be numbered from
+# its own declaration rather than assumed.  IDispatch itself stays a legacy
+# roster row.
+# --------------------------------------------------------------------------
+
+SYSINFO_HEADERS = [os.path.join("include", "wbemcli.h"),
+                   os.path.join("include", "netlistmgr.h")]
+# oaidl.h for IDispatch's slot numbering; wtypes.h for the POINTER TYPEDEFS
+# the classifier licenses BSTR by -- `const BSTR` is a by-value parameter of
+# unprovable class until `typedef OLECHAR *BSTR` is in the scanned texts.
+SYSINFO_BASE_HEADERS = [os.path.join("include", "oaidl.h"),
+                        os.path.join("include", "wtypes.h")]
+
+WBEM_IFACES = ["IWbemLocator", "IWbemServices", "IEnumWbemClassObject",
+               "IWbemClassObject", "IWbemContext"]
+# IWbemContext is rostered for TYPE visibility: ConnectServer and ExecQuery
+# take an IWbemContext* in-parameter (games pass NULL), and a slot whose
+# parameter names an unrostered interface refuses.  Its own methods can all
+# refuse; nothing on the measured path calls them.
+NLM_IFACES = ["INetworkListManager", "IEnumNetworks", "INetwork",
+              "IEnumNetworkConnections", "INetworkConnection"]
+
+SYSINFO_IFACES = WBEM_IFACES + NLM_IFACES
+
+# Everything THIS generator owns and derives; the legacy blocks are the rest.
+OWNED_IFACES = AUDIO_IFACES + SYSINFO_IFACES
+
 # Enums these headers declare that the classifier must be able to prove are
 # integer-class by value.  Collected from the headers themselves (scan_enums),
 # merged into the roster's own list.
@@ -558,20 +612,34 @@ def build_audio_rows(build):
     xa_text = read_header(XAUDIO2_HEADER, build)
     mm_texts = [read_header(h, build) for h in MMDEV_HEADERS]
     ctx_texts = [read_header(h, SRCTREE) for h in CONTEXT_HEADERS]
+    si_texts = [read_header(h, build) for h in SYSINFO_HEADERS]
+    si_base_texts = [read_header(h, build) for h in SYSINFO_BASE_HEADERS]
 
     # Parsed per header so each row records the header it was read from; no
-    # interface in this family inherits across the two files.
+    # interface in the AUDIO family inherits across the two files.
     parsed = {XAUDIO2_HEADER: parse_midl(xa_text, XAUDIO2_HEADER)}
     for path, text in zip(MMDEV_HEADERS, mm_texts):
         parsed[path] = parse_midl(text, path)
 
+    # The SYSINFO family DOES inherit across files -- INetworkListManager's
+    # base chain runs through oaidl.h's IDispatch -- so its headers parse into
+    # one merged view for flatten() to resolve bases in.  Each interface still
+    # records the header it was declared in.
+    si_parsed = {}
+    for path, text in zip(SYSINFO_HEADERS + SYSINFO_BASE_HEADERS,
+                          si_texts + si_base_texts):
+        for k, v in parse_midl(text, path).items():
+            si_parsed.setdefault(k, v)
+    parsed["<sysinfo>"] = si_parsed
+
     rows, synthetic = {}, []
-    for want in (XAUDIO2_IFACES, MMDEV_IFACES):
+    for want in (XAUDIO2_IFACES, MMDEV_IFACES, SYSINFO_IFACES):
         for name in want:
             got = next((g for g in parsed.values() if name in g), None)
             if got is None:
                 sys.exit("gen_syscom_audio: %s is declared in none of %s"
-                         % (name, ", ".join([XAUDIO2_HEADER] + MMDEV_HEADERS)))
+                         % (name, ", ".join([XAUDIO2_HEADER] + MMDEV_HEADERS
+                                            + SYSINFO_HEADERS)))
             i = got[name]
             uuid = i["uuid"]
             row = dict(uuid=uuid or synth_iid(name),
@@ -583,7 +651,7 @@ def build_audio_rows(build):
                 synthetic.append(name)
             rows[name] = row
 
-    texts = [xa_text] + mm_texts + ctx_texts
+    texts = [xa_text] + mm_texts + ctx_texts + si_texts + si_base_texts
     return rows, scan_enums(texts), texts, sorted(synthetic)
 
 
@@ -595,7 +663,7 @@ def merge_roster(build, base):
     rows, enums, texts, synthetic = build_audio_rows(build)
 
     out = dict(base)
-    ifaces = {k: v for k, v in base["interfaces"].items() if k not in AUDIO_IFACES}
+    ifaces = {k: v for k, v in base["interfaces"].items() if k not in OWNED_IFACES}
     ifaces.update(rows)
     out["enums"] = sorted(set(base.get("enums", ())) | enums)
     out["interfaces"] = {k: ifaces[k] for k in sorted(ifaces)}
@@ -935,7 +1003,7 @@ def derive_legacy(old, roster, order, iface_index, typedefs):
     ifaces = roster["interfaces"]
     checked, withheld = 0, []
     for name, para in sorted(old["blocks"].items()):
-        if name in AUDIO_IFACES:
+        if name in OWNED_IFACES:
             continue
         decls = {m.group(1): [x.strip() for x in m.group(2).split(",")]
                  for m in DECL_RE.finditer(para)}
@@ -1061,7 +1129,7 @@ def generate(roster, texts, old):
     # ---- the legacy blocks: reused verbatim, xaux[] renumbered -------------
     blocks = {}
     for name, para in old["blocks"].items():
-        if name in AUDIO_IFACES:
+        if name in OWNED_IFACES:
             continue
 
         def renumber(m):
@@ -1094,7 +1162,7 @@ def generate(roster, texts, old):
     withheld.extend(legacy_withheld)
 
     # ---- this generator's own blocks --------------------------------------
-    for name in AUDIO_IFACES:
+    for name in OWNED_IFACES:
         if name not in ifaces:
             sys.exit("gen_syscom_audio: %s is missing from the roster" % name)
         rows, decls = [], []
@@ -1236,15 +1304,15 @@ def generate(roster, texts, old):
             " * the roster and cross-checked against this file.\n"
             " * Reverse-proxy licence: %s.  %d interface IN-parameter(s)\n"
             " * withheld, each of which fails closed. */"
-            % (len(order), total, len(AUDIO_IFACES), stats["marshalled"],
+            % (len(order), total, len(OWNED_IFACES), stats["marshalled"],
                stats["hand"], stats["fp"], stats["refused"], stats["iunknown"],
-               n_local, len(order) - len(AUDIO_IFACES),
+               n_local, len(order) - len(OWNED_IFACES),
                stats["legacy_marshalled"], stats["legacy_refused"],
                stats["legacy_iunknown"], stats["legacy_checked"],
                ", ".join(sorted(REVERSE_SINKS)), len(withheld)))
 
-    head = BANNER % (len(order), total, len(AUDIO_IFACES),
-                     len(order) - len(AUDIO_IFACES))
+    head = BANNER % (len(order), total, len(OWNED_IFACES),
+                     len(order) - len(OWNED_IFACES))
     text = render(head, order, blocks, meta, defines,
                   [local_paragraph(order, is_local), tail])
     return text, stats, refusal_log, hand_order, withheld
@@ -1275,8 +1343,8 @@ def main():
     roster, texts = merge_roster(args.build, base)
 
     if args.roster:
-        n = len(AUDIO_IFACES)
-        slots = sum(len(roster["interfaces"][k]["slots"]) for k in AUDIO_IFACES)
+        n = len(OWNED_IFACES)
+        slots = sum(len(roster["interfaces"][k]["slots"]) for k in OWNED_IFACES)
         print("wine-syscom audio family: %d interface(s), %d vtable slot(s); "
               "roster total %d / %d"
               % (n, slots, len(roster["interfaces"]),

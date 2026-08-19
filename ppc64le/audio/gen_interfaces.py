@@ -170,6 +170,15 @@ SURFACES = {
             # produces a roster whose IXAudio2 has a different IID and three
             # fewer slots, which is exactly what it did the first time.
             ("dlls/xaudio2_7/xaudio_classes.h", "midl",     True),
+            # The system-information family: Cyberpunk 2077's boot walks WMI
+            # and the NetworkListManager through CoCreateInstance before it
+            # loads d3d12, and calls INetworkListManager::GetNetworks without
+            # checking the HRESULT -- an unrostered refusal is a guest NULL
+            # deref there, not a graceful degrade.  Same family, both
+            # generators, one roster: gen_syscom_audio.py owns the rows and
+            # this extractor must regenerate them for the drift gate.
+            ("include/wbemcli.h",      "midl",              True),
+            ("include/netlistmgr.h",   "midl",              True),
             ("dsound.h",               "declare_interface", False),
             ("dmusicc.h",              "declare_interface", False),
             ("dmusici.h",              "declare_interface", False),
@@ -201,6 +210,10 @@ SURFACES = {
             "IXAudio2EngineCallback", "IXAudio2MasteringVoice",
             "IXAudio2SourceVoice", "IXAudio2SubmixVoice", "IXAudio2Voice",
             "IXAudio2VoiceCallback",
+            "IWbemLocator", "IWbemServices", "IEnumWbemClassObject",
+            "IWbemClassObject", "IWbemContext",
+            "INetworkListManager", "IEnumNetworks", "INetwork",
+            "IEnumNetworkConnections", "INetworkConnection",
         ],
     ),
 }
