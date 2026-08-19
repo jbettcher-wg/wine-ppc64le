@@ -1,0 +1,48 @@
+# AMD64 thunk export spec -- msvcr120.dll.
+#
+# WHY THIS MODULE.  The Witcher 3 GOTY's witcher3.exe statically imports
+# NvCameraSDK64.dll (NVIDIA Ansel, shipped beside the exe), and that DLL
+# imports MSVCP120.dll and MSVCR120.dll.  This tree built dlls/msvcr120 as a
+# native ppc64 module with no AMD64 thunk, so the guest loader answered
+# c000007b for both halves of the VC++ 2013 runtime and the process died in
+# loader_init before main -- rc=53, nothing drawn ([MEASURED] 2026-08-19,
+# first `fex nw-witcher3` launch).  The same wall DOOM hit as pdh.dll and
+# Styx hit as msvcp100: an optional-looking Wine builtin a real game links
+# against, invisible until a title actually does.
+#
+# The split follows dlls/msvcr100 exactly, and the reasons are its reasons:
+# the C runtime is the half this port CAN translate, so FROM-SPEC auto emits
+# every export the signature oracle can prove out of the shared ../msvcrt
+# sources; msvcp120 is the MSVC C++ ABI, is refused honestly, and the
+# steamtool stages Proton's own x86-64 Wine build of it into the guest
+# system directory instead (ppc64le/steamtool/proton, the msvcp100 block).
+#
+# The mangled rows at the bottom are the same four flat-prototype memory
+# operators (mangled NAME, flat SIGNATURE) plus the two symbols msvcp120's
+# own DllMain resolves at PROCESS_ATTACH -- the exact set msvcr100 carries,
+# re-checked against msvcr120.spec's win64 lines.
+
+DLL msvcr120.dll
+FROM-SPEC auto
+
+INCLUDE-DIR   ../msvcrt
+PROBE-EXTRA   locale.h
+PROBE-EXTRA   setjmp.h
+PROBE-EXTRA   sys/utime.h
+PROBE-EXTRA   sys/timeb.h
+PROBE-EXTRA   mtdll.h
+PROBE-EXTRA   msvcrt.h
+PROBE-EXTRA   mbstring.h
+
+GUEST-IMPL   _initterm                        __wine_guest__initterm
+GUEST-IMPL   _initterm_e                      __wine_guest__initterm_e
+
+_malloc_crt                   0x0000A110  1  int   msvcr120.spec:1440
+
+??2@YAPEAX_K@Z    0x00000C01  1  int   msvcr120.spec:336
+??_U@YAPEAX_K@Z   0x00000C02  1  int   msvcr120.spec:393
+??3@YAXPEAX@Z     0x00000C03  1  void  msvcr120.spec:340
+??_V@YAXPEAX@Z    0x00000C04  1  void  msvcr120.spec:397
+
+?IsCurrentTaskCollectionCanceling@Context@Concurrency@@SA_NXZ  0x00000C05  0  int   msvcr120.spec:441
+?_set_new_handler@@YAP6AH_K@ZP6AH0@Z@Z                         0x00000C06  1  int   msvcr120.spec:709
