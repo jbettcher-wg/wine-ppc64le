@@ -563,6 +563,94 @@ NTSTATUS call_seh_handlers( EXCEPTION_RECORD *rec, CONTEXT *orig_context )
 }
 
 
+static LDR_DATA_TABLE_ENTRY *guest_module_entry_from_address( const void *addr );
+
+/***********************************************************************
+ *           module_entry_from_address
+ *
+ * The loader entry containing an address, whatever machine it is for.
+ * guest_module_entry_from_address() asks the same question of AMD64 images
+ * only; this one is for diagnostics that must name a NATIVE caller.
+ */
+static LDR_DATA_TABLE_ENTRY *module_entry_from_address( const void *addr )
+{
+    LIST_ENTRY *mark, *entry;
+
+    if (!addr) return NULL;
+    mark = &NtCurrentTeb()->Peb->LdrData->InMemoryOrderModuleList;
+    for (entry = mark->Flink; entry != mark; entry = entry->Flink)
+    {
+        LDR_DATA_TABLE_ENTRY *mod = CONTAINING_RECORD( entry, LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks );
+        const IMAGE_NT_HEADERS *nt = RtlImageNtHeader( mod->DllBase );
+        const char *base = (const char *)mod->DllBase;
+
+        if (!nt) continue;
+        if ((const char *)addr >= base && (const char *)addr < base + nt->OptionalHeader.SizeOfImage)
+            return mod;
+    }
+    return NULL;
+}
+
+
+/***********************************************************************
+ *           report_native_pc_in_guest_image
+ *
+ * THE NATIVE CPU EXECUTING GUEST CODE, which is the one thing this port must
+ * never let happen and the hardest failure to recognise from a log.
+ *
+ * A ppc64 core turned loose on x86-64 bytes does not stop.  It decodes them as
+ * ppc64 instructions and runs them, and the first one that touches memory
+ * raises an access violation somewhere meaningless -- so the report says "a
+ * read of 0x44 at an address inside the game", which reads exactly like the
+ * game dereferencing a null pointer, and sends the investigation after the
+ * game's own bugs.  DOOM (2016) spent this port a fortnight there.
+ *
+ * Two things separate the cases, and both are checked rather than argued:
+ *
+ *   - The faulting pc is INSIDE a loaded AMD64 image.  Guest code never
+ *     executes natively, so a native pc there is already the whole finding.
+ *   - It is four-byte aligned, because it is a ppc64 program counter.  An x86
+ *     pc reported for a guest fault lands wherever the instruction boundary
+ *     is, and a "mid-instruction" pc that is nevertheless a multiple of four,
+ *     twice running, is the signature of this and of nothing else.
+ *
+ * What is printed is what identifies the culprit: the branch was made either
+ * by `bctrl` (through CTR) or `bl` (leaving LR at the return address), so CTR
+ * and LR between them name the call site, and LR is resolved to module+offset
+ * because that is the line that says which native function called a guest
+ * pointer without going through the emulator.
+ */
+static void report_native_pc_in_guest_image( EXCEPTION_RECORD *rec, CONTEXT *context )
+{
+    LDR_DATA_TABLE_ENTRY *guest, *caller;
+    static LONG reported;
+
+    if (!(guest = guest_module_entry_from_address( (void *)(ULONG_PTR)context->Iar ))) return;
+    if (InterlockedIncrement( &reported ) > 4) return;
+
+    ERR( "NATIVE ppc64 execution has branched INTO GUEST CODE: nip=%I64x = %s+%I64x, "
+         "which the native cpu is decoding as ppc64 instructions -- the reported fault "
+         "(%08x touching %p) is what those decoded to, not what the guest did\n",
+         context->Iar, debugstr_w(guest->BaseDllName.Buffer),
+         context->Iar - (ULONG64)(ULONG_PTR)guest->DllBase,
+         (UINT)rec->ExceptionCode,
+         rec->NumberParameters >= 2 ? (void *)rec->ExceptionInformation[1] : NULL );
+
+    caller = module_entry_from_address( (void *)(ULONG_PTR)context->Lr );
+    if (caller)
+        ERR( "  the branch came from lr=%I64x = %s+%I64x (ctr=%I64x, r12=%I64x): that call "
+             "site handed a guest address to the native cpu\n", context->Lr,
+             debugstr_w(caller->BaseDllName.Buffer),
+             context->Lr - (ULONG64)(ULONG_PTR)caller->DllBase, context->Ctr, context->Gpr12 );
+    else
+        ERR( "  the branch came from lr=%I64x, which is in no loaded module (ctr=%I64x, "
+             "r12=%I64x)\n", context->Lr, context->Ctr, context->Gpr12 );
+
+    ERR( "  args as ppc64 would have them: r3=%I64x r4=%I64x r5=%I64x r6=%I64x r7=%I64x "
+         "r8=%I64x sp=%I64x\n", context->Gpr3, context->Gpr4, context->Gpr5, context->Gpr6,
+         context->Gpr7, context->Gpr8, context->Gpr1 );
+}
+
 /*******************************************************************
  *		KiUserExceptionDispatcher (NTDLL.@)
  *
@@ -621,6 +709,7 @@ void WINAPI KiUserExceptionDispatcher( EXCEPTION_RECORD *rec, CONTEXT *context )
                  on_win32_stack ? "WIN32" : "UNIX/other",
                  tib->StackLimit, tib->StackBase );
         }
+        report_native_pc_in_guest_image( rec, context );
         if (reported <= 8)
             ERR( "access violation at %p: %s %p (info[0]=%Ix info[1]=%Ix)\n",
                  rec->ExceptionAddress,
@@ -3646,6 +3735,113 @@ static NTSTATUS dispatch_guest_frames( EXCEPTION_RECORD *rec, AMD64_CONTEXT *ctx
 
 
 /***********************************************************************
+ *           report_guest_access_violation
+ *
+ * WHAT THE GUEST WAS HOLDING WHEN IT COULD NOT TOUCH SOMETHING.
+ *
+ * An address and a fault kind name the symptom; they do not name the bug.  On
+ * this port the two questions that do are "which register was wrong" and "who
+ * transferred control here", and both were reachable only through +seh -- 22 GB
+ * of trace for one DOOM run -- or through the guest's own crash reporter, which
+ * writes an all-zero register block and cannot be believed at all.
+ *
+ * So the whole guest register file is printed, with the pc and the stack
+ * pointer resolved to module+RVA, sixteen bytes of the code around the pc, and
+ * the top of the guest stack with every value that lands in a guest image
+ * resolved the same way.  A CALL pushes its return address, so the first such
+ * value is normally the caller: that is the line that says who branched here.
+ *
+ * It also settles a question the pc alone cannot.  DOOM (2016) faults at a pc
+ * four bytes into a function, i.e. INSIDE the instruction that begins it, which
+ * either means the guest really branched into the middle of an instruction or
+ * means the reported pc is imprecise.  The registers decide it: if the pc is
+ * exact, the operands of the instruction decoded there must explain the
+ * address that faulted, and if they do not, the pc is not where the fault was.
+ *
+ * Bounded to the first four, because a guest that catches its own faults raises
+ * thousands of them and they are all the same one.
+ */
+static void report_guest_access_violation( EXCEPTION_RECORD *rec, const AMD64_CONTEXT *ctx,
+                                           void *stack_base, void *stack_limit )
+{
+    static const char * const names[16] =
+        { "rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi",
+          "r8 ", "r9 ", "r10", "r11", "r12", "r13", "r14", "r15" };
+    const ULONG64 regs[16] =
+        { ctx->Rax, ctx->Rcx, ctx->Rdx, ctx->Rbx, ctx->Rsp, ctx->Rbp, ctx->Rsi, ctx->Rdi,
+          ctx->R8,  ctx->R9,  ctx->R10, ctx->R11, ctx->R12, ctx->R13, ctx->R14, ctx->R15 };
+    static LONG reported;
+    LDR_DATA_TABLE_ENTRY *mod;
+    UINT i;
+
+    if (InterlockedIncrement( &reported ) > 4) return;
+
+    if ((mod = guest_module_entry_from_address( (void *)(ULONG_PTR)ctx->Rip )))
+        ERR( "guest fault %08x at %s+%I64x (rip %I64x), touching %p\n", (UINT)rec->ExceptionCode,
+             debugstr_w(mod->BaseDllName.Buffer), ctx->Rip - (ULONG64)(ULONG_PTR)mod->DllBase,
+             ctx->Rip, (void *)rec->ExceptionInformation[1] );
+    else
+        ERR( "guest fault %08x at rip %I64x, which is in no guest image, touching %p\n",
+             (UINT)rec->ExceptionCode, ctx->Rip, (void *)rec->ExceptionInformation[1] );
+
+    for (i = 0; i < 16; i += 4)
+        ERR( "  %s=%016I64x  %s=%016I64x  %s=%016I64x  %s=%016I64x\n",
+             names[i],   regs[i],   names[i+1], regs[i+1],
+             names[i+2], regs[i+2], names[i+3], regs[i+3] );
+
+    /* The code around the pc, read from the LIVE image rather than the file on
+     * disk, because a DRM stub that rewrites its own text makes those two
+     * different things.  Only read when the pc is inside a module, where the
+     * whole window is mapped and this cannot itself fault. */
+    if (mod)
+    {
+        const IMAGE_NT_HEADERS *nt = RtlImageNtHeader( mod->DllBase );
+        const char *base = (const char *)mod->DllBase;
+        const char *end = base + (nt ? nt->OptionalHeader.SizeOfImage : 0);
+        const char *rip = (const char *)(ULONG_PTR)ctx->Rip;
+        const char *from = (rip - 8 >= base) ? rip - 8 : base;
+        const char *to = (rip + 16 <= end) ? rip + 16 : end;
+        static const char hex[] = "0123456789abcdef";
+        char buf[3 * 24 + 1];
+        UINT n = 0;
+
+        while (from + n / 3 < to && n + 3 < sizeof(buf))
+        {
+            BYTE b = (BYTE)from[n / 3];
+
+            buf[n++] = hex[b >> 4];
+            buf[n++] = hex[b & 0xf];
+            buf[n++] = ' ';
+        }
+        buf[n] = 0;
+        ERR( "  code at rip%+d: %s(rip is byte %d of that window)\n",
+             (int)(from - rip), buf, (int)(rip - from) );
+    }
+
+    /* The top of the guest stack.  The first value in a guest image is normally
+     * the return address a CALL pushed, and therefore the caller. */
+    if (is_valid_guest_frame( ctx->Rsp, stack_base, stack_limit ) && guest_stack_is_readable( ctx->Rsp ))
+    {
+        for (i = 0; i < 8; i++)
+        {
+            ULONG64 slot = ctx->Rsp + i * 8;
+            ULONG64 val;
+
+            if (!is_valid_guest_frame( slot, stack_base, stack_limit )) break;
+            if (!guest_stack_is_readable( slot )) break;
+            val = *(ULONG64 *)(ULONG_PTR)slot;
+            if ((mod = guest_module_entry_from_address( (void *)(ULONG_PTR)val )))
+                ERR( "  [rsp+%02x]=%016I64x = %s+%I64x\n", i * 8, val,
+                     debugstr_w(mod->BaseDllName.Buffer), val - (ULONG64)(ULONG_PTR)mod->DllBase );
+            else
+                ERR( "  [rsp+%02x]=%016I64x\n", i * 8, val );
+        }
+    }
+    else ERR( "  rsp %I64x is not a readable frame on this guest stack (%p-%p)\n",
+              ctx->Rsp, stack_limit, stack_base );
+}
+
+/***********************************************************************
  *           dispatch_guest_exception
  *
  * Guest-level dispatch, in the order Windows uses on x86-64:
@@ -3692,6 +3888,9 @@ static NTSTATUS dispatch_guest_exception( EXCEPTION_RECORD *rec, AMD64_CONTEXT *
            (void *)(ULONG_PTR)ctx->Rip, (void *)(ULONG_PTR)ctx->Rsp, (UINT)rec->NumberParameters );
     for (i = 0; i < rec->NumberParameters; i++)
         TRACE( " info[%u]=%p\n", i, (void *)rec->ExceptionInformation[i] );
+
+    if (rec->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && rec->NumberParameters >= 2)
+        report_guest_access_violation( rec, ctx, stack_base, stack_limit );
 
     /* A call through a wild function pointer, named at the call site.
      *
