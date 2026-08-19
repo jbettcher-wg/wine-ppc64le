@@ -74,6 +74,21 @@ $HOME/Projects/power8/fex-ppc64le/build/Source/Tools/FexBridge/libfexbridge.so"
 # readable the first readable candidate is still used, because a 64-bit-only
 # guest works perfectly well on it.  What must not happen is choosing that one
 # SILENTLY and leaving a modal dialog as the only evidence.
+# AN EXPLICIT REQUEST IS ABSOLUTE.  WINE_PPC64LE_FEXBRIDGE names a bridge on
+# purpose -- to A/B two emulator builds, or to pin one while debugging -- and
+# the 32-bit preference below must not quietly substitute a different file.
+# [MEASURED] 2026-08-18: it did, and an A/B against a second FEX build silently
+# ran the same bridge twice, which would have been read as "the emulator is not
+# implicated".  A preference may choose between candidates nobody named; it may
+# not overrule the one somebody did.
+if [ -n "${WINE_PPC64LE_FEXBRIDGE:-}" ] && [ -r "${WINE_PPC64LE_FEXBRIDGE}" ]; then
+    bridge=$WINE_PPC64LE_FEXBRIDGE
+    grep -q fexbridge_process_init32 "$bridge" 2>/dev/null || \
+        say "WARNING: $bridge has no fexbridge_process_init32, so no 32-bit \
+process can start; using it anyway because WINE_PPC64LE_FEXBRIDGE names it"
+    bridge_cands=
+fi
+
 bridge32=
 for cand in $bridge_cands; do
     [ -n "$cand" ] && [ -r "$cand" ] || continue
@@ -83,7 +98,9 @@ for cand in $bridge_cands; do
         break
     fi
 done
-if [ -n "$bridge32" ]; then
+if [ -n "${WINE_PPC64LE_FEXBRIDGE:-}" ] && [ -r "${WINE_PPC64LE_FEXBRIDGE}" ]; then
+    :                                   # already chosen above; nothing overrules it
+elif [ -n "$bridge32" ]; then
     bridge=$bridge32
 elif [ -n "$bridge" ]; then
     say "WARNING: no 32-bit-capable bridge found; using $bridge"
