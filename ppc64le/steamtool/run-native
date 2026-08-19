@@ -94,6 +94,15 @@ if [ -n "$appid" ]; then
 fi
 
 echo "run-native: prefix $prefix" >&2
+# The game dir is the working directory, because that is what Steam does when
+# it launches a title and what this tool's prefix-shape promise implies.  It
+# is not decoration: REDengine 3 resolves its content paths from CWD, and
+# witcher3.exe launched from $HOME initializes D3D11, finds no content, and
+# exits rc=0 within the minute -- politely and uselessly ([MEASURED]
+# 2026-08-19, nw-witcher3 run 6 vs a by-hand run from bin/x64 that played
+# its intro cinematic).  Cyberpunk never noticed because REDengine 4
+# resolves from the exe path instead.
+cd "$(dirname "$exe")" || { echo "run-native: cannot cd to the game dir" >&2; exit 1; }
 # waitforexitandrun rather than run: it is the verb Steam launches a GAME with,
 # so per-title settings apply and the game's own dialogs are left alone, and it
 # waits for the wineserver on the way out.

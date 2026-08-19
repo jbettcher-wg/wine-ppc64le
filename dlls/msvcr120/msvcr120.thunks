@@ -46,3 +46,22 @@ _malloc_crt                   0x0000A110  1  int   msvcr120.spec:1440
 
 ?IsCurrentTaskCollectionCanceling@Context@Concurrency@@SA_NXZ  0x00000C05  0  int   msvcr120.spec:441
 ?_set_new_handler@@YAP6AH_K@ZP6AH0@Z@Z                         0x00000C06  1  int   msvcr120.spec:709
+
+# NvCameraSDK64.dll (NVIDIA Ansel, statically linked by witcher3.exe)
+# imports these six on top of the auto surface, and took the DEAD000D
+# sentinel through __clean_type_info_names_internal at CRT teardown --
+# fatally, some seconds into every boot ([MEASURED] 2026-08-19, three
+# boots, same call site NvCameraSDK64.dll+1c2c).  All six are flat
+# prototypes; the C++ EH personality the same module imports
+# (_CxxThrowException, __CxxFrameHandler3, __CppXcptFilter's real EH
+# cousins) stays refused by design, same documented hole as
+# vcruntime140.  __crtCapturePreviousContext and __crtUnhandledException
+# also stay refused: both traffic in CONTEXT records, which this native
+# build shapes for ppc64, not for the guest that asked.
+
+?terminate@@YAXXZ                                              0x00000C07  0  void  msvcr120.spec:773
+__CppXcptFilter                                                0x00000C08  2  int   msvcr120.spec:861
+__clean_type_info_names_internal                               0x00000C09  1  void  msvcr120.spec:890
+__crtTerminateProcess                                          0x00000C0A  1  void  msvcr120.spec:922
+__crt_debugger_hook                                            0x00000C0B  1  void  msvcr120.spec:1089
+?_type_info_dtor_internal_method@type_info@@QEAAXXZ            0x00000C0C  1  void  msvcr120.spec:719

@@ -716,7 +716,7 @@
 @ cdecl -arch=win64 ?_sopen@@YAHPEBDHHH@Z(str long long long) _sopen
 @ stub -arch=arm ?_type_info_dtor_internal_method@type_info@@QAAXXZ
 @ stub -arch=i386 ?_type_info_dtor_internal_method@type_info@@QAEXXZ  # public: void __thiscall type_info::_type_info_dtor_internal_method(void)
-@ stub -arch=win64 ?_type_info_dtor_internal_method@type_info@@QEAAXXZ  # public: void __cdecl type_info::_type_info_dtor_internal_method(void) __ptr64
+@ cdecl -arch=win64 ?_type_info_dtor_internal_method@type_info@@QEAAXXZ(ptr) type_info_dtor  # NvCameraSDK64 calls it at CRT teardown; same this-only shape and the same allocator side as ??1type_info
 @ cdecl -arch=win32 ?_wopen@@YAHPB_WHH@Z(wstr long long) _wopen
 @ cdecl -arch=win64 ?_wopen@@YAHPEB_WHH@Z(wstr long long) _wopen
 @ cdecl -arch=win32 ?_wsopen@@YAHPB_WHHH@Z(wstr long long long) _wsopen
