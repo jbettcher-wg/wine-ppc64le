@@ -627,7 +627,33 @@ static void report_native_pc_in_guest_image( EXCEPTION_RECORD *rec, CONTEXT *con
 
     if (InterlockedIncrement( &reported ) > 4) return;
 
-    if (!(guest = guest_module_entry_from_address( (void *)(ULONG_PTR)context->Iar ))) return;
+    if (!(guest = guest_module_entry_from_address( (void *)(ULONG_PTR)context->Iar )))
+    {
+        /* An ordinary NATIVE fault, which this function has nothing to say
+         * about except the one thing the bare address does not: which module
+         * it is in, and where it was called from.  Printed here rather than
+         * left to a debugger because a guest process on this port frequently
+         * has no usable one -- see [[misleading-crash-reports]] -- and
+         * because the module+offset is what addr2line takes. */
+        LDR_DATA_TABLE_ENTRY *at = module_entry_from_address( (void *)(ULONG_PTR)context->Iar );
+        LDR_DATA_TABLE_ENTRY *from = module_entry_from_address( (void *)(ULONG_PTR)context->Lr );
+
+        if (at)
+            ERR( "native fault at %s+%I64x (nip %I64x)\n", debugstr_w(at->BaseDllName.Buffer),
+                 context->Iar - (ULONG64)(ULONG_PTR)at->DllBase, context->Iar );
+        else
+            ERR( "native fault at nip %I64x, which is in no loaded module\n", context->Iar );
+        if (from)
+            ERR( "  called from lr=%I64x = %s+%I64x (r3=%I64x r4=%I64x r5=%I64x sp=%I64x)\n",
+                 context->Lr, debugstr_w(from->BaseDllName.Buffer),
+                 context->Lr - (ULONG64)(ULONG_PTR)from->DllBase,
+                 context->Gpr3, context->Gpr4, context->Gpr5, context->Gpr1 );
+        else
+            ERR( "  called from lr=%I64x, which is in no loaded module (r3=%I64x r4=%I64x "
+                 "r5=%I64x sp=%I64x)\n", context->Lr, context->Gpr3, context->Gpr4,
+                 context->Gpr5, context->Gpr1 );
+        return;
+    }
 
     ERR( "NATIVE ppc64 execution has branched INTO GUEST CODE: nip=%I64x = %s+%I64x, "
          "which the native cpu is decoding as ppc64 instructions -- the reported fault "
