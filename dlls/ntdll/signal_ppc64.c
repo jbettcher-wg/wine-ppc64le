@@ -625,8 +625,9 @@ static void report_native_pc_in_guest_image( EXCEPTION_RECORD *rec, CONTEXT *con
     LDR_DATA_TABLE_ENTRY *guest, *caller;
     static LONG reported;
 
-    if (!(guest = guest_module_entry_from_address( (void *)(ULONG_PTR)context->Iar ))) return;
     if (InterlockedIncrement( &reported ) > 4) return;
+
+    if (!(guest = guest_module_entry_from_address( (void *)(ULONG_PTR)context->Iar ))) return;
 
     ERR( "NATIVE ppc64 execution has branched INTO GUEST CODE: nip=%I64x = %s+%I64x, "
          "which the native cpu is decoding as ppc64 instructions -- the reported fault "
@@ -5335,8 +5336,14 @@ static ULONG_PTR emu_CallWindowProc( const ULONG_PTR *a, void *native )
  */
 struct guest_fiber
 {
-    AMD64_CONTEXT  ctx;           /* where it resumes; valid while parked */
+    /* THE PARAMETER IS FIRST, AND THAT IS AN ABI, NOT A LAYOUT CHOICE.
+     * GetFiberData() is a macro that dereferences the fiber pointer --
+     * *(void **)GetCurrentFiber() -- so a guest reads its own argument out of
+     * offset zero of whatever SwitchToFiber was given, without calling
+     * anything.  Wine's own struct fiber_data puts it there for the same
+     * reason. */
     void          *param;         /* the argument its start routine gets */
+    AMD64_CONTEXT  ctx;           /* where it resumes; valid while parked */
     void          *start;         /* guest LPFIBER_START_ROUTINE, or NULL for
                                      the fiber a thread converted itself into */
     void          *stack_base;    /* the guest stack: ours to free unless... */
@@ -5345,9 +5352,39 @@ struct guest_fiber
     BOOL           owns_stack;    /* ...this is FALSE, for a converted thread,
                                      whose stack belongs to the run */
     BOOL           started;
+    ULONG          magic;         /* GUEST_FIBER_MAGIC while live */
 };
 
+/* A guest hands SwitchToFiber a pointer it got from GetCurrentFiber(), which
+ * is a macro reading the TEB rather than anything this file can vet -- so the
+ * pointer is checked before 1232 bytes are copied out of it.  DOOM (2016)
+ * passed a stale small value that way and the copy faulted inside ntdll,
+ * which is a far worse report than the refusal below. */
+#define GUEST_FIBER_MAGIC 0x46424752   /* 'FBGR' */
+
+static BOOL guest_fiber_valid( const struct guest_fiber *fiber )
+{
+    return fiber && !((ULONG_PTR)fiber & 7) && fiber->magic == GUEST_FIBER_MAGIC;
+}
+
 static __thread struct guest_fiber *guest_current_fiber;
+
+/* WHAT THE TEB HAS TO SAY, because two of the fiber API's four answers are
+ * not calls at all.  GetCurrentFiber() and GetFiberData() are macros that
+ * read Tib.FiberData directly -- no export, nothing to intercept -- so a
+ * guest gets its own fiber handle from there or not at all.  DOOM (2016)
+ * does exactly that: it handed SwitchToFiber whatever was in that field, and
+ * with the field left alone that was a stale small value which this file then
+ * treated as a fiber and copied 1232 bytes out of.
+ *
+ * HasFiberData is what IsThreadAFiber reads, and the two are kept in step
+ * here rather than at each call site. */
+static void guest_fiber_make_current( struct guest_fiber *fiber )
+{
+    guest_current_fiber = fiber;
+    NtCurrentTeb()->Tib.FiberData = fiber;
+    NtCurrentTeb()->HasFiberData  = fiber != NULL;
+}
 
 /* The guest stack bounds the running emulator run is using, and the HLT page
  * a guest entry frame returns to.  Both live on the unix side of this lane;
@@ -5362,6 +5399,7 @@ static struct guest_fiber *guest_fiber_alloc(void)
     struct guest_fiber *fiber = RtlAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY,
                                                  sizeof(*fiber) );
     if (!fiber) RtlSetLastWin32Error( ERROR_NOT_ENOUGH_MEMORY );
+    else fiber->magic = GUEST_FIBER_MAGIC;
     return fiber;
 }
 
@@ -5393,13 +5431,7 @@ static ULONG_PTR emu_ConvertThreadToFiber( const ULONG_PTR *a, void *native )
     fiber->stack_alloc = stack.dealloc;
     fiber->owns_stack  = FALSE;
     fiber->started     = TRUE;
-    guest_current_fiber = fiber;
-    /* IsThreadAFiber reads this and nothing else, and it is the one field a
-     * guest can observe without going through a call this file intercepts.
-     * Tib.FiberData is deliberately left alone: it is native kernelbase's
-     * record of a NATIVE fiber, and a pointer to one of ours in it would be
-     * freed by kernelbase the first time native code converted back. */
-    NtCurrentTeb()->HasFiberData = TRUE;
+    guest_fiber_make_current( fiber );
     TRACE( "thread is now fiber %p on stack %p-%p\n", fiber, stack.limit, stack.base );
     return (ULONG_PTR)fiber;
 }
@@ -5413,8 +5445,7 @@ static ULONG_PTR emu_ConvertFiberToThread( const ULONG_PTR *a, void *native )
         RtlSetLastWin32Error( ERROR_ALREADY_THREAD );
         return 0;
     }
-    guest_current_fiber = NULL;
-    NtCurrentTeb()->HasFiberData = FALSE;
+    guest_fiber_make_current( NULL );
     RtlFreeHeap( GetProcessHeap(), 0, fiber );
     return 1;
 }
@@ -5507,6 +5538,7 @@ static ULONG_PTR emu_CreateFiberEx( const ULONG_PTR *a, void *native )
 
 static void guest_fiber_free( struct guest_fiber *fiber )
 {
+    fiber->magic = 0;
     if (fiber->owns_stack && fiber->stack_alloc) RtlFreeUserStack( fiber->stack_alloc );
     RtlFreeHeap( GetProcessHeap(), 0, fiber );
 }
@@ -5516,6 +5548,11 @@ static ULONG_PTR emu_DeleteFiber( const ULONG_PTR *a, void *native )
     struct guest_fiber *fiber = (struct guest_fiber *)a[0];
 
     if (!fiber) return 0;
+    if (!guest_fiber_valid( fiber ))
+    {
+        ERR( "DeleteFiber(%p) refused: not a fiber this process made\n", fiber );
+        return 0;
+    }
     if (fiber == guest_current_fiber)
     {
         /* Windows: deleting the RUNNING fiber terminates the thread.  Said
@@ -5523,8 +5560,7 @@ static ULONG_PTR emu_DeleteFiber( const ULONG_PTR *a, void *native )
          * this has almost certainly confused two fiber handles. */
         ERR( "DeleteFiber on the running fiber %p: the thread ends here, which "
              "is what Windows does\n", fiber );
-        guest_current_fiber = NULL;
-        NtCurrentTeb()->HasFiberData = FALSE;
+        guest_fiber_make_current( NULL );
         guest_fiber_free( fiber );
         RtlExitUserThread( 1 );
     }
@@ -5544,11 +5580,13 @@ static ULONG_PTR emu_SwitchToFiber( const ULONG_PTR *a, void *native )
     struct emu_fiber_params stack = { 0 };
     AMD64_CONTEXT *ctx = emu_current_trap_ctx;
 
-    if (!target || !cur || !ctx)
+    if (!guest_fiber_valid( target ) || !cur || !ctx)
     {
-        ERR( "SwitchToFiber(%p) refused: current fiber %p, trap context %p -- a "
-             "switch needs a running guest fiber to switch away from\n",
-             target, cur, ctx );
+        ERR( "SwitchToFiber(%p) refused: it is %s, the current fiber is %p and the "
+             "trap context %p -- a switch needs a fiber this process made and a "
+             "running guest fiber to switch away from\n", target,
+             guest_fiber_valid( target ) ? "a fiber" : "not a fiber of ours",
+             cur, ctx );
         return 0;
     }
     if (target == cur) return 0;
@@ -5570,7 +5608,7 @@ static ULONG_PTR emu_SwitchToFiber( const ULONG_PTR *a, void *native )
     /* ...and resume the incoming one in its place */
     *ctx = target->ctx;
     emu_trap_ctx_rewritten = TRUE;
-    guest_current_fiber = target;
+    guest_fiber_make_current( target );
 
     /* THE BOUNDS MOVE WITH IT.  The negative control leaves them behind,
      * which is the whole bug this pays for: the resumed fiber runs on its own

@@ -136,6 +136,8 @@ guest_fibers: start
 guest_fibers: not a fiber yet ok
 guest_fibers: ConvertThreadToFiber returned a fiber ok
 guest_fibers: now a fiber ok
+guest_fibers: GetCurrentFiber sees it ok
+guest_fibers: GetFiberData sees its parameter ok
 guest_fibers: the thread's own stack did not move ok
 guest_fibers: CreateFiber A ok
 guest_fibers: CreateFiber B ok
@@ -155,6 +157,7 @@ guest_fibers: the switch order was M A M A M B A M ok
 guest_fibers: still on the thread's own stack after DeleteFiber ok
 guest_fibers: ConvertFiberToThread ok
 guest_fibers: not a fiber any more ok
+guest_fibers: GetCurrentFiber says so too ok
 guest_fibers: turns A=3 B=1
 guest_fibers: PASS
 EOF

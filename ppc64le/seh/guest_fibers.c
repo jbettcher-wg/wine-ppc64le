@@ -94,6 +94,20 @@ static ULONGLONG teb_qword( ULONG off )
 static ULONGLONG teb_stack_base(void)  { return teb_qword( 0x08 ); }
 static ULONGLONG teb_stack_limit(void) { return teb_qword( 0x10 ); }
 
+/* GetCurrentFiber() and GetFiberData() are MACROS: they read Tib.FiberData at
+ * gs:[0x20] and dereference it, with no call for the port to intercept.  A
+ * guest gets its own fiber handle from there or not at all, which makes this
+ * the one part of the fiber API that has to be right in the TEB itself.
+ * DOOM (2016) is what proved it matters -- it switched to whatever that field
+ * held. */
+static void *current_fiber(void)   { return (void *)(ULONG_PTR)teb_qword( 0x20 ); }
+static void *current_fiber_data(void)
+{
+    void **fiber = current_fiber();
+
+    return fiber ? *fiber : NULL;
+}
+
 static GF_NOINLINE BOOL on_my_own_stack( void )
 {
     volatile char here;
@@ -154,6 +168,10 @@ static void WINAPI fiber_a_proc( void *param )
         mark( 'A' );
         a_turns++;
         if (!on_my_own_stack()) a_stack_ok = FALSE;
+        /* the same question from inside a fiber: a guest that switches by
+         * GetCurrentFiber() has to see ITSELF here, not the last fiber */
+        if (current_fiber() != fiber_a || current_fiber_data() != (void *)0x0a)
+            a_stack_ok = FALSE;
         if (local != 0xa11ce) a_locals_kept = FALSE;
         if (param != (void *)0x0a) a_locals_kept = FALSE;
         /* the deep frame is exercised on the second turn only, so the first
@@ -199,6 +217,8 @@ void __stdcall guest_fibers_entry( void )
     main_fiber = ConvertThreadToFiber( (void *)0x77 );
     check( "ConvertThreadToFiber returned a fiber", main_fiber != NULL );
     check( "now a fiber", IsThreadAFiber() != FALSE );
+    check( "GetCurrentFiber sees it", current_fiber() == main_fiber );
+    check( "GetFiberData sees its parameter", current_fiber_data() == (void *)0x77 );
     check( "the thread's own stack did not move", teb_stack_base() == main_base );
 
     fiber_a = CreateFiber( 0x20000, fiber_a_proc, (void *)0x0a );
@@ -245,6 +265,7 @@ void __stdcall guest_fibers_entry( void )
 
     check( "ConvertFiberToThread", ConvertFiberToThread() != FALSE );
     check( "not a fiber any more", !IsThreadAFiber() );
+    check( "GetCurrentFiber says so too", current_fiber() == NULL );
 
     out( "guest_fibers: turns A=" );
     out_dec( a_turns );
