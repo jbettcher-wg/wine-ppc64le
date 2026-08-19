@@ -55,36 +55,22 @@ refusal cannot yet serve.  THE GAME RUNS: title screen at 245 fps, menus,
 character creation, all user-confirmed on screen.  What remains, in order of
 what is actually seen:
 
-* **Graphics corruption — the top item, and it is settings-independent.**
-  The user reached GAMEPLAY (prologue dialogue) and turned every graphics
-  setting to low or off: no real change.  The look: a fine, regular dithered
-  speckling over most textured surfaces — characters, walls, props — with
-  black rectangles, while UI text, lights and some flat surfaces render
-  clean.  That texture-granular pattern reads as CORRUPTED TEXTURE CONTENT
-  (block-compressed data with stale/garbage portions at some regular
-  stride), not as broken shading: geometry, lighting and the whole frame
-  loop are right.  Nothing in the logs names it.
-
-  Suspects, in the order worth measuring:
-  1. **The upload path through the emulator.**  REDengine fills its upload
-     heaps with wide/streaming SIMD stores; if FEX's non-temporal store
-     emulation drops or reorders partial cachelines into mapped memory, the
-     copy that follows uploads garbage at exactly this kind of stride.  The
-     emulated GE-Proton lane on the same box uses the same class of stores
-     THROUGH THE SAME FEX CORE, so first measure: same scene on the
-     emulated lane — if it is clean there, the difference is the native
-     port's mapping/copy path, not the JIT's stores.
-  2. **The served copy slots**: hand_copy_texture_region (new this session),
-     CopyBufferRegion, GetCopyableFootprints round trips, WriteToSubresource.
-     A targeted probe that uploads a known pattern through the guest-side
-     CopyTextureRegion path and reads it back would convict or clear the
-     whole family in one run (the d3d12 gate of commit 2f25f234 did exactly
-     this for the copy queue — extend it to the PlacedFootprint form).
-  3. **vkd3d/RADV on ppc64le itself** (shader or DCC issue on NAVI21 under
-     an untested host arch) — only after 1 and 2 come back clean.
-  Not suspects: marshalling of the draw-time slots (the frame composes
-  correctly), the swapchain (present is clean), descriptor copies (fixed
-  and verified this session).
+* **Graphics corruption — MOSTLY FIXED, residue remains, root cause is
+  below this tree.**  The discriminator was measured across runs 36-38: the
+  speckle appears exactly when uploads go through GTT (VKD3D_CONFIG=
+  no_upload_hvv, since removed from the appconfig — heap 1 is 30 GiB of
+  full-ReBAR host-visible VRAM on this V620, so the flag bought nothing)
+  and the scene is clean when they stay in VRAM, mesh shaders on or off.
+  `ppc64le/vkd3d/probes/copy_pattern_run.sh` then drove a known pattern
+  through upload->texture->readback in BOTH placements: byte-identical both
+  ways, so the marshal/copy path is CLEARED and the quiet GTT case is fine
+  — the corruption needs game-scale GTT traffic, the shape of a
+  kernel/amdgpu DMA problem on the custom 4K POWER8 kernel, not a userspace
+  one.  What remains here: the residual speckle where vkd3d still touches
+  system memory at scale (fallbacks, readbacks) — worth quantifying with
+  VKD3D_DEBUG memory logging or a kernel-side look at amdgpu GTT/TCE
+  mapping on this kernel; and the probe's GTT leg stands as the tripwire
+  (if the quiet case ever starts failing, chase that first).
 * **Frame-latency waitable**: `GetFrameLatencyWaitableObject` returns NULL
   (unix_present.c, "the eventfd->semaphore relay is P5").  vkd3d's side
   already hands out a TAGGED eventfd (vkd3d-patches/0001); the lift is the
