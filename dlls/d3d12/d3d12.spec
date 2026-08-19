@@ -11,3 +11,8 @@
 @ stdcall D3D12SerializeVersionedRootSignature(ptr ptr ptr)
 @ stdcall D3D12GetInterface(ptr ptr ptr)
 @ stdcall __wine_com_dispatch(long long ptr)
+# Cross-lane presentation: NATIVE d3d11.dll (DXVK's winecom instance) hands a
+# CreateSwapChainForHwnd whose device is THIS surface's ID3D12CommandQueue
+# proxy over to this lane -- winecom instances are per-linkee and cannot read
+# each other's interning.  Wine-private; see main.c.
+@ stdcall __wine_d3d12_create_swapchain_for_hwnd(ptr ptr ptr ptr ptr ptr)

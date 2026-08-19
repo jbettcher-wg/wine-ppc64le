@@ -682,6 +682,35 @@ static UINT64 hand_create_swapchain_for_hwnd( void *host, UINT slot, AMD64_CONTE
     if ((guest_device && !winecom_translate_in( guest_device, &host_device )) ||
         (guest_output && !winecom_translate_in( guest_output, &host_output )))
     {
+        /* Not this surface's pointer -- but not necessarily a guest-
+         * implemented object either.  A D3D12 title reaches THIS factory
+         * (dxgi.dll forwards CreateDXGIFactory here) and passes the vkd3d
+         * surface's ID3D12CommandQueue proxy as the device, which this
+         * instance cannot translate because winecom interning is per-linkee.
+         * Hand the whole call to the d3d12 lane: it unwraps the queue in its
+         * own surface, presents through its unix factory + win32u, and
+         * gives the guest back a swapchain proxy of ITS surface -- the one
+         * whose GetBuffer(IID_ID3D12Resource) rows a D3D12 title needs.
+         * [MEASURED] Cyberpunk 2077 run 31: the old blanket refusal here
+         * made the game throw on a fiber stack and die undispatchable.
+         * E_NOINTERFACE from the lane means "not mine either". */
+        HRESULT (WINAPI *p_d3d12)( void *, void *, const void *, const void *,
+                                   void *, void ** );
+        HMODULE d3d12 = LoadLibraryW( L"d3d12.dll" );
+
+        if (d3d12 && (p_d3d12 = (void *)GetProcAddress( d3d12,
+                          "__wine_d3d12_create_swapchain_for_hwnd" )))
+        {
+            HRESULT hr2 = p_d3d12( guest_device, hwnd,
+                                   (const void *)(ULONG_PTR)read_arg( ctx, 3 ),
+                                   (const void *)(ULONG_PTR)read_arg( ctx, 4 ),
+                                   guest_output, out );
+            if (hr2 != E_NOINTERFACE)
+            {
+                TRACE( "served by the d3d12 lane, hr %#x\n", (UINT)hr2 );
+                return (UINT64)(UINT)hr2;
+            }
+        }
         FIXME( "CreateSwapChainForHwnd with a guest-implemented device or "
                "output; reverse proxies do not exist yet\n" );
         return (UINT64)(UINT)E_NOTIMPL;

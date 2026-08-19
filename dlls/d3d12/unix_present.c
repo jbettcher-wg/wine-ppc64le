@@ -589,7 +589,7 @@ static HRESULT STDMETHODCALLTYPE factory_GetWindowAssociation( IDXGIFactory2 *if
 static HRESULT STDMETHODCALLTYPE factory_CreateSwapChain( IDXGIFactory2 *iface, IUnknown *device,
         DXGI_SWAP_CHAIN_DESC *desc, IDXGISwapChain **swapchain )
 {
-    FIXME( "the marshal plan refuses this slot; CreateSwapChainForHwnd is the phase-(a) path\n" );
+    FIXME( "legacy CreateSwapChain not served; CreateSwapChainForHwnd is the phase-(a) path\n" );
     return E_NOTIMPL;
 }
 

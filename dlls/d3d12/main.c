@@ -92,12 +92,20 @@ static const WCHAR *const d3d12_guest_modules[] = { L"d3d12.dll" };
 static UINT64 hand_resource_barrier( void *host, UINT slot, AMD64_CONTEXT *ctx );
 static UINT64 hand_create_compute_pso( void *host, UINT slot, AMD64_CONTEXT *ctx );
 static UINT64 hand_create_swapchain_for_hwnd( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static UINT64 hand_create_graphics_pso( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static UINT64 hand_create_pipeline_state( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static UINT64 hand_copy_texture_region( void *host, UINT slot, AMD64_CONTEXT *ctx );
 
+/* Order is the generated header's hand_funcs[] order -- see the
+ * "hand_funcs[] order" comment ppc64le/vkd3d/gen_winecom.py emits there. */
 static const winecom_hand_fn d3d12_hand_funcs[] =
 {
     hand_resource_barrier,
     hand_create_compute_pso,
     hand_create_swapchain_for_hwnd,
+    hand_create_graphics_pso,
+    hand_create_pipeline_state,
+    hand_copy_texture_region,
 };
 
 C_ASSERT( ARRAYSIZE(d3d12_hand_funcs) == D3D12_HAND_COUNT );
@@ -274,6 +282,191 @@ static UINT64 hand_create_swapchain_for_hwnd( void *host, UINT slot, AMD64_CONTE
     return (UINT64)(UINT)hr;
 }
 
+/* ID3D12Device::CreateGraphicsPipelineState( const
+ * D3D12_GRAPHICS_PIPELINE_STATE_DESC *desc, REFIID riid, void **ppv ):
+ * the desc's one interface member is pRootSignature -- every other pointer
+ * in it (shader bytecode, input layout, cached PSO) is plain data. */
+static UINT64 hand_create_graphics_pso( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    const D3D12_GRAPHICS_PIPELINE_STATE_DESC *src = (const void *)(ULONG_PTR)read_arg( ctx, 1 );
+    const GUID *riid = (const GUID *)(ULONG_PTR)read_arg( ctx, 2 );
+    void **ppv = (void **)(ULONG_PTR)read_arg( ctx, 3 );
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC desc;
+    UINT64 args[D3D12_UNIX_MAX_ARGS] = { 0 };
+    HRESULT hr;
+    UINT idx;
+
+    if (!src || !ppv) return (UINT64)(UINT)E_INVALIDARG;
+    desc = *src;
+    desc.pRootSignature = com_unwrap( desc.pRootSignature );
+    args[1] = (UINT64)(ULONG_PTR)&desc;
+    args[2] = (UINT64)(ULONG_PTR)riid;
+    args[3] = (UINT64)(ULONG_PTR)ppv;
+    hr = (HRESULT)unix_vtbl_call( host, slot, 4, args );
+    if (SUCCEEDED(hr) && *ppv)
+    {
+        idx = winecom_iface_from_iid( riid );
+        if (idx == ~0u)
+        {
+            ERR( "CreateGraphicsPipelineState returned unknown IID %s\n",
+                 debugstr_guid(riid) );
+            winecom_host_release( *ppv );
+            *ppv = NULL;
+            return (UINT64)(UINT)E_NOINTERFACE;
+        }
+        *ppv = com_wrap( *ppv, idx );
+    }
+    return (UINT64)(UINT)hr;
+}
+
+/* ID3D12Device2::CreatePipelineState( const D3D12_PIPELINE_STATE_STREAM_DESC
+ * *desc, REFIID riid, void **ppv ): the desc is a stream of subobjects --
+ * a type enum, a naturally-aligned payload, a stride padded to pointer size,
+ * the exact layout vkd3d's own
+ * vkd3d_pipeline_state_desc_from_d3d12_stream_desc walks -- and the
+ * ROOT_SIGNATURE payload is a guest proxy.  The stream is copied and the
+ * proxy unwrapped in the copy; a subobject type the pinned vkd3d headers do
+ * not name stops the walk, because a cursor that cannot advance cannot
+ * prove the rest of the stream carries no proxies. */
+static UINT64 hand_create_pipeline_state( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    const D3D12_PIPELINE_STATE_STREAM_DESC *src = (const void *)(ULONG_PTR)read_arg( ctx, 1 );
+    const GUID *riid = (const GUID *)(ULONG_PTR)read_arg( ctx, 2 );
+    void **ppv = (void **)(ULONG_PTR)read_arg( ctx, 3 );
+    D3D12_PIPELINE_STATE_STREAM_DESC desc;
+    UINT64 args[D3D12_UNIX_MAX_ARGS] = { 0 };
+    char *copy = NULL, *ptr, *end;
+    HRESULT hr;
+    UINT idx;
+
+    if (!src || !ppv) return (UINT64)(UINT)E_INVALIDARG;
+    desc = *src;
+    if (desc.SizeInBytes && desc.pPipelineStateSubobjectStream)
+    {
+        if (!(copy = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0,
+                                      desc.SizeInBytes )))
+            return (UINT64)(UINT)E_OUTOFMEMORY;
+        memcpy( copy, desc.pPipelineStateSubobjectStream, desc.SizeInBytes );
+        desc.pPipelineStateSubobjectStream = copy;
+
+        ptr = copy;
+        end = copy + desc.SizeInBytes;
+#define ALIGN_PTR(x) (((x) + sizeof(void *) - 1) & ~(sizeof(void *) - 1))
+#define WALK_SUBOBJECT(type_enum, type_name, fixup)                          \
+        case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ ## type_enum:              \
+        {                                                                    \
+            struct                                                           \
+            {                                                                \
+                D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;                    \
+                type_name data;                                              \
+            } *so = (void *)ptr;                                             \
+            if (ptr + sizeof(*so) > end) goto malformed;                     \
+            fixup;                                                           \
+            ptr += ALIGN_PTR( sizeof(*so) );                                 \
+            break;                                                           \
+        }
+        while (ptr < end)
+        {
+            if (ptr + sizeof(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE) > end) goto malformed;
+            switch (*(const D3D12_PIPELINE_STATE_SUBOBJECT_TYPE *)ptr)
+            {
+            WALK_SUBOBJECT( ROOT_SIGNATURE, ID3D12RootSignature *,
+                            so->data = com_unwrap( so->data ) )
+            WALK_SUBOBJECT( VS, D3D12_SHADER_BYTECODE, (void)0 )
+            WALK_SUBOBJECT( PS, D3D12_SHADER_BYTECODE, (void)0 )
+            WALK_SUBOBJECT( DS, D3D12_SHADER_BYTECODE, (void)0 )
+            WALK_SUBOBJECT( HS, D3D12_SHADER_BYTECODE, (void)0 )
+            WALK_SUBOBJECT( GS, D3D12_SHADER_BYTECODE, (void)0 )
+            WALK_SUBOBJECT( CS, D3D12_SHADER_BYTECODE, (void)0 )
+            WALK_SUBOBJECT( AS, D3D12_SHADER_BYTECODE, (void)0 )
+            WALK_SUBOBJECT( MS, D3D12_SHADER_BYTECODE, (void)0 )
+            WALK_SUBOBJECT( STREAM_OUTPUT, D3D12_STREAM_OUTPUT_DESC, (void)0 )
+            WALK_SUBOBJECT( BLEND, D3D12_BLEND_DESC, (void)0 )
+            WALK_SUBOBJECT( SAMPLE_MASK, UINT, (void)0 )
+            WALK_SUBOBJECT( RASTERIZER, D3D12_RASTERIZER_DESC, (void)0 )
+            WALK_SUBOBJECT( RASTERIZER1, D3D12_RASTERIZER_DESC1, (void)0 )
+            WALK_SUBOBJECT( RASTERIZER2, D3D12_RASTERIZER_DESC2, (void)0 )
+            WALK_SUBOBJECT( DEPTH_STENCIL, D3D12_DEPTH_STENCIL_DESC, (void)0 )
+            WALK_SUBOBJECT( DEPTH_STENCIL1, D3D12_DEPTH_STENCIL_DESC1, (void)0 )
+            WALK_SUBOBJECT( DEPTH_STENCIL2, D3D12_DEPTH_STENCIL_DESC2, (void)0 )
+            WALK_SUBOBJECT( INPUT_LAYOUT, D3D12_INPUT_LAYOUT_DESC, (void)0 )
+            WALK_SUBOBJECT( IB_STRIP_CUT_VALUE, D3D12_INDEX_BUFFER_STRIP_CUT_VALUE, (void)0 )
+            WALK_SUBOBJECT( PRIMITIVE_TOPOLOGY, D3D12_PRIMITIVE_TOPOLOGY_TYPE, (void)0 )
+            WALK_SUBOBJECT( RENDER_TARGET_FORMATS, D3D12_RT_FORMAT_ARRAY, (void)0 )
+            WALK_SUBOBJECT( DEPTH_STENCIL_FORMAT, DXGI_FORMAT, (void)0 )
+            WALK_SUBOBJECT( SAMPLE_DESC, DXGI_SAMPLE_DESC, (void)0 )
+            WALK_SUBOBJECT( NODE_MASK, UINT, (void)0 )
+            WALK_SUBOBJECT( CACHED_PSO, D3D12_CACHED_PIPELINE_STATE, (void)0 )
+            WALK_SUBOBJECT( FLAGS, D3D12_PIPELINE_STATE_FLAGS, (void)0 )
+            WALK_SUBOBJECT( VIEW_INSTANCING, D3D12_VIEW_INSTANCING_DESC, (void)0 )
+            default:
+                WARN( "unknown pipeline subobject type %u; cannot walk past it\n",
+                      *(const UINT *)ptr );
+                goto malformed;
+            }
+        }
+#undef WALK_SUBOBJECT
+#undef ALIGN_PTR
+    }
+    args[1] = (UINT64)(ULONG_PTR)&desc;
+    args[2] = (UINT64)(ULONG_PTR)riid;
+    args[3] = (UINT64)(ULONG_PTR)ppv;
+    hr = (HRESULT)unix_vtbl_call( host, slot, 4, args );
+    if (copy) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, copy );
+    if (SUCCEEDED(hr) && *ppv)
+    {
+        idx = winecom_iface_from_iid( riid );
+        if (idx == ~0u)
+        {
+            ERR( "CreatePipelineState returned unknown IID %s\n",
+                 debugstr_guid(riid) );
+            winecom_host_release( *ppv );
+            *ppv = NULL;
+            return (UINT64)(UINT)E_NOINTERFACE;
+        }
+        *ppv = com_wrap( *ppv, idx );
+    }
+    return (UINT64)(UINT)hr;
+
+malformed:
+    ERR( "malformed pipeline state stream (%Iu bytes)\n", desc.SizeInBytes );
+    if (copy) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, copy );
+    return (UINT64)(UINT)E_INVALIDARG;
+}
+
+/* ID3D12GraphicsCommandList::CopyTextureRegion( const
+ * D3D12_TEXTURE_COPY_LOCATION *dst, UINT x, UINT y, UINT z, const
+ * D3D12_TEXTURE_COPY_LOCATION *src, const D3D12_BOX *box ): each location's
+ * pResource is a proxy; the union behind it is plain data. */
+static UINT64 hand_copy_texture_region( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    const D3D12_TEXTURE_COPY_LOCATION *dst = (const void *)(ULONG_PTR)read_arg( ctx, 1 );
+    const D3D12_TEXTURE_COPY_LOCATION *src = (const void *)(ULONG_PTR)read_arg( ctx, 5 );
+    D3D12_TEXTURE_COPY_LOCATION dst_copy, src_copy;
+    UINT64 args[D3D12_UNIX_MAX_ARGS] = { 0 };
+
+    if (dst)
+    {
+        dst_copy = *dst;
+        dst_copy.pResource = com_unwrap( dst_copy.pResource );
+    }
+    if (src)
+    {
+        src_copy = *src;
+        src_copy.pResource = com_unwrap( src_copy.pResource );
+    }
+    args[1] = (UINT64)(ULONG_PTR)(dst ? &dst_copy : NULL);
+    args[2] = read_arg( ctx, 2 );
+    args[3] = read_arg( ctx, 3 );
+    /* dst_z is a UINT in the fifth slot -- a STACK argument, so the guest's
+     * 32-bit store left the slot's upper half stale (winecom_slot::dwordmask
+     * is the table-driven form of this same extension). */
+    args[4] = (UINT)read_arg( ctx, 4 );
+    args[5] = (UINT64)(ULONG_PTR)(src ? &src_copy : NULL);
+    args[6] = read_arg( ctx, 6 );
+    return unix_vtbl_call( host, slot, 7, args );   /* void method; RAX is scratch */
+}
+
 /* ---------------------------------------------------------- flat entries */
 
 static HRESULT flat_call( UINT func, UINT argc, UINT64 *args, UINT64 *ret )
@@ -409,6 +602,69 @@ HRESULT WINAPI D3D12SerializeVersionedRootSignature( const D3D12_VERSIONED_ROOT_
     return hr;
 }
 
+/* The cross-lane swapchain entry, called by NATIVE d3d11.dll (DXVK's lane).
+ *
+ * A D3D12 title creates its swapchain through dxgi.dll's CreateDXGIFactory,
+ * which this port forwards to DXVK -- but the device it passes is THIS
+ * surface's ID3D12CommandQueue proxy, and winecom instances are per-linkee,
+ * so DXVK's hand_create_swapchain_for_hwnd sees a pointer it cannot
+ * translate.  [MEASURED] Cyberpunk 2077, run 31: DXVK's lane refused with
+ * "guest-implemented device", the game threw, and the throw died on a
+ * fiber stack.  Rather than teaching either surface the other's interning,
+ * DXVK's hand slot forwards the whole call HERE, where the queue unwraps in
+ * its own surface, the unix present factory creates the swapchain through
+ * vkd3d + win32u, and the guest gets back a swapchain proxy of THIS surface
+ * -- whose GetBuffer(IID_ID3D12Resource) and Present1 rows are the ones a
+ * D3D12 title needs anyway.
+ *
+ * Returns E_NOINTERFACE iff a non-NULL device/output is NOT this surface's
+ * proxy -- the caller keeps its own refusal for that case.  The descriptors
+ * cross as opaque pointers; neither carries an interface or a window. */
+HRESULT WINAPI __wine_d3d12_create_swapchain_for_hwnd( void *guest_device, void *hwnd,
+                                                       const void *desc, const void *fs_desc,
+                                                       void *guest_output, void **out )
+{
+    struct d3d12_present_factory_params params = { 0 };
+    UINT64 args[D3D12_UNIX_MAX_ARGS] = { 0 };
+    UINT64 rel[2] = { 0 };
+    void *host_device = NULL, *host_output = NULL, *host_out = NULL;
+    HRESULT hr;
+
+    TRACE( "device %p, hwnd %p, desc %p, fs_desc %p, output %p, out %p\n",
+           guest_device, hwnd, desc, fs_desc, guest_output, out );
+
+    if (!out) return E_POINTER;
+    *out = NULL;
+    if (!com_runtime_init()) return E_FAIL;
+    if (guest_device && !winecom_translate_in( guest_device, &host_device ))
+        return E_NOINTERFACE;
+    if (guest_output && !winecom_translate_in( guest_output, &host_output ))
+        return E_NOINTERFACE;
+    if (D3D12_UNIX_CALL( present_factory, &params ) || !params.factory)
+    {
+        ERR( "unix present factory creation failed\n" );
+        return E_FAIL;
+    }
+    args[1] = (UINT64)(ULONG_PTR)host_device;
+    args[2] = (UINT64)(ULONG_PTR)hwnd;
+    args[3] = (UINT64)(ULONG_PTR)desc;
+    args[4] = (UINT64)(ULONG_PTR)fs_desc;
+    args[5] = (UINT64)(ULONG_PTR)host_output;
+    args[6] = (UINT64)(ULONG_PTR)&host_out;
+    /* slot 15 = IDXGIFactory2::CreateSwapChainForHwnd, the same slot the
+     * surface's own hand function is registered on (d3d12_marshal.h) */
+    hr = (HRESULT)unix_vtbl_call( (void *)(ULONG_PTR)params.factory, 15, 7, args );
+    /* drop the creation reference; the swapchain does not reach back into
+     * the factory (unix_present.c), same lifetime the guest-proxy path has */
+    unix_vtbl_call( (void *)(ULONG_PTR)params.factory, 2, 1, rel );
+    if (SUCCEEDED(hr) && host_out)
+    {
+        if (!(*out = com_wrap( host_out, D3D12_IFACE_IDXGISwapChain1 )))
+            return E_OUTOFMEMORY;
+    }
+    return hr;
+}
+
 HRESULT WINAPI D3D12GetInterface( REFCLSID clsid, REFIID riid, void **out )
 {
     UINT64 args[8] = { 0 };
@@ -523,6 +779,12 @@ ULONG_PTR WINAPI D3D12GetInterface( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3 )
 ULONG_PTR WINAPI __wine_com_dispatch( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3 )
 {
     __wine_spec_unimplemented_stub( "d3d12.dll", "__wine_com_dispatch" );
+}
+
+ULONG_PTR WINAPI __wine_d3d12_create_swapchain_for_hwnd( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3,
+                                                         ULONG_PTR a4, ULONG_PTR a5, ULONG_PTR a6 )
+{
+    __wine_spec_unimplemented_stub( "d3d12.dll", "__wine_d3d12_create_swapchain_for_hwnd" );
 }
 
 #endif  /* __powerpc64__ */
