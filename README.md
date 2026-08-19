@@ -8,6 +8,13 @@ Upstream Wine has no PowerPC support; 32-bit PowerPC was removed years ago and
 > what to build, how to register the compatibility tool with Steam, the
 > per-game settings, and what each failure means.  This file is the design
 > record.
+>
+> **Want to work on it?**  `ppc64le/NEXT.md` is the ordered work list and
+> where the port stands; `ppc64le/games/STATUS.md` is the per-title board;
+> `ppc64le/WORKING-ON-THIS.md` is the operational knowledge that is not
+> derivable from the code — which environment knobs actually reach the
+> emulator, how to measure a change, and the traps that have each cost a
+> session.
 
 ## Why
 
@@ -742,12 +749,27 @@ marker from the wrong frame and silently loads stack garbage into r2.
 Build on a ppc64le host. There is no cross-build path.
 
 ```
-./configure --enable-win64
+./configure --enable-win64 --enable-archs=ppc64,i386
 make -j 64
 ```
 
 That is the whole thing — the PE modules are produced by `tools/elf2pe`, which
 the build drives itself, so no extra toolchain or flag is needed for them.
+
+**`--enable-archs=ppc64,i386` is not optional if you want 32-bit Windows
+programs to run.** The i386 lane is real WoW64: Wine's own i386 PE builtins
+run under the emulator and convert at the syscall boundary, so they have to be
+built. With `--enable-win64` alone `PE_ARCHS` is `ppc64` and those builtins are
+simply absent — and because a build tree keeps whatever an earlier configure
+left behind, a tree that once had them can appear to work long after it stopped
+building them. If `dlls/kernel32/i386-windows/kernel32.dll` is a couple of
+megabytes you have them; if it is ~100 KB it is a guest thunk stub and
+something is wrong.
+
+After changing `tools/makedep.c`, run `./tools/makedep` yourself. `make`
+rebuilds the tool but does not necessarily re-run it, so the generated
+`Makefile` can silently keep the old rules and your change appears to do
+nothing.
 
 `-j` should match the machine; these are large builds and the developer machine
 is a 176-thread AC922. Note that `ninja` — used by some subprojects — does

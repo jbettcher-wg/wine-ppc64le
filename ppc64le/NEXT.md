@@ -1,34 +1,46 @@
 # What to do next
 
-Written 2026-08-18, at the end of the session that got DOOM (2016) into
-gameplay.  It is ordered: the things at the top are the ones that unblock the
-most, and each entry says what is known, what is not, and where the evidence
-is.  `ppc64le/games/STATUS.md` is the per-title board; this is the work list.
+Ordered: the things at the top unblock the most, and each entry says what is
+known, what is not, and where the evidence is.  `ppc64le/games/STATUS.md` is
+the per-title board, `ppc64le/WORKING-ON-THIS.md` is the operational knowledge
+(env knobs, measuring, traps), and this is the work list.
 
-## Where the port stands
+## Where the port stands (2026-08-19)
 
-* **DOOM (2016) plays.** Fibers and two callback classes were the last walls;
-  see the commits from `ntdll: say when the native cpu is the one executing
-  guest code` onwards.
-* **33 gates**, each with a negative control.  The full suite was green on the
-  build DOOM runs on.  The `--sabotage` half of that sweep was interrupted and
-  has not been re-run since the 226 callback rows landed — **do that first**,
-  it is twenty minutes and it is the only thing between here and "the suite is
-  green" being a true sentence.
-* Cyberpunk 2077 reaches its own code; Boltgun reaches its engine; Portal 2,
-  the first 32-bit title actually tried, does not launch and nobody has looked
-  at why.
+* **DOOM (2016) plays.**  Fibers and two callback classes were the last walls.
+* **Cyberpunk 2077 renders correctly.**  The long-running "memory corruption"
+  was one refused `ClearDepthStencilView`: FLOAT-by-value, so no frame ever
+  cleared depth and every 3D pass tested against stale depth/HTILE.  Served by
+  a hand walker plus the unixlib's typed-float call; the built-in `-benchmark`
+  flythrough is clean end to end and is now the A/B harness for everything.
+* **The Witcher 3 plays** — in-world, mounted, HUD and weather live.  Four
+  walls fell: the msvcr120 thunk, the SSE3 feature answers, NvCameraSDK's flat
+  CRT imports, and `run-native` not setting the working directory (REDengine 3
+  resolves content from CWD and exited rc=0 politely without it).
+* **33 gates green, sabotage sweep included** — every negative control goes
+  red, none skipped, none failed.  That sentence is finally true.
+* **The 32-bit lane is half built.**  dexwin boots and shows a window; it has
+  no graphics because i386 d3d11 exports no dxvk surface.  Item 2 has the
+  state, and `ppc64le/dxvk/docs/i386-lane-design.md` the design and the crux.
+* **Performance is one thread.**  Not the old ~2.5-core ceiling (which does
+  not reproduce): the game pulls ~15 cores with GameThread pinned at 92%.
+  Item 6 has the measured lever matrix.
 
-## 1. Finish the sabotage sweep
+## 1. DONE — the sabotage sweep is green
 
 ```sh
 for g in ppc64le/*/check-*.sh; do "$g" --sabotage; done
 ```
 
-Every gate's negative control must go red.  Two were added today
-(`check-fibers.sh`, `check-callback-rows.sh`) and both pass their controls
-individually; what has not been proven is that the other 31 still fail when
-they should, with 226 new rows in `thunk_overrides[]` underneath them.
+ Run 2026-08-19 on the full tree: **33 gates, every negative control red,
+none skipped, none failed.**  Keep it that way — a gate whose control stops
+going red is a gate that has stopped testing anything, which is worse than
+not having it.
+
+Two notes for the next run.  Several gates raise REAL modal dialogs on the
+live desktop as their controls and steal focus from whatever else is running;
+give the sweep its own Xvfb.  And it takes about half an hour, so it is a
+"before you push" step, not an inner-loop one.
 
 ## 2. The 32-bit lane: the i386 half of the dxvk thunk surface
 
