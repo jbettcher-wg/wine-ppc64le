@@ -55,9 +55,10 @@ refusal cannot yet serve.  THE GAME RUNS: title screen at 245 fps, menus,
 character creation, all user-confirmed on screen.  What remains, in order of
 what is actually seen:
 
-* **Graphics corruption**: the character-scan UI panel draws garbled with
-  black rectangles, and character models in creation render as unlit
-  silhouettes.  Nothing in the logs names it; suspects worth measuring first
+* **Graphics corruption**: the GAME VIEW itself draws garbled — dithered
+  blocks and black rectangles across the scene (user-corrected: this is not
+  the scan-UI's intentional glitch styling), and character models in
+  creation render as unlit silhouettes.  Nothing in the logs names it; suspects worth measuring first
   are the served-copy paths (hand_copy_texture_region, CopyBufferRegion,
   GetCopyableFootprints round trips) and whatever REDengine does with the
   slots that still refuse quietly.  Compare a RADV capture against the
