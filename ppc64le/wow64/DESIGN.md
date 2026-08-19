@@ -473,3 +473,29 @@ no YMM home, same boundary as the 64-bit lane and upstream's own
 bridge teardown; leaks a terminated-from-outside thread's bridge state), and
 a 32-bit `winedbg` story (untested, not designed out).  Nothing else is
 stubbed.
+
+## Operational requirements
+
+Two things must be true or no 32-bit process starts, and neither fails loudly.
+
+**The emulator bridge must be ABI 4** — it must export
+`fexbridge_process_init32`. Without it `BTCpuProcessInit` returns `c0000139`.
+The bridge built beside the binfmt-registered FEX is ABI 3; the one this port
+needs is built from `fex-ppc64le` with `ninja fexbridge`.
+`ppc64le/steamtool/proton` prefers a bridge carrying the symbol, and
+`check-wow64-smoke.sh` checks for it before anything else.
+
+**The prefix must have `C:\windows\syswow64` populated.** `wineboot` fills it
+by running `syswow64\rundll32.exe` as an i386 process for the inf's
+`Wow64Install` section. With a bridge that cannot start one, that process dies
+and **wineboot reports success over an empty directory**. A prefix created in
+that state looks fine and fails later on whatever PE32 the application
+launches.
+
+Plain `wineboot -u` does **not** repair such a prefix: wineboot compares
+`.update-timestamp` against `wine.inf`, finds the prefix current, and runs no
+install pass at all. Measured: zero `rundll32` invocations, `syswow64` still
+empty. Removing `.update-timestamp` first forces it — 890 entries staged.
+`ppc64le/steamtool/proton` does this automatically when it finds an empty
+`syswow64` and has a capable bridge.
+

@@ -48,6 +48,8 @@ Honest, and in progress.
 | Swapchain **resize** | **works** — on screen and in the back buffer; `ppc64le/dxvk/check-fullscreen-smoke.sh` |
 | Exclusive **fullscreen** | **works** — the window becomes the screen, the display mode follows, and leaving puts both back; same gate |
 | Media Foundation for guests | **works** — measured end to end on `mfplat`/`mf`/`mfreadwrite` |
+| Running a **32-bit** PE | **works** — real Wine WoW64, the embedded emulator as the CPU backend; `ppc64le/wow64/check-wow64-smoke.sh` |
+| Processor topology | **all cores** — sparse CPU and NUMA numbering, real processor groups; `ppc64le/cpu/check-cpu-topology.sh` |
 | `mfmediaengine`, `evr`, `wmvcore` | **surface built, unexercised** — same roster, same instance; no title has driven one, and `ppc64le/mf/README.md` says so |
 | **A commercial game** | **no** — see "Where real games stop" |
 
@@ -68,6 +70,13 @@ This does **not** go through WoW64. WoW64 is 32-on-64 by construction, but
 `is_machine_64bit(AMD64)` is true, so `WowTebOffset` stays 0 and that path is
 never entered. Instead the prefix advertises AMD64 in the server's supported
 machines, and `RtlUserThreadStart` hands a guest entry point to the emulator.
+
+A **32-bit** PE is different: that one does go through real WoW64, with the
+embedded emulator as the CPU backend behind `BTCpuSimulate`. The server
+advertises `IMAGE_FILE_MACHINE_I386`, `wineboot` stages the 32-bit builtins
+into `C:\windows\syswow64`, and `ntdll` is itself the CPU DLL. See
+`ppc64le/wow64/DESIGN.md`. The emulator bridge must be ABI 4 or no 32-bit
+process starts at all.
 
 Guest imports bind to **AMD64 thunk PEs** served from a per-machine system
 directory (`C:\windows\sysx8664\`, alongside Wine's existing `syswow64` and
