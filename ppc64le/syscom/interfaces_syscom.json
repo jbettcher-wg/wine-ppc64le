@@ -154,6 +154,7 @@
     "FILTER_STATE",
     "FUNCFLAGS",
     "FUNCKIND",
+    "GETPROPERTYSTOREFLAGS",
     "GLOBALOPT_EH_VALUES",
     "GLOBALOPT_PROPERTIES",
     "GLOBALOPT_RO_FLAGS",
@@ -181,8 +182,23 @@
     "PENDINGTYPE",
     "PICTUREATTRIBUTES",
     "PIN_DIRECTION",
+    "PKA_FLAGS",
     "PROPBAG2_TYPE",
+    "PROPDESC_AGGREGATION_TYPE",
+    "PROPDESC_COLUMNINDEX_TYPE",
+    "PROPDESC_CONDITION_TYPE",
+    "PROPDESC_DISPLAYTYPE",
+    "PROPDESC_ENUMFILTER",
+    "PROPDESC_FORMAT_FLAGS",
+    "PROPDESC_GROUPING_RANGE",
+    "PROPDESC_RELATIVEDESCRIPTION_TYPE",
+    "PROPDESC_SEARCHINFO_FLAGS",
+    "PROPDESC_SORTDESCRIPTION",
+    "PROPDESC_TYPE_FLAGS",
+    "PROPDESC_VIEW_FLAGS",
+    "PROPENUMTYPE",
     "PROPPAGESTATUS",
+    "PSC_STATE",
     "QACONTAINERFLAGS",
     "QualityMessageType",
     "READYSTATE",
@@ -238,6 +254,7 @@
     "_EDataFlow",
     "_ERole",
     "_EndpointFormFactor",
+    "_PERSIST_SPROPSTORE_FLAGS",
     "tagCALLCONV",
     "tagCHANGEKIND",
     "tagDESCKIND",
@@ -6903,6 +6920,83 @@
           "slot": 8,
           "owner": "IPersistStreamInit",
           "name": "InitNew",
+          "ret": "HRESULT",
+          "params": []
+        }
+      ]
+    },
+    "IPropertyStore": {
+      "uuid": "886d8eeb-8cf2-4446-8d02-cdba1dbdcf99",
+      "base": "IUnknown",
+      "header": "propsys.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IPropertyStore",
+          "name": "GetCount",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD *cProps"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IPropertyStore",
+          "name": "GetAt",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD iProp",
+            "PROPERTYKEY *pkey"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IPropertyStore",
+          "name": "GetValue",
+          "ret": "HRESULT",
+          "params": [
+            "REFPROPERTYKEY key",
+            "PROPVARIANT *pv"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IPropertyStore",
+          "name": "SetValue",
+          "ret": "HRESULT",
+          "params": [
+            "REFPROPERTYKEY key",
+            "REFPROPVARIANT propvar"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IPropertyStore",
+          "name": "Commit",
           "ret": "HRESULT",
           "params": []
         }

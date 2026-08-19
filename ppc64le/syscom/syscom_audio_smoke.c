@@ -64,18 +64,21 @@
  *   IXAudio2::RegisterForCallbacks, IXAudio2::CreateSourceVoice with a
  *   non-NULL pCallback, IMMDeviceEnumerator::UnregisterEndpointNotification-
  *   Callback, and IMMDevice::OpenPropertyStore (whose IPropertyStore this
- *   roster does not carry, so there is no guest vtable to hand back).
+ *   roster did not then carry, so there was no guest vtable to hand back).
  *
- * THREE OF THE FOUR ARE NOW SERVED, and the comment that used to stand here
+ * ALL FOUR ARE NOW SERVED, and the comment that used to stand here
  * saying this port "does not do that direction yet" is what libs/winecom's
  * reverse.c falsified.  The bar for a served one is not "the guest escaped
- * E_NOTIMPL" but "the guest got the SAME answer the native leg got", which is
- * what check-syscom-audio.sh section G measures.
- *
- * Only IMMDevice::OpenPropertyStore still answers E_NOTIMPL to the guest, and
- * that one is a SIGNATURE fact rather than a direction one: it vends an
- * interface this roster does not carry.  It still succeeds on the native leg,
- * which is exactly why it cannot be a diffed step.
+ * E_NOTIMPL" but "the guest got the SAME answer the native leg got", which
+ * for the first three is what check-syscom-audio.sh section G measures and
+ * for OpenPropertyStore is a DIFFED step below: Cyberpunk 2077 calls it
+ * without checking the HRESULT, so the old refusal left the game's
+ * IPropertyStore* uninitialised and it called through stack garbage
+ * (run 30, 2026-08-19) -- IPropertyStore joined the roster for that, and
+ * this smoke walks the read path (GetCount / GetAt / GetValue) on both
+ * legs.  SetValue stays refused by name: a guest-AUTHORED PROPVARIANT can
+ * carry VT_UNKNOWN, and nothing on the measured path writes device
+ * properties.
  *
  * A FIFTH note is the OTHER kind of refusal, and it is here because it is the
  * exact line a guest used to get for XAudio2 itself: IMMDevice::Activate for
@@ -114,6 +117,7 @@
 #include <objbase.h>
 #include <mmdeviceapi.h>
 #include <audioclient.h>
+#include <propsys.h>
 
 /* ------------------------------------------------------------------ GUIDs
  *
@@ -143,6 +147,7 @@ static const GUID sc_IID_IAudioRenderClient =
  * choke point every riid-typed out-parameter passes through, and it is the
  * same line -- with a different GUID -- that a guest asking combase for an
  * unrostered IXAudio2 used to get. */
+static const GUID sc_GUID_NULL = { 0 };
 static const GUID sc_IID_IAudioClient2 =
     { 0x726778cd, 0xf60a, 0x4eda, { 0x82,0xde,0xe4,0x76,0x10,0xcd,0x78,0xaa } };
 
@@ -623,9 +628,40 @@ static int sc_audio_run( void )
         out_hr( "hr", hr );
         verdict( hr == S_OK && client != NULL, "no audio client" );
 
-        note( "note: IMMDevice::OpenPropertyStore ->",
-              IMMDevice_OpenPropertyStore( dev, STGM_READ, &pstore ) );
-        if (pstore) { IUnknown_Release( (IUnknown *)pstore ); pstore = NULL; }
+        begin( "IMMDevice::OpenPropertyStore, and the read path" );
+        hr = IMMDevice_OpenPropertyStore( dev, STGM_READ, &pstore );
+        out_hr( "hr", hr );
+        verdict( hr == S_OK && pstore != NULL, "no property store" );
+        if (pstore)
+        {
+            PROPERTYKEY key;
+            PROPVARIANT pv;
+            DWORD nprops = 0;
+
+            hr = IPropertyStore_GetCount( pstore, &nprops );
+            out_hr( " GetCount hr", hr );
+            out( " props-nonzero=" );
+            out_dec( nprops != 0 );
+            verdict( hr == S_OK && nprops != 0, "empty device property store" );
+
+            /* both are OUT parameters (hr-checked); no CRT memset in the
+             * guest leg to zero them with */
+            key.fmtid = sc_GUID_NULL;
+            key.pid = 0;
+            pv.vt = VT_EMPTY;
+            hr = IPropertyStore_GetAt( pstore, 0, &key );
+            out_hr( " GetAt(0) hr", hr );
+            hr = IPropertyStore_GetValue( pstore, &key, &pv );
+            out_hr( " GetValue hr", hr );
+            out( " vt-nonempty=" );
+            out_dec( pv.vt != VT_EMPTY );
+            verdict( hr == S_OK && pv.vt != VT_EMPTY, "no value for key 0" );
+            /* Not PropVariantClear'd: that is ole32's flat surface, not this
+             * smoke's subject, and the process is about to exit anyway. */
+
+            IUnknown_Release( (IUnknown *)pstore );
+            pstore = NULL;
+        }
 
         pstore = NULL;
         hr = IMMDevice_Activate( dev, &sc_IID_IAudioClient2, CLSCTX_ALL, NULL,

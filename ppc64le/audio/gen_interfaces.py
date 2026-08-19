@@ -179,6 +179,13 @@ SURFACES = {
             # this extractor must regenerate them for the drift gate.
             ("include/wbemcli.h",      "midl",              True),
             ("include/netlistmgr.h",   "midl",              True),
+            # The device property store: Cyberpunk 2077's audio boot calls
+            # IMMDevice::OpenPropertyStore without checking the HRESULT, so
+            # the unrostered refusal left its IPropertyStore* uninitialised
+            # and the game called through stack garbage (run 30, 2026-08-19).
+            # gen_syscom_audio.py owns the rows; this extractor must
+            # regenerate them for the drift gate.
+            ("include/propsys.h",      "midl",              True),
             ("dsound.h",               "declare_interface", False),
             ("dmusicc.h",              "declare_interface", False),
             ("dmusici.h",              "declare_interface", False),
@@ -210,6 +217,7 @@ SURFACES = {
             "IXAudio2EngineCallback", "IXAudio2MasteringVoice",
             "IXAudio2SourceVoice", "IXAudio2SubmixVoice", "IXAudio2Voice",
             "IXAudio2VoiceCallback",
+            "IPropertyStore",
             "IWbemLocator", "IWbemServices", "IEnumWbemClassObject",
             "IWbemClassObject", "IWbemContext",
             "INetworkListManager", "IEnumNetworks", "INetwork",

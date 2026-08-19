@@ -901,32 +901,24 @@ else
     bad "native and guest output differ"
 fi
 
-# ---- G: what is still refused, and what is now SERVED ----------------------
-# E_NOTIMPL is 0x80004001.  This one is still refused to the guest, for a
-# reason that is about a SIGNATURE rather than about direction: it vends an
-# interface this roster does not carry.
+# ---- G: what is now SERVED --------------------------------------------------
+# IMMDevice::OpenPropertyStore USED TO BE HERE as the one still-refused note
+# (E_NOTIMPL, "an interface this roster does not carry").  Cyberpunk 2077
+# falsified the survivability of that refusal -- it calls OpenPropertyStore
+# without checking the HRESULT, so the honest E_NOTIMPL left its
+# IPropertyStore* uninitialised and the game called through stack garbage
+# (run 30, 2026-08-19).  IPropertyStore is on the roster now and the property
+# read path is a DIFFED STEP of this smoke: both legs walk GetCount / GetAt /
+# GetValue and section F requires the answers byte-identical, which is a
+# stronger statement than any grep here could make.  SetValue stays refused by
+# name in the table (a guest-authored PROPVARIANT can carry VT_UNKNOWN).
 #
-# CreateSourceVoice-with-a-callback USED TO BE HERE and has moved down to the
-# served list.  Its refusal was never a signature fact either: it was the
+# CreateSourceVoice-with-a-callback also used to be here and has moved down to
+# the served list.  Its refusal was never a signature fact either: it was the
 # roster gap that kept IXAudio2VoiceCallback -- the per-BUFFER sink a 2.7
 # streaming loader waits on -- off the surface, and closing that gap is what
 # lets the slot answer S_OK.  The sends/chain refusals beside it are untouched
 # and are still signature facts, refused in both directions.
-for want in "IMMDevice::OpenPropertyStore -> 0x80004001"; do
-    if ! grep -qF "note: $want" "$OUT/guest.err"; then
-        bad "the guest did not refuse '$(echo "$want" | sed 's/ -> .*//')' with \
-E_NOTIMPL; it answered '$(grep -F "$(echo "$want" | sed 's/ -> .*//')" \
-        "$OUT/guest.err" | tail -1)'"
-    fi
-done
-# and the native leg must SUCCEED at both, or the refusals above are measuring
-# an API that fails for everybody
-for want in "IMMDevice::OpenPropertyStore -> 0x00000000"; do
-    if ! grep -qF "note: $want" "$OUT/native.err"; then
-        bad "the NATIVE leg did not succeed at '$(echo "$want" | sed 's/ -> .*//')', \
-so the guest refusing it proves nothing"
-    fi
-done
 # THE THREE THAT ARE NOW SERVED.  All used to be in the list above.  The bar is
 # not "the guest did not get E_NOTIMPL" but "the guest got the SAME answer the
 # native leg got", which for the unregister is mmdevapi's own E_NOTFOUND

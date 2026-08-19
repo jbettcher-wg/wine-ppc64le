@@ -177,11 +177,24 @@ MMDEV_IFACES = ["IMMDeviceEnumerator", "IMMDeviceCollection", "IMMDevice",
 # from its own notification thread, and the reverse direction needs its slot
 # table to marshal by.
 #
-# NOT here: IMMEndpoint / IPropertyStore / IAudioClient2/3 / IAudioClock / the
-# volume interfaces (nothing on the measured path asks for them, and an
-# unrostered IID is refused loudly by winecom rather than served wrongly).
+# NOT here: IMMEndpoint / IAudioClient2/3 / IAudioClock / the volume
+# interfaces (nothing on the measured path asks for them, and an unrostered
+# IID is refused loudly by winecom rather than served wrongly).
+#
+# IPropertyStore WAS on that list, and Cyberpunk 2077 took it off.  Its audio
+# boot calls IMMDevice::OpenPropertyStore and does not check the HRESULT --
+# the same manner it treats every COM call -- so the honest refusal left the
+# game's IPropertyStore* stack variable UNINITIALISED, and thread 01b0 called
+# through it: guest fault at rip 0x710c232, which is the top half of a stale
+# stack quadword read as a vtable slot (run 30, 2026-08-19).  Same lesson as
+# the NetworkListManager below: a refusal is only survivable when the caller
+# looks at it.  The store's read path is served (GetCount / GetAt / GetValue
+# -- see the VARIANT paragraph below for why a PROPVARIANT out is data on
+# this path); SetValue stays refused by name (REFUSALS).
+PROPSTORE_HEADERS = [os.path.join("include", "propsys.h")]
+PROPSTORE_IFACES = ["IPropertyStore"]
 
-AUDIO_IFACES = XAUDIO2_IFACES + MMDEV_IFACES
+AUDIO_IFACES = XAUDIO2_IFACES + MMDEV_IFACES + PROPSTORE_IFACES
 
 # --------------------------------------------------------------------------
 # THE SYSTEM-INFORMATION FAMILY: WMI and the NetworkListManager.
@@ -388,7 +401,19 @@ NOTABLE_SLOTS = ["IXAudio2Voice::DestroyVoice"]
 # and answer E_NOTFOUND for anything else, WITHOUT touching it.  That is the
 # same shape as the live-voice registry in dlls/combase/syscom.c and it exists
 # for the same kind of reason.
-REFUSALS = {}
+REFUSALS = {
+    # The read path of a device property store is data (a PROPVARIANT the
+    # NATIVE side filled with a VT_BLOB wave format or a VT_LPWSTR name); the
+    # write path is the one direction where the GUEST authors the tagged
+    # union, and a guest-written VT_UNKNOWN would hand mmdevapi a proxy it
+    # would call as ppc64 code.  Nothing on the measured path writes device
+    # properties, so the honest answer is a named refusal.
+    "IPropertyStore::SetValue":
+        "takes a guest-authored REFPROPVARIANT; a PROPVARIANT the GUEST "
+        "fills can carry VT_UNKNOWN -- an interface pointer with no type in "
+        "the signature -- and the device property store is read-only on "
+        "every measured path anyway",
+}
 
 
 class Refused(Exception):
@@ -611,6 +636,7 @@ def build_audio_rows(build):
     """-> (rows, enums, header_texts).  rows is {name: roster row}."""
     xa_text = read_header(XAUDIO2_HEADER, build)
     mm_texts = [read_header(h, build) for h in MMDEV_HEADERS]
+    ps_texts = [read_header(h, build) for h in PROPSTORE_HEADERS]
     ctx_texts = [read_header(h, SRCTREE) for h in CONTEXT_HEADERS]
     si_texts = [read_header(h, build) for h in SYSINFO_HEADERS]
     si_base_texts = [read_header(h, build) for h in SYSINFO_BASE_HEADERS]
@@ -618,7 +644,8 @@ def build_audio_rows(build):
     # Parsed per header so each row records the header it was read from; no
     # interface in the AUDIO family inherits across the two files.
     parsed = {XAUDIO2_HEADER: parse_midl(xa_text, XAUDIO2_HEADER)}
-    for path, text in zip(MMDEV_HEADERS, mm_texts):
+    for path, text in zip(MMDEV_HEADERS + PROPSTORE_HEADERS,
+                          mm_texts + ps_texts):
         parsed[path] = parse_midl(text, path)
 
     # The SYSINFO family DOES inherit across files -- INetworkListManager's
@@ -633,12 +660,14 @@ def build_audio_rows(build):
     parsed["<sysinfo>"] = si_parsed
 
     rows, synthetic = {}, []
-    for want in (XAUDIO2_IFACES, MMDEV_IFACES, SYSINFO_IFACES):
+    for want in (XAUDIO2_IFACES, MMDEV_IFACES, PROPSTORE_IFACES,
+                 SYSINFO_IFACES):
         for name in want:
             got = next((g for g in parsed.values() if name in g), None)
             if got is None:
                 sys.exit("gen_syscom_audio: %s is declared in none of %s"
                          % (name, ", ".join([XAUDIO2_HEADER] + MMDEV_HEADERS
+                                            + PROPSTORE_HEADERS
                                             + SYSINFO_HEADERS)))
             i = got[name]
             uuid = i["uuid"]
@@ -651,7 +680,8 @@ def build_audio_rows(build):
                 synthetic.append(name)
             rows[name] = row
 
-    texts = [xa_text] + mm_texts + ctx_texts + si_texts + si_base_texts
+    texts = ([xa_text] + mm_texts + ps_texts + ctx_texts + si_texts
+             + si_base_texts)
     return rows, scan_enums(texts), texts, sorted(synthetic)
 
 
