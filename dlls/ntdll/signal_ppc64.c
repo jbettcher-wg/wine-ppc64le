@@ -1003,12 +1003,20 @@ NTSTATUS WINAPI RtlGetNativeSystemInformation( SYSTEM_INFORMATION_CLASS class,
 /***********************************************************************
  *           RtlIsProcessorFeaturePresent [NTDLL.@]
  *
- * The PF_* feature numbers are all x86/ARM specific; none of them describes a
- * PowerPC capability, so nothing is ever present.  Stub, deliberately.
+ * This used to return FALSE unconditionally -- "the PF_* numbers are all
+ * x86/ARM specific; none describes a PowerPC capability".  True about the
+ * HOST and wrong about the CALLERS that matter: an x86 guest reaches this
+ * through the kernelbase thunk, and witcher3.exe read the unconditional
+ * FALSE as "CPU does not meet minimal requirements.  Support for SSE3
+ * instructions is required." over a POWER8 emulating SSE4.2 ([MEASURED]
+ * 2026-08-19).  Read the shared feature array like every other
+ * architecture; dlls/ntdll/unix/system.c's ppc64 init seeds it with what
+ * the emulation lane actually provides, and a query this port has no
+ * answer for stays FALSE there.
  */
 BOOLEAN WINAPI RtlIsProcessorFeaturePresent( UINT feature )
 {
-    return FALSE;
+    return feature < PROCESSOR_FEATURE_MAX && user_shared_data->ProcessorFeatures[feature];
 }
 
 

@@ -922,6 +922,35 @@ void init_shared_data_cpuinfo( KUSER_SHARED_DATA *data )
     features[PF_FASTFAIL_AVAILABLE]      = TRUE;
     features[PF_COMPARE_EXCHANGE_DOUBLE] = TRUE;
     features[PF_NX_ENABLED]              = TRUE;
+
+    /* An x86 guest reads these through IsProcessorFeaturePresent, and the
+     * bare ppc64 answers cost The Witcher 3 its launch: witcher3.exe checks
+     * PF_SSE3_INSTRUCTIONS_AVAILABLE in engine init and put up "CPU does
+     * not meet minimal requirements.  Support for SSE3 instructions is
+     * required." over a POWER8 that emulates SSE4.2 ([MEASURED]
+     * 2026-08-19, first nw-witcher3 boot after the CRT wall fell).
+     *
+     * UNCONDITIONALLY, not behind the aarch64 branch's supported_machines
+     * loop: this port's x86-64 guests come in through its own emulation
+     * lane, not the wow64 machine list, so that list names neither I386
+     * nor AMD64 and the loop never fires ([MEASURED] the same night: a
+     * guest probe read every PF_ answer as 0 with the loop in place).  On
+     * this build the only CPU a guest can BE is the emulated x86, so the
+     * emulated x86 is what these must describe -- FEX serves the full
+     * baseline through SSE4.2; AVX is a CPUID/XCR0 story with no PF_ bit,
+     * so nothing here overstates it.  A ppc64 PE reading an x86 answer out
+     * of these gets a fact about the machine's guests, which is the least
+     * wrong thing a cross-ISA field can say. */
+    features[PF_MMX_INSTRUCTIONS_AVAILABLE]    = TRUE;
+    features[PF_XMMI_INSTRUCTIONS_AVAILABLE]   = TRUE;
+    features[PF_RDTSC_INSTRUCTION_AVAILABLE]   = TRUE;
+    features[PF_XMMI64_INSTRUCTIONS_AVAILABLE] = TRUE;
+    features[PF_SSE3_INSTRUCTIONS_AVAILABLE]   = TRUE;
+    features[PF_COMPARE_EXCHANGE128]           = TRUE;
+    features[PF_RDTSCP_INSTRUCTION_AVAILABLE]  = TRUE;
+    features[PF_SSSE3_INSTRUCTIONS_AVAILABLE]  = TRUE;
+    features[PF_SSE4_1_INSTRUCTIONS_AVAILABLE] = TRUE;
+    features[PF_SSE4_2_INSTRUCTIONS_AVAILABLE] = TRUE;
 }
 
 #endif /* End architecture specific feature detection for CPUs */
