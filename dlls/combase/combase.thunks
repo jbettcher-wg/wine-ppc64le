@@ -51,6 +51,13 @@ GUEST-REFUSE CoSwitchCallContext
 GUEST-REFUSE CoUnmarshalHresult
 GUEST-REFUSE CoUnmarshalInterface
 GUEST-REFUSE CreateErrorInfo
+# The Co-prefixed spellings are .spec ALIASES of the three ErrorInfo exports
+# refused above; they became emittable when spec2thunk learned to take an
+# alias's signature from its target, and the same refusal applies for the
+# same reason.
+GUEST-REFUSE CoCreateErrorInfo
+GUEST-REFUSE CoGetErrorInfo
+GUEST-REFUSE CoSetErrorInfo
 GUEST-REFUSE DllGetClassObject
 GUEST-REFUSE FreePropVariantArray
 GUEST-REFUSE GetErrorInfo

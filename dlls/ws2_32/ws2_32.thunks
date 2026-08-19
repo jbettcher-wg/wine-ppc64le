@@ -9,3 +9,17 @@
 # module's own .spec.
 DLL ws2_32.dll
 FROM-SPEC auto
+
+# inet_ntoa is the one export in this .spec that takes a STRUCT BY VALUE --
+# `char *inet_ntoa(struct in_addr)` -- so the header oracle refuses it
+# ("argument 0 (struct in_addr) is not integer/pointer class") and guests
+# that import ws2_32 ordinal 12 (Cyberpunk2077.exe and its REDGalaxy64.dll)
+# get a sentinel.  The .spec-location row below bypasses the class check the
+# same way msvcr100's mangled names do, and it is sound HERE because a 4-byte
+# aggregate is one register slot on both sides of this boundary: MS-x64 puts
+# it in the low bytes of RCX, ELFv2 (LE) expects it in the low bytes of r3,
+# and the callee reads only its own 4 bytes, so forwarding the slot verbatim
+# is the correct marshalling.  No extension question arises -- aggregates are
+# not integer-extended by either ABI.  The returned char* is a native
+# per-thread buffer in the shared address space, readable by the guest as-is.
+inet_ntoa                 0x00001E7A  1  int   ws2_32.spec:12

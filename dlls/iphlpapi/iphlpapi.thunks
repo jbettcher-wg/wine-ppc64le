@@ -16,3 +16,8 @@ FROM-SPEC auto
 # DOOMx64vk.exe+0x32a7c2.  iphlpapi.h is not in the global probe (nothing else
 # needs it), so it is appended here exactly as dbghelp appends dbghelp.h.
 PROBE-EXTRA   iphlpapi.h
+
+# icmpapi.h, for the Icmp* surface: IcmpCreateFile/IcmpSendEcho and kin are
+# declared only there.  Cyberpunk 2077's REDGalaxy64.dll imports both --
+# GOG Galaxy pings its endpoints -- and got sentinels.
+PROBE-EXTRA   icmpapi.h

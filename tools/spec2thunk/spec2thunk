@@ -615,6 +615,17 @@ def parse_wine_spec(path, mangled_ok=()):
             name, _, tail = decl.partition('(')
             name = name.strip()
             args = tail.rpartition(')')[0].split() if '(' in decl else []
+            # The token after the closing paren, when there is one, names the
+            # implementation the export is an ALIAS of -- ucrtbase's whole
+            # `_o_*` surface is `@ cdecl _o__close(long) _close` and its kind.
+            # Kept only when it is a same-module plain C identifier: a dotted
+            # target is a forward into another module, and a mangled one is
+            # nothing the header oracle could declare.  The header oracle can
+            # then resolve the TARGET's declaration when the alias's own name
+            # is declared nowhere, which for `_o__close` it never is.
+            impl = tail.rpartition(')')[2].strip() if '(' in decl else ''
+            alias = (impl if impl and impl != name and '.' not in impl
+                     and impl.replace('_', 'a').isalnum() else None)
             if name == '@':
                 # `86 stdcall -i386 -private @(ptr) krnl386...`: exported by
                 # ordinal under no name at all.
@@ -645,7 +656,8 @@ def parse_wine_spec(path, mangled_ok=()):
                                 'a CONTEXT, not an argument list'))
                 continue
             entries.append(dict(name=name, spec_args=args, spec_type=kind,
-                                flags=flags, specline=lineno, rec=rec))
+                                flags=flags, specline=lineno, spec_alias=alias,
+                                rec=rec))
     ord_limit = assign_ordinals(records, path)
     for e in entries:
         rec = e.pop('rec')
@@ -1154,7 +1166,10 @@ def resolve_signatures(exports, headers, specs=None):
         [(e['name'], e.get('variadic_impl') is not None)
          for e in exports if not (e['header'] or '').endswith('.spec')]
         + [(e['variadic_impl'], False)
-           for e in exports if e.get('variadic_impl')])
+           for e in exports if e.get('variadic_impl')]
+        + [(e['spec_alias'], False)
+           for e in exports if e.get('spec_alias')
+           and not (e['header'] or '').endswith('.spec')])
 
     accepted, refused, mismatches = [], [], []
     for e in exports:
@@ -1215,8 +1230,26 @@ def resolve_signatures(exports, headers, specs=None):
                                                      and e.get('line')
                                                          == e.get('specline')))
             else:
-                sig = headers.signature(e['name'],
-                                        allow_variadic=want_variadic)
+                try:
+                    sig = headers.signature(e['name'],
+                                            allow_variadic=want_variadic)
+                except Refused as ex:
+                    # An export that is a same-module ALIAS in its .spec
+                    # (`@ cdecl _o__close(long) _close`) has the TARGET's
+                    # signature by construction -- winebuild binds both names
+                    # to the one implementation -- so when the alias's own
+                    # name is declared in no header, the target's declaration
+                    # answers for it.  Only the no-declaration refusal may be
+                    # rescued this way: an alias whose own name IS declared is
+                    # governed by that declaration, and any other refusal
+                    # (struct class, varargs) is about the shape, which the
+                    # alias shares.  The native module exports the alias name
+                    # itself, so the host still resolves e['name'] unchanged.
+                    if not (e.get('spec_alias')
+                            and ex.reason.startswith('no declaration found')):
+                        raise
+                    sig = headers.signature(e['spec_alias'],
+                                            allow_variadic=want_variadic)
         except Refused as ex:
             refused.append((e['name'], ex.reason))
             continue

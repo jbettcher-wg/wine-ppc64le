@@ -1302,7 +1302,11 @@ class WineSpecs:
         if not (1 <= lineno <= len(lines)):
             raise Refused('%s has no line %d' % (specname, lineno))
         raw = lines[lineno - 1].split('#', 1)[0].strip()
-        if not raw.startswith('@'):
+        # An export line opens with `@` or with an explicit ordinal --
+        # `12  stdcall  inet_ntoa(ptr)` is how ws2_32.spec pins its classic
+        # winsock ordinals, and parse_wine_spec accepts both spellings.
+        first = raw.split(None, 1)[0] if raw else ''
+        if first != '@' and not first.isdigit():
             raise Refused('%s:%d is not an export line: %r'
                           % (specname, lineno, raw[:80]))
         if '(' not in raw or ')' not in raw:

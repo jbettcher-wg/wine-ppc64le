@@ -218,3 +218,27 @@ PROBE-EXTRA   mbstring.h      # _mbschr, _mbsstr, _ismbcspace, ... (the _mbs* fa
 # initialises and its exports run); a guest that does gets the named sentinel.
 _resetstkoflw                 0x00000A20  0  int   ucrtbase.spec:1871
 _seh_filter_dll               0x00000A21  2  int   ucrtbase.spec:1882
+
+# ---------------------------------------------------------------------------
+# The 2026-08-19 Cyberpunk 2077 triage: the C++ helpers that ARE flat
+# ---------------------------------------------------------------------------
+# The game's icuuc/icuin/libxess import __RTtypeid, __RTDynamicCast and the
+# __std_* family from vcruntime140.dll; the staged (Wine-built) vcruntime140
+# is a forwarder into this module, and this module refused them all as "no
+# declaration found in Wine headers" -- the same tooling gap as mtdll.h
+# above, fixed the same way.  thunkcxx.h (beside this file) carries flat
+# C declarations for exactly the helpers whose success path is data-only,
+# and says in its own comment why _CxxThrowException, __CxxFrameHandler3 and
+# __unDNameEx are deliberately not in it.
+INCLUDE-DIR   .
+PROBE-EXTRA   thunkcxx.h
+
+# div returns div_t BY VALUE, so the header oracle refuses it ("return is not
+# integer/pointer class") and icuin.dll got a sentinel.  The .spec-location
+# row bypasses that check soundly here: div_t is {int quot; int rem;} -- eight
+# bytes, packed identically on both little-endian ABIs -- and both sides
+# return it in their one integer return register (RAX / r3), which is exactly
+# the single slot the descriptor's `int` return already carries.  The .spec
+# line is `-ret64` for the same reason.  Arguments are two ints, integer
+# class, nothing to marshal.
+div                       0x00000D1F  2  int   ucrtbase.spec:2272

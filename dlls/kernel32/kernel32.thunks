@@ -68,9 +68,9 @@ FROM-SPEC auto
 
 GetCurrentProcessId       0x1234      0  int   processthreadsapi.h:254
 GetCurrentThreadId        0x00005678  0  int   processthreadsapi.h:256
-Sleep                     0x0000BEEF  1  void  winbase.h:2294
+Sleep                     0x0000BEEF  1  void  winbase.h:2297
 GetModuleHandleW          0x0000CAFE  1  int   winbase.h:1818
-GetProcAddress            0x0000D00D  2  int   winbase.h:1861
+GetProcAddress            0x0000D00D  2  int   winbase.h:1862
 GetEnvironmentVariableW   0x0000FEED  3  int   winbase.h:1774
 # index 6: first export with >4 arguments -- exercises the [RSP+...] path.
 MultiByteToWideChar       0x0000B00C  6  int   winnls.h:982
@@ -80,15 +80,15 @@ MultiByteToWideChar       0x0000B00C  6  int   winnls.h:982
 #   IsBadReadPtr raises an access violation and catches it in native code (SEH)
 #   the rest each go through an NT syscall (NtCreateEvent/NtSetEvent/
 #   NtWaitForSingleObject/NtClose)
-IsBadReadPtr              0x0000BAD1  2  int   winbase.h:2003
+IsBadReadPtr              0x0000BAD1  2  int   winbase.h:2004
 CreateEventW              0x0000E7E0  4  int   winbase.h:1493
-SetEvent                  0x00005E7E  1  int   winbase.h:2236
-WaitForSingleObject       0x0000A17F  2  int   winbase.h:2346
+SetEvent                  0x00005E7E  1  int   winbase.h:2237
+WaitForSingleObject       0x0000A17F  2  int   winbase.h:2349
 CloseHandle               0x0000C105  1  int   winbase.h:1454
 # index 12: raises with NO handler anywhere inside the callback, so the unwind
 # has to leave the switched stack and reach RtlUserThreadStart.  A wrong FDE
 # here hangs rather than crashes -- see probes/a_unwind.c.
-RaiseException            0x0000BEE7  4  void  winbase.h:2169
+RaiseException            0x0000BEE7  4  void  winbase.h:2170
 
 # ---------------------------------------------------------------------------
 # indices 13..: the kernel32 half of the /tmp/realprog/hostname.exe import
@@ -98,16 +98,16 @@ RaiseException            0x0000BEE7  4  void  winbase.h:2169
 # ---------------------------------------------------------------------------
 GetComputerNameW          0x0000C0B7  2  int   winbase.h:1740
 GetOEMCP                  0x00000E30  0  int   winnls.h:938
-GetStdHandle              0x00005DA1  1  int   winbase.h:1894
+GetStdHandle              0x00005DA1  1  int   winbase.h:1895
 # HeapAlloc's declaration carries __WINE_MALLOC (winnt.h:225), which clang
 # prints as a MacroQualifiedType.  Its declared shape is unaffected: three
 # integer/pointer arguments, LPVOID return.
-HeapAlloc                 0x0000A110  3  int   winbase.h:1966
-HeapFree                  0x0000F4EE  3  int   winbase.h:1965
+HeapAlloc                 0x0000A110  3  int   winbase.h:1967
+HeapFree                  0x0000F4EE  3  int   winbase.h:1966
 # 8 arguments: four in registers, four at [RSP + 8 + i*8].
 WideCharToMultiByte       0x0000B2C0  8  int   winnls.h:997
 WriteConsoleW             0x0000C025  5  int   consoleapi.h:87
-WriteFile                 0x0000F11E  5  int   winbase.h:2361
+WriteFile                 0x0000F11E  5  int   winbase.h:2364
 
 # ---------------------------------------------------------------------------
 # indices 21..22: the delay-load pair.  NEITHER IS DECLARED IN ANY WINE
@@ -155,13 +155,13 @@ GetEnvironmentStrings     0x0000D1A2  0  int   kernel32.spec:676
 # ---------------------------------------------------------------------------
 GetLongPathNameW          0x00000B01  3  int   winbase.h:1809
 GetModuleHandleA          0x00000B02  1  int   winbase.h:1817
-GetShortPathNameW         0x00000B03  3  int   winbase.h:1890
+GetShortPathNameW         0x00000B03  3  int   winbase.h:1891
 # GetTickCount lives in sysinfoapi.h, not winbase.h -- winbase.h only #includes it.
 GetTickCount              0x00000B04  0  int   sysinfoapi.h:97
 # 4 args (handle, flags, old block, new size) -- one more than HeapAlloc.
-HeapReAlloc               0x00000B05  4  int   winbase.h:1971
-IsBadStringPtrW           0x00000B06  2  int   winbase.h:2005
-lstrcmpiW                 0x00000B07  2  int   winbase.h:2387
+HeapReAlloc               0x00000B05  4  int   winbase.h:1972
+IsBadStringPtrW           0x00000B06  2  int   winbase.h:2006
+lstrcmpiW                 0x00000B07  2  int   winbase.h:2390
 
 # ---------------------------------------------------------------------------
 # indices 30..31: winepath's two RUN-TIME-resolved exports.  These are in NO
@@ -178,8 +178,8 @@ lstrcmpiW                 0x00000B07  2  int   winbase.h:2387
 #
 # Both ARE declared in a Wine header, so both are fully clang-verified; the
 # kernel32.spec lines (1737/1738) only corroborate the arity.
-wine_get_unix_file_name   0x00000B08  1  int   winbase.h:2507
-wine_get_dos_file_name    0x00000B09  1  int   winbase.h:2508
+wine_get_unix_file_name   0x00000B08  1  int   winbase.h:2510
+wine_get_dos_file_name    0x00000B09  1  int   winbase.h:2511
 
 # Guest threads.  lpStartAddress is passed through UNWRAPPED on purpose: the
 # thread-start funnel (RtlUserThreadStart -> thread_start_is_guest_code) owns
@@ -199,3 +199,12 @@ ExitThread                0x0000E717  1  void  processthreadsapi.h:165
 # this header serves those and 24 more, and costs nothing else (measured: 1112
 # exports emitted without it, 1139 with, none lost).
 PROBE-EXTRA   psapi.h
+
+# errhandlingapi.h, for RaiseFailFastException -- Cyberpunk 2077 imports it
+# and the declaration lives only there; windows.h does not pull that header
+# in, so the oracle reported "no declaration found" for a function
+# kernelbase implements.  Same tooling gap as psapi.h above.  The other three
+# exports the same game exposed (GetPhysicallyInstalledSystemMemory,
+# SetThreadStackGuarantee, SetThreadSelectedCpuSets) had no declaration in
+# ANY Wine header and are now declared in winbase.h, where the SDK puts them.
+PROBE-EXTRA   errhandlingapi.h

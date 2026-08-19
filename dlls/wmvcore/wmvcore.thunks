@@ -36,18 +36,23 @@
 # carry no interface; six vend an object and are GUEST-IMPL below.
 #
 # The `Priv` variants -- WMCreateReaderPriv, WMCreateSyncReaderPriv,
-# WMCreateWriterPriv, WMCreateBackupRestorerPrivate -- are deliberately NOT
-# here, and for the reason the psapi/wldap32 rename above gives rather than
-# any reason of their own.  They vend the same objects under the names the
-# SDK's own static library calls, and Wine implements every one of them --
-# dlls/wmvcore/async_reader.c:1956, wmvcore_main.c:40, writer.c:373 -- but no
-# Wine HEADER declares them.  The signature oracle resolves a NAME against the
-# translation unit it compiles, so an implementation with no declaration is
-# invisible to it and the export is refused with the compiler's own reason.
-# Naming a wrapper for one would assert a signature by hand, which is the one
-# thing this generator exists not to do.  They keep their ordinals as named
-# sentinels.  If a title ever calls one, the fix is a declaration, not a
-# .thunks entry.
+# WMCreateWriterPriv -- are deliberately NOT here, and for the reason the
+# psapi/wldap32 rename above gives rather than any reason of their own.  They
+# vend the same objects under the names the SDK's own static library calls,
+# and Wine implements every one of them -- dlls/wmvcore/async_reader.c:1956,
+# wmvcore_main.c:40, writer.c:373 -- but no Wine HEADER declares them.  The
+# signature oracle resolves a NAME against the translation unit it compiles,
+# so an implementation with no declaration is invisible to it and the export
+# is refused with the compiler's own reason.  Naming a wrapper for one would
+# assert a signature by hand, which is the one thing this generator exists
+# not to do.  They keep their ordinals as named sentinels.  If a title ever
+# calls one, the fix is a declaration, not a .thunks entry.
+#
+# WMCreateBackupRestorerPrivate is the exception, and only became one when
+# spec2thunk learned to take an ALIAS's signature from its target: its .spec
+# line is `WMCreateBackupRestorerPrivate(ptr ptr) WMCreateBackupRestorer`, so
+# its signature is WMCreateBackupRestorer's declared one, no hand assertion
+# involved.  It vends the same object and takes the same GUEST-IMPL wrapper.
 DLL wmvcore.dll
 FROM-SPEC auto
 
@@ -62,3 +67,4 @@ GUEST-IMPL   WMCreateWriter                        __wine_guest_WMCreateWriter
 GUEST-IMPL   WMCreateProfileManager                __wine_guest_WMCreateProfileManager
 GUEST-IMPL   WMCreateEditor                        __wine_guest_WMCreateEditor
 GUEST-IMPL   WMCreateBackupRestorer                __wine_guest_WMCreateBackupRestorer
+GUEST-IMPL   WMCreateBackupRestorerPrivate         __wine_guest_WMCreateBackupRestorer
