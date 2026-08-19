@@ -47,6 +47,7 @@ a Windows build, and the fix for all fifteen was one `.thunks` file each.
 | FreeInfantry | 2830720 | **PE32** | refused — no 32-bit guest | 32-bit is served now; not attempted since |
 | Styx: Master of Shadows (Win32) | 242640 | **PE32** | refused — no 32-bit guest | 32-bit is served now; not attempted since |
 | Styx: Shards of Darkness | — | — | not installed (empty directory, no appmanifest) | — |
+| Cyberpunk 2077 | 1091500 (GOG copy) | PE32+ | never tried | **runs its loader and its own code** — three missing modules fixed (`powrprof`, `xinput9_1_0`, `mswsock`), then NVIDIA Streamline's `sl.interposer.dll` needed the real `msvcp140`; with the redistributable staged it reaches `Cyberpunk2077.exe+0x16ddbd`, which calls a sentinel.  Owed: four kernel32 exports the generator refused (`GetPhysicallyInstalledSystemMemory`, `RaiseFailFastException`, `SetThreadStackGuarantee`, `SetThreadSelectedCpuSets`), `ws2_32` ordinal 12, and six `ucrtbase` C++ RTTI/EH forwards the real `vcruntime140` wants |
 | DOOM (2016) | 379720 | PE32+ | reached ~99% of startup, then `FATAL ERROR: Memory corruption before block!` and `rc=5`, every run | **past it** — the message was a misdiagnosis, not damage; see handoff #7 below |
 
 > ### Handoff #7 — DOOM's "memory corruption" was `pdh.dll` not loading
