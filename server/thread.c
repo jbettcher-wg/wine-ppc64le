@@ -829,6 +829,34 @@ static int affinity_bit_to_unix_cpu( const struct wine_cpu_topology *topo, unsig
  * this machine.  set_process_affinity() uses it to refuse a mask no thread
  * could honour; see the comment there for why that check lives there and not
  * in the per-thread loop. */
+/* -> nonzero if this mask places no restriction at all.
+ *
+ * THE DEFAULT HAS TO MEAN THE WHOLE MACHINE, and on a multi-group machine it
+ * cannot say so bit by bit.  server/process.c initialises every process to
+ * ~0 and every thread inherits it, so ~0 is what "the application never asked
+ * for an affinity" looks like by the time it reaches here -- and an affinity_t
+ * is 64 bits, which on this machine can name only group 0's forty processors.
+ * Translating ~0 bit by bit would therefore CONFINE an application that never
+ * asked to be confined, to half the machine.
+ *
+ * [MEASURED] 2026-08-18, op4k, before any of this: a guest cmd.exe was
+ * runnable on 0-3,8-11,...,56-59 -- 32 of 80 processors -- because the old
+ * loop mapped bits 0-63 straight to Linux CPUs and the online set is sparse.
+ * The native shell that launched it had all 80.  Nothing asked for that; it
+ * was the default mask meeting a machine Wine could not describe.
+ *
+ * So an unrestricted mask is answered with every online processor, across
+ * every group.  That is also what Windows does with a process nobody has
+ * pinned: its threads are placed wherever the scheduler likes, and a process
+ * is free to have threads in more than one group.  An EXPLICIT mask still
+ * means group 0, because that is all the protocol can carry (see
+ * affinity_bit_to_unix_cpu); the difference is that not asking no longer
+ * costs you the machine. */
+static int affinity_is_unrestricted( affinity_t affinity )
+{
+    return affinity == ~(affinity_t)0;
+}
+
 int affinity_names_a_processor( affinity_t affinity )
 {
 #ifdef HAVE_SCHED_SETAFFINITY
@@ -872,7 +900,20 @@ int set_thread_affinity( struct thread *thread, affinity_t affinity )
         unsigned int i, named = 0;
 
         CPU_ZERO( &set );
-        for (i = 0; i < 8 * sizeof(affinity); i++)
+        if (affinity_is_unrestricted( affinity ) && !cpu_map_disabled())
+        {
+            /* Every processor the machine has, not just the ones a 64-bit
+             * mask could have named.  See affinity_is_unrestricted. */
+            for (i = 0; i < topo->count; i++)
+            {
+                int cpu = topo->to_unix[i];
+
+                if (cpu < 0 || cpu >= CPU_SETSIZE) continue;
+                CPU_SET( cpu, &set );
+                named++;
+            }
+        }
+        else for (i = 0; i < 8 * sizeof(affinity); i++)
         {
             int cpu;
 
@@ -931,12 +972,32 @@ affinity_t get_thread_affinity( struct thread *thread )
          * are ones that named a real processor on the way out, so a Linux CPU
          * with no Windows index simply has no bit to set. */
         if (!sched_getaffinity( thread->unix_tid, sizeof(set), &set ))
+        {
+            /* UNRESTRICTED IS REPORTED AS UNRESTRICTED, and this is not
+             * cosmetic.  server/process.c stores the FIRST process's affinity
+             * as whatever this returns, and every thread of every later
+             * process inherits it -- so describing a thread that can use the
+             * whole machine as "group 0 only" would confine everything that
+             * came after it to half the machine, permanently, without anything
+             * having asked.  This is the inverse of the unrestricted case in
+             * set_thread_affinity and has to exist for the same reason. */
+            unsigned int have = 0;
+
+            for (i = 0; i < topo->count; i++)
+            {
+                int cpu = topo->to_unix[i];
+
+                if (cpu >= 0 && cpu < CPU_SETSIZE && CPU_ISSET( cpu, &set )) have++;
+            }
+            if (topo->count && have == topo->count) return ~(affinity_t)0;
+
             for (i = 0; i < 8 * sizeof(mask); i++)
             {
                 int cpu = affinity_bit_to_unix_cpu( topo, i );
 
                 if (cpu >= 0 && CPU_ISSET( cpu, &set )) mask |= (affinity_t)1 << i;
             }
+        }
     }
 #endif
     /* Unreadable affinity, or a thread confined entirely to processors outside
