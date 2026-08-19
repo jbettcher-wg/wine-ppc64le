@@ -755,7 +755,7 @@ is a 176-thread AC922. Note that `ninja` — used by some subprojects — does
 core-count+2 jobs and is bounded by RAM rather than cores.
 
 To play a Steam game with what you have just built, follow
-`PLAYING-GAMES.md` from section 3.
+`PLAYING-GAMES.md` from section 4.
 
 Then run programs straight out of the build directory, as with upstream Wine:
 

@@ -36,7 +36,50 @@ this port has anything to attach to.
 
 ---
 
-## 2. Build the port
+## 2. One command that tells you where you stand
+
+Once the tree is built (next section), this reads your whole Steam library and
+this machine, and says what will happen to each title — without launching
+anything:
+
+```sh
+python3 ppc64le/corpus/library_sweep.py --audit
+```
+
+```
+This build: i386 lane present, bridge is 32-bit-capable, page size 4096
+Steam root: /home/you/.local/share/Steam
+  library:  /mnt/games
+  library:  /mnt/other/SteamLibrary  -- NOT MOUNTED, its games cannot be inspected
+  10 installed title(s), 9 Valve tool(s)/runtime(s) skipped
+
+APPID    TITLE                       VERDICT          WHY
+379720   DOOM                        MISSING EXPORTS  4 import(s) bind to a sentinel; fatal only if called
+2005010  Warhammer 40,000: Boltgun   MISSING EXPORTS  109 import(s) ... ; ships a prerequisite installer
+620      Portal 2                    32-BIT           runs through the WoW64 lane; this setup has it
+```
+
+It checks the three things about your setup that silently break everything
+(page size, the i386 lane, a 32-bit-capable bridge), then per title: whether it
+ships kernel anti-cheat, whether its binaries are 32-bit, whether it ships a
+prerequisite installer, and — with `--audit` — whether its imports would bind
+against this tree at all.  The verdicts mean:
+
+| verdict | meaning |
+|---|---|
+| `READY` | nothing static is in the way.  Not a promise; a launch is still the test. |
+| `MISSING EXPORTS` | some imports bind to a sentinel.  Fatal only if the game calls one — several titles run fine with hundreds. |
+| `WILL NOT LOAD` | a whole DLL has no guest thunk.  The process dies in the loader before its own code runs; this one is worth reporting. |
+| `32-BIT` / `32-BIT: BLOCKED` | goes through the WoW64 lane; blocked says which half of the setup is missing. |
+| `ANTI-CHEAT` | kernel anti-cheat.  It will not work here. |
+| `NOT-ON-DISK`, `NO WINDOWS EXE` | Steam has a manifest but no files, or the install is a native Linux build. |
+
+Titles you own but have not installed are not listed — Steam keeps those in a
+binary cache and their files are not on disk.  Install one and re-run.
+
+---
+
+## 3. Build the port
 
 On the ppc64le machine.  There is no cross-build path.
 
@@ -61,7 +104,7 @@ You do not need to `make install`.  Everything below runs the tree in place.
 
 ---
 
-## 3. Build the emulator bridge
+## 4. Build the emulator bridge
 
 The port loads a bridge library, `libfexbridge.so`, to execute the guest's
 x86-64 code.  It comes from the [fastppcx86](https://github.com/daedalao/fastppcx86)
@@ -101,7 +144,7 @@ The compatibility tool finds a bridge by itself, in this order: whatever
 
 ---
 
-## 4. Install the compatibility tool
+## 5. Install the compatibility tool
 
 ```sh
 ./ppc64le/steamtool/install.sh
@@ -122,7 +165,7 @@ Then, because **Steam only scans `compatibilitytools.d` at startup**:
 
 ---
 
-## 5. Press Play
+## 6. Press Play
 
 The first launch of a game creates its prefix and runs `wineboot`, which takes
 a minute or two and looks like nothing is happening.  Later launches skip it.
@@ -152,7 +195,7 @@ Proton prefix for the same game is safe.
 
 ---
 
-## 6. Per-game settings
+## 7. Per-game settings
 
 Two ways, and they compose: a launch option wins over the file.
 
@@ -214,6 +257,15 @@ say so:
 [wine-ppc64le-native] NUMA: numactl --cpunodebind=0 --membind=0
 ```
 
+**SMT width.**  Changing SMT (`ppc64_cpu --smt=2`) needs nothing from this
+port: the topology is derived from the kernel's *online* CPU set, sparse
+numbering and all, and the derivation is gated against every width the machine
+supports — at SMT2 a 2×10 POWER8 comes out as 40 processors in one group,
+because a second processor group only appears above 64.  Two things follow.
+The topology is read when a process starts, so restart a game after changing
+SMT rather than expecting it to notice.  And one group is not one node: the
+NUMA lever above still applies at any width.
+
 To see what you got, with the game running:
 
 ```sh
@@ -242,7 +294,30 @@ the .NET 4 detection keys and the installer skips the stage.  That is a claim
 made to installers, not an implementation: managed code still will not run, and
 a game that genuinely executes .NET assemblies needs wine-mono in its prefix.
 
-## 7. Before running a title for the first time
+### Running a game that Steam is not launching
+
+A GOG copy, a title under test, or an A/B against Proton wants the same setup
+Steam's tool builds, so there is one script that fills in what Steam would have
+set and calls the same tool:
+
+```sh
+ppc64le/steamtool/run-native --name cp2077 --appid 1091500 \
+    "/games/Cyberpunk 2077/bin/x64/Cyberpunk2077.exe" -skipStartScreen
+```
+
+`--prefix DIR` picks the prefix explicitly; otherwise it is
+`$WINE_PPC64LE_COMPAT_ROOT/<name>`, defaulting to
+`~/.local/share/wine-ppc64le/<name>`.  **One prefix per title, never shared** —
+a prefix carries per-game overrides, installed redistributables and registry
+state.  Pass `--appid` for a Steam title you are launching by hand: Steamworks
+reads it, per-title settings in `appconfig/<appid>.env` are keyed to it, and
+the Steam bridge helper needs it to reach a running client.
+
+Every knob in the table above works here too, because the script only sets
+environment and execs — so an A/B against an emulated Proton launcher is a
+matter of calling one or the other with the same variables.
+
+## 8. Before running a title for the first time
 
 Most first failures are decidable without running anything, because an import
 table and an export table are both just tables.  Point the static audit at the
@@ -261,7 +336,7 @@ minutes.
 
 ---
 
-## 8. When it does not work
+## 9. When it does not work
 
 The port's own `err:` lines in the tool log are the instrument.  Read those
 first — and specifically **do not trust `winedbg` or the game's own crash
@@ -290,7 +365,7 @@ Two rules that will save you a bad evening:
 
 ---
 
-## 9. What actually runs today
+## 10. What actually runs today
 
 `ppc64le/corpus/CATALOG.md` is the honest status board: every Windows game
 tested here, in the order each one hits its wall, with what was fixed and what
@@ -304,7 +379,7 @@ Known-not-working classes, so you do not waste an evening:
 * Titles whose DRM prologue depends on Windows-only behaviour beyond the
   SteamStub family have not been surveyed.
 
-## 10. Reporting something
+## 11. Reporting something
 
 The useful bug report for this port is small: the tool log (it is a few
 thousand lines, not a trace), the output of the import audit for the title, and

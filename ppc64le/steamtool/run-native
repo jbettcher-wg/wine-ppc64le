@@ -1,0 +1,100 @@
+#!/bin/sh
+#
+# run-native -- run a Windows game with this port WITHOUT Steam.
+#
+#   run-native [options] /path/to/Game.exe [args...]
+#
+#     --prefix DIR   the Wine prefix to use or create (default: see below)
+#     --name SHORT   a short name for the prefix directory
+#     --appid N      the Steam appid, if the title has one
+#     --list         print what the defaults would be and exit
+#
+# WHY THIS EXISTS.  Everything the compatibility tool does -- picking a bridge,
+# stripping another Wine's environment, making or adopting a prefix, staging
+# runtimes, starting the Steam bridge helper -- has nothing to do with Steam
+# being the thing that launched it.  A GOG copy, a game under test, or an A/B
+# against Proton wants exactly the same setup.  So this fills in the two
+# variables Steam would have set and calls the same script; there is no second
+# implementation to keep in step.
+#
+# PREFIXES.  One per title, never shared: a prefix carries per-game overrides,
+# installed redistributables and registry state, and sharing one between titles
+# is how you end up with a prefix nothing runs in.  The default root is
+# $WINE_PPC64LE_COMPAT_ROOT, or ~/.local/share/wine-ppc64le if that is unset,
+# with a directory named after --name, --appid, or the executable.
+#
+# THE APPID MATTERS even outside Steam.  A game that uses Steamworks reads it,
+# per-title settings in appconfig/<appid>.env are keyed to it, and the bridge
+# helper needs it to talk to a running client.  Pass --appid for a Steam title
+# you are launching by hand; leave it off for one that has none.
+#
+# Every knob the tool documents works here too -- WINE_PPC64LE_NUMA_NODE,
+# WINE_PPC64LE_RUN_EXE, WINEDEBUG, MANGOHUD -- because this only sets
+# environment and execs.
+set -u
+
+self=$(cd "$(dirname "$0")" && pwd)
+prefix=
+name=
+appid=
+list=0
+
+while [ $# -gt 0 ]; do
+    case $1 in
+    --prefix) prefix=${2:?--prefix needs a directory}; shift 2 ;;
+    --name)   name=${2:?--name needs a value}; shift 2 ;;
+    --appid)  appid=${2:?--appid needs a number}; shift 2 ;;
+    --list)   list=1; shift ;;
+    --help|-h) sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --)       shift; break ;;
+    -*)       echo "run-native: unknown option $1" >&2; exit 2 ;;
+    *)        break ;;
+    esac
+done
+
+exe=${1:-}
+if [ -z "$exe" ] && [ $list -eq 0 ]; then
+    echo "usage: run-native [--prefix DIR] [--name SHORT] [--appid N] Game.exe [args...]" >&2
+    exit 2
+fi
+[ $# -gt 0 ] && shift
+
+if [ -n "$exe" ] && [ ! -f "$exe" ]; then
+    echo "run-native: no such file: $exe" >&2
+    exit 2
+fi
+
+# The prefix directory has the same SHAPE Steam's compatdata does -- the tool
+# puts its prefix and its logs inside it -- so a title launched here and the
+# same title launched from Steam behave identically.
+root=${WINE_PPC64LE_COMPAT_ROOT:-$HOME/.local/share/wine-ppc64le}
+if [ -z "$prefix" ]; then
+    if [ -n "$name" ]; then dir=$name
+    elif [ -n "$appid" ]; then dir=$appid
+    else dir=$(basename "${exe%.*}" | tr ' ' '_')
+    fi
+    prefix=$root/$dir
+fi
+
+if [ $list -eq 1 ]; then
+    echo "tool:    $self/proton"
+    echo "root:    $root"
+    echo "prefix:  ${prefix:-<from the exe name>}"
+    echo "appid:   ${appid:-<none>}"
+    exit 0
+fi
+
+mkdir -p "$prefix" || { echo "run-native: cannot create $prefix" >&2; exit 1; }
+
+STEAM_COMPAT_DATA_PATH=$prefix
+export STEAM_COMPAT_DATA_PATH
+if [ -n "$appid" ]; then
+    SteamAppId=$appid; SteamGameId=$appid
+    export SteamAppId SteamGameId
+fi
+
+echo "run-native: prefix $prefix" >&2
+# waitforexitandrun rather than run: it is the verb Steam launches a GAME with,
+# so per-title settings apply and the game's own dialogs are left alone, and it
+# waits for the wineserver on the way out.
+exec "$self/proton" waitforexitandrun "$exe" "$@"
