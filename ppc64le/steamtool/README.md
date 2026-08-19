@@ -66,7 +66,7 @@ mid-session, unbound: 38 threads on node 0 and 35 on node 8, 3.5 GB split
 2.1/1.4. Bound to node 0: 74 threads and 2.0 GB of 2.0 GB on that node.
 
 Whether it helps is a per-title, per-machine question — two nodes is twice the
-bandwidth, but this port's ceiling is latency-bound and op4k's remote distance
+bandwidth, but this port's ceiling is latency-bound and the test machine's remote distance
 is 40 against a local 10 — so it is a lever with no default, set per game in
 `appconfig/<appid>.env`.
 

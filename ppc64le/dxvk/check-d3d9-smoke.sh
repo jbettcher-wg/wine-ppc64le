@@ -19,7 +19,7 @@
 # HWND it is passed, whether the application ever presents or not, and DXVK
 # builds its Presenter (and its VkSurfaceKHR) inside CreateDevice.
 #
-# [MEASURED] 2026-08-17, op4k: with `DXVK_WSI_DRIVER=Headless` and no display
+# [MEASURED] 2026-08-17, the test machine: with `DXVK_WSI_DRIVER=Headless` and no display
 # variables at all, CreateDevice returns 0x8876086A (D3DERR_NOTAVAILABLE) and
 # DXVK says `Foreign WSI: headless driver cannot create a surface` followed by
 # `Presenter: Failed to create Vulkan surface`.  With

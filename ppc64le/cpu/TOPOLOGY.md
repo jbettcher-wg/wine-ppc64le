@@ -148,7 +148,7 @@ again automatically once the field exists.
 - Linux CPU numbers ≥ `CPU_SETSIZE` (1024) are dropped.
 - `QueryIdleProcessorCycleTimeEx` accepts only group 0 and returns whole-machine
   entries.
-- Idle-cycle *values* are unverified: op4k has no `cpufreq/base_frequency`, so
+- Idle-cycle *values* are unverified: the test machine has no `cpufreq/base_frequency`, so
   `tsc_from_jiffies` is zero. Only the call's length is checked.
 - The hwloc/FreeBSD path in `system.c` swaps the arguments to
   `logical_proc_info_add_numa_node()`. Not touched; not reachable on Linux.

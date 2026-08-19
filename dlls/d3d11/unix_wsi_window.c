@@ -9,7 +9,7 @@
  * belongs to somebody else.  True for the foreign-X11 backend, which is handed
  * a raw XID owned by another process.  FALSE for the Win32u backend, whose
  * window is a Wine HWND that Wine created and can move.  [MEASURED] 2026-08-18,
- * op4k: IDXGISwapChain::SetFullscreenState(TRUE) returned S_OK,
+ * the test machine: IDXGISwapChain::SetFullscreenState(TRUE) returned S_OK,
  * GetFullscreenState agreed, GetSystemMetrics reported the whole screen, and
  * the rectangle on screen was still the 192x144 the window had been resized to.
  *

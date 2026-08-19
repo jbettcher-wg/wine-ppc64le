@@ -44,7 +44,7 @@
 #      implementations rather than one served twice.  So this is run rather
 #      than argued -- and it is also the only leg here that reaches real
 #      hardware, because an Xvfb has no DRI3 and its GL is llvmpipe.
-#      [MEASURED] 2026-08-18, op4k: X11 leg renderer "llvmpipe", Wayland leg
+#      [MEASURED] 2026-08-18, the test machine: X11 leg renderer "llvmpipe", Wayland leg
 #      "Radeon Pro V620", both 15/15, both byte-identical native-vs-guest.
 #      A layer re-runs the guest leg at trace+waylanddrv and requires the
 #      driver's own trace, so a leg that quietly ran on X11 cannot pass.
@@ -226,7 +226,7 @@ untouched"
 # the same reasons -- it is MORE isolated than an Xvfb, not less.
 #
 # It is also the only leg here that reaches real hardware.  [MEASURED]
-# 2026-08-18, op4k: the Xvfb leg has no DRI3, so its GL is llvmpipe; the weston
+# 2026-08-18, the test machine: the Xvfb leg has no DRI3, so its GL is llvmpipe; the weston
 # leg imports on the same GPU the compositor is running on and reports
 # "Radeon Pro V620 ... Mesa 26.1.2".  The two legs therefore exercise two
 # drivers AND two GL implementations, which is why leg F2 compares native
@@ -601,7 +601,7 @@ if [ "$WL_LEG" = 1 ]; then
     #     but no driver could be loaded.
     #   err:winediag:nodrv_CreateWindow L"The explorer process failed to start."
     #
-    # [MEASURED] 2026-08-18, op4k: identical binary, identical environment,
+    # [MEASURED] 2026-08-18, the test machine: identical binary, identical environment,
     # 15/15 in a session of its own and 1/2 in a session the X11 legs had
     # already started.  It is not a defect in either driver -- the desktop
     # window is per session and it has one owner -- but it is a fact anyone

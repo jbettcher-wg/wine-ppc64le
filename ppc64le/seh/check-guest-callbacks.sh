@@ -415,7 +415,7 @@ fi
 # WM_NCCREATE/WM_CREATE for a message-only window on this port, and
 # depth_bytes= (step 18) depends on this clang's exact per-frame call
 # overhead at -O1 for gc_recurse.  Both were confirmed byte-for-byte
-# reproducible across repeated runs on op4k before being pinned here; a
+# reproducible across repeated runs on the test machine before being pinned here; a
 # change to either is worth noticing (a different message sequence, a
 # different compiler), which is the entire reason this diffs byte for byte
 # instead of only pattern-matching.

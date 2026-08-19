@@ -406,7 +406,7 @@ static void do_pin(void)
 
     /* The process affinity mask, reported here and not only in report mode,
      * because it is what DECIDES whether the call below is refused: a thread
-     * mask has to be a subset of it.  [MEASURED] 2026-08-18, op4k: it comes
+     * mask has to be a subset of it.  [MEASURED] 2026-08-18, the test machine: it comes
      * back as 0x0f0f0f0f0f0f0f0f -- the online Linux CPUs below 64 -- so bits
      * naming offline CPUs are clear and a guest asking for them is refused,
      * while a bit naming an online CPU past the end of its own group is

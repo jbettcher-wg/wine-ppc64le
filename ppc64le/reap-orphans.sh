@@ -13,7 +13,7 @@
 # WHY THIS EXISTS.  A Wine session leaves service processes behind -- services,
 # winedevice, svchost, plugplay, rpcss, explorer -- and when its wineserver goes
 # away they are reparented to init and never exit.  They do not go quietly
-# either: [MEASURED] 2026-08-18, op4k, after a day of gate suites and agent
+# either: [MEASURED] 2026-08-18, the test machine, after a day of gate suites and agent
 # runs, 54 orphaned winedevice.exe were resident, each having accumulated close
 # to a full core of CPU time, on a machine with 80.  Another 72 orphaned
 # svchost/plugplay processes sat idle alongside them.  Load average 16 with

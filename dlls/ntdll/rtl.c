@@ -1396,7 +1396,7 @@ void WINAPI RtlGetCurrentProcessorNumberEx(PROCESSOR_NUMBER *processor)
      * value straight into Number.  Both halves are wrong once a second group
      * exists: the group is not always 0, and Number is defined as the index
      * WITHIN the group, not the machine-wide one.  [MEASURED] 2026-08-18,
-     * op4k (80 processors, 2 groups of 40): running on Linux CPU 155 -- which
+     * the test machine (80 processors, 2 groups of 40): running on Linux CPU 155 -- which
      * is Windows processor 79, group 1, index 39 -- it reported {group 0,
      * number 79}, naming a processor group 0 does not have.  A guest that
      * trusts the group cannot then address the processor it is on.

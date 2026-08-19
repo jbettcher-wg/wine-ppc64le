@@ -22,4 +22,4 @@ FROM-SPEC auto
 # never starting.  The same macro-rename hides ten of wldap32's exports; it is
 # a gap in the signature oracle (it resolves an export name, not the
 # declaration a header redirects that name to) and is recorded as such in
-# ppc64le/corpus/CATALOG.md rather than papered over here.
+# ppc64le/games/STATUS.md rather than papered over here.

@@ -1690,7 +1690,7 @@ static void set_process_affinity( struct process *process, affinity_t affinity )
      *
      * This is reachable even though ntdll screens the mask first, because ntdll
      * screens against the system processor COUNT while the server can only name
-     * the processors in group 0.  [MEASURED] 2026-08-18, op4k: 80 processors in
+     * the processors in group 0.  [MEASURED] 2026-08-18, the test machine: 80 processors in
      * two groups of 40, so bits 40-79 pass ntdll and name nothing here. */
     if (!affinity_names_a_processor( affinity ))
     {

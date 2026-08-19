@@ -13,7 +13,7 @@
 # it is a PE with a fixed image base.  Here ntdll's PE side is the one module
 # that cannot be a PE (its TEB lives in an initial-exec __thread), so it is an
 # ELF builtin and the dynamic linker puts it wherever it likes.  [MEASURED]
-# 2026-08-18, op4k: three concurrent processes of the same binary mapped
+# 2026-08-18, the test machine: three concurrent processes of the same binary mapped
 # dlls/ntdll/ntdll.dll.so at 0x3fff881ed000, 0x3fffb9a1d000 and 0x3fff91a0d000.
 # So the address handed across named nothing in the target, the port's
 # thread-start classifier said exactly that --

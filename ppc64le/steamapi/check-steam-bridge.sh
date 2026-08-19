@@ -79,7 +79,7 @@
 #      never take the process down.
 #
 #   5b LIVE CLIENT (only if one is already running): SteamAppId 480 --
-#      Spacewar, the SDK's own test appid, deliberately NOT the corpus game's,
+#      Spacewar, the SDK's own test appid, deliberately NOT the game list game's,
 #      because using a real appid would flip the account's presence to
 #      "playing" it.  A pipe, a user on it, and then the same callback channel
 #      as layer 6 with nothing injected: the callbacks are the client's own,
@@ -479,7 +479,7 @@ if [ "$STEAM_UP" = 0 ]; then
     say "layer 5b: SKIPPED (no client running; this gate never starts one)"
 else
     say "layer 5b: a Steam client is running -- appid 480 (Spacewar)"
-    # Spacewar is the SDK's own test appid.  The corpus game's appid is
+    # Spacewar is the SDK's own test appid.  The game list game's appid is
     # deliberately NOT used: it would publish "playing" to the account.
     cleanup
     SteamAppId=480 SteamGameId=480 start_helper || \

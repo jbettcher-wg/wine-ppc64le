@@ -744,7 +744,7 @@ NTSTATUS WINAPI DbgUiConvertStateChangeStructure( DBGUI_WAIT_STATE_CHANGE *state
  * cannot be a PE at all -- its TEB lives in an initial-exec __thread and a PE
  * image has nowhere to put a static TLS block, so it is built as an ELF
  * builtin (configure.ac's SO_BUILTIN_SUBDIRS) and the system dynamic linker
- * chooses where to put it.  [MEASURED] 2026-08-18, op4k: three concurrent
+ * chooses where to put it.  [MEASURED] 2026-08-18, the test machine: three concurrent
  * processes of the same binary mapped dlls/ntdll/ntdll.dll.so at
  * 0x3fff881ed000, 0x3fffb9a1d000 and 0x3fff91a0d000.  So the address handed
  * across is an address in the DEBUGGER, pointing at nothing in particular in

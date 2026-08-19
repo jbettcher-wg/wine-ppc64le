@@ -7,7 +7,7 @@
 #
 # The thing being tested is a NUMBER, not a status code.  wineserver used to map
 # Windows processor i onto Linux CPU i, which is true on x86 by accident and
-# false on POWER: [MEASURED] 2026-08-18, op4k, the online CPUs are
+# false on POWER: [MEASURED] 2026-08-18, the test machine, the online CPUs are
 # 0-3,8-11,...,152-155, so a guest asking for eight processors named Linux CPUs
 # 0-7 of which four are offline.  At the raw syscall level sched_setaffinity
 # returns SUCCESS for that and the thread runs on four.  Through the whole Win32

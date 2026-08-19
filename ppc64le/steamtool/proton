@@ -354,7 +354,7 @@ fi
 # The answer is the one dlls/msvcp140 already takes: run a REAL x86-64
 # msvcp100.dll as a guest module under the emulator.  A copy is on this disk if
 # the user provisioned a Proton prefix for the app, and -- this is the
-# correction to what ppc64le/corpus/CATALOG.md handoff #4 assumed -- that file
+# correction to what ppc64le/games/STATUS.md handoff #4 assumed -- that file
 # is not Microsoft's.  Measured: 1,747,524 bytes, machine 0x8664, and the
 # string "Wine builtin DLL" in its DOS stub, with 1628 exports.  It is WINE'S
 # OWN msvcp100 built for x86-64 by Proton.  That is better rather than worse:
@@ -759,7 +759,7 @@ esac
 
 # -------------------------------------------------------------------- numa --
 #
-# WHICH NUMA NODE THE GAME RUNS ON.  op4k is two nodes (0 and 8) whose `node
+# WHICH NUMA NODE THE GAME RUNS ON.  the test machine is two nodes (0 and 8) whose `node
 # distances` are 10 local and 40 remote, so a remote line costs about four
 # times a local one.  A guest process on this port is deliberately NOT
 # confined: ppc64le/cpu/TOPOLOGY.md's rule is that an unrestricted affinity

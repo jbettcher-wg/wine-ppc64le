@@ -3,7 +3,7 @@
 # check-guest-ntdll-seed.sh -- the guest ntdll namespace-seed gate.
 #
 # CATALOG.md's Skyrim Special Edition entry and Handoff #1 root-cause the
-# wall every SteamStub v3.1-wrapped title in this corpus hits at its own
+# wall every SteamStub v3.1-wrapped title in this game list hits at its own
 # entry point: the anti-debug prologue calls
 #
 #     h  = GetModuleHandleA("ntdll.dll");
@@ -20,7 +20,7 @@
 # ntdll.dll once at guest-process bringup, before any guest instruction runs
 # -- GetModuleHandle itself still never loads anything.
 #
-# ppc64le/corpus/ntdll_seed_probe.c carries the full defect/fix writeup and
+# ppc64le/games/ntdll_seed_probe.c carries the full defect/fix writeup and
 # is built TWICE from one source:
 #
 #   checked   verifies each return value before using it; never crashes on
@@ -177,7 +177,7 @@ $GUESTLD -o "$OUT/probe_blind.exe" "$OUT/probe_blind.o" "$OUT/libkernel32guest.a
 # still reach stderr.  +seh (not err+seh) is deliberate: handle_syscall_fault's
 # info[0]/info[1]/addr breakdown the sabotage layer keys on is logged at
 # TRACE, not ERR, so a plain "+seh" (all classes for the channel) is what
-# actually surfaces it -- measured against a real corpus log, not assumed.
+# actually surfaces it -- measured against a real game list log, not assumed.
 # +module is the seed itself: dlls/ntdll/loader.c declares
 # WINE_DEFAULT_DEBUG_CHANNEL(module), so the WINEEMUNOGUESTNTDLLSEED WARN and
 # the seed-failure ERR both live there, not under seh.

@@ -100,7 +100,7 @@ fi
 # link rule for the versioned library, so `ninja src/d3d11/libdxvk_d3d11.so`
 # names a file with no rule -- which ninja treats as a SOURCE, not a target.
 #
-# [MEASURED] 2026-08-17, op4k.  With a new file added to src/wsi and build.ninja
+# [MEASURED] 2026-08-17, the test machine.  With a new file added to src/wsi and build.ninja
 # correctly regenerated to compile it, `ninja src/dxgi/libdxvk_dxgi.so
 # src/d3d11/libdxvk_d3d11.so src/d3d10/libdxvk_d3d10core.so` printed "ninja: no
 # work to do" and exited zero, twice, while `ninja src/wsi/libwsi.a` on the same

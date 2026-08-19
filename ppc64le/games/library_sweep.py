@@ -31,7 +31,7 @@ Titles you own but have not installed: Steam keeps those in a binary
 inspect.  They are counted, not judged.  Install one and re-run.
 
 A verdict here is a statement about STATIC facts, not a promise.  A title with
-nothing to report can still hit a runtime gap -- that is what the corpus
+nothing to report can still hit a runtime gap -- that is what the game list
 catalogue records, and what a launch is for.
 """
 

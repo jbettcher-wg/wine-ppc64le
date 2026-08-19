@@ -171,7 +171,7 @@ _malloc_crt                   0x0000A110  1  int   msvcr100.spec:1243
 # nothing back, no `this`, no EH state, no language runtime.  What refused them
 # is the signature oracle, which resolves a NAME against the translation unit
 # it compiles and finds no header declaring `??2@YAPEAX_K@Z` -- a tooling gap,
-# exactly the class ppc64le/corpus/CATALOG.md's psapi/wldap32 handoff names,
+# exactly the class ppc64le/games/STATUS.md's psapi/wldap32 handoff names,
 # and not an ABI fact.  msvcr100.spec declares all four with their arity and
 # their implementation, so the .spec location column is the documented
 # downgrade for precisely this: the <int|void> column becomes a human
@@ -189,7 +189,7 @@ _malloc_crt                   0x0000A110  1  int   msvcr100.spec:1243
 #   guest called through a wild pointer: 00000000DEAD000B ... from
 #     L"wxmsw28u_vc_custom_64.dll"+5d580
 #
-# operator new, called from wxWidgets' PROCESS_ATTACH.  ppc64le/corpus/CATALOG.md
+# operator new, called from wxWidgets' PROCESS_ATTACH.  ppc64le/games/STATUS.md
 # read that same 0xDEAD000B as msvcp100's; the sentinel numbering is per
 # IMPORTING module, so the index says nothing about which DLL owns the name.
 #
@@ -199,7 +199,7 @@ _malloc_crt                   0x0000A110  1  int   msvcr100.spec:1243
 # exactly as vcruntime140.__CxxFrameHandler3 is a documented hole in
 # ppc64le/thunks/check-import-chain.sh.  _HUGE and _encoded_null are `@ extern`
 # DATA exports, and a trap stub cannot serve data -- there is no call to trap
-# on -- which is the design item ppc64le/corpus/CATALOG.md already records.
+# on -- which is the design item ppc64le/games/STATUS.md already records.
 ??2@YAPEAX_K@Z    0x00000C01  1  int   msvcr100.spec:297
 ??_U@YAPEAX_K@Z   0x00000C02  1  int   msvcr100.spec:347
 ??3@YAXPEAX@Z     0x00000C03  1  void  msvcr100.spec:301

@@ -43,7 +43,7 @@ this machine, and says what will happen to each title — without launching
 anything:
 
 ```sh
-python3 ppc64le/corpus/library_sweep.py --audit
+python3 ppc64le/games/library_sweep.py --audit
 ```
 
 ```
@@ -367,7 +367,7 @@ Two rules that will save you a bad evening:
 
 ## 10. What actually runs today
 
-`ppc64le/corpus/CATALOG.md` is the honest status board: every Windows game
+`ppc64le/games/STATUS.md` is the honest status board: every Windows game
 tested here, in the order each one hits its wall, with what was fixed and what
 is still open.  Read it before assuming a title should work.
 

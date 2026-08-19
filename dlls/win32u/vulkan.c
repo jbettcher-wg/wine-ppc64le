@@ -3169,7 +3169,7 @@ static const struct vulkan_driver_funcs lazydrv_funcs =
  * consumed by the first run.  Every lazydrv_* entry point is
  * "vulkan_driver_load(); return driver_funcs->p_same_thing()", so once
  * driver_funcs points at lazydrv with the load already done, each of them calls
- * ITSELF.  [MEASURED] 2026-08-18, op4k: a guest that changed the display mode
+ * ITSELF.  [MEASURED] 2026-08-18, the test machine: a guest that changed the display mode
  * and then created a D3D11 swapchain died with 5.8 MB of core and a stack made
  * entirely of lazydrv_map_instance_extensions frames -- SIGSEGV on the stdu
  * that pushes the frame, which is stack exhaustion, not a bad pointer.

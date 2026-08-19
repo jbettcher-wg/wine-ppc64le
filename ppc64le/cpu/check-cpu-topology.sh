@@ -12,7 +12,7 @@
 # the scheduler does.
 #
 # WHY THIS GATE EXISTS.  There was none, and its absence is why the following
-# survived.  [MEASURED] 2026-08-18, op4k, a POWER8 with 80 online CPUs:
+# survived.  [MEASURED] 2026-08-18, the test machine, a POWER8 with 80 online CPUs:
 #
 #   GetSystemInfo().dwNumberOfProcessors        80
 #   GetActiveProcessorCount(ALL_PROCESSOR_...)  32     <- disagrees by 2.5x
@@ -32,7 +32,7 @@
 #
 # THROUGH WIN32 THE SAME DEFECT WEARS THE OPPOSITE FACE, AND THAT IS WHY THE
 # RETURN VALUE IS WORSE THAN USELESS HERE.  The process affinity mask is built
-# over ONLINE LINUX CPU NUMBERS BELOW 64.  [MEASURED] 2026-08-18, op4k:
+# over ONLINE LINUX CPU NUMBERS BELOW 64.  [MEASURED] 2026-08-18, the test machine:
 # GetProcessAffinityMask returned 0x0f0f0f0f0f0f0f0f -- 32 bits, at 0-3, 8-11,
 # ... 56-59, which is exactly the online CPUs below 64 and nothing else.  Two
 # things follow from that one mask, and both were measured:
@@ -624,7 +624,7 @@ fi
 # getting this wrong fails silently in the worst direction: a detector that
 # cannot see a lever that IS there reports it MISSING forever, the control is
 # never run, and nobody notices because the message looks like a to-do rather
-# than a bug.  [MEASURED] 2026-08-18, op4k: this port's existing levers are WIDE
+# than a bug.  [MEASURED] 2026-08-18, the test machine: this port's existing levers are WIDE
 # string literals -- emu_env_flag( L"WINEEMUNORIPCACHE" ) in
 # dlls/ntdll/signal_ppc64.c -- and land in dlls/ntdll/ntdll.dll.so as UTF-16LE,
 # where a plain `strings` over ntdll.so finds nothing at all.  The unix-side

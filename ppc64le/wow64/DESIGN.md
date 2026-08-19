@@ -72,7 +72,7 @@ design on aarch64 with FEX as the CPU.  This port's host arch is different;
 the shape is not.
 
 What (a) costs: cross-compiling the i386 PE DLL set with clang (upstream's
-`--enable-archs` machinery; op4k has clang/lld/llvm-dlltool), a ppc64 arm for
+`--enable-archs` machinery; the test machine has clang/lld/llvm-dlltool), a ppc64 arm for
 three asm functions in `wow64/syscall.c`, one new CPU backend, and a small
 extension to the emulator bridge.  Each is itemized below.
 
@@ -154,7 +154,7 @@ marshalling anywhere in this design.  That absence *is* the design.
 **FEXCore decodes and runs 32-bit mode on this backend today.**  Verified by
 execution before anything was designed: a static i386 ELF making `int $0x80`
 write/exit syscalls runs correctly under the binfmt-registered FEX from the
-smc build on op4k (prints, exits with the right code).  Decode mode is
+smc build on the test machine (prints, exits with the right code).  Decode mode is
 `Config.Is64BitMode`, consumed at Context construction
 (`ContextImpl::ContextImpl` clamps `VirtualMemSize` to 1<<32 in 32-bit mode)
 and by the tables/dispatcher; segments in 32-bit mode are IR-level —
@@ -427,7 +427,7 @@ The full lane as designed above is implemented and runs.  What landed:
   two sabotage levers (`WINEEMUNOWOW32`, `WINEEMUNOFSBASE32`), both proven to
   go red and name themselves.
 
-**Verification ladder reached — the top rung.**  On op4k, all green:
+**Verification ladder reached — the top rung.**  On the test machine, all green:
 * a PE32 is accepted by the server and loader (was refused);
 * a trivial 32-bit PE runs and exits with the right code (123 through
   `ExitProcess`);

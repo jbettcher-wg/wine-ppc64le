@@ -4892,7 +4892,7 @@ void loader_init( CONTEXT *context, void **entry )
          * a native ppc64 process has no guest namespace to seed. */
         if (RtlImageNtHeader( wm->ldr.DllBase )->FileHeader.Machine == IMAGE_FILE_MACHINE_AMD64)
         {
-            /* Negative-control knob for ppc64le/corpus/check-guest-ntdll-seed.sh's
+            /* Negative-control knob for ppc64le/games/check-guest-ntdll-seed.sh's
              * --sabotage run: WINEEMUNOGUESTNTDLLSEED=1 skips this seed entirely,
              * reproducing the pre-fix namespace exactly, so the gate can prove it
              * goes red where the unfixed port actually failed -- rather than red

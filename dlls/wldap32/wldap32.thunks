@@ -32,7 +32,7 @@ FROM-SPEC auto
 # different reason, which is what makes it a class rather than a quirk: the
 # oracle resolves an export NAME, and a header is entitled to declare that
 # name's implementation under another one.  It is a gap in the signature
-# oracle, not in this module, and ppc64le/corpus/CATALOG.md records it as
+# oracle, not in this module, and ppc64le/games/STATUS.md records it as
 # such rather than papering over it here.  Each of the ten keeps its ordinal
 # as a named sentinel, so a guest that CALLS one faults by name; Boltgun
 # imports them and, so far, calls none.

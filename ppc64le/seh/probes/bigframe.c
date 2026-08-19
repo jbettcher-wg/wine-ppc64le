@@ -10,7 +10,7 @@
  *
  * ---------------------------------------------------------------------------
  *
- * [MEASURED] 2026-08-18, DOOM (2016) on op4k: 120 access violations in a
+ * [MEASURED] 2026-08-18, DOOM (2016) on the test machine: 120 access violations in a
  * single run, all at ONE address, whose function begins
  *
  *     pushq %rbx

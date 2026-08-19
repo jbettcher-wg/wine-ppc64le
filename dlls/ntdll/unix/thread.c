@@ -2964,7 +2964,7 @@ ULONG WINAPI NtGetCurrentProcessorNumber(void)
         if (ntdll_no_cpu_map()) return res;
 
         /* sched_getcpu() returns the LINUX CPU number, and Linux does not
-         * number CPUs densely: [MEASURED] 2026-08-18, op4k (POWER8, SMT4)
+         * number CPUs densely: [MEASURED] 2026-08-18, the test machine (POWER8, SMT4)
          * returns up to 155 on a machine every other API reports as 80
          * processors, so a guest that sizes an array from the processor count
          * and indexes it with this value writes out of bounds.  Translate to

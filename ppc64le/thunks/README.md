@@ -83,7 +83,7 @@ the same way.
 | gate | covers |
 |---|---|
 | `check-rip-cache.sh` | Values across both crossing kinds, from four threads. 17 crossings per pass. Four sabotage legs. |
-| `check-import-chain.sh` | Every import of every corpus module resolves, or is a named hole. |
+| `check-import-chain.sh` | Every import of every tested game's modules resolves, or is a named hole. |
 | `check-optional-module.sh` | Modules reached only by `LoadLibrary` — invisible to import-table checking. |
 
 ## Levers

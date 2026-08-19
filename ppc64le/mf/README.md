@@ -296,7 +296,7 @@ and declared by no Wine header, so the signature oracle — which resolves a
 NAME against the translation unit it compiles — cannot type them. So does
 `MFCreateVideoMediaTypeFromVideoInfoHeader`, whose declaration sits behind
 `#ifdef _KSMEDIA_`. Each keeps its ordinal as a named sentinel. That is the
-same class as the `psapi`/`wldap32` renames in `ppc64le/corpus/CATALOG.md`: a
+same class as the `psapi`/`wldap32` renames in `ppc64le/games/STATUS.md`: a
 tooling gap, and the fix belongs in the oracle rather than in a `.thunks` file
 asserting a signature by hand.
 

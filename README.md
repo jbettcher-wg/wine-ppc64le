@@ -322,7 +322,7 @@ and each is worth naming because each will recur:
   puts the image back in charge, which is what the gate has to go red against;
 * a callback-taking API missing from the interception table is a `bctrl` into
   x86-64 bytes. Interception is at *registration*, so each API is a row, and
-  the rows follow what the corpus actually registers rather than API
+  the rows follow what the game list actually registers rather than API
   taxonomy: DOOM handing a `FONTENUMPROC` to `EnumFontFamiliesA` was one, and
   native `gdi32` called it once per font family. The next one could not be a
   row at all. A `WNDPROC` arrives *inside* a `WNDCLASS`, so there is no

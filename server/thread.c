@@ -778,7 +778,7 @@ static int cpu_map_disabled(void)
  * that processor actually is, or -1 if the bit names nothing on this machine.
  *
  * The two numbering schemes are not the same thing, and assuming they were is
- * what this function exists to stop.  [MEASURED] 2026-08-18, op4k (POWER8,
+ * what this function exists to stop.  [MEASURED] 2026-08-18, the test machine (POWER8,
  * SMT4-of-SMT8): the online CPUs are 0-3,8-11,16-19,...,152-155 -- four online
  * out of every eight slots.  A guest asking for eight processors with mask 0xFF
  * used to be handed Linux CPUs 0-7, of which 4-7 are offline, and
@@ -839,7 +839,7 @@ static int affinity_bit_to_unix_cpu( const struct wine_cpu_topology *topo, unsig
  * Translating ~0 bit by bit would therefore CONFINE an application that never
  * asked to be confined, to half the machine.
  *
- * [MEASURED] 2026-08-18, op4k, before any of this: a guest cmd.exe was
+ * [MEASURED] 2026-08-18, the test machine, before any of this: a guest cmd.exe was
  * runnable on 0-3,8-11,...,56-59 -- 32 of 80 processors -- because the old
  * loop mapped bits 0-63 straight to Linux CPUs and the online set is sparse.
  * The native shell that launched it had all 80.  Nothing asked for that; it
@@ -885,7 +885,7 @@ int affinity_names_a_processor( affinity_t affinity )
  * That is consistent with the client today, not a new hole: ntdll's
  * ThreadGroupInformation setter rejects a nonzero Group outright, so no
  * group != 0 request has ever reached here.  What it costs on a multi-group
- * machine is reach -- [MEASURED] 2026-08-18, op4k: group 0 is NUMA node 0
+ * machine is reach -- [MEASURED] 2026-08-18, the test machine: group 0 is NUMA node 0
  * (Linux CPUs 0-3,8-11,...,72-75) and group 1 is node 8 (Linux CPUs
  * 80-83,...,152-155), so 40 of this machine's 80 processors cannot be named by
  * a guest at all.  Closing that needs a protocol change, not a change here. */

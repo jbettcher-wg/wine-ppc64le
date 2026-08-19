@@ -1,4 +1,4 @@
-# The corpus
+# The game list
 
 Every Windows game installed on this machine, run against the port, with the
 walls each one names written down in the order it hits them.
@@ -415,7 +415,7 @@ proc-name argument `…DD60`. The `0x310` both entry RVAs end in is the stub
 header's `BindSectionOffset` field, not a coincidence.
 
 Two titles, one cause, and it will recur on **every Steam-DRM-wrapped title**
-in any corpus. That makes it the highest-value single item this pass produced.
+in any game list. That makes it the highest-value single item this pass produced.
 
 **Ruled out, with evidence, so nobody re-treads it:** TLS callbacks — Skyrim's
 TLS callback array at `0x141766000` has a zero first entry, i.e. no callbacks.
@@ -482,11 +482,11 @@ only two of them exist:
 | library | mounted |
 |---|---|
 | `~/.local/share/Steam` | yes |
-| `/mnt/caution` | yes — `/dev/nvme0n1p2`, the corpus above |
+| `/mnt/caution` | yes — `/dev/nvme0n1p2`, the game list above |
 | `/mnt/b26f28df-d4ab-4293-8de7-e8972421838f/SteamLibrary` | **the directory does not exist** |
 | `/mnt/11012365-648a-4956-a2da-c5ad6bab12ad/SteamLibrary` | **the directory does not exist** |
 
-[MEASURED] 2026-08-18, op4k: `findmnt` shows exactly three filesystems — `/`,
+[MEASURED] 2026-08-18, the test machine: `findmnt` shows exactly three filesystems — `/`,
 `/home` and `/mnt/caution`. `lsblk` shows `sdc` through `sdj` at **0 B**, which
 is what a SCSI slot with no disk in it reports. Neither library path is even a
 directory, so there is nothing to mount onto. There is no `appmanifest_2320.acf`

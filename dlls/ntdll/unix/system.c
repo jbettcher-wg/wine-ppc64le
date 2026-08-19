@@ -1203,7 +1203,7 @@ done:
  * Everything below works in WINDOWS processor indices, never raw Linux CPU
  * numbers.  The two are not the same thing: Windows numbers processors
  * densely, 0..N-1, in groups of at most 64, while Linux numbers CPUs however
- * the firmware enumerated them.  [MEASURED] 2026-08-18, op4k (POWER8, SMT4
+ * the firmware enumerated them.  [MEASURED] 2026-08-18, the test machine (POWER8, SMT4
  * out of an SMT8 part): 80 online CPUs numbered 0-3,8-11,...,152-155, NUMA
  * nodes 0 and 8.  The old code here walked that sysfs numbering directly
  * into single-ULONG_PTR masks and stopped at index 64, i.e. after 33 online
@@ -1522,7 +1522,7 @@ static NTSTATUS create_logical_proc_info(void)
 
     /* Pass 1: which physical package each Windows processor belongs to.
      * Packages are keyed by the kernel's physical_package_id ([MEASURED]
-     * 2026-08-18, op4k: 0 and 8, matching the node ids) and kept in order of
+     * 2026-08-18, the test machine: 0 and 8, matching the node ids) and kept in order of
      * first appearance, which is ascending Windows index. */
     for (w = 0; w < topo->count; w++)
     {
@@ -1608,7 +1608,7 @@ static NTSTATUS create_logical_proc_info(void)
                 if (!r) continue;
                 cache.Level = r;
 
-                /* [MEASURED] 2026-08-18, op4k: ways_of_associativity and
+                /* [MEASURED] 2026-08-18, the test machine: ways_of_associativity and
                  * coherency_line_size exist but are EMPTY for L2/L3, so a
                  * failed fscanf must leave the default alone rather than
                  * assign stale bytes (the old code assigned r unchecked). */
@@ -1656,7 +1656,7 @@ static NTSTATUS create_logical_proc_info(void)
     }
 
     /* NUMA nodes come straight from the topology.  The node ids are the
-     * KERNEL's ids, not a dense renumbering: [MEASURED] 2026-08-18, op4k has
+     * KERNEL's ids, not a dense renumbering: [MEASURED] 2026-08-18, the test machine has
      * nodes 0 and 8, and a guest walking GetNumaHighestNodeNumber must find
      * a node 8, not a node 1 that maps to nothing the kernel knows. */
     for (n = 0; n < topo->node_count; n++)
@@ -2030,7 +2030,7 @@ static void init_logical_proc_info(void)
             if (p->Relationship == RelationNumaNode || p->Relationship == RelationNumaNodeEx)
             {
                 /* NodeNumber is the KERNEL's node id and the kernel does not
-                 * number nodes densely: [MEASURED] 2026-08-18, op4k (POWER8)
+                 * number nodes densely: [MEASURED] 2026-08-18, the test machine (POWER8)
                  * has two nodes with ids 0 and 8.  So HighestNodeNumber is
                  * the highest ID, not count-1 (which said 1 while node 8's
                  * affinity sat unreachable at index 8), and an id past the
@@ -2105,7 +2105,7 @@ void init_cpu_info(void)
      * sysconf(_SC_NPROCESSORS_ONLN) both count the CPUs in
      * /sys/devices/system/cpu/online, but reading it twice through different
      * parsers is how GetSystemInfo and GetActiveProcessorCount came to
-     * disagree ([MEASURED] 2026-08-18, op4k: 80 vs 32).  Every group mask,
+     * disagree ([MEASURED] 2026-08-18, the test machine: 80 vs 32).  Every group mask,
      * NUMA record and per-CPU array below is sized from the topology, so the
      * processor count must be too.  This is also the first use of the
      * topology in this process: we are single-threaded here, which is the

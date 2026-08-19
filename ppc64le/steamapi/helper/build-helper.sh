@@ -13,7 +13,7 @@
 # compat tool.
 #
 # ---------------------------------------------------------------------------
-# WHAT THE HOST ACTUALLY HAS (measured on op4k, not assumed)
+# WHAT THE HOST ACTUALLY HAS (measured on the test machine, not assumed)
 #
 #   $ clang --version
 #   clang version 22.1.8 ... Target: powerpc64le-unknown-linux-gnu

@@ -1,6 +1,6 @@
 # AMD64 thunk export spec -- d3dcompiler_43.dll.
 #
-# From the 2026-08-17 corpus pass (ppc64le/corpus/CATALOG.md).  Two titles
+# From the 2026-08-17 corpus pass (ppc64le/games/STATUS.md).  Two titles
 # import this module STATICALLY and it had no guest thunk at all, so the
 # loader found the native ppc64 module and correctly refused to splice it into
 # a guest call: c000007b.  A plain (non-delay-load) import failure fails the

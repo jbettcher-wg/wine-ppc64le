@@ -12,7 +12,7 @@
  * a future d3d9 thunk must satisfy, in the same way d3d11_smoke.c's guest
  * half was presumably written before its own thunk existed, and it will
  * start proving the boundary the day that thunk links.  Only the NATIVE
- * half has been compiled, linked and RUN, on op4k, against the real DXVK
+ * half has been compiled, linked and RUN, on the test machine, against the real DXVK
  * d3d9 library and real RADV silicon -- see the run transcript this
  * probe's commit message / accompanying report carries.
  *
@@ -33,7 +33,7 @@
  * MEASUREMENT settles which DXVK does.  It was measured, by hand, with a
  * throwaway probe built with this exact recipe against
  * ~/Projects/power8/wine-ppc64le/ppc64le/dxvk-build/src/d3d9/libdxvk_d3d9.so
- * on op4k (POWER9, V620/RADV), 2026-08-17:
+ * on the test machine (POWER9, V620/RADV), 2026-08-17:
  *
  *   env -u DISPLAY -u WAYLAND_DISPLAY -u XDG_RUNTIME_DIR \
  *       DXVK_WSI_DRIVER=Headless <probe> libdxvk_d3d9.so
@@ -222,7 +222,7 @@
  *                      4096 depth comparisons mismatch.  The depth
  *                      equivalent of case 2.
  *
- *   [MEASURED] 2026-08-17, op4k: native leg built and run under
+ *   [MEASURED] 2026-08-17, the test machine: native leg built and run under
  *   env -u DISPLAY -u WAYLAND_DISPLAY -u XDG_RUNTIME_DIR
  *   DXVK_WSI_DRIVER=Headless DXVK_CONFIG="d3d9.deferSurfaceCreation = True",
  *   baseline reported "d3d9_smoke: PASS 8/8" (checksum fnv1a=0x4C431DC5,

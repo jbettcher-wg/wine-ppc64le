@@ -16,6 +16,6 @@
 # The real answer for a C++ runtime on this port is the one msvcp140 already
 # takes for MFC: run MICROSOFT'S OWN msvcp100.dll as an x86-64 guest module
 # under the emulator rather than translating the MSVC C++ ABI.  See the
-# handoff in ppc64le/corpus/CATALOG.md.
+# handoff in ppc64le/games/STATUS.md.
 DLL msvcp100.dll
 FROM-SPEC auto

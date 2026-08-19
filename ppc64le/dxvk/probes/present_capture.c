@@ -22,7 +22,7 @@
  * into the gate.
  *
  * WHY A PNG AND NOT XGetImage, WHICH THIS FILE USED TO DO.  [MEASURED]
- * 2026-08-17, op4k: an Xvfb has no DRI3, and RADV refuses to present to an X
+ * 2026-08-17, the test machine: an Xvfb has no DRI3, and RADV refuses to present to an X
  * server without it -- `vkcube` on Xvfb prints "MESA: info: vulkan: No DRI3
  * support detected - required for presentation" and dumps core, with no Wine
  * anywhere in the process.  So the isolated display this gate is allowed to
@@ -43,7 +43,7 @@
  * a different exact statement, and it exists because of one measured fact
  * about Wayland.
  *
- * [MEASURED] 2026-08-18, op4k, headless weston 1024x768: a Wine top-level
+ * [MEASURED] 2026-08-18, the test machine, headless weston 1024x768: a Wine top-level
  * window is an xdg_toplevel, and NO Wayland client may place its own
  * top-levels -- position is the compositor's, always.  This weston placed the
  * probe's window at (103,198) when it was mapped and never moved it again:

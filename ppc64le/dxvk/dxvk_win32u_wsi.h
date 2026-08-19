@@ -46,7 +46,7 @@
  * process.  It is FALSE here -- a Win32u window is a Wine HWND that Wine
  * itself created and can move -- and inheriting it unchanged is what made
  * IDXGISwapChain::SetFullscreenState(TRUE) return S_OK, GetFullscreenState
- * agree, and the rectangle on screen never move.  [MEASURED] 2026-08-18, op4k:
+ * agree, and the rectangle on screen never move.  [MEASURED] 2026-08-18, the test machine:
  * 192x144 before the call and 192x144 after it, on a 640x480 screen.
  *
  * So the six calls below are the road that did not exist: the geometry and

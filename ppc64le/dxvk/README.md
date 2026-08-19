@@ -100,7 +100,7 @@ refusals, audited `void **`, refused flat exports -- selected by `--prefix`.
 An unknown prefix stops generation rather than emitting a surface with nothing
 hand-written and nothing refused, which reads exactly like a clean run.
 
-`[MEASURED] 2026-08-17, op4k (POWER9, V620/RADV)` — the D3D11+DXGI subset
+`[MEASURED] 2026-08-17, the test machine (POWER9, V620/RADV)` — the D3D11+DXGI subset
 reproduces the standalone project's measured baseline exactly, **111
 interfaces / 2,593 slots**, and D3D10 adds **+26 / +429** for a roster of
 **137 interfaces / 3,022 slots**. (`ID3D10Multithread` is dropped: it shares
@@ -181,7 +181,7 @@ arrives in the guest's XMM3 and is read out of the trap CONTEXT's
 
 ## Presentation
 
-**It presents, on both APIs.** `[MEASURED] 2026-08-17, op4k` — an x86-64 guest
+**It presents, on both APIs.** `[MEASURED] 2026-08-17, the test machine` — an x86-64 guest
 creates a real Wine window, `D3D11CreateDeviceAndSwapChain`s on it, clears to
 `(0.00, 0.25, 0.50, 1.00)` and presents; a separate native ppc64le process with
 no Wine in it reads the compositor's own framebuffer and finds **all 65,536
@@ -276,7 +276,7 @@ it needs the d3d12 lane's winecom instance.
 ### What could not be proven here, and how that was measured
 
 The gate presents to a **headless Weston with the GL renderer**, not to an
-Xvfb, and that is not a preference. `[MEASURED] 2026-08-17, op4k`: an Xvfb has
+Xvfb, and that is not a preference. `[MEASURED] 2026-08-17, the test machine`: an Xvfb has
 no DRI3, and RADV refuses to present to an X server without it — with no Wine
 anywhere in the process, `DISPLAY=:73 vkcube` on an Xvfb prints `MESA: info:
 vulkan: No DRI3 support detected - required for presentation` and dumps core.
@@ -432,7 +432,7 @@ changed. The reasoning was right and the conclusion was wrong: **meson does not
 emit a ninja target for the unversioned name** — it creates that symlink as a
 side effect of the link rule for the versioned library, so
 `ninja src/d3d11/libdxvk_d3d11.so` names a file with no rule, and ninja treats
-a file with no rule as a *source*. `[MEASURED] 2026-08-17, op4k`: with a new
+a file with no rule as a *source*. `[MEASURED] 2026-08-17, the test machine`: with a new
 file added to `src/wsi` and `build.ninja` correctly regenerated to compile it,
 that command printed `ninja: no work to do` and exited zero, twice, while
 `ninja src/wsi/libwsi.a` on the same tree had twelve objects to compile. **Every
@@ -472,7 +472,7 @@ execute, and refuses to report a result unless its own five-case self-test
 passes first — the assembler-based version it replaced scored 1 of 5 on that
 control and still exited zero.
 
-`[MEASURED] 2026-08-17, op4k` — `scan-isa.sh` over the 273 objects of a
+`[MEASURED] 2026-08-17, the test machine` — `scan-isa.sh` over the 273 objects of a
 `-mcpu=power8` build: **CLEAN**, no word decoding above the floor. 43,572 words
 decode at no ISA level (alignment padding, literal pools, switch tables the
 compiler placed in `.text`) and 30 words in 13 runs decode above the floor but

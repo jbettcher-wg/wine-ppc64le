@@ -6,7 +6,7 @@
 # ~/.local/share/Steam/GameOverlayRenderer64.dll: kernel32, user32, gdi32,
 # advapi32, ole32, oleaut32, winmm, imm32 and psapi all had one; cfgmgr32 did
 # not.  On this port that difference is the difference between the two failure
-# shapes ppc64le/corpus/CATALOG.md opens with -- a missing EXPORT binds a
+# shapes ppc64le/games/STATUS.md opens with -- a missing EXPORT binds a
 # sentinel and dies by name at the first call, a missing MODULE fails the whole
 # import walk before a single guest instruction runs.
 #

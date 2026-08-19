@@ -20,7 +20,7 @@
 # surface attached to nothing at all, which is exactly the state this lane was
 # in before presentation existed.
 #
-# WHY A HEADLESS WESTON AND NOT AN Xvfb.  [MEASURED] 2026-08-17, op4k: an Xvfb
+# WHY A HEADLESS WESTON AND NOT AN Xvfb.  [MEASURED] 2026-08-17, the test machine: an Xvfb
 # has no DRI3, and RADV refuses to present to an X server without it.  With no
 # Wine anywhere in the process, `DISPLAY=:73 vkcube` on an Xvfb prints
 #
@@ -588,7 +588,7 @@ fi
 # is the exact shape of "presented to the parent instead", and it is checked
 # rather than assumed because it is the failure this shape produces.
 #
-# [MEASURED] 2026-08-18, op4k: it already works.  DXVK reports "Buffer size:
+# [MEASURED] 2026-08-18, the test machine: it already works.  DXVK reports "Buffer size:
 # 128x96", and the compositor's own framebuffer holds a 128x96 rectangle of
 # exactly the cleared colour.  This leg exists so that it keeps working.
 if build_probe child -DPRESENT_CHILD=1; then

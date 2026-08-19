@@ -82,7 +82,7 @@ skip() { echo "check-wow64-smoke: $*" >&2; exit 2; }
 # wineboot -u", which is a symptom pointing at the wrong thing: running it
 # again produces exactly the same empty directory.
 #
-# [MEASURED] 2026-08-18, op4k: the bridge built beside the binfmt-registered
+# [MEASURED] 2026-08-18, the test machine: the bridge built beside the binfmt-registered
 # FEX was ABI 3 and had no fexbridge_process_init32, so four Wow64Install
 # passes ran and staged nothing.  Rebuilt at ABI 4, one wineboot -u staged 890
 # entries and this gate went green first try.

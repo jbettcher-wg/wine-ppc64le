@@ -4,7 +4,7 @@
  * WHAT THIS REPRODUCES.  SteamStub v3.1's anti-debug prologue -- the DRM
  * wrapper every Steam release of Skyrim Special Edition and Warhammer
  * 40,000: Boltgun carries, and the wrapper this port's CATALOG.md names as
- * "the highest-value single item" the corpus pass produced -- runs this
+ * "the highest-value single item" the game-testing pass produced -- runs this
  * sequence before a single byte of the wrapped game executes:
  *
  *     h  = GetModuleHandleA("ntdll.dll");
