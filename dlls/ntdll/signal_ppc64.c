@@ -6089,6 +6089,294 @@ static const struct thunk_override thunk_overrides[] =
     { L"kernelbase.dll", "SwitchToFiber",          1, emu_SwitchToFiber },
     { L"kernelbase.dll", "DeleteFiber",            1, emu_DeleteFiber },
     { L"kernelbase.dll", "IsThreadAFiber",         0, emu_IsThreadAFiber },
+    /* THE REST OF THE REGISTRATION SURFACE, found by audit rather than by
+     * crashing into it one export at a time.
+     *
+     * Every row above this block was written after a program died on the
+     * export it names.  ppc64le/thunks/callback_audit.py asks the question
+     * the other way round: it reads every export of every thunked module
+     * through the same clang oracle the thunk generator uses, and reports
+     * each one that takes a parameter whose type is a POINTER TO FUNCTION.
+     * 9,190 exports, 250 such parameters, 146 rows already covering them --
+     * and the rest are these.
+     *
+     * The two numbers a row cannot be guessed at are measured, not read off
+     * the name: how many arguments the callback itself takes (its parameter
+     * list, split at depth zero) and whether its return is a full 64 bits
+     * (sizeof of its return type, measured by clang for the guest target).
+     * That is where LRESULT-returning rows like SetWindowsHookA and
+     * SUBCLASSPROC get their wide bit, and where the six-argument
+     * SetWindowSubclass gets its arity.
+     *
+     * DELIBERATELY NOT HERE, each for a reason:
+     *
+     *   CreateThread, CreateRemoteThread(Ex), NtCreateThreadEx,
+     *   RtlCreateUserThread -- a thread's start routine is already handled,
+     *   one layer down, by thread_start_is_guest_code() at RtlUserThreadStart,
+     *   which also gives the thread's guest stack the size the thread asked
+     *   for.  A row here would route it through a trampoline instead and
+     *   quietly bypass both.
+     *
+     *   RtlUserThreadStart itself -- it takes the entry point as an argument
+     *   because this port CALLS it; nothing registers anything there.
+     *
+     *   IsBadCodePtr -- probes a pointer, never calls it.  Wrapping would
+     *   have it answer about the trampoline.
+     *
+     *   Anything whose callback takes more than six arguments: the trampoline
+     *   pool has fixed-arity dispatchers for four, five and six, and refuses
+     *   anything else by name.  That is DdeInitialize (8), SetWinEventHook
+     *   (7), WSAAccept (8), EventRegister (7) and the CopyFileEx /
+     *   MoveFileWithProgress family (9).  They are listed in
+     *   ppc64le/thunks/callback_holes.txt, which the gate matches exactly, so
+     *   extending the pool is a change that shows up there.
+     */
+    { L"advapi32.dll", "PerfStartProvider",                  3, NULL, 1u << 1,             0,          0 },
+    { L"advapi32.dll", "ReadEncryptedFileRaw",               3, NULL, 1u << 0,             0,          0 },
+    { L"advapi32.dll", "RegisterServiceCtrlHandlerA",        2, NULL, 1u << 1,             0,          0 },
+    { L"advapi32.dll", "RegisterServiceCtrlHandlerExA",      3, NULL, 1u << 1,             0,          0 },
+    { L"advapi32.dll", "RegisterServiceCtrlHandlerExW",      3, NULL, 1u << 1,             0,          0 },
+    { L"advapi32.dll", "RegisterServiceCtrlHandlerW",        2, NULL, 1u << 1,             0,          0 },
+    { L"advapi32.dll", "RegisterTraceGuidsA",                8, NULL, 1u << 0,             0,          0 },
+    { L"advapi32.dll", "RegisterTraceGuidsW",                8, NULL, 1u << 0,             0,          0 },
+    { L"advapi32.dll", "WriteEncryptedFileRaw",              3, NULL, 1u << 0,             0,          0 },
+
+    { L"cfgmgr32.dll", "CM_Register_Notification",           4, NULL, 1u << 2,             0,          5 },
+
+    { L"comctl32.dll", "DPA_DestroyCallback",                3, NULL, 1u << 1,             0,          0 },
+    { L"comctl32.dll", "DPA_EnumCallback",                   3, NULL, 1u << 1,             0,          0 },
+    { L"comctl32.dll", "DPA_LoadStream",                     4, NULL, 1u << 1,             0,          0 },
+    { L"comctl32.dll", "DPA_Merge",                          6, NULL, 1u << 3 | 1u << 4,   1u << 4,    0 },
+    { L"comctl32.dll", "DPA_SaveStream",                     4, NULL, 1u << 1,             0,          0 },
+    { L"comctl32.dll", "DPA_Search",                         6, NULL, 1u << 3,             0,          0 },
+    { L"comctl32.dll", "DPA_Sort",                           3, NULL, 1u << 1,             0,          0 },
+    { L"comctl32.dll", "DSA_DestroyCallback",                3, NULL, 1u << 1,             0,          0 },
+    { L"comctl32.dll", "GetWindowSubclass",                  4, NULL, 1u << 1,             1u << 1,    6 },
+    { L"comctl32.dll", "RemoveWindowSubclass",               3, NULL, 1u << 1,             1u << 1,    6 },
+    { L"comctl32.dll", "SetWindowSubclass",                  4, NULL, 1u << 1,             1u << 1,    6 },
+
+    { L"crypt32.dll", "CertEnumPhysicalStore",              4, NULL, 1u << 3,             0,          6 },
+    { L"crypt32.dll", "CertEnumSystemStore",                4, NULL, 1u << 3,             0,          5 },
+    { L"crypt32.dll", "CryptEnumOIDInfo",                   4, NULL, 1u << 3,             0,          0 },
+
+    { L"gdi32.dll", "EnumEnhMetaFile",                    5, NULL, 1u << 2,             0,          5 },
+    { L"gdi32.dll", "EnumICMProfilesA",                   3, NULL, 1u << 1,             0,          0 },
+    { L"gdi32.dll", "EnumICMProfilesW",                   3, NULL, 1u << 1,             0,          0 },
+    { L"gdi32.dll", "EnumMetaFile",                       4, NULL, 1u << 2,             0,          5 },
+    { L"gdi32.dll", "EnumObjects",                        4, NULL, 1u << 2,             0,          0 },
+    { L"gdi32.dll", "LineDDA",                            6, NULL, 1u << 4,             0,          0 },
+    { L"gdi32.dll", "SetAbortProc",                       2, NULL, 1u << 1,             0,          0 },
+
+    { L"imm32.dll", "ImmEnumInputContext",                3, NULL, 1u << 1,             0,          0 },
+    { L"imm32.dll", "ImmEnumRegisterWordA",               6, NULL, 1u << 1,             0,          0 },
+    { L"imm32.dll", "ImmEnumRegisterWordW",               6, NULL, 1u << 1,             0,          0 },
+
+    { L"kernel32.dll", "BindIoCompletionCallback",           3, NULL, 1u << 1,             0,          0 },
+    { L"kernel32.dll", "CreateThreadpoolIo",                 4, NULL, 1u << 1,             0,          6 },
+    { L"kernel32.dll", "CreateThreadpoolTimer",              3, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "CreateThreadpoolWait",               3, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "CreateThreadpoolWork",               3, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "CreateTimerQueueTimer",              7, NULL, 1u << 2,             0,          0 },
+    { L"kernel32.dll", "EnumCalendarInfoA",                  4, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumCalendarInfoExA",                4, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumCalendarInfoExEx",               6, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumCalendarInfoExW",                4, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumCalendarInfoW",                  4, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumDateFormatsA",                   3, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumDateFormatsExA",                 3, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumDateFormatsExEx",                4, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumDateFormatsExW",                 3, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumDateFormatsW",                   3, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumLanguageGroupLocalesA",          4, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumLanguageGroupLocalesW",          4, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumResourceLanguagesA",             5, NULL, 1u << 3,             0,          5 },
+    { L"kernel32.dll", "EnumResourceLanguagesExA",           7, NULL, 1u << 3,             0,          5 },
+    { L"kernel32.dll", "EnumResourceLanguagesExW",           7, NULL, 1u << 3,             0,          5 },
+    { L"kernel32.dll", "EnumResourceLanguagesW",             5, NULL, 1u << 3,             0,          5 },
+    { L"kernel32.dll", "EnumResourceNamesA",                 4, NULL, 1u << 2,             0,          0 },
+    { L"kernel32.dll", "EnumResourceNamesExA",               6, NULL, 1u << 2,             0,          0 },
+    { L"kernel32.dll", "EnumResourceNamesExW",               6, NULL, 1u << 2,             0,          0 },
+    { L"kernel32.dll", "EnumResourceNamesW",                 4, NULL, 1u << 2,             0,          0 },
+    { L"kernel32.dll", "EnumResourceTypesA",                 3, NULL, 1u << 1,             0,          0 },
+    { L"kernel32.dll", "EnumResourceTypesExA",               5, NULL, 1u << 1,             0,          0 },
+    { L"kernel32.dll", "EnumResourceTypesExW",               5, NULL, 1u << 1,             0,          0 },
+    { L"kernel32.dll", "EnumResourceTypesW",                 3, NULL, 1u << 1,             0,          0 },
+    { L"kernel32.dll", "EnumSystemCodePagesA",               2, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumSystemCodePagesW",               2, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumSystemGeoID",                    3, NULL, 1u << 2,             0,          0 },
+    { L"kernel32.dll", "EnumSystemLanguageGroupsA",          3, NULL, 1u << 0,             0,          5 },
+    { L"kernel32.dll", "EnumSystemLanguageGroupsW",          3, NULL, 1u << 0,             0,          5 },
+    { L"kernel32.dll", "EnumSystemLocalesA",                 2, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumSystemLocalesEx",                4, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumSystemLocalesW",                 2, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumTimeFormatsA",                   3, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumTimeFormatsEx",                  4, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumTimeFormatsW",                   3, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumUILanguagesA",                   3, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "EnumUILanguagesW",                   3, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "InitOnceExecuteOnce",                4, NULL, 1u << 1,             0,          0 },
+    { L"kernel32.dll", "QueueUserAPC",                       3, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "QueueUserAPC2",                      4, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "QueueUserWorkItem",                  3, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "ReadDirectoryChangesW",              8, NULL, 1u << 7,             0,          0 },
+    { L"kernel32.dll", "ReadFileEx",                         5, NULL, 1u << 4,             0,          0 },
+    { L"kernel32.dll", "RegisterApplicationRecoveryCallback",  4, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "RegisterWaitForSingleObject",        6, NULL, 1u << 2,             0,          0 },
+    { L"kernel32.dll", "RegisterWaitForSingleObjectEx",      5, NULL, 1u << 1,             0,          0 },
+    { L"kernel32.dll", "RtlInstallFunctionTableCallback",    6, NULL, 1u << 3,             1u << 3,    0 },
+    { L"kernel32.dll", "SetConsoleCtrlHandler",              2, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "SetWaitableTimer",                   6, NULL, 1u << 3,             0,          0 },
+    { L"kernel32.dll", "SetWaitableTimerEx",                 7, NULL, 1u << 3,             0,          0 },
+    { L"kernel32.dll", "TrySubmitThreadpoolCallback",        3, NULL, 1u << 0,             0,          0 },
+    { L"kernel32.dll", "WriteFileEx",                        5, NULL, 1u << 4,             0,          0 },
+
+    { L"kernelbase.dll", "CreateThreadpoolIo",                 4, NULL, 1u << 1,             0,          6 },
+    { L"kernelbase.dll", "CreateThreadpoolTimer",              3, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "CreateThreadpoolWait",               3, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "CreateThreadpoolWork",               3, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "CreateTimerQueueTimer",              7, NULL, 1u << 2,             0,          0 },
+    { L"kernelbase.dll", "EnumCalendarInfoExEx",               6, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "EnumCalendarInfoExW",                4, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "EnumCalendarInfoW",                  4, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "EnumDateFormatsExEx",                4, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "EnumDateFormatsExW",                 3, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "EnumDateFormatsW",                   3, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "EnumLanguageGroupLocalesW",          4, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "EnumResourceLanguagesExA",           7, NULL, 1u << 3,             0,          5 },
+    { L"kernelbase.dll", "EnumResourceLanguagesExW",           7, NULL, 1u << 3,             0,          5 },
+    { L"kernelbase.dll", "EnumResourceNamesExA",               6, NULL, 1u << 2,             0,          0 },
+    { L"kernelbase.dll", "EnumResourceNamesExW",               6, NULL, 1u << 2,             0,          0 },
+    { L"kernelbase.dll", "EnumResourceNamesW",                 4, NULL, 1u << 2,             0,          0 },
+    { L"kernelbase.dll", "EnumResourceTypesExA",               5, NULL, 1u << 1,             0,          0 },
+    { L"kernelbase.dll", "EnumResourceTypesExW",               5, NULL, 1u << 1,             0,          0 },
+    { L"kernelbase.dll", "EnumSystemCodePagesW",               2, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "EnumSystemGeoID",                    3, NULL, 1u << 2,             0,          0 },
+    { L"kernelbase.dll", "EnumSystemLanguageGroupsW",          3, NULL, 1u << 0,             0,          5 },
+    { L"kernelbase.dll", "EnumSystemLocalesA",                 2, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "EnumSystemLocalesEx",                4, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "EnumSystemLocalesW",                 2, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "EnumTimeFormatsEx",                  4, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "EnumTimeFormatsW",                   3, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "EnumUILanguagesW",                   3, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "InitOnceExecuteOnce",                4, NULL, 1u << 1,             0,          0 },
+    { L"kernelbase.dll", "PerfStartProvider",                  3, NULL, 1u << 1,             0,          0 },
+    { L"kernelbase.dll", "QueueUserAPC",                       3, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "QueueUserAPC2",                      4, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "QueueUserWorkItem",                  3, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "ReadDirectoryChangesW",              8, NULL, 1u << 7,             0,          0 },
+    { L"kernelbase.dll", "ReadFileEx",                         5, NULL, 1u << 4,             0,          0 },
+    { L"kernelbase.dll", "RegisterTraceGuidsW",                8, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "RegisterWaitForSingleObjectEx",      5, NULL, 1u << 1,             0,          0 },
+    { L"kernelbase.dll", "SetConsoleCtrlHandler",              2, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "SetWaitableTimer",                   6, NULL, 1u << 3,             0,          0 },
+    { L"kernelbase.dll", "SetWaitableTimerEx",                 7, NULL, 1u << 3,             0,          0 },
+    { L"kernelbase.dll", "TrySubmitThreadpoolCallback",        3, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "WriteFileEx",                        5, NULL, 1u << 4,             0,          0 },
+
+    { L"msvcr100.dll", "signal",                             2, NULL, 1u << 1,             0,          0 },
+
+    { L"msvcrt.dll", "signal",                             2, NULL, 1u << 1,             0,          0 },
+
+    { L"ntdll.dll", "LdrRegisterDllNotification",         4, NULL, 1u << 1,             0,          0 },
+    { L"ntdll.dll", "NtDeviceIoControlFile",             10, NULL, 1u << 2,             0,          0 },
+    { L"ntdll.dll", "NtFsControlFile",                   10, NULL, 1u << 2,             0,          0 },
+    { L"ntdll.dll", "NtLockFile",                        10, NULL, 1u << 2,             0,          0 },
+    { L"ntdll.dll", "NtNotifyChangeDirectoryFile",        9, NULL, 1u << 2,             0,          0 },
+    { L"ntdll.dll", "NtNotifyChangeKey",                 10, NULL, 1u << 2,             0,          0 },
+    { L"ntdll.dll", "NtNotifyChangeMultipleKeys",        12, NULL, 1u << 4,             0,          0 },
+    { L"ntdll.dll", "NtQueryDirectoryFile",              11, NULL, 1u << 2,             0,          0 },
+    { L"ntdll.dll", "NtQueueApcThread",                   5, NULL, 1u << 1,             0,          0 },
+    { L"ntdll.dll", "NtQueueApcThreadEx",                 6, NULL, 1u << 2,             0,          0 },
+    { L"ntdll.dll", "NtQueueApcThreadEx2",                7, NULL, 1u << 3,             0,          0 },
+    { L"ntdll.dll", "NtReadFile",                         9, NULL, 1u << 2,             0,          0 },
+    { L"ntdll.dll", "NtReadFileScatter",                  9, NULL, 1u << 2,             0,          0 },
+    { L"ntdll.dll", "NtSetTimer",                         7, NULL, 1u << 2,             0,          0 },
+    { L"ntdll.dll", "NtWriteFile",                        9, NULL, 1u << 2,             0,          0 },
+    { L"ntdll.dll", "NtWriteFileGather",                  9, NULL, 1u << 2,             0,          0 },
+    { L"ntdll.dll", "RtlAddVectoredContinueHandler",      2, NULL, 1u << 1,             0,          0 },
+    { L"ntdll.dll", "RtlCreateTimer",                     7, NULL, 1u << 2,             0,          0 },
+    { L"ntdll.dll", "RtlInstallFunctionTableCallback",    6, NULL, 1u << 3,             1u << 3,    0 },
+    { L"ntdll.dll", "RtlQueueWorkItem",                   3, NULL, 1u << 0,             0,          0 },
+    { L"ntdll.dll", "RtlRegisterWait",                    6, NULL, 1u << 2,             0,          0 },
+    { L"ntdll.dll", "RtlSetIoCompletionCallback",         3, NULL, 1u << 1,             0,          0 },
+    { L"ntdll.dll", "RtlSetUnhandledExceptionFilter",     1, NULL, 1u << 0,             0,          0 },
+    { L"ntdll.dll", "TpAllocIoCompletion",                5, NULL, 1u << 2,             0,          5 },
+    { L"ntdll.dll", "TpAllocTimer",                       4, NULL, 1u << 1,             0,          0 },
+    { L"ntdll.dll", "TpAllocWait",                        4, NULL, 1u << 1,             0,          0 },
+    { L"ntdll.dll", "TpAllocWork",                        4, NULL, 1u << 1,             0,          0 },
+    { L"ntdll.dll", "TpSimpleTryPost",                    3, NULL, 1u << 0,             0,          0 },
+
+    { L"rpcrt4.dll", "NDRSContextMarshall",                3, NULL, 1u << 2,             0,          0 },
+    { L"rpcrt4.dll", "NDRSContextMarshall2",               6, NULL, 1u << 3,             0,          0 },
+    { L"rpcrt4.dll", "NDRSContextMarshallEx",              4, NULL, 1u << 3,             0,          0 },
+    { L"rpcrt4.dll", "NdrServerContextMarshall",           3, NULL, 1u << 2,             0,          0 },
+    { L"rpcrt4.dll", "NdrServerContextNewMarshall",        4, NULL, 1u << 2,             0,          0 },
+    { L"rpcrt4.dll", "RpcMgmtSetAuthorizationFn",          1, NULL, 1u << 0,             0,          0 },
+    { L"rpcrt4.dll", "RpcServerRegisterAuthInfoA",         4, NULL, 1u << 2,             0,          5 },
+    { L"rpcrt4.dll", "RpcServerRegisterAuthInfoW",         4, NULL, 1u << 2,             0,          5 },
+
+    { L"setupapi.dll", "SetupCommitFileQueueA",              4, NULL, 1u << 2,             0,          0 },
+    { L"setupapi.dll", "SetupCommitFileQueueW",              4, NULL, 1u << 2,             0,          0 },
+    { L"setupapi.dll", "SetupDiRegisterDeviceInfo",          6, NULL, 1u << 3,             0,          0 },
+    { L"setupapi.dll", "SetupInstallFileA",                  8, NULL, 1u << 6,             0,          0 },
+    { L"setupapi.dll", "SetupInstallFileExA",                9, NULL, 1u << 6,             0,          0 },
+    { L"setupapi.dll", "SetupInstallFileExW",                9, NULL, 1u << 6,             0,          0 },
+    { L"setupapi.dll", "SetupInstallFileW",                  8, NULL, 1u << 6,             0,          0 },
+    { L"setupapi.dll", "SetupInstallFromInfSectionA",       11, NULL, 1u << 7,             0,          0 },
+    { L"setupapi.dll", "SetupInstallFromInfSectionW",       11, NULL, 1u << 7,             0,          0 },
+    { L"setupapi.dll", "SetupIterateCabinetA",               4, NULL, 1u << 2,             0,          0 },
+    { L"setupapi.dll", "SetupIterateCabinetW",               4, NULL, 1u << 2,             0,          0 },
+    { L"setupapi.dll", "SetupScanFileQueueA",                6, NULL, 1u << 3,             0,          0 },
+    { L"setupapi.dll", "SetupScanFileQueueW",                6, NULL, 1u << 3,             0,          0 },
+
+    { L"shell32.dll", "CDefFolderMenu_Create2",             9, NULL, 1u << 5,             0,          6 },
+    { L"shell32.dll", "SHAddFromPropSheetExtArray",         3, NULL, 1u << 1,             0,          0 },
+    { L"shell32.dll", "SHReplaceFromPropSheetExtArray",     4, NULL, 1u << 2,             0,          0 },
+
+    { L"ucrtbase.dll", "_crt_at_quick_exit",                 1, NULL, 1u << 0,             0,          0 },
+    { L"ucrtbase.dll", "_register_onexit_function",          2, NULL, 1u << 1,             0,          0 },
+    { L"ucrtbase.dll", "signal",                             2, NULL, 1u << 1,             0,          0 },
+
+    { L"user32.dll", "DrawStateA",                        10, NULL, 1u << 2,             0,          5 },
+    { L"user32.dll", "DrawStateW",                        10, NULL, 1u << 2,             0,          5 },
+    { L"user32.dll", "EnumChildWindows",                   3, NULL, 1u << 1,             0,          0 },
+    { L"user32.dll", "EnumDesktopWindows",                 3, NULL, 1u << 1,             0,          0 },
+    { L"user32.dll", "EnumDesktopsA",                      3, NULL, 1u << 1,             0,          0 },
+    { L"user32.dll", "EnumDesktopsW",                      3, NULL, 1u << 1,             0,          0 },
+    { L"user32.dll", "EnumPropsA",                         2, NULL, 1u << 1,             0,          0 },
+    { L"user32.dll", "EnumPropsExA",                       3, NULL, 1u << 1,             0,          0 },
+    { L"user32.dll", "EnumPropsExW",                       3, NULL, 1u << 1,             0,          0 },
+    { L"user32.dll", "EnumPropsW",                         2, NULL, 1u << 1,             0,          0 },
+    { L"user32.dll", "EnumThreadWindows",                  3, NULL, 1u << 1,             0,          0 },
+    { L"user32.dll", "EnumWindowStationsA",                2, NULL, 1u << 0,             0,          0 },
+    { L"user32.dll", "EnumWindowStationsW",                2, NULL, 1u << 0,             0,          0 },
+    { L"user32.dll", "EnumWindows",                        2, NULL, 1u << 0,             0,          0 },
+    { L"user32.dll", "GrayStringA",                        9, NULL, 1u << 2,             0,          0 },
+    { L"user32.dll", "GrayStringW",                        9, NULL, 1u << 2,             0,          0 },
+    { L"user32.dll", "SendMessageCallbackA",               6, NULL, 1u << 4,             0,          0 },
+    { L"user32.dll", "SendMessageCallbackW",               6, NULL, 1u << 4,             0,          0 },
+    { L"user32.dll", "SetCoalescableTimer",                5, NULL, 1u << 3,             0,          0 },
+    { L"user32.dll", "SetWindowsHookA",                    2, NULL, 1u << 1,             1u << 1,    0 },
+    { L"user32.dll", "SetWindowsHookW",                    2, NULL, 1u << 1,             1u << 1,    0 },
+    { L"user32.dll", "UnhookWindowsHook",                  2, NULL, 1u << 1,             1u << 1,    0 },
+
+    { L"vcruntime140.dll", "_set_purecall_handler",              1, NULL, 1u << 0,             0,          0 },
+
+    { L"winmm.dll", "mciSetYieldProc",                    3, NULL, 1u << 1,             0,          0 },
+    { L"winmm.dll", "mmioInstallIOProcA",                 3, NULL, 1u << 1,             1u << 1,    0 },
+    { L"winmm.dll", "mmioInstallIOProcW",                 3, NULL, 1u << 1,             1u << 1,    0 },
+
+    { L"ws2_32.dll", "GetAddrInfoExW",                    10, NULL, 1u << 8,             0,          0 },
+    { L"ws2_32.dll", "WSAIoctl",                           9, NULL, 1u << 8,             0,          0 },
+    { L"ws2_32.dll", "WSAProviderConfigChange",            3, NULL, 1u << 2,             0,          0 },
+    { L"ws2_32.dll", "WSARecv",                            7, NULL, 1u << 6,             0,          0 },
+    { L"ws2_32.dll", "WSARecvFrom",                        9, NULL, 1u << 8,             0,          0 },
+    { L"ws2_32.dll", "WSASend",                            7, NULL, 1u << 6,             0,          0 },
+    { L"ws2_32.dll", "WSASendTo",                          9, NULL, 1u << 8,             0,          0 },
+    { L"ws2_32.dll", "WSASetBlockingHook",                 1, NULL, 1u << 0,             1u << 0,    0 },
+
+    { L"wsock32.dll", "WSASetBlockingHook",                 1, NULL, 1u << 0,             1u << 0,    0 },
+
     /* the whole of modern OpenGL, which no opengl32 anywhere exports: see the
      * banner above emu_wglGetProcAddress.  wglGetDefaultProcAddress takes the
      * same row because it answers in the same namespace -- Wine's returns NULL
