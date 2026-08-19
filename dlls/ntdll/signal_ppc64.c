@@ -1888,6 +1888,22 @@ static __thread UINT guest_run_depth;
  * emu_trap_dispatch end it.  Cleared here, by the initiator of that run. */
 static __thread BOOL guest_unwind_run_end;
 
+/* The guest stack of the last nested run that ended for an unwind, handed
+ * over unfreed by the unix side (emu_run_entry_params.kept_stack) because the
+ * request's record may point into it.  One slot, because it is consumed
+ * immediately: call_guest_handler_run() moves it into the request's
+ * guest_unwind_target, and the frame walk sweeps it after every funclet it
+ * runs (the collided road has no guest_handler_call to carry it). */
+static __thread void *guest_kept_run_stack;
+
+static void free_guest_run_stack( void *addr )
+{
+    SIZE_T size = 0;
+
+    if (!addr) return;
+    NtFreeVirtualMemory( GetCurrentProcess(), &addr, &size, MEM_RELEASE );
+}
+
 static ULONG_PTR call_guest_function( void *entry, void *arg )
 {
     struct emu_run_entry_params params = { entry, arg, 0, emu_trap_dispatch };
@@ -1909,6 +1925,15 @@ static ULONG_PTR call_guest_function( void *entry, void *arg )
     if (guest_unwind_run_end)
     {
         guest_unwind_run_end = FALSE;
+        /* the run's stack stays mapped until the unwind that was requested
+         * from it has no more use for it; see guest_unwind_target.kept_stack */
+        if (guest_kept_run_stack)
+        {
+            ERR( "a kept run stack %p was never claimed; freeing it late\n",
+                 guest_kept_run_stack );
+            free_guest_run_stack( guest_kept_run_stack );
+        }
+        guest_kept_run_stack = params.kept_stack;
         return 0;
     }
 
@@ -1917,9 +1942,12 @@ static ULONG_PTR call_guest_function( void *entry, void *arg )
         /* a guest exception the nested run could not consume propagates
          * natively from here -- the callback's native caller and the
          * unhandled machinery above it get their shot with their own
-         * machine's context.  Does not return when one was pending. */
+         * machine's context.  Does not return when one was pending, in which
+         * case the run's stack is left mapped for the report's sake -- the
+         * thread is on its way to a reported death. */
         raise_pending_guest_exception();
         ERR( "guest callback %p failed, status %08x\n", entry, (UINT)status );
+        free_guest_run_stack( params.kept_stack );
         return 0;
     }
     return (ULONG_PTR)params.retval;
@@ -2203,6 +2231,116 @@ int CDECL __wine_guest__initterm_e( int (**start)(void), int (**end)(void) )
         if (res) TRACE( "function %p failed: %#x\n", *cur, res );
     }
     return res;
+}
+
+
+/***********************************************************************
+ *           __wine_guest_InitSecurityInterfaceW   (NTDLL.@)
+ *
+ * What a guest's GetProcAddress(secur32, "InitSecurityInterfaceW") resolves
+ * to (GUEST-IMPL in secur32.thunks, forwarded here from secur32.spec).  The
+ * real export returns a SecurityFunctionTableW of NATIVE function pointers,
+ * and a guest calling through one of those is the native-pc-in-a-guest-image
+ * failure class -- so the guest gets a table built from the GUEST secur32
+ * thunk module's own export addresses, each of which is an AMD64 stub that
+ * traps into the same dispatch a named import would.  Cyberpunk 2077's
+ * REDGalaxy64.dll is the wanting title: it GetProcAddress()es exactly this
+ * name and throws gog::RuntimeError on NULL, which its engine treats as
+ * fatal init.
+ *
+ * The slot order is Windows' SecurityFunctionTableW, copied from
+ * dlls/secur32/secur32.c's own table -- including Windows' quirk of packing
+ * EncryptMessage/DecryptMessage into the Reserved3/Reserved4 slots.  A name
+ * the guest thunk does not export leaves a NULL slot, which is what a real
+ * table has in its Reserved slots too; nothing is guessed.
+ */
+static const char * const sspi_tablew_names[] =
+{
+    "EnumerateSecurityPackagesW",
+    "QueryCredentialsAttributesW",
+    "AcquireCredentialsHandleW",
+    "FreeCredentialsHandle",
+    NULL,                            /* Reserved2 */
+    "InitializeSecurityContextW",
+    "AcceptSecurityContext",
+    "CompleteAuthToken",
+    "DeleteSecurityContext",
+    "ApplyControlToken",
+    "QueryContextAttributesW",
+    "ImpersonateSecurityContext",
+    "RevertSecurityContext",
+    "MakeSignature",
+    "VerifySignature",
+    "FreeContextBuffer",
+    "QuerySecurityPackageInfoW",
+    "EncryptMessage",                /* Reserved3, as on Windows */
+    "DecryptMessage",                /* Reserved4, as on Windows */
+    "ExportSecurityContext",
+    "ImportSecurityContextW",
+    "AddCredentialsW",
+    NULL,                            /* Reserved8 */
+    "QuerySecurityContextToken",
+    "EncryptMessage",
+    "DecryptMessage",
+    "SetContextAttributesW",
+};
+
+void * CDECL __wine_guest_InitSecurityInterfaceW(void)
+{
+    /* ULONG then pointers: dwVersion pads to one slot on LP64, which is the
+     * MS-x64 layout of SecurityFunctionTableW.  Static and filled once; the
+     * table outlives every caller, exactly like the real export's. */
+    static struct
+    {
+        ULONG version;
+        void *fn[ARRAY_SIZE(sspi_tablew_names)];
+    } table;
+    static HMODULE guest_secur32;
+
+    if (!guest_secur32)
+    {
+        LIST_ENTRY *mark = &NtCurrentTeb()->Peb->LdrData->InMemoryOrderModuleList, *entry;
+        HMODULE found = NULL;
+        unsigned int i;
+
+        for (entry = mark->Flink; entry != mark; entry = entry->Flink)
+        {
+            LDR_DATA_TABLE_ENTRY *mod = CONTAINING_RECORD( entry, LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks );
+            const IMAGE_NT_HEADERS *nt = RtlImageNtHeader( mod->DllBase );
+
+            if (!nt || nt->FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64) continue;
+            if (wcsicmp( mod->BaseDllName.Buffer, L"secur32.dll" )) continue;
+            found = mod->DllBase;
+            break;
+        }
+        if (!found)
+        {
+            /* The caller reached this code through the guest secur32 thunk,
+             * so its absence from the module list is a loader inconsistency,
+             * not a user error. */
+            ERR( "no guest secur32.dll in the module list\n" );
+            return NULL;
+        }
+        table.version = 1;  /* SECURITY_SUPPORT_PROVIDER_INTERFACE_VERSION */
+        for (i = 0; i < ARRAY_SIZE(sspi_tablew_names); i++)
+        {
+            ANSI_STRING name;
+            void *proc = NULL;
+
+            if (!sspi_tablew_names[i]) continue;
+            RtlInitAnsiString( &name, sspi_tablew_names[i] );
+            if (LdrGetProcedureAddress( found, &name, 0, &proc ))
+            {
+                TRACE( "guest secur32 has no %s; leaving the slot NULL\n",
+                       sspi_tablew_names[i] );
+                proc = NULL;
+            }
+            table.fn[i] = proc;
+        }
+        guest_secur32 = found;
+    }
+    TRACE( "-> %p (guest module %p)\n", &table, guest_secur32 );
+    return &table;
 }
 
 
@@ -2497,6 +2635,25 @@ struct guest_unwind_target
     ULONG64          frame;        /* establisher frame to resume in */
     ULONG64          target_ip;    /* where in it to resume */
     ULONG64          return_value; /* RAX on arrival: the unwind's return value */
+    ULONG64          context_out;  /* guest CONTEXT* to write the unwound state
+                                    * back into, or 0.  RtlUnwindEx's
+                                    * ContextRecord parameter is an OUTPUT:
+                                    * Windows walks in it and leaves it holding
+                                    * the target frame's context, and MSVC's
+                                    * C++ personality reads the establisher
+                                    * frame back out of it in its consolidation
+                                    * routine.  Measured: GfnRuntimeSdk's catch
+                                    * funclet entered with rdx=0 because the
+                                    * routine read the STALE pre-unwind context,
+                                    * whose Rbp the throw had left null. */
+    void            *kept_stack;   /* the guest stack of the run that ISSUED
+                                    * this request, kept mapped because the
+                                    * record's slots may point into it (FH4's
+                                    * establisher travels as a pointer to a
+                                    * personality-run local), or NULL.  Freed
+                                    * by the walk once nothing can read it --
+                                    * after the consolidation routine has
+                                    * run. */
     EXCEPTION_RECORD rec;          /* the record the unwind phase runs with */
 };
 
@@ -2796,8 +2953,12 @@ static UINT call_guest_handler_run( ULONG_PTR handler, EXCEPTION_RECORD *rec, UL
     if (call.unwound)
     {
         /* It called RtlUnwindEx, which on Windows does not return.  Here it
-         * returned by ending its own run, and the request is the answer. */
+         * returned by ending its own run, and the request is the answer.
+         * The run's stack rides along: the record it recorded may point into
+         * it (see guest_unwind_target.kept_stack). */
         *target = call.target;
+        target->kept_stack = guest_kept_run_stack;
+        guest_kept_run_stack = NULL;
         TRACE( "guest handler %p unwound to frame %I64x ip %I64x retval %I64x\n",
                (void *)handler, target->frame, target->target_ip, target->return_value );
         return ExceptionExecuteHandler_guest;
@@ -3230,6 +3391,14 @@ static NTSTATUS guest_unwind_to_target( const struct guest_unwind_target *target
     ULONG64 collided_frame = 0;
     DWORD collided_scope = 0;
     UINT depth = 0;
+    /* Every request adopted by this walk may bring the guest stack of the run
+     * it was issued from (guest_unwind_target.kept_stack): the record's slots
+     * may point into it, and the last reader is the consolidation routine at
+     * the very end.  Collected here, freed on every exit after that point. */
+    void *kept_stacks[GUEST_SEH_MAX_FRAMES];
+    UINT n_kept = 0;
+
+    if (want.kept_stack) kept_stacks[n_kept++] = want.kept_stack;
 
     *result = *from;
     unwind_rec.ExceptionFlags |= EXCEPTION_UNWINDING;
@@ -3286,6 +3455,16 @@ static NTSTATUS guest_unwind_to_target( const struct guest_unwind_target *target
             else
                 res = call_guest_language_handler( &unwind_rec, result, &dispatch, &again );
 
+            /* A funclet run that ended for a COLLIDED unwind has no
+             * guest_handler_call to carry its kept stack; sweep it here so
+             * the record it recorded stays readable until this walk is done. */
+            if (guest_kept_run_stack)
+            {
+                if (n_kept < GUEST_SEH_MAX_FRAMES) kept_stacks[n_kept++] = guest_kept_run_stack;
+                else free_guest_run_stack( guest_kept_run_stack );
+                guest_kept_run_stack = NULL;
+            }
+
             switch (res)
             {
             case ExceptionContinueSearch:
@@ -3331,6 +3510,11 @@ static NTSTATUS guest_unwind_to_target( const struct guest_unwind_target *target
                        want.target_ip, (UINT)dispatch.ScopeIndex );
                 collided_frame = dispatch.EstablisherFrame;
                 collided_scope = dispatch.ScopeIndex;
+                if (again.kept_stack)
+                {
+                    if (n_kept < GUEST_SEH_MAX_FRAMES) kept_stacks[n_kept++] = again.kept_stack;
+                    else free_guest_run_stack( again.kept_stack );
+                }
                 want              = again;
                 unwind.frame      = want.frame;
                 unwind.target_ip  = want.target_ip;
@@ -3377,20 +3561,39 @@ done:
      * unwind. */
     guest_unwind_state = unwind.prev;
 
-    if (status) return status;
+    if (!status)
+    {
+        /* RAX carries the unwind's ReturnValue on arrival whichever kind of
+         * unwind this was: x86-64 RtlUnwindEx writes context->Rax before
+         * RtlRestoreContext and does not make that conditional on the
+         * exception code. */
+        result->Rax = want.return_value;
 
-    /* RAX carries the unwind's ReturnValue on arrival whichever kind of unwind
-     * this was: x86-64 RtlUnwindEx writes context->Rax before RtlRestoreContext
-     * and does not make that conditional on the exception code. */
-    result->Rax = want.return_value;
+        /* RtlUnwindEx's ContextRecord parameter is an output: the issuer's
+         * copy must hold the TARGET frame's context once the unwind is done,
+         * because MSVC's consolidation routine reads the establisher frame
+         * back out of it (see the field's comment).  Written before the
+         * routine runs, which is exactly when Windows' in-place walk has it
+         * written too. */
+        if (want.context_out)
+            *(AMD64_CONTEXT *)(ULONG_PTR)want.context_out = *result;
 
-    if (unwind_rec.ExceptionCode == (DWORD)STATUS_UNWIND_CONSOLIDATE)
-        return guest_consolidate_callback( &unwind_rec, result );
+        if (unwind_rec.ExceptionCode == (DWORD)STATUS_UNWIND_CONSOLIDATE)
+            status = guest_consolidate_callback( &unwind_rec, result );
+        else
+        {
+            result->Rip = want.target_ip;
+            TRACE( "guest resumes at rip %I64x rsp %I64x rax %I64x\n",
+                   result->Rip, result->Rsp, result->Rax );
+        }
+    }
 
-    result->Rip = want.target_ip;
-    TRACE( "guest resumes at rip %I64x rsp %I64x rax %I64x\n",
-           result->Rip, result->Rsp, result->Rax );
-    return STATUS_SUCCESS;
+    /* The consolidation routine was the last thing that could read a record
+     * slot pointing into an issuer's run stack; the kept stacks go now, on
+     * every exit. */
+    while (n_kept) free_guest_run_stack( kept_stacks[--n_kept] );
+
+    return status;
 }
 
 /***********************************************************************
@@ -3465,7 +3668,47 @@ static NTSTATUS guest_request_unwind( const struct guest_unwind_target *target )
 
     if (guest_handler_call && guest_handler_call->run_depth == guest_run_depth)
     {
+        /* A language handler unwinding WITHIN its own run is not the handler
+         * ACCEPTING.  MSVC's C++ personality wraps its funclet dispatch in
+         * SEH of its own and RtlUnwinds to its own establisher on the way
+         * out -- measured: GfnRuntimeSdk's __CxxFrameHandler, called at
+         * unwind time during a consolidating C++ unwind, RtlUnwind()s to a
+         * frame at the base of the run stack it is executing on, and
+         * deferring THAT to the frame walk handed the walk a frame on the
+         * wrong stack, which it could only read as "target already passed"
+         * (STATUS_INVALID_UNWIND_TARGET, and GeForce NOW's SDK took
+         * Cyberpunk 2077 down with it).  The frames such a request means are
+         * on the RUN's stack; the walk cannot serve them and does not need
+         * to -- it is a local unwind, served in place like any other.  Only
+         * a request naming a frame OFF this run's stack is the handler
+         * accepting and unwinding the faulting stack. */
+        struct emu_guest_stack_params stack = { 0 };
+
+        WINE_UNIX_CALL( unix_emu_guest_stack, &stack );
+        if (stack.limit && (void *)(ULONG_PTR)target->frame > stack.limit &&
+            (void *)(ULONG_PTR)target->frame <= stack.base)
+        {
+            TRACE( "handler's unwind to frame %I64x ip %I64x stays on its own run "
+                   "stack (%p-%p): a local unwind, served in place\n",
+                   target->frame, target->target_ip, stack.limit, stack.base );
+            return guest_unwind_in_place( target );
+        }
         guest_handler_call->target  = *target;
+        /* This road ENDS the issuer's run, and the run's guest stack with
+         * it.  A ContextRecord that lives on that stack is about to dangle,
+         * so the write-back the walk owes RtlUnwindEx's caller cannot be
+         * delivered there -- dropped, with the reason, rather than written
+         * into whatever reuses the pages.  One that lives anywhere else
+         * (the dispatcher's own context, which is what a personality passes)
+         * outlives the run and keeps its write-back. */
+        if (target->context_out &&
+            (void *)(ULONG_PTR)target->context_out > stack.limit &&
+            (void *)(ULONG_PTR)target->context_out <= stack.base)
+        {
+            TRACE( "ContextRecord %I64x lives on the run stack this defer ends; "
+                   "dropping the unwound-context write-back\n", target->context_out );
+            guest_handler_call->target.context_out = 0;
+        }
         guest_handler_call->unwound = TRUE;
         guest_unwind_run_end = TRUE;   /* emu_trap_dispatch ends the run on this */
         TRACE( "deferring the unwind to frame %I64x ip %I64x to the frame walk\n",
@@ -3504,6 +3747,21 @@ static NTSTATUS guest_request_unwind( const struct guest_unwind_target *target )
             return STATUS_NOT_IMPLEMENTED;
         }
         unwind->again    = *target;
+        /* Same run-stack lifetime rule as the deferred road above: this
+         * collision ends the funclet's run too. */
+        if (target->context_out)
+        {
+            struct emu_guest_stack_params fstack = { 0 };
+
+            WINE_UNIX_CALL( unix_emu_guest_stack, &fstack );
+            if ((void *)(ULONG_PTR)target->context_out > fstack.limit &&
+                (void *)(ULONG_PTR)target->context_out <= fstack.base)
+            {
+                TRACE( "ContextRecord %I64x lives on the run stack this collision ends; "
+                       "dropping the unwound-context write-back\n", target->context_out );
+                unwind->again.context_out = 0;
+            }
+        }
         unwind->collided = TRUE;
         guest_unwind_run_end = TRUE;   /* emu_trap_dispatch ends the run on this */
         TRACE( "collided unwind: a __finally of the unwind to frame %I64x ip %I64x started "
@@ -4264,15 +4522,19 @@ static ULONG_PTR emu_RtlRaiseException( const ULONG_PTR *a, void *native )
  * the unwind in place and handing it back to the frame walk; neither of them
  * resumes anything until every __finally between here and the target has run.
  *
- * The ContextRecord and HistoryTable arguments are deliberately unused, and
- * that matches x86-64 rather than departing from it: RtlUnwindEx opens with
+ * The ContextRecord argument is unused as an INPUT, and that matches x86-64
+ * rather than departing from it: RtlUnwindEx opens with
  * RtlCaptureContext( context ), i.e. it overwrites the context it is handed
  * with its own and walks from there, and the history table is a lookup cache.
  * Here "its own" is the guest state the trap fired with, which is where
- * guest_unwind_in_place() starts.
+ * guest_unwind_in_place() starts.  As an OUTPUT it is honoured: the walk
+ * leaves the target frame's context in it, which is what MSVC's C++
+ * personality reads its establisher frame back out of -- see
+ * guest_unwind_target.context_out.
  */
 static NTSTATUS guest_unwind_ex( ULONG64 end_frame, ULONG64 target_ip,
-                                 const EXCEPTION_RECORD *rec, ULONG64 retval )
+                                 const EXCEPTION_RECORD *rec, ULONG64 retval,
+                                 ULONG64 context_out )
 {
     struct guest_unwind_target target = { 0 };
 
@@ -4286,6 +4548,7 @@ static NTSTATUS guest_unwind_ex( ULONG64 end_frame, ULONG64 target_ip,
     target.frame        = end_frame;
     target.target_ip    = target_ip;
     target.return_value = retval;
+    target.context_out  = context_out;
     target.rec          = *rec;
     if (target.rec.ExceptionCode == (DWORD)STATUS_UNWIND_CONSOLIDATE)
     {
@@ -4312,6 +4575,12 @@ static NTSTATUS guest_unwind_ex( ULONG64 end_frame, ULONG64 target_ip,
         TRACE( "guest RtlUnwindEx: CONSOLIDATING unwind to frame %I64x, routine %p, "
                "%u parameters\n", end_frame, (void *)target.rec.ExceptionInformation[0],
                (UINT)target.rec.NumberParameters );
+        if (TRACE_ON(seh))
+        {
+            UINT i;
+            for (i = 0; i < target.rec.NumberParameters && i < EXCEPTION_MAXIMUM_PARAMETERS; i++)
+                TRACE( "  consolidate info[%u]=%I64x\n", i, target.rec.ExceptionInformation[i] );
+        }
         return guest_request_unwind( &target );
     }
     TRACE( "guest RtlUnwindEx: frame %I64x ip %I64x code %08x retval %I64x\n",
@@ -4340,7 +4609,7 @@ static ULONG_PTR emu_RtlUnwindEx( const ULONG_PTR *a, void *native )
         synth.ExceptionAddress = (void *)*(ULONG_PTR *)(ULONG_PTR)ctx->Rsp;
         rec = &synth;
     }
-    if ((status = guest_unwind_ex( a[0], a[1], rec, a[3] )))
+    if ((status = guest_unwind_ex( a[0], a[1], rec, a[3], a[4] )))
     {
         /* RtlUnwindEx has no failure return: on Windows it raises, and there
          * is no state in which the guest could sensibly carry on past an
@@ -5725,6 +5994,13 @@ static const struct thunk_override thunk_overrides[] =
     /* native->guest: the pointer is queued here and run by our own native
      * handler at exit; see run_guest_atexit_handlers */
     { L"ucrtbase.dll", "_crt_atexit",       1, emu_crt_atexit },
+    /* ucrtbase's _o_-prefixed aliases bind to the SAME native registration
+     * points, so each alias of a row above needs its own row -- the table is
+     * keyed by export name, and _o__crt_atexit arriving without one would
+     * park a raw guest pointer in the native atexit queue.  The aliases only
+     * became reachable when spec2thunk learned to take an alias's signature
+     * from its target; before that they were refusals. */
+    { L"ucrtbase.dll", "_o__crt_atexit",    1, emu_crt_atexit },
     { L"msvcrt.dll",   "_crt_atexit",       1, emu_crt_atexit },
     { L"msvcrt.dll",   "atexit",            1, emu_crt_atexit },
     { L"msvcrt.dll",   "_onexit",           1, emu_onexit },
@@ -5897,9 +6173,11 @@ static const struct thunk_override thunk_overrides[] =
      * reach native qsort as 0xffffffff */
     { L"msvcrt.dll",   "qsort",   4, NULL, 1u << 3 },
     { L"ucrtbase.dll", "qsort",   4, NULL, 1u << 3 },
+    { L"ucrtbase.dll", "_o_qsort",   4, NULL, 1u << 3 },
     { L"msvcr100.dll", "qsort",   4, NULL, 1u << 3 },
     { L"msvcrt.dll",   "bsearch", 5, NULL, 1u << 4 },
     { L"ucrtbase.dll", "bsearch", 5, NULL, 1u << 4 },
+    { L"ucrtbase.dll", "_o_bsearch", 5, NULL, 1u << 4 },
     { L"msvcr100.dll", "bsearch", 5, NULL, 1u << 4 },
     /* The rest of the C runtime's registration points -- the ones
      * msvcr100.thunks named as STILL OPEN, each a raw guest pointer parked in
@@ -6335,6 +6613,7 @@ static const struct thunk_override thunk_overrides[] =
 
     { L"ucrtbase.dll", "_crt_at_quick_exit",                 1, NULL, 1u << 0,             0,          0 },
     { L"ucrtbase.dll", "_register_onexit_function",          2, NULL, 1u << 1,             0,          0 },
+    { L"ucrtbase.dll", "_o__register_onexit_function",       2, NULL, 1u << 1,             0,          0 },
     { L"ucrtbase.dll", "signal",                             2, NULL, 1u << 1,             0,          0 },
 
     { L"user32.dll", "DrawStateA",                        10, NULL, 1u << 2,             0,          5 },

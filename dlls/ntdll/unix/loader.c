@@ -1632,6 +1632,30 @@ static void emu_alloc_hlt_page(void)
 
 
 /***********************************************************************
+ *           emu_invalidate_code_range
+ *
+ * The 64-bit lane's equivalent of the WoW64 BTCpuNotify* forwards
+ * (wow64cpu_ppc64.c): the emulator detects the GUEST's own stores itself,
+ * but code that appears through NATIVE syscalls -- a view mapped over a
+ * reused address, a protection change, an explicit NtFlushInstructionCache
+ * -- is invisible to it, and fexbridge.h names reporting those the caller's
+ * job.  The cost of missing one is not a wrong result but a STICKY wrong
+ * result: the bridge's fetchability probe answers for the page as it was,
+ * CompileCode caches a NoExecOp block for that rip, and every later call
+ * lands on the cached refusal even after the page holds real code
+ * (measured: Cyberpunk 2077's amd_ags_x64.dll and its crash handler, both
+ * readable at report time, both permanently "NoExec" to the emulator).
+ * Over-invalidation is always safe, so virtual.c forwards every range a
+ * native syscall could have changed.  No-op when no bridge is loaded.
+ */
+void emu_invalidate_code_range( const void *addr, SIZE_T size )
+{
+    if (p_fexbridge_invalidate_code_range)
+        p_fexbridge_invalidate_code_range( (ULONG_PTR)addr, size );
+}
+
+
+/***********************************************************************
  *           emu_run_loop
  *
  * The Wine-owned replacement for the bridge's one-shot fexbridge_run_entry:
@@ -1856,25 +1880,38 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
         emu_publish_guest_context( &prev_guest_ctx, prev_guest_state );
 
     stack_addr = stack.DeallocationStack;
-    /* ...and it keeps its STACK, but only while somebody is debugging.  The
-     * registers alone answer "where did it die"; the stack is what answers
-     * "how did it get there", and freeing it here is why a debugger attached
-     * to a guest crash used to see a valid RSP pointing at unmapped memory.
-     * Held rather than freed, so it is a leak of one stack on a thread that
-     * is about to die reporting, in a process that has a debugger on it --
-     * and byte-for-byte the old behaviour in every process that does not. */
-    if (emu_no_dbg_stack == -1)
-    {
-        const char *str = getenv( "WINEEMUNODBGSTACK" );
-        emu_no_dbg_stack = (str && *str == '1');
-    }
-    if (status == STATUS_EMU_GUEST_EXCEPTION && !emu_no_dbg_stack &&
-        NtCurrentTeb()->Peb->BeingDebugged)
-        TRACE( "guest stack %p-%p kept mapped for the debugger; the run ended on an "
-               "unhandled guest exception at rip=%p\n",
-               stack.DeallocationStack, stack.StackBase, (void *)(ULONG_PTR)ctx.Rip );
+    /* A NESTED run that ended on STATUS_EMU_GUEST_EXCEPTION keeps its STACK,
+     * handed to the PE side unfreed.  Both flavors of that ending need it to
+     * outlive the run: an unwind request's EXCEPTION_RECORD may carry
+     * POINTERS into this stack -- MSVC's FH4 passes the catch establisher
+     * frame as a pointer to a personality-run local -- and the next nested
+     * run reuses these pages, so freeing here is how GfnRuntimeSdk's catch
+     * funclet came to be entered with a null frame [MEASURED].  The PE side
+     * owns the free now, at the point it knows nothing needs the stack any
+     * more; see call_guest_function() in signal_ppc64.c.
+     *
+     * The OUTERMOST run keeps the old rule verbatim: the thread is on its
+     * way up to report, the stack is kept mapped only while a debugger is
+     * attached (registers alone answer "where it died", the stack answers
+     * "how it got there"), and WINEEMUNODBGSTACK=1 is the negative control
+     * that forces the free (ppc64le/winedbg/check-guest-debug.sh). */
+    if (status == STATUS_EMU_GUEST_EXCEPTION && prev_base)
+        params->kept_stack = stack_addr;
     else
-        NtFreeVirtualMemory( NtCurrentProcess(), &stack_addr, &free_size, MEM_RELEASE );
+    {
+        if (emu_no_dbg_stack == -1)
+        {
+            const char *str = getenv( "WINEEMUNODBGSTACK" );
+            emu_no_dbg_stack = (str && *str == '1');
+        }
+        if (status == STATUS_EMU_GUEST_EXCEPTION && !emu_no_dbg_stack &&
+            NtCurrentTeb()->Peb->BeingDebugged)
+            TRACE( "guest stack %p-%p kept mapped for the debugger; the run ended on an "
+                   "unhandled guest exception at rip=%p\n",
+                   stack.DeallocationStack, stack.StackBase, (void *)(ULONG_PTR)ctx.Rip );
+        else
+            NtFreeVirtualMemory( NtCurrentProcess(), &stack_addr, &free_size, MEM_RELEASE );
+    }
     return status;
 }
 

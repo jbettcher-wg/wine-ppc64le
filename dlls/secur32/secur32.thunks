@@ -1,0 +1,28 @@
+# AMD64 thunk export spec -- secur32.dll.
+#
+# SSPI.  Cyberpunk 2077's REDGalaxy64.dll LoadLibrary()s this for its TLS
+# to GOG's services, and a guest namespace without it is the fatal shape:
+# the loader finds the native ppc64 builtin, correctly refuses to splice it
+# into a guest call, the LoadLibrary fails, and REDGalaxy throws
+# gog::RuntimeError (measured: the e06d7363 throw-info in REDGalaxy64.dll
+# names .?AVRuntimeError@gog@@), which the engine treats as fatal init --
+# REDEngineErrorReporter and exit 3 before d3d12 ever loads.  The emulated
+# lane loads wintrust and this module at the same point and boots.
+#
+# InitSecurityInterfaceW is GUEST-IMPL, and this is load-bearing: the real
+# export returns a SecurityFunctionTable full of NATIVE function pointers,
+# and a guest calling through one of those is the native-pc-in-a-guest-image
+# failure class.  REDGalaxy64 GetProcAddress()es exactly this name and throws
+# gog::RuntimeError on NULL, so the absent export was not survivable either.
+# __wine_guest_InitSecurityInterfaceW (ntdll, forwarded through this module's
+# .spec) builds the table from the GUEST thunk module's own stub addresses.
+# The A variant stays EXCLUDED until a title proves it needs the same.
+#
+# sspi.h carries the whole SSPI surface and nothing in the oracle's default
+# translation unit includes it; without it 52 of 61 exports were refused as
+# "no declaration found" and only the Lsa* nine emitted.
+DLL secur32.dll
+FROM-SPEC auto
+PROBE-EXTRA sspi.h
+EXCLUDE   InitSecurityInterfaceA
+GUEST-IMPL   InitSecurityInterfaceW   __wine_guest_InitSecurityInterfaceW

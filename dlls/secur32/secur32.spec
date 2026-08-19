@@ -81,3 +81,9 @@
 @ stdcall TranslateNameW(wstr long long ptr ptr)
 @ stdcall UnsealMessage(ptr ptr long ptr) DecryptMessage
 @ stdcall VerifySignature(ptr ptr long ptr)
+
+# The GUEST-IMPL target for secur32.thunks's InitSecurityInterfaceW: the
+# native machinery lives in ntdll (see __wine_guest_InitSecurityInterfaceW
+# in signal_ppc64.c), forwarded here so the audit finds it in the native
+# namesake, exactly like ucrtbase's __wine_guest__initterm.
+@ cdecl -arch=ppc64 __wine_guest_InitSecurityInterfaceW() ntdll.__wine_guest_InitSecurityInterfaceW

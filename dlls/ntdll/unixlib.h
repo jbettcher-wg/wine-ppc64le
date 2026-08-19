@@ -104,6 +104,16 @@ struct emu_run_entry_params
      * in dlls/ntdll/signal_ppc64.c).  NULL restores the old behaviour: a
      * guest fault fails the run with no dispatch of any kind. */
     void     (*exception_dispatcher)( ULONG id, void *args, ULONG len );
+    /* out: the run's guest stack, handed to the PE side UNFREED when the run
+     * ended on STATUS_EMU_GUEST_EXCEPTION.  Both flavors of that ending need
+     * the stack to outlive the run: an unwind request's EXCEPTION_RECORD may
+     * carry POINTERS into it (MSVC's FH4 passes the catch establisher as a
+     * pointer to a personality-run local -- measured, GfnRuntimeSdk), and a
+     * fault report is worthless over a freed stack.  The PE side frees it
+     * when the unwind that needed it completes, or immediately when nothing
+     * does; see call_guest_function() in signal_ppc64.c.  NULL on every
+     * other ending, where the run frees its own stack as before. */
+    void      *kept_stack;
 };
 
 /* What emu_exception_dispatch receives: the guest state to dispatch against

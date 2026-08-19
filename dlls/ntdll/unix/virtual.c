@@ -3470,6 +3470,7 @@ static NTSTATUS virtual_map_image( HANDLE mapping, void **addr_ptr, SIZE_T *size
         if (is_builtin && !offset) add_builtin_module( view->base, NULL );
         *addr_ptr = view->base;
         *size_ptr = size;
+        emu_invalidate_code_range( view->base, size );
         VIRTUAL_DEBUG_DUMP_VIEW( view );
     }
     else delete_view( view );
@@ -3608,6 +3609,7 @@ static unsigned int virtual_map_section( HANDLE handle, PVOID *addr_ptr, ULONG_P
     {
         *addr_ptr = view->base;
         *size_ptr = size;
+        emu_invalidate_code_range( view->base, size );
         VIRTUAL_DEBUG_DUMP_VIEW( view );
     }
     else delete_view( view );
@@ -5248,6 +5250,7 @@ static NTSTATUS allocate_virtual_memory( void **ret, SIZE_T *size_ptr, ULONG typ
     {
         *ret = base;
         *size_ptr = size;
+        emu_invalidate_code_range( base, size );
     }
     else if (status == STATUS_NO_MEMORY)
         ERR( "out of memory for allocation, base %p size %08lx\n", base, size );
@@ -5619,6 +5622,7 @@ NTSTATUS WINAPI NtProtectVirtualMemory( HANDLE process, PVOID *addr_ptr, SIZE_T 
         *addr_ptr = base;
         *size_ptr = size;
         *old_prot = old;
+        emu_invalidate_code_range( base, size );
     }
     else *old_prot = PAGE_NOACCESS;
     return status;
@@ -6528,9 +6532,12 @@ static NTSTATUS unmap_view_of_section( HANDLE process, PVOID addr, ULONG flags )
     SERVER_END_REQ;
     if (!status)
     {
+        char *inval_base = view->base;
+        SIZE_T inval_size = view->size;
         if (view->protect & SEC_IMAGE) release_builtin_module( view->base );
         if (flags & MEM_PRESERVE_PLACEHOLDER) free_pages_preserve_placeholder( view, view->base, view->size );
         else delete_view( view );
+        emu_invalidate_code_range( inval_base, inval_size );
     }
     else FIXME( "failed to unmap %p %x\n", view->base, status );
 done:
@@ -6863,6 +6870,11 @@ NTSTATUS WINAPI NtWriteVirtualMemory( HANDLE process, void *addr, const void *bu
         size = 0;
     }
     if (bytes_written) *bytes_written = size;
+    /* a WriteProcessMemory into our own process is a native store the
+     * emulator cannot see; the cross-process direction stays uncovered
+     * exactly as the WoW64 lane's work-list comment says */
+    if (!status && size && process == NtCurrentProcess())
+        emu_invalidate_code_range( addr, size );
     return status;
 }
 
@@ -7013,6 +7025,7 @@ NTSTATUS WINAPI NtFlushInstructionCache( HANDLE handle, const void *addr, SIZE_T
     if (handle == GetCurrentProcess())
     {
         __clear_cache( (char *)addr, (char *)addr + size );
+        emu_invalidate_code_range( addr, size );
     }
     else
     {

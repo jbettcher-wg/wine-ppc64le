@@ -11,5 +11,6 @@ SOURCES = \
 	schannel.c \
 	schannel_gnutls.c \
 	secur32.c \
+	secur32.thunks \
 	thunks.c \
 	wrapper.c
