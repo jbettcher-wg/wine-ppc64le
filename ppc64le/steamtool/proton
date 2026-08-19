@@ -172,11 +172,19 @@ for name in $(env | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p'); do
     __EGL_VENDOR_LIBRARY_DIRS|__EGL_VENDOR_LIBRARY_FILENAMES|\
     OCL_ICD_FILENAMES|SDL_DYNAMIC_API|GST_PLUGIN_*|GTK_PATH|\
     GIO_MODULE_DIR|GDK_PIXBUF_MODULE_FILE|PYTHONPATH|PYTHONHOME|PERL5LIB) ;;
-    # Outer emulator knobs.  The bridge inside Wine is FEX too, and it must
-    # start from its own defaults rather than whatever the launcher script set
-    # for the Steam client.  WINE_PPC64LE_KEEP_FEX_ENV=1 keeps them.
+    # Emulator knobs PASS THROUGH by default (changed 2026-08-19).  The old
+    # rule stripped FEX_* so the bridge started from its own defaults --
+    # written when the bridge read no environment at all, so the strip cost
+    # nothing.  Since fastppcx86 54df357cb the bridge consumes the same
+    # FEX_* configuration the frontend does, and stripping it silently
+    # discarded deliberate per-run knobs: measured 2026-08-19, a whole
+    # FEX_SPINCOLLAPSE/FEX_HWTSO benchmark matrix ran with every knob
+    # stripped and its deltas were pure run noise.  These variables exist
+    # for a reason (user directive, same date); whoever sets them owns
+    # them.  WINE_PPC64LE_STRIP_FEX_ENV=1 restores the old behavior for a
+    # launch environment known to carry someone else's FEX settings.
     FEX_*)
-        [ "${WINE_PPC64LE_KEEP_FEX_ENV:-0}" = 1 ] && continue          ;;
+        [ "${WINE_PPC64LE_STRIP_FEX_ENV:-0}" = 1 ] || continue         ;;
     # Wine loader state belonging to some other Wine (Proton's, usually).
     WINEPREFIX|WINESERVER|WINELOADER|WINEDLLPATH|WINEARCH|\
     WINEFEXBRIDGE|WINEESYNC|WINEFSYNC)                             ;;

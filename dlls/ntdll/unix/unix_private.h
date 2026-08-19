@@ -454,6 +454,12 @@ extern NTSTATUS call_emu_trap_dispatcher( void *func, void *ctx );
 extern BOOL emu_handle_fault( void *sigcontext, EXCEPTION_RECORD *rec );
 extern void emu_invalidate_code_range( const void *addr, SIZE_T size );
 extern BOOL emu_get_guest_context( AMD64_CONTEXT *ctx );
+/* PROT_SAO hardware TSO: loader.c owns the bridge seam, virtual.c owns the
+ * pages.  virtual_enable_hwtso starts carrying the bit (and retro-applies
+ * it); emu_hwtso_refused reports a kernel refusal to the bridge and answers
+ * the bit's new value (0 after the bridge revokes). */
+extern void virtual_enable_hwtso( unsigned int prot_bit );
+extern unsigned int emu_hwtso_refused( const void *addr, SIZE_T size );
 #endif
 
 #define IMAGE_DLLCHARACTERISTICS_PREFER_NATIVE 0x0010 /* Wine extension */

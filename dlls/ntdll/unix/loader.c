@@ -1041,6 +1041,8 @@ static int  (*p_fexbridge_fault_is_jit)( const void *host_ucontext );
 static int  (*p_fexbridge_fault_unwind)( void *host_ucontext );
 static int  (*p_fexbridge_run)( void *thread, void *ctx );
 static void (*p_fexbridge_invalidate_code_range)( ULONGLONG start, ULONGLONG length );
+static UINT (*p_fexbridge_hwtso_prot)(void);
+static UINT (*p_fexbridge_hwtso_refused)( ULONGLONG start, ULONGLONG length );
 
 /* fexbridge_run results and CONTEXT flags, mirrored from fexbridge.h (the
  * header is not vendored into the tree; the values are ABI). */
@@ -1159,6 +1161,9 @@ static void emu_load_bridge(void)
     p_fexbridge_fault_unwind   = dlsym( so, "fexbridge_fault_unwind" );
     p_fexbridge_run            = dlsym( so, "fexbridge_run" );
     p_fexbridge_invalidate_code_range = dlsym( so, "fexbridge_invalidate_code_range" );
+    /* optional (no ABI bump): an older bridge simply has no hardware TSO */
+    p_fexbridge_hwtso_prot    = dlsym( so, "fexbridge_hwtso_prot" );
+    p_fexbridge_hwtso_refused = dlsym( so, "fexbridge_hwtso_refused" );
     /* ABI 4: the 32-bit (WoW64) lane.  Resolved unconditionally like the
      * rest; their absence is diagnosed where the 32-bit lane starts, not
      * here, so a 64-bit-only bridge keeps serving the AMD64 lane exactly as
@@ -1656,6 +1661,36 @@ void emu_invalidate_code_range( const void *addr, SIZE_T size )
 
 
 /***********************************************************************
+ *           emu_hwtso_enable / emu_hwtso_refused
+ *
+ * The PROT_SAO half of FEX_HWTSO on the native lane.  The bridge decides
+ * (probe + config) during fexbridge_process_init*; from then on the JIT
+ * emits no TSO barriers and every guest-reachable page must carry the SAO
+ * bit.  virtual.c's get_unix_prot() is the funnel that applies it forward;
+ * virtual_enable_hwtso() retro-applies it to what was mapped before the
+ * lazy bridge init; and a kernel refusal comes back through
+ * emu_hwtso_refused, where the bridge either aborts (FEX_HWTSO_STRICT) or
+ * revokes the whole process to emitted barriers -- after which the answer
+ * here is 0 and virtual.c stops adding the bit.
+ */
+static void emu_hwtso_enable(void)
+{
+    UINT prot;
+
+    if (!p_fexbridge_hwtso_prot) return;
+    if (!(prot = p_fexbridge_hwtso_prot())) return;
+    TRACE( "hardware TSO live, carrying prot bit %#x on guest pages\n", prot );
+    virtual_enable_hwtso( prot );
+}
+
+unsigned int emu_hwtso_refused( const void *addr, SIZE_T size )
+{
+    if (!p_fexbridge_hwtso_refused) return 0;
+    return p_fexbridge_hwtso_refused( (ULONG_PTR)addr, size );
+}
+
+
+/***********************************************************************
  *           emu_run_loop
  *
  * The Wine-owned replacement for the bridge's one-shot fexbridge_run_entry:
@@ -1992,6 +2027,7 @@ static NTSTATUS unixcall_emu_run_entry( void *args )
          * need the thread to exist before it runs so that the base is set
          * before the first guest instruction.  Both are idempotent. */
         if (p_fexbridge_process_init()) WARN( "emulator process init failed\n" );
+        else emu_hwtso_enable();
         if (p_fexbridge_current_thread) thread = p_fexbridge_current_thread();
         if (!thread && !p_fexbridge_thread_init( &thread )) own_thread = TRUE;
 
@@ -2236,6 +2272,7 @@ static NTSTATUS unixcall_emu32_init( void *args )
             ERR( "32-bit emulator process init failed (%d)\n", rc );
             return emu32_status;
         }
+        emu_hwtso_enable();
         p_fexbridge_invalidate_code_range( emu32_bop_page, page_size );
         emu32_status = STATUS_SUCCESS;
         TRACE( "32-bit lane up: bops at %p/+16, exit page %p\n",

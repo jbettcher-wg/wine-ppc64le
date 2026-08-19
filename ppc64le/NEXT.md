@@ -136,29 +136,42 @@ back-to-back runs):
 | as found (ondemand gov, SMT4, node0)     | 15.04 / 14.94 |
 | performance gov, SMT4, node0             | 15.45 |
 | performance gov, SMT4, unbound           | 16.05 |
-| + FEX_SPINCOLLAPSE=128 (SMT4, node0)     | 15.72 |
 | performance gov, **SMT2, node0**         | **7.47 — never do this** |
-| performance gov, **SMT2, unbound**       | **17.56** |
-| performance gov, SMT2, unbound, +spin128 | **17.75** (best; min 13.0) |
-| FEX_X87REDUCEDPRECISION=1 (any)          | no delta (correctness lever, not perf) |
+| performance gov, **SMT2, unbound**       | **17.56 / 17.75 / 16.34** (three samples) |
 
-So: **performance governor + SMT2 + NO numa bind (+ FEX_SPINCOLLAPSE=128
-if you like the min-fps bump) = +18%** over as-found,
-and the node-0 bind must never be combined with SMT2 (node 0 then has 20
-threads against the game's ~15-thread appetite; it halves the frame
-rate).  SMT2's win is exactly what the thread profile predicts: the
-fatter per-thread core feeds the one thread that matters.  FEX_* knobs
-reach the native lane since fastppcx86 `54df357cb` (the bridge
-environment layer).
+So: **performance governor + SMT2 + NO numa bind** is the measured
+winner, and the node-0 bind must never be combined with SMT2 (node 0
+then has 20 threads against the game's ~15-thread appetite; it halves
+the frame rate).  SMT2's win is exactly what the thread profile
+predicts: the fatter per-thread core feeds the one thread that matters.
+Note SMT2-unbound run variance is real (~1.4 fps across samples), much
+wider than SMT4's ±0.1.
+
+**A correction stands where FEX_* rows used to be.**  The first knob
+matrix (SPINCOLLAPSE, X87REDUCEDPRECISION) ran through steamtool/
+proton, whose environment filter STRIPPED FEX_* wholesale — a rule from
+before the bridge read any environment — so every "knob" leg actually
+ran bare and its delta was run noise.  The filter now passes FEX_*
+through by default (WINE_PPC64LE_STRIP_FEX_ENV=1 restores the strip),
+`stripped 0 variable(s)` in the launch log is the tell, and the knobs
+are UNMEASURED on this lane by deliberate choice: the user has done the
+JIT testing; what this tree owes is passthrough, which is verified.
+FEX_* knobs reach the native lane since fastppcx86 `54df357cb` (the
+bridge environment layer), and FEX_HWTSO works for real since
+`d4168c1ec` + this tree's PROT_SAO wiring (see the commit).
 
 What remains: the GameThread itself.  Next instrument is a perf profile
 of that one tid mid-benchmark (`FEX_GLOBALJITNAMING=1` writes
 /tmp/perf-<pid>.map, and the bridge honors it now) to split its 92%
-between JIT'd guest code, bridge helpers, and TSO barrier overhead —
-the last one matters because HWTSO/PROT_SAO is still
-FEXInterpreter-only (the bridge never runs SetupTSOEmulation, so
-FEX_HWTSO is safely inert on this lane; wiring SAO through the bridge
-is the known heavy lift if barriers turn out to dominate).
+between JIT'd guest code, bridge helpers, and TSO barrier overhead.
+HWTSO/PROT_SAO is NO LONGER FEXInterpreter-only: fastppcx86 `d4168c1ec`
+re-hosts the probe and the refusal/revocation closure in the bridge,
+and this tree carries the bit through get_unix_prot(), retro-applies it
+at the lazy bridge init (virtual_enable_hwtso) and reports kernel
+refusals back (mprotect_hwtso -> emu_hwtso_refused).  `FEX_HWTSO=1 fex
+nw-<title>` is live end to end — verified by smaps ('ar' VmFlags on 83
+wine-managed VMAs vs 0 in control) and the gate set, per the user's
+direction measured no further.
 
 ## 7. Smaller, known, and written down
 

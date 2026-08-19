@@ -240,6 +240,15 @@ static const size_t view_block_size = 0x100000;
 static void *preload_reserve_start;
 static void *preload_reserve_end;
 static BOOL force_exec_prot;  /* whether to force PROT_EXEC on all PROT_READ mmaps */
+
+/* PROT_SAO (hardware TSO for the emulation lane), or 0.  Non-zero exactly
+ * while the bridge reports FEX_HWTSO live: the JIT is emitting no TSO
+ * barriers, ordering rides on the pages, and every protection this file
+ * computes must carry the bit -- get_unix_prot() is the one funnel all of
+ * them flow through.  Set by virtual_enable_hwtso() (loader.c, right after
+ * emulator process init), cleared by the refusal path in mprotect_exec()
+ * when the kernel declines the bit for a range and the bridge revokes. */
+int emu_hwtso_prot = 0;
 static BOOL enable_write_exceptions;  /* raise exception on writes to executable memory */
 
 struct range_entry
@@ -1373,6 +1382,9 @@ static int get_unix_prot( BYTE vprot )
         if (vprot & VPROT_WRITEWATCH) prot &= ~PROT_WRITE;
     }
     if (!prot) prot = PROT_NONE;
+    /* every accessible page the guest can reach carries PROT_SAO while
+     * hardware TSO is live; PROT_NONE guard/uncommitted pages stay pure */
+    else prot |= emu_hwtso_prot;
     return prot;
 }
 
@@ -1935,17 +1947,38 @@ static NTSTATUS get_vprot_flags( DWORD protect, unsigned int *vprot, BOOL image 
  *
  * Wrapper for mprotect, adds PROT_EXEC if forced by force_exec_prot
  */
+/* mprotect, with the hardware-TSO refusal net.  arch_validate_prot answers
+ * EINVAL for a PROT_SAO the MMU cannot honor on this vma; anything else that
+ * fails would have failed without the bit and is not the bit's fault.  On a
+ * refusal the bridge applies FEX's own policy (strict abort, or revoke the
+ * whole process to emitted barriers -- fexbridge_hwtso_refused), the funnel
+ * flag drops to what the bridge now answers, and the operation retries
+ * without the bit so the caller's request still lands. */
+static int mprotect_hwtso( void *base, size_t size, int unix_prot )
+{
+    int ret = mprotect( base, size, unix_prot );
+#ifdef __powerpc64__
+    if (ret && errno == EINVAL && emu_hwtso_prot && (unix_prot & emu_hwtso_prot))
+    {
+        int bit = emu_hwtso_prot;
+        emu_hwtso_prot = emu_hwtso_refused( base, size );
+        ret = mprotect( base, size, unix_prot & ~bit );
+    }
+#endif
+    return ret;
+}
+
 static inline int mprotect_exec( void *base, size_t size, int unix_prot )
 {
     if (force_exec_prot && (unix_prot & PROT_READ) && !(unix_prot & PROT_EXEC))
     {
         TRACE( "forcing exec permission on %p-%p\n", base, (char *)base + size - 1 );
-        if (!mprotect( base, size, unix_prot | PROT_EXEC )) return 0;
+        if (!mprotect_hwtso( base, size, unix_prot | PROT_EXEC )) return 0;
         /* exec + write may legitimately fail, in that case fall back to write only */
         if (!(unix_prot & PROT_WRITE)) return -1;
     }
 
-    return mprotect( base, size, unix_prot );
+    return mprotect_hwtso( base, size, unix_prot );
 }
 
 
@@ -5016,6 +5049,46 @@ NTSTATUS virtual_uninterrupted_write_memory( void *addr, const void *buffer, SIZ
  *
  * Whether to force exec prot on all views.
  */
+#ifdef __powerpc64__
+/***********************************************************************
+ *           virtual_enable_hwtso
+ *
+ * Hardware TSO went live in the bridge (fexbridge_process_init* just
+ * returned, before the first guest instruction).  From here on
+ * get_unix_prot() carries PROT_SAO; this walk retro-applies it to
+ * everything already mapped, because the bridge initializes LAZILY (first
+ * guest entry) and by then the main image, its imports and the early heaps
+ * exist -- pages a barrier-free block may touch on its very first run.
+ * The walk is virtual_set_force_exec's, for virtual_set_force_exec's
+ * reasons; re-protecting with (0,0) reapplies each page's own protection,
+ * which now includes the bit.  Driver/device mappings never pass through
+ * these page tables and correctly stay non-SAO (x86 makes no TSO promise
+ * for WC memory -- the same envelope the emulated lane runs with).
+ */
+void virtual_enable_hwtso( unsigned int prot_bit )
+{
+    struct file_view *view;
+    sigset_t sigset;
+
+    server_enter_uninterrupted_section( &virtual_mutex, &sigset );
+    if (!emu_hwtso_prot)
+    {
+        emu_hwtso_prot = prot_bit;
+
+        WINE_RB_FOR_EACH_ENTRY( view, &views_tree, struct file_view, entry )
+        {
+            /* file mappings are always accessible */
+            BYTE commit = is_view_valloc( view ) ? 0 : VPROT_COMMITTED;
+
+            mprotect_range( view->base, view->size, commit, 0 );
+            if (!emu_hwtso_prot) break;   /* a refusal mid-walk revoked it */
+        }
+    }
+    server_leave_uninterrupted_section( &virtual_mutex, &sigset );
+}
+#endif  /* __powerpc64__ */
+
+
 void virtual_set_force_exec( BOOL enable )
 {
     struct file_view *view;
