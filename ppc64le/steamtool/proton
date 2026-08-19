@@ -437,6 +437,106 @@ if [ -n "$cpp_missing" ]; then
     say "  again.  Nothing is downloaded here."
 fi
 
+# ---------------------------------------------------- prerequisite markers --
+#
+# A GAME'S OWN INSTALLER CHAIN, AND THE ONE STAGE OF IT THAT CANNOT SUCCEED.
+#
+# Unreal Engine titles ship UE4PrereqSetup_x64.exe and run it from their
+# launcher; Steam runs the same class of thing from a game's install script.
+# The Visual C++ stages of those installers work here -- [MEASURED] Warhammer
+# 40,000: Boltgun installed the 2015-2019 x86 and x64 redistributables into its
+# own prefix and left the VisualStudio\14.0\VC\Runtimes keys behind to prove
+# it.  The .NET Framework 4 stage cannot: its MSI refuses the platform outright
+# (`Install_I_Silent_Error`, MSI result **1633** = ERROR_INSTALL_PLATFORM_
+# UNSUPPORTED), the chain reports failure, and the launcher exits without ever
+# starting the game -- rc=44, with no message that names .NET as the cause.
+#
+# On Windows that stage is a no-op, because .NET 4.x is part of the operating
+# system and the installer's detection key is already there.  So the key is put
+# there.  This is what winetricks and protonfixes do for the same problem, and
+# what the prefix would look like on the machine the game was built for.
+#
+# BE CLEAR ABOUT WHAT THIS IS.  It is a claim that .NET 4 is present, made to
+# installers that only ever read the key.  It does NOT make managed code run:
+# this tree ships no Mono, and a game that actually executes .NET assemblies
+# will fail later and differently.  Nothing here was downloaded, and nothing
+# was installed -- if you want real .NET in a prefix, install wine-mono into it
+# and this block will step aside, because it seeds only a prefix that has no
+# NDP key at all.
+#
+# WINE_PPC64LE_NO_PREREQ_SEED=1 turns it off.
+seed_prereq_markers() {
+    stamp=$prefix/.wine-ppc64le-prereq
+    [ -f "$stamp" ] && return 0
+    if [ "${WINE_PPC64LE_NO_PREREQ_SEED:-0}" = 1 ]; then
+        say "prerequisite markers not seeded (WINE_PPC64LE_NO_PREREQ_SEED=1)"
+        return 0
+    fi
+    # A prefix that already answers the question -- somebody installed
+    # wine-mono, or a real .NET -- is left exactly as it is.
+    if grep -q "NET Framework Setup" "$prefix/system.reg" 2>/dev/null; then
+        say "prefix already answers the .NET detection keys; not seeding"
+        : > "$stamp" 2>/dev/null
+        return 0
+    fi
+    reg=$compat/.wine-ppc64le-prereq.reg
+    # Release 528040 is .NET 4.8, the value Microsoft documents for detecting
+    # "4.8 or later"; the Client and Full subkeys are the two an installer
+    # actually reads, and the Wow6432Node copies are what a 32-bit stage of
+    # the same installer reads.
+    cat > "$reg" <<'REGEOF'
+REGEDIT4
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\NET Framework Setup\NDP\v4\Full]
+"Install"=dword:00000001
+"Release"=dword:00080ea8
+"Version"="4.8.04084"
+"TargetVersion"="4.0.0"
+"InstallPath"="C:\\windows\\Microsoft.NET\\Framework64\\v4.0.30319\\"
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\NET Framework Setup\NDP\v4\Client]
+"Install"=dword:00000001
+"Release"=dword:00080ea8
+"Version"="4.8.04084"
+"TargetVersion"="4.0.0"
+"InstallPath"="C:\\windows\\Microsoft.NET\\Framework64\\v4.0.30319\\"
+
+[HKEY_LOCAL_MACHINE\Software\Wow6432Node\Microsoft\NET Framework Setup\NDP\v4\Full]
+"Install"=dword:00000001
+"Release"=dword:00080ea8
+"Version"="4.8.04084"
+"TargetVersion"="4.0.0"
+"InstallPath"="C:\\windows\\Microsoft.NET\\Framework\\v4.0.30319\\"
+
+[HKEY_LOCAL_MACHINE\Software\Wow6432Node\Microsoft\NET Framework Setup\NDP\v4\Client]
+"Install"=dword:00000001
+"Release"=dword:00080ea8
+"Version"="4.8.04084"
+"TargetVersion"="4.0.0"
+"InstallPath"="C:\\windows\\Microsoft.NET\\Framework\\v4.0.30319\\"
+REGEOF
+    if "$wine" reg import "$(winepath_w "$reg")" >/dev/null 2>&1 ||
+       "$wine" regedit /S "$(winepath_w "$reg")" >/dev/null 2>&1; then
+        say "seeded the .NET 4 detection keys so a prerequisite installer skips"
+        say "  the stage that cannot succeed here (MSI 1633).  This claims .NET is"
+        say "  present; it does not make managed code run.  WINE_PPC64LE_NO_PREREQ_SEED=1"
+        say "  turns it off, and installing wine-mono into the prefix supersedes it."
+        : > "$stamp" 2>/dev/null
+    else
+        say "could not seed the .NET detection keys; a prerequisite installer that"
+        say "  chains .NET Framework 4 will fail its MSI with 1633 and the game's"
+        say "  launcher will exit without starting it"
+    fi
+    rm -f "$reg" 2>/dev/null
+}
+
+# The windows path of a unix file, for the handful of calls that need one.
+winepath_w() {
+    "$wine" winepath -w "$1" 2>/dev/null || echo "$1"
+}
+
+seed_prereq_markers
+
 # ------------------------------------------------------------ Steam bridge --
 #
 # A Windows game reaches Steam through steam_api64.dll, which reads

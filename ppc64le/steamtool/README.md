@@ -80,6 +80,23 @@ nobody could answer and the launch hung.
 verb only**. The game keeps every box it raises. Set it to `0` to restore the
 dialogs; that is what the gate's negative control does.
 
+## Prerequisite markers
+
+A new prefix gets the .NET 4 detection keys (`NDP\v4\Full` and `\Client`,
+plus the Wow6432Node copies) written into it.  A prefix that already answers
+those keys -- wine-mono, or a real install -- is left alone, and a stamp file
+means it happens once.
+
+Why: a game's own prerequisite installer chains .NET Framework 4, whose MSI
+refuses the platform (`Install_I_Silent_Error`, MSI **1633**), and the failure
+takes the whole chain with it -- Boltgun's UE4PrereqSetup exits and its launcher
+never starts the game, rc=44, with nothing naming .NET as the cause.  The Visual
+C++ stages of the same installer succeed and leave their own keys behind.
+
+On Windows the .NET stage is a no-op because .NET is part of the OS.  This makes
+the prefix look the same.  It is a claim to installers, not an implementation.
+`WINE_PPC64LE_NO_PREREQ_SEED=1` turns it off.
+
 ## Prefixes
 
 A prefix Proton already owns is never touched. If `pfx` exists and was not

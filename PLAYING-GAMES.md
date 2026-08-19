@@ -188,6 +188,7 @@ WINE_PPC64LE_NUMA_NODE=0
 | `WINE_PPC64LE_FEXBRIDGE` | Use this bridge library, whatever else is on the machine. |
 | `WINE_PPC64LE_NO_STEAM_BRIDGE` | `1` disables the helper that lets the game reach the real Steam client.  Games that need Steam will then fail their own way, which is sometimes what you want while debugging. |
 | `WINE_PPC64LE_KEEP_FEX_ENV` | `1` keeps the outer `FEX_*` variables instead of letting the inner emulator start from its own defaults. |
+| `WINE_PPC64LE_NO_PREREQ_SEED` | `1` stops the tool claiming .NET 4 is present in a new prefix.  Off by default because a game's own prerequisite installer otherwise fails its .NET stage and never starts the game. |
 | `WINE_PPC64LE_NO_DIALOGS` | `0` restores message boxes on the pre-step, which are suppressed by default; the game's own boxes are never suppressed. |
 | `WINE_PPC64LE_TREE` | Point the tool at a different build tree. |
 | `WINEDEBUG` | Wine's own channels, e.g. `WINEDEBUG=+seh`.  Useful and *enormous* — a full `+seh` trace of one game launch can be tens of gigabytes. |
@@ -225,6 +226,22 @@ Compare frame times with and without.  If it is worse, set the value to `off`.
 
 ---
 
+### When a game installs its own prerequisites
+
+Unreal Engine titles run `UE4PrereqSetup_x64.exe` from their launcher, and
+Steam runs redistributable installers from a game's install script.  You will
+see those windows before the game, and that is normal — they run under this
+port and their Visual C++ stages work: Boltgun installed the 2015-2019 x86 and
+x64 redistributables into its own prefix and recorded them in the registry.
+
+The **.NET Framework 4** stage cannot work: its MSI refuses the platform (error
+**1633**), the chain reports failure, and the launcher exits without starting
+the game.  On Windows that stage is skipped, because .NET is part of the
+operating system.  So the tool makes a new prefix look the same way — it writes
+the .NET 4 detection keys and the installer skips the stage.  That is a claim
+made to installers, not an implementation: managed code still will not run, and
+a game that genuinely executes .NET assemblies needs wine-mono in its prefix.
+
 ## 7. Before running a title for the first time
 
 Most first failures are decidable without running anything, because an import
@@ -259,6 +276,7 @@ several games write crash reports with an all-zero register block.
 | `err:seh:...` followed by `rc=3` | A genuine port bug in the game's path. | Report the log; the `err:` lines carry real values. |
 | `NATIVE ppc64 execution has branched INTO GUEST CODE` | A native module was handed one of the game's function pointers and called it directly — a missing wrapping row. | Report it **with the `called from lr=...` line**: that names the exact call site, and the fix is usually one table entry. |
 | `guest called through a wild pointer` | The game called through a pointer that is in no image — usually a `GetProcAddress` that returned NULL earlier. | The message names the caller; look upstream for the failed lookup. |
+| A **UE4 Prerequisites** or Steam redistributable installer appears instead of the game, then it exits (`rc=44`) | The chain reached its **.NET Framework 4** stage, whose MSI refuses the platform — `Install_I_Silent_Error`, result **1633**.  The Visual C++ stages of the same installer do work. | Nothing to do: the tool seeds the .NET detection keys into a new prefix so the stage is skipped, exactly as it is skipped on Windows where .NET is part of the OS.  For a prefix made before that existed, delete it and launch again, or set the keys yourself.  `WINE_PPC64LE_NO_PREREQ_SEED=1` turns the seeding off. |
 | Game runs but is slow, log full of `Pump was not called` | The known concurrency ceiling: this port is latency-bound at roughly 2.5 cores today. | Try the NUMA binding above.  Otherwise it is a known limit, not your setup. |
 | Nothing on screen, no error | Check `vulkaninfo` works for the user Steam runs as, and that the game is not picking an OpenGL binary (`WINE_PPC64LE_RUN_EXE`). |
 
