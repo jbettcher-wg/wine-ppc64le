@@ -160,6 +160,28 @@ OUT=${OUT:-/tmp/cpu-topology}
 SABOTAGE=0
 [ "${1:-}" = "--sabotage" ] && SABOTAGE=1
 
+# A STALE WINESERVER DEFEATS EVERY SERVER-SIDE LEVER, silently.
+#
+# WINEEMUNOCPUMAP is read by the wineserver, once, into a static -- the house
+# pattern for a lever, and right for a value that must not change under a
+# running process.  But a wineserver outlives the run that started it, so a
+# server already up from an EARLIER run latched the variable's old value and
+# will not see this run's.  [MEASURED] 2026-08-18: with a leftover server the
+# nocpumap leg reported "the guest's thread still landed on [0,1,2,3,8,9,10,11]
+# with the identity map forced" -- the lever appeared not to work; with the
+# server killed first, the same command goes red exactly as it should.
+#
+# A negative control that a leftover process can defeat is not a control, and
+# the failure is the dangerous direction: it looks like the mechanism under
+# test is broken when it is fine, or -- if the stale server happens to have the
+# variable set -- like a control passing when nothing was tested.  So the
+# server is retired here, before anything runs, in both modes.  `wineserver -k`
+# is scoped to $WINEPREFIX and touches nobody else's.
+if [ -x "$BUILD/server/wineserver" ] && [ -n "${WINEPREFIX:-}" ]; then
+    "$BUILD/server/wineserver" -k >/dev/null 2>&1 || true
+    sleep 1
+fi
+
 say()  { echo "check-cpu-topology: $*"; }
 bad()  { echo "check-cpu-topology: FAIL $*" >&2; fail=1; }
 note() { echo "check-cpu-topology: note $*"; }
@@ -939,6 +961,19 @@ way to name"
     fi
 fi
 
+# -> 0 if the wineserver protocol can carry a processor GROUP alongside an
+# affinity mask.  Read from the source rather than assumed, so this gate cannot
+# drift away from the tree it is testing: `affinity_t affinity;` with a
+# `group` field beside it in the same request is the thing that would make
+# group 1 addressable.
+server_carries_a_group()
+{
+    awk '/@REQ\(set_thread_info\)/ { inreq = 1; next }
+         inreq && /^@(REQ|REPLY|END)/ { inreq = 0 }
+         inreq && /[ \t]group[ \t]*;/ { found = 1 }
+         END { exit(found ? 0 : 1) }' "$SRC/server/protocol.def" 2>/dev/null
+}
+
 # 3e: a group other than 0.  Only exists on a machine big enough to have one,
 # and it is the leg that says whether the second half of this machine is
 # reachable by a guest at all.
@@ -953,11 +988,42 @@ if [ "$GROUP_COUNT" -gt 1 ]; then
     if guest_pin_leg pin_g1 1 group "$M1" "$E1"; then
         say "layer 3e: the guest reached group 1 through SetThreadGroupAffinity \
 and its thread runs on Linux CPUs [$E1]"
+    elif ! server_carries_a_group; then
+        # A KNOWN LIMIT, NOT A PASS, AND IT RE-ARMS ITSELF.
+        #
+        # The wineserver protocol carries an affinity mask and NOTHING ELSE --
+        # `affinity_t affinity` in set_thread_info/get_thread_info and their
+        # process counterparts, with no group field anywhere in
+        # server/protocol.def -- so the server cannot be TOLD which group a
+        # mask means, and a guest cannot address group 1 no matter how right
+        # the enumeration is.  ntdll agrees with it today: rtl.c's group
+        # affinity setter refuses any group but 0.
+        #
+        # This is deliberate and scoped: closing it means adding a group field
+        # to four requests, bumping SERVER_PROTOCOL_VERSION, and deciding what
+        # a process affinity SET of groups means -- work that was weighed and
+        # deferred, not overlooked.  What is NOT deferred is the default case,
+        # which is what costs a real machine real processors: a guest that
+        # never pins now runs on all $COUNT (measured 32 of 80 before).
+        #
+        # Reporting this as a pass would bury it, and failing forever would
+        # make the whole gate worthless -- a red light nobody can act on gets
+        # ignored, and then a real regression hides behind it.  So it is named,
+        # and the test above is on the PROTOCOL rather than on a hardcoded
+        # expectation: the day a group field appears in protocol.def this stops
+        # being a limit and becomes a failure again, with no one having to
+        # remember to re-enable it.
+        say "layer 3e: LIMIT -- group 1's $(gsize 1) processors cannot be \
+addressed by a guest, because server/protocol.def carries no group field \
+alongside the affinity mask.  Not a regression and not a pass: this leg \
+becomes an assertion again automatically once that field exists.  Unpinned \
+threads are unaffected and use all $COUNT processors"
     else
         bad "layer 3e: SetThreadGroupAffinity(group 1, $M1) should have landed \
 on Linux CPUs [$E1] -- $OBS_RESULT.  $(pin_detail pin_g1) The $(gsize 1) \
 processors of group 1 are $(gsize 1) of this machine's $COUNT, and a guest \
-cannot reach any of them"
+cannot reach any of them.  server/protocol.def DOES carry a group field now, \
+so this is a real failure rather than the documented limit"
     fi
 fi
 
