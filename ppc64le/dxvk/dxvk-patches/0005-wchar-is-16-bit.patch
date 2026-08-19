@@ -1,0 +1,135 @@
+diff --git a/include/native/windows/windows_base.h b/include/native/windows/windows_base.h
+index 8650d2e3..15fd02ce 100644
+--- a/include/native/windows/windows_base.h
++++ b/include/native/windows/windows_base.h
+@@ -27,7 +27,14 @@ typedef int32_t *LPLONG;
+ 
+ typedef int32_t HRESULT;
+ 
+-typedef wchar_t WCHAR;
++/* 16-bit, NOT the platform wchar_t: every struct that crosses to a Windows
++ * consumer -- and on the wine-ppc64le port every guest IS one, reading these
++ * structs over shared memory -- lays WCHAR out as two bytes.  With the
++ * 4-byte wchar_t here, DXGI_ADAPTER_DESC::Description grew to 512 bytes and
++ * pushed VendorId from offset 0x100 to 0x200, so a guest read a one-letter
++ * adapter name and zeros for every id and memory size (measured: Cyberpunk
++ * 2077 rejected the adapter and tore down its device enumeration). */
++typedef uint16_t WCHAR;
+ typedef WCHAR *NWPSTR, *LPWSTR, *PWSTR;
+ typedef unsigned char UCHAR, *PUCHAR;
+ 
+@@ -130,7 +137,7 @@ typedef UINT_PTR* PUINT_PTR;
+ #endif /*STRICT*/
+ 
+ typedef char* LPSTR;
+-typedef const wchar_t* LPCWSTR;
++typedef const WCHAR* LPCWSTR;   /* the WCHAR above, not wchar_t: one wide char, one width */
+ 
+ typedef struct LUID {
+   DWORD LowPart;
+diff --git a/src/d3d11/d3d11_fence.cpp b/src/d3d11/d3d11_fence.cpp
+index 1ae07f77..99257926 100644
+--- a/src/d3d11/d3d11_fence.cpp
++++ b/src/d3d11/d3d11_fence.cpp
+@@ -1,3 +1,4 @@
++#include <cstdio>
+ #include "d3d11_fence.h"
+ #include "d3d11_device.h"
+ #include "../util/util_win32_compat.h"
+@@ -80,10 +81,19 @@ namespace dxvk {
+     WCHAR buffer[MAX_PATH];
+     UNICODE_STRING name_str;
+     if (lpName) {
+-        DWORD session, len, name_len = wcslen(lpName);
++        DWORD session, len, name_len = 0;
++        while (lpName[name_len]) name_len++;
+ 
+         ProcessIdToSessionId(GetCurrentProcessId(), &session);
+-        len = swprintf(buffer, ARRAYSIZE(buffer), L"\\Sessions\\%u\\BaseNamedObjects\\", session);
++        {
++            /* glibc's wide functions speak 4-byte wchar_t; WCHAR here is the
++             * 2-byte Windows one, so the prefix is spelled narrow and widened
++             * by hand. */
++            char prefix[64];
++            std::snprintf(prefix, sizeof(prefix),
++                          "\\Sessions\\%u\\BaseNamedObjects\\", (unsigned)session);
++            for (len = 0; prefix[len]; len++) buffer[len] = (WCHAR)prefix[len];
++        }
+         memcpy(buffer + len, lpName, (name_len + 1) * sizeof(WCHAR));
+         name_str.MaximumLength = name_str.Length = (len + name_len) * sizeof(WCHAR);
+         name_str.MaximumLength += sizeof(WCHAR);
+diff --git a/src/d3d11/d3d11_resource.cpp b/src/d3d11/d3d11_resource.cpp
+index 8f2bc998..461307a8 100644
+--- a/src/d3d11/d3d11_resource.cpp
++++ b/src/d3d11/d3d11_resource.cpp
+@@ -1,3 +1,4 @@
++#include <cstdio>
+ #include "d3d11_buffer.h"
+ #include "d3d11_texture.h"
+ #include "d3d11_resource.h"
+@@ -308,10 +309,19 @@ namespace dxvk {
+     WCHAR buffer[MAX_PATH];
+     UNICODE_STRING name_str;
+     if (lpName) {
+-        DWORD session, len, name_len = wcslen(lpName);
++        DWORD session, len, name_len = 0;
++        while (lpName[name_len]) name_len++;
+ 
+         ProcessIdToSessionId(GetCurrentProcessId(), &session);
+-        len = swprintf(buffer, ARRAYSIZE(buffer), L"\\Sessions\\%u\\BaseNamedObjects\\", session);
++        {
++            /* glibc's wide functions speak 4-byte wchar_t; WCHAR here is the
++             * 2-byte Windows one, so the prefix is spelled narrow and widened
++             * by hand. */
++            char prefix[64];
++            std::snprintf(prefix, sizeof(prefix),
++                          "\\Sessions\\%u\\BaseNamedObjects\\", (unsigned)session);
++            for (len = 0; prefix[len]; len++) buffer[len] = (WCHAR)prefix[len];
++        }
+         memcpy(buffer + len, lpName, (name_len + 1) * sizeof(WCHAR));
+         name_str.MaximumLength = name_str.Length = (len + name_len) * sizeof(WCHAR);
+         name_str.MaximumLength += sizeof(WCHAR);
+diff --git a/src/wsi/glfw/wsi_monitor_glfw.cpp b/src/wsi/glfw/wsi_monitor_glfw.cpp
+index 358fb146..469ca351 100644
+--- a/src/wsi/glfw/wsi_monitor_glfw.cpp
++++ b/src/wsi/glfw/wsi_monitor_glfw.cpp
+@@ -36,13 +36,11 @@ namespace dxvk::wsi {
+     if (!isDisplayValid(displayId))
+       return false;
+ 
+-    std::wstringstream nameStream;
+-    nameStream << LR"(\\.\DISPLAY)" << (displayId + 1);
+-
+-    std::wstring name = nameStream.str();
+-
++    char nameBuf[32];
++    std::snprintf(nameBuf, sizeof(nameBuf), "\\\\.\\DISPLAY%u", displayId + 1);
+     std::memset(Name, 0, sizeof(Name));
+-    name.copy(Name, name.length(), 0);
++    for (size_t i = 0; nameBuf[i] && i < 31; i++)
++      Name[i] = static_cast<WCHAR>(nameBuf[i]);
+ 
+     return true;
+   }
+diff --git a/src/wsi/sdl2/wsi_monitor_sdl2.cpp b/src/wsi/sdl2/wsi_monitor_sdl2.cpp
+index d021346f..323d80a2 100644
+--- a/src/wsi/sdl2/wsi_monitor_sdl2.cpp
++++ b/src/wsi/sdl2/wsi_monitor_sdl2.cpp
+@@ -37,13 +37,11 @@ namespace dxvk::wsi {
+     if (!isDisplayValid(displayId))
+       return false;
+ 
+-    std::wstringstream nameStream;
+-    nameStream << LR"(\\.\DISPLAY)" << (displayId + 1);
+-
+-    std::wstring name = nameStream.str();
+-
++    char nameBuf[32];
++    std::snprintf(nameBuf, sizeof(nameBuf), "\\\\.\\DISPLAY%u", displayId + 1);
+     std::memset(Name, 0, sizeof(Name));
+-    name.copy(Name, name.length(), 0);
++    for (size_t i = 0; nameBuf[i] && i < 31; i++)
++      Name[i] = static_cast<WCHAR>(nameBuf[i]);
+ 
+     return true;
+   }
