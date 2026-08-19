@@ -758,6 +758,19 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
                     (raw & (1ull << (bits - 1))))
                     raw |= ~mask;
             }
+            /* A FOUR-byte argument is clean in a register (x86-64 zero-extends
+             * 32-bit register writes) but NOT on the stack, where the guest's
+             * 32-bit store leaves the slot's upper half stale and an ELFv2
+             * callee trusts the caller extended it.  Extend per the declared
+             * signedness -- see winecom_slot::dwordmask for the measurement
+             * (CopyDescriptors' heap type, argument seven). */
+            else if (sl->dwordmask & (1u << (i - 1)))
+            {
+                if (sl->dwordsign & (1u << (i - 1)))
+                    raw = (UINT64)(INT64)(INT)raw;
+                else
+                    raw = (UINT)raw;
+            }
             args[i] = raw;
             break;
         case WINECOM_CA_IFACE_IN:

@@ -170,11 +170,13 @@ struct winecom_slot
                                    any check that only asks whether the call
                                    returned.
 
-                                   32-bit arguments need nothing: x86-64
-                                   zero-extends every 32-bit register write to
-                                   64 bits by hardware rule, so a DWORD is
-                                   already clean.  Only 8- and 16-bit
-                                   parameters are at risk.
+                                   32-bit arguments IN REGISTERS need
+                                   nothing: x86-64 zero-extends every 32-bit
+                                   register write to 64 bits by hardware rule,
+                                   so a DWORD in RDX is already clean.  A
+                                   32-bit argument ON THE STACK is a different
+                                   animal -- see dwordmask below, measured on
+                                   ID3D12Device::CopyDescriptors.
 
                                    A table generated before this field existed
                                    has narrowmask 0 and behaves exactly as it
@@ -196,6 +198,43 @@ struct winecom_slot
                                    SHORT of -1 arrives as DX=0xFFFF and has to
                                    reach the callee as 0xFFFFFFFFFFFFFFFF, not
                                    as 0x000000000000FFFF. */
+    unsigned short dwordmask;   /* bit i: parameter i is a FOUR-BYTE by-value
+                                   slot.  The register story above does not
+                                   cover the stack: an MS-x64 caller stores a
+                                   32-bit stack argument with a 32-bit store
+                                   and leaves whatever was in the slot's upper
+                                   half, and an ELFv2 callee at -O2 is
+                                   entitled to trust the caller extended it.
+
+                                   [MEASURED] Cyberpunk 2077's
+                                   ID3D12Device::CopyDescriptors passes the
+                                   descriptor heap type as its seventh
+                                   argument -- a stack slot -- and vkd3d's
+                                   64-bit switch missed every case of an enum
+                                   whose low half said 0 -- 32768 refused
+                                   descriptor copies in the first minute of a
+                                   run, no crash anywhere.  The flat lane has carried the same
+                                   fix since its version-6 width descriptors
+                                   (dlls/ntdll/signal_ppc64.c THUNK_WIDTH,
+                                   measured there on mspatcha).
+
+                                   unsigned short where the elder masks are
+                                   unsigned char, because refusing a slot for
+                                   having a 32-bit argument in position 9
+                                   (UpdateTileMappings' flags) would take a
+                                   served row away; sixteen bits cover every
+                                   argc this surface has.  A table generated
+                                   before this field existed has 0 here and
+                                   behaves exactly as it did -- same
+                                   deliberate not-fail-closed rule as
+                                   narrowmask, and the lanes that have not
+                                   been regenerated keep their latent stack
+                                   hazard until they are. */
+    unsigned short dwordsign;   /* bit i: that four-byte parameter is SIGNED
+                                   (INT, LONG, an enum -- int underneath), so
+                                   it is sign-extended; unsigned ones are
+                                   zero-extended.  ELFv2's own rule, applied
+                                   as written. */
 };
 
 /* winecom_iface flags */
