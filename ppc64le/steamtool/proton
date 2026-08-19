@@ -657,6 +657,51 @@ run|runinprefix|waitforexitandrun)
     ;;
 esac
 
+# -------------------------------------------------------------------- numa --
+#
+# WHICH NUMA NODE THE GAME RUNS ON.  op4k is two nodes (0 and 8) whose `node
+# distances` are 10 local and 40 remote, so a remote line costs about four
+# times a local one.  A guest process on this port is deliberately NOT
+# confined: ppc64le/cpu/TOPOLOGY.md's rule is that an unrestricted affinity
+# mask -- what "the thread never asked" looks like -- means every online
+# processor across every group, so Linux spreads a game's threads over both
+# nodes.  [MEASURED] DOOM (2016) mid-session: 38 threads on node 0 and 35 on
+# node 8, with its 3.5 GB split 2.1/1.4 between them.
+#
+# That is not obviously right.  Windows keeps a process inside ONE processor
+# group unless it asks for another, and this port's own concurrency ceiling is
+# latency-bound rather than throughput-bound -- so a job system whose queues
+# ping-pong across a 4x-distance link is exactly the shape that suffers.  It is
+# also not obviously wrong: two nodes is twice the memory bandwidth.
+#
+# So it is a lever rather than a decision.  WINE_PPC64LE_NUMA_NODE=<id> binds
+# the game (and the wineserver it starts, which inherits this) to one node;
+# unset, or "off", changes nothing.  WINE_PPC64LE_NUMA_MEM chooses how strict
+# the memory half is: "membind" (the default) allocates only there and fails
+# over to nothing, "preferred" allocates there when it can and elsewhere when
+# it cannot, "none" binds the cpus and leaves memory alone.
+#
+# The bridge helper is deliberately outside this: it is an x86-64 process under
+# the outer FEX serving Steamworks calls, not part of the game's working set.
+numa_run=
+case ${WINE_PPC64LE_NUMA_NODE:-} in
+""|off|none)
+    ;;
+*)
+    if command -v numactl >/dev/null 2>&1; then
+        case ${WINE_PPC64LE_NUMA_MEM:-membind} in
+        preferred) numa_run="numactl --cpunodebind=$WINE_PPC64LE_NUMA_NODE --preferred=$WINE_PPC64LE_NUMA_NODE" ;;
+        none)      numa_run="numactl --cpunodebind=$WINE_PPC64LE_NUMA_NODE" ;;
+        *)         numa_run="numactl --cpunodebind=$WINE_PPC64LE_NUMA_NODE --membind=$WINE_PPC64LE_NUMA_NODE" ;;
+        esac
+        say "NUMA: $numa_run"
+    else
+        say "WINE_PPC64LE_NUMA_NODE=$WINE_PPC64LE_NUMA_NODE but numactl is not \
+installed; running unbound"
+    fi
+    ;;
+esac
+
 # --------------------------------------------------------------------- run --
 
 case $verb in
@@ -673,15 +718,16 @@ getnativepath)
 run|runinprefix)
     # No longer an exec: this script owns the bridge helper and has to be here
     # to stop it when the game is gone.  The EXIT trap does that.
-    say "run $wine $*"
-    "$wine" "$@"
+    say "run $numa_run $wine $*"
+    # unquoted deliberately: $numa_run is a command line, not one word
+    $numa_run "$wine" "$@"
     rc=$?
     say "game exited rc=$rc"
     exit $rc
     ;;
 waitforexitandrun)
-    say "run $wine $*"
-    "$wine" "$@"
+    say "run $numa_run $wine $*"
+    $numa_run "$wine" "$@"
     rc=$?
     say "game exited rc=$rc; waiting for wineserver"
     "$wineserver" -w

@@ -3,6 +3,10 @@
 `proton` is the script Steam runs instead of Proton. It sets up an environment
 for the native ppc64 wine and hands the game to it.
 
+This file is how the tool works. **If you are trying to get a game running,
+read `PLAYING-GAMES.md` at the top of the tree instead** — installation, the
+Steam settings, the per-game knobs and what each failure means.
+
 Installed by `install.sh` into
 `~/.local/share/Steam/compatibilitytools.d/wine-ppc64le-native/`.
 
@@ -46,6 +50,25 @@ Stripped: the Steam runtime's loader and driver paths, `FEX_*` (the inner
 emulator must start from its own defaults, not the launcher's —
 `WINE_PPC64LE_KEEP_FEX_ENV=1` keeps them), and another wine's `WINEPREFIX`,
 `WINELOADER`, `WINESERVER`, `WINEDLLPATH`, `WINEARCH`, `WINEESYNC`, `WINEFSYNC`.
+
+## NUMA
+
+`WINE_PPC64LE_NUMA_NODE=<id>` wraps the game in `numactl --cpunodebind=<id>
+--membind=<id>`; unset or `off` changes nothing. `WINE_PPC64LE_NUMA_MEM` picks
+`membind` (default), `preferred` or `none` (cpus only). The wineserver the game
+starts inherits it; the steam bridge helper deliberately does not, being an
+x86-64 process under the outer FEX rather than part of the game's working set.
+
+It exists because this port does not confine a guest: `ppc64le/cpu/TOPOLOGY.md`'s
+rule is that an unrestricted affinity mask means every processor in every group,
+so Linux spreads a game across every NUMA node. [MEASURED] DOOM (2016)
+mid-session, unbound: 38 threads on node 0 and 35 on node 8, 3.5 GB split
+2.1/1.4. Bound to node 0: 74 threads and 2.0 GB of 2.0 GB on that node.
+
+Whether it helps is a per-title, per-machine question — two nodes is twice the
+bandwidth, but this port's ceiling is latency-bound and op4k's remote distance
+is 40 against a local 10 — so it is a lever with no default, set per game in
+`appconfig/<appid>.env`.
 
 ## Dialogs
 

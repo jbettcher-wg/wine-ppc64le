@@ -4,6 +4,11 @@
 Upstream Wine has no PowerPC support; 32-bit PowerPC was removed years ago and
 64-bit never existed. This branch adds it.
 
+> **Want to play something?** `PLAYING-GAMES.md` is the practical guide —
+> what to build, how to register the compatibility tool with Steam, the
+> per-game settings, and what each failure means.  This file is the design
+> record.
+
 ## Why
 
 To run Windows software on POWER with **only the guest binary emulated**. Today,
@@ -748,6 +753,9 @@ the build drives itself, so no extra toolchain or flag is needed for them.
 is a 176-thread AC922. Note that `ninja` — used by some subprojects — does
 **not** read `MAKEFLAGS`, so pass it `-j` explicitly or it spawns roughly
 core-count+2 jobs and is bounded by RAM rather than cores.
+
+To play a Steam game with what you have just built, follow
+`PLAYING-GAMES.md` from section 3.
 
 Then run programs straight out of the build directory, as with upstream Wine:
 
