@@ -15,6 +15,21 @@ DLL       dxgi.dll
 FROM-SPEC auto
 COM-JSON  ../../ppc64le/dxvk/interfaces_dxvk.json
 
+# GUEST-MACHINE: this module serves a 32-bit guest too, and it is one of the
+# few that must.  The i386 lane is real WoW64 -- Wine's own i386 builtins run
+# emulated and convert at the syscall boundary (74f9b452924) -- so a .thunks
+# file gets NO i386 half by default and kernel32's i386 build stays Wine's
+# own.  d3d11/dxgi/d3d10core are the exception because this tree REPLACED
+# their implementation with dxvk behind a unixlib: the i386 build of this
+# same source forwards to __wine_dxvk_* entries that exist only in the native
+# ppc64 module, which is the wall a 32-bit title hits (dexwin: four
+# find_forwarded_export errors, then no D3D11 device).  The struct layout
+# divergence that made a general i386 Win32 thunk lane a bad idea is paid for
+# here explicitly, by generated repacks -- ppc64le/thunks/gen_repack32.py.
+GUEST-MACHINE x86_64
+GUEST-MACHINE i386
+
+
 GUEST-IMPL CreateDXGIFactory       __wine_guest_CreateDXGIFactory
 GUEST-IMPL CreateDXGIFactory1      __wine_guest_CreateDXGIFactory1
 GUEST-IMPL CreateDXGIFactory2      __wine_guest_CreateDXGIFactory2

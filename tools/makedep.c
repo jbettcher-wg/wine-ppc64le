@@ -3519,6 +3519,7 @@ struct thunks_info
     struct strarray probe_includes; /* PROBE-INCLUDE <header>, one per line */
     struct strarray probe_extra;    /* PROBE-EXTRA <header>, one per line */
     struct strarray include_dirs;   /* INCLUDE-DIR <dir>, .thunks-relative, file order */
+    struct strarray machines;       /* GUEST-MACHINE <arch>, one per line; empty = x86_64 only */
 };
 
 /*******************************************************************
@@ -3531,7 +3532,8 @@ struct thunks_info
 static struct thunks_info read_thunks_file( const char *filename )
 {
     struct thunks_info info = { NULL, NULL, NULL, NULL,
-                                 empty_strarray, empty_strarray, empty_strarray };
+                                 empty_strarray, empty_strarray, empty_strarray,
+                                 empty_strarray };
     FILE *file;
     char *buffer;
 
@@ -3560,6 +3562,7 @@ static struct thunks_info read_thunks_file( const char *filename )
         else if (!strcmp( keyword, "PROBE-INCLUDE" )) strarray_add( &info.probe_includes, xstrdup( value ));
         else if (!strcmp( keyword, "PROBE-EXTRA" )) strarray_add( &info.probe_extra, xstrdup( value ));
         else if (!strcmp( keyword, "INCLUDE-DIR" )) strarray_add( &info.include_dirs, xstrdup( value ));
+        else if (!strcmp( keyword, "GUEST-MACHINE" )) strarray_add( &info.machines, xstrdup( value ));
         /* anything else: not our concern, see the struct's banner above */
     }
     fclose( file );
@@ -3649,19 +3652,40 @@ static void add_probe_header_dep( const struct makefile *make, struct strarray *
  * verify them up front anyway; that is a property of the source tree's
  * setup, not a reason to weaken the dependency.)
  */
+/* WHICH GUEST MACHINES A .thunks FILE SERVES, and why it is not simply "both".
+ *
+ * The AMD64 lane thunks the whole Win32 surface: a guest's imports bind to
+ * trap stubs and ntdll marshals MS-x64 to ELFv2, which works because guest
+ * and native are both LLP64 and every struct is the same bytes on both sides.
+ *
+ * The i386 lane is REAL WoW64 (see 74f9b452924): Wine's own i386 PE builtins
+ * run under the emulator and convert at the SYSCALL boundary, where wow64.dll
+ * and wow64win.dll already do all ~1500 conversions.  Thunking the Win32
+ * surface for i386 was rejected there on purpose -- a 4-byte pointer moves
+ * every field of every struct that carries one, in both directions, through
+ * graphs no signature describes.  So a .thunks file does NOT get an i386 half
+ * by default, and emitting one for e.g. kernel32 would put a trap stub where
+ * Wine's real i386 implementation belongs.
+ *
+ * The exception a module OPTS INTO with `GUEST-MACHINE i386` is a module this
+ * tree REPLACES outright, whose implementation is therefore native ppc64 and
+ * unreachable from an i386 image any other way: d3d11/dxgi/d3d10core, whose
+ * bodies are dxvk behind a unixlib.  Wine's i386 build of those is this
+ * tree's own source, so it forwards to __wine_dxvk_* entries that exist only
+ * in the native module -- which is exactly the wall dexwin hits.  For those,
+ * and only those, the struct divergence is paid for explicitly by generated
+ * repacks (ppc64le/thunks/gen_repack32.py).
+ */
+static const char * const thunk_machine_default[] = { "x86_64" };
+
 static void output_source_thunks( struct makefile *make, struct incl_file *source, const char *obj )
 {
-    const char *dir = "x86_64-windows";
-    const char *name = strmake( "%s/%s.dll", dir, obj );
     struct thunks_info info = read_thunks_file( source->filename );
     struct strarray real_deps = empty_strarray;
-    unsigned int i;
+    struct strarray machines;
+    unsigned int i, m;
 
     if (make->disabled[0]) return;
-
-    strarray_add( &make->all_targets[0], name );
-    install_data_file( make, strmake( "%s.dll", obj ), name,
-                       strmake( "$(libdir)/wine/%s", dir ), NULL );
 
     if (info.com_json) strarray_add( &real_deps, src_dir_path( make, info.com_json ));
     if (info.from_def) strarray_add( &real_deps, src_dir_path( make, info.from_def ));
@@ -3691,14 +3715,29 @@ static void output_source_thunks( struct makefile *make, struct incl_file *sourc
      * more, each of which pulls in further generated headers -- so order on the
      * whole set.  It is order-only: "include/all" is phony, and a real
      * prerequisite on it would regenerate every thunk on every make. */
-    output( "%s:", obj_dir_path( make, name ));
-    output_filename( source->filename );
-    output_filename( spec2thunk );
-    output_filename( spec2thunk_sig );
-    output_filenames( real_deps );
-    output( " | include/all\n" );
-    output( "\t%s%s --spec %s --body=trap --out $@\n",
-            cmd_prefix( "THUNK" ), spec2thunk, source->filename );
+    machines = info.machines;
+    if (!machines.count)
+        for (m = 0; m < ARRAY_SIZE(thunk_machine_default); m++)
+            strarray_add( &machines, thunk_machine_default[m] );
+    for (m = 0; m < machines.count; m++)
+    {
+        const char *dir = strmake( "%s-windows", machines.str[m] );
+        const char *name = strmake( "%s/%s.dll", dir, obj );
+
+        strarray_add( &make->all_targets[0], name );
+        install_data_file( make, strmake( "%s.dll", obj ), name,
+                           strmake( "$(libdir)/wine/%s", dir ), NULL );
+
+        output( "%s:", obj_dir_path( make, name ));
+        output_filename( source->filename );
+        output_filename( spec2thunk );
+        output_filename( spec2thunk_sig );
+        output_filenames( real_deps );
+        output( " | include/all\n" );
+        output( "\t%s%s --spec %s --body=trap --machine %s --out $@\n",
+                cmd_prefix( "THUNK" ), spec2thunk, source->filename,
+                machines.str[m] );
+    }
 }
 
 
@@ -4334,6 +4373,38 @@ static void output_fake_module( struct makefile *make, const char *spec_file )
 /*******************************************************************
  *         output_module
  */
+
+/*******************************************************************
+ *         thunk_owns_arch
+ *
+ * True when this module's .thunks file claims `arch` with GUEST-MACHINE,
+ * i.e. the guest thunk PE IS this module's build for that architecture and
+ * the ordinary from-source PE build must not also be emitted.  Without this
+ * both rules name the same target and make picks one with an "overriding
+ * recipe" warning -- the right outcome by luck, which is not a build system.
+ *
+ * Only the modules whose implementation this tree REPLACES ever say so; see
+ * the thunk_machine_default banner for why an i386 half is opt-in.
+ */
+static bool thunk_owns_arch( struct makefile *make, unsigned int arch )
+{
+    struct incl_file *source;
+    unsigned int i;
+
+    if (!arch) return false;   /* the native arch is never thunked */
+    LIST_FOR_EACH_ENTRY( source, &make->sources, struct incl_file, entry )
+    {
+        struct thunks_info info;
+
+        if (!strendswith( source->name, ".thunks" )) continue;
+        info = read_thunks_file( source->filename );
+        for (i = 0; i < info.machines.count; i++)
+            if (!strcmp( info.machines.str[i], archs.str[arch] )) return true;
+    }
+    return false;
+}
+
+
 static void output_module( struct makefile *make, unsigned int arch )
 {
     struct strarray default_imports = empty_strarray;
@@ -4856,6 +4927,7 @@ static void output_sources( struct makefile *make )
     {
         for (arch = 0; arch < archs.count; arch++)
         {
+            if (thunk_owns_arch( make, arch )) continue;
             if (is_multiarch( arch ) || (!arch && make->so_builtin)) output_module( make, arch );
             if (make->importlib && (is_multiarch( arch ) || (!arch && !is_native_arch_disabled( make ))))
                 output_import_lib( make, arch );

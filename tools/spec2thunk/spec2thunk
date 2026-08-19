@@ -180,11 +180,70 @@ from wine_sig import Refused
 
 STRIDE = 16
 INFO_VERSION = 7
-# Byte offset of the trapping instruction inside a stub, per body mode.
-TRAP_OFF = {'direct': 0, 'trap': 3}
 BUILTIN_SIG = b"Wine builtin DLL\x00"   # 17 bytes, must sit at file offset 0x40
 SIG_OFF = 0x40
-IMAGE_BASE = 0x180000000
+
+# --------------------------------------------------------------------------
+# THE TWO GUEST MACHINES
+#
+# A .thunks file describes a module's exports, not a word size, so the same
+# file produces BOTH guest halves: an x86-64 PE for a 64-bit guest and an
+# i386 PE for a 32-bit one.  Wine serves whichever the loading image needs
+# (get_machine_system_dir()), and a port of Wine owes both -- a 32-bit guest
+# that finds no i386 half of a module this tree replaces has no fallback,
+# because the replacement IS the implementation.
+#
+# What differs, and nothing else does:
+#
+#   trap body   x86-64 needs `mov r10, rcx` first because SYSCALL clobbers
+#               RCX, which is MS-x64 argument 0.  i386 passes every argument
+#               on the stack, so the stub is the bare trap and trap_off is 0.
+#               `int 0x80` is the 32-bit instruction this FEXCore build
+#               routes into the same OS_GENERIC sink `0F 05` reaches on the
+#               64-bit side, EIP left at the trapping byte -- see the "32-bit
+#               (WoW64) lane" banner in dlls/ntdll/unix/loader.c.
+#   image base  a 32-bit image must load below 4 GiB.
+#   toolchain   clang target and lld-link /machine.
+#
+# The info structures, the stride, the ordinal assignment, the signature
+# oracle and every descriptor table are machine-independent by construction:
+# they describe the module's C surface, which is the same surface either
+# guest calls.  The ABI difference lives entirely in the host dispatcher,
+# which reads those same descriptors (see libs/winecom's dispatch32 and
+# ntdll's guest thunk dispatcher).
+# --------------------------------------------------------------------------
+MACHINES = {
+    'x86_64': dict(
+        clang_target='x86_64-windows-gnu',
+        link_machine='x64',
+        image_base=0x180000000,
+        pe_dir='x86_64-windows',
+        # mov r10, rcx ; syscall
+        trap_body=b'\x49\x89\xca\x0f\x05',
+        trap_off=3,
+    ),
+    'i386': dict(
+        clang_target='i386-windows-gnu',
+        link_machine='x86',
+        image_base=0x10000000,
+        pe_dir='i386-windows',
+        # int 0x80
+        trap_body=b'\xcd\x80',
+        trap_off=0,
+        # x86 lld-link defaults to /safeseh, which requires every object to
+        # carry a registered handler table.  This module is a hand-written
+        # stub array with no exception handlers of any kind -- an empty
+        # table would be a claim, and the honest statement is that the
+        # image opts out.  A guest's own SEH is its business and does not
+        # route through here.
+        link_extra=['/safeseh:no'],
+    ),
+}
+
+# Byte offset of the trapping instruction inside a stub, per body mode.  The
+# 'trap' entry is per machine; 'direct' returns a constant and never traps.
+def trap_off(mode, machine):
+    return 0 if mode == 'direct' else MACHINES[machine]['trap_off']
 
 
 # --------------------------------------------------------------------------
@@ -318,6 +377,16 @@ def parse_spec(path):
                     sys.exit("%s:%d: INCLUDE-DIR needs exactly one directory"
                              % (path, lineno))
                 extra['include_dirs'].append(parts[1])
+                continue
+            if parts[0].upper() == 'GUEST-MACHINE':
+                # Read by tools/makedep.c, which decides WHICH machines to
+                # invoke this tool for; the machine itself arrives here as
+                # --machine.  Validated rather than ignored, so a typo is a
+                # build error at the file that has it and not a silently
+                # missing half.
+                if len(parts) != 2 or parts[1] not in MACHINES:
+                    sys.exit("%s:%d: GUEST-MACHINE needs one of: %s"
+                             % (path, lineno, ', '.join(sorted(MACHINES))))
                 continue
             if parts[0].upper() == 'FROM-SPEC':
                 if len(parts) != 2:
@@ -1103,12 +1172,12 @@ def audit_guest_com_flat(exports, com_json_path, extra, native_spec_path):
     print()
 
 
-def emit_com_asm(a, com_ifaces):
+def emit_com_asm(a, com_ifaces, machine='x86_64'):
     """Append the COM stub arrays (to .thunk) and info tables (to .rdata).
     Called with the flat sections already emitted; `a` is the line sink."""
     a('\t.section\t.thunk,"xr"')
     a('\t.balign\t%d' % STRIDE)
-    body = stub_bytes('trap', 0)
+    body = stub_bytes('trap', 0, machine=machine)
     for i, itf in enumerate(com_ifaces):
         a('\t.globl\twine_com_stubs_%d' % i)
         a('wine_com_stubs_%d:\t\t# %s, %d slots'
@@ -1123,7 +1192,7 @@ def emit_com_asm(a, com_ifaces):
     a('\t.long\t%d\t\t\t# version' % COM_INFO_VERSION)
     a('\t.long\t%d\t\t\t# iface_count' % len(com_ifaces))
     a('\t.long\t%d\t\t\t# stride' % STRIDE)
-    a('\t.long\t%d\t\t\t# trap_off' % TRAP_OFF['trap'])
+    a('\t.long\t%d\t\t\t# trap_off' % trap_off('trap', machine))
     a('\t.long\twine_com_ifacev@IMGREL\t# ifaces_rva')
     a('')
     a('\t.balign\t4')
@@ -1623,15 +1692,15 @@ RAW_BODY_EXPORTS = {
 }
 
 
-def stub_bytes(mode, imm, raw_body=None):
-    """Exactly STRIDE bytes of x86-64 for one stub slot."""
+def stub_bytes(mode, imm, raw_body=None, machine='x86_64'):
+    """Exactly STRIDE bytes of guest machine code for one stub slot."""
     if raw_body is not None:
         body = raw_body                                       # RAW_BODY_EXPORTS
     elif mode == 'direct':
-        body = b'\xb8' + struct.pack('<I', imm) + b'\xc3'     # mov eax,imm32; ret
+        # mov eax,imm32 ; ret -- the same five bytes on both machines.
+        body = b'\xb8' + struct.pack('<I', imm) + b'\xc3'
     elif mode == 'trap':
-        # mov r10, rcx  -- SYSCALL clobbers RCX, which is MS-x64 arg0.
-        body = b'\x49\x89\xca' + b'\x0f\x05'                 # mov r10,rcx; syscall
+        body = MACHINES[machine]['trap_body']
     else:
         raise ValueError(mode)
     assert len(body) <= STRIDE
@@ -1642,18 +1711,37 @@ def stub_bytes(mode, imm, raw_body=None):
 # assembly / def emission
 # --------------------------------------------------------------------------
 
-def emit_asm(dll, exports, mode, com_ifaces=None):
+# --------------------------------------------------------------------------
+# i386 SYMBOL DECORATION
+#
+# A 32-bit PE object names C symbols with a leading underscore, and lld-link
+# resolves /def entries against the decorated name.  Every label this
+# generator emits shares the `wine_` prefix and every reference to one is in
+# the same translation unit, so decorating the whole listing keeps definition
+# and reference in agreement by construction -- which a per-site prefix would
+# not.  Export NAMES are untouched: a Win32 DLL exports `D3D11CreateDevice`
+# undecorated (this is exactly what a .def is for), and the guest imports it
+# by that name whatever the ABI's internal decoration.
+# --------------------------------------------------------------------------
+
+def decorate(text, machine):
+    if machine != 'i386':
+        return text
+    return re.sub(r'\bwine_', '_wine_', text)
+
+
+def emit_asm(dll, exports, mode, com_ifaces=None, machine='x86_64'):
     out = []
     a = out.append
     a('\t# generated by tools/spec2thunk -- do not edit')
-    a('\t# dll=%s body=%s stride=%d info_version=%d trap_off=%d'
-      % (dll, mode, STRIDE, INFO_VERSION, TRAP_OFF[mode]))
+    a('\t# dll=%s body=%s machine=%s stride=%d info_version=%d trap_off=%d'
+      % (dll, mode, machine, STRIDE, INFO_VERSION, trap_off(mode, machine)))
     a('')
     a('\t.section\t.thunk,"xr"')
     a('\t.balign\t%d' % STRIDE)
     a('wine_thunk_stubs:')
     for i, e in enumerate(exports):
-        b = stub_bytes(mode, e['imm'], e.get('raw_body'))
+        b = stub_bytes(mode, e['imm'], e.get('raw_body'), machine)
         a('\t.globl\twine_thunk_stub_%d' % i)
         a('wine_thunk_stub_%d:\t\t# %s' % (i, e['name']))
         a('\t.byte\t' + ','.join('0x%02X' % c for c in b))
@@ -1675,7 +1763,7 @@ def emit_asm(dll, exports, mode, com_ifaces=None):
     a('\t.long\t%d\t\t\t# stride' % STRIDE)
     a('\t.long\twine_thunk_namev@IMGREL\t# names_rva')
     a('\t.long\twine_thunk_sigv@IMGREL\t# sigs_rva')
-    a('\t.long\t%d\t\t\t# trap_off' % TRAP_OFF[mode])
+    a('\t.long\t%d\t\t\t# trap_off' % trap_off(mode, machine))
     a('\t.long\twine_thunk_implv@IMGREL\t# impl_names_rva  (version 4)')
     a('\t.long\twine_thunk_fpv@IMGREL\t# fp_rva  (version 5)')
     a('\t.long\twine_thunk_widthv@IMGREL\t# widths_rva  (version 6)')
@@ -1747,17 +1835,25 @@ def emit_asm(dll, exports, mode, com_ifaces=None):
             a('\t.asciz\t"%s"' % e['impl'])
     a('')
     if com_ifaces:
-        emit_com_asm(a, com_ifaces)
-    a('\t# One absolute 64-bit pointer so the linker is forced to emit a')
-    a('\t# base relocation directory; Wine relocates this image.')
-    a('\t.balign\t8')
-    a('wine_thunk_self:')
-    a('\t.quad\twine_thunk_info')
+        emit_com_asm(a, com_ifaces, machine)
+    a('\t# One absolute pointer so the linker is forced to emit a base')
+    a('\t# relocation directory; Wine relocates this image.  Pointer-sized,')
+    a('\t# so .quad on the 64-bit guest and .long on the 32-bit one -- a')
+    a('\t# .quad here would be two i386 relocations, the second against the')
+    a('\t# high half of an address that has none.')
+    if machine == 'i386':
+        a('\t.balign\t4')
+        a('wine_thunk_self:')
+        a('\t.long\twine_thunk_info')
+    else:
+        a('\t.balign\t8')
+        a('wine_thunk_self:')
+        a('\t.quad\twine_thunk_info')
     a('')
-    return '\n'.join(out) + '\n'
+    return decorate(  '\n'.join(out) + '\n', machine)
 
 
-def emit_def(dll, exports, have_com=False, ord_limit=0):
+def emit_def(dll, exports, have_com=False, ord_limit=0, machine='x86_64'):
     """The .def the thunk PE is linked from.
 
     Each export carries the ordinal assign_ordinals() gave it, because a guest
@@ -1767,17 +1863,25 @@ def emit_def(dll, exports, have_com=False, ord_limit=0):
     that an ordinal the thunk cannot serve stays a hole rather than resolving
     to a table of RVAs.
     """
+    # NOT decorated, on either machine: lld-link applies the target's own
+    # symbol decoration to the names a .def mentions, so spelling the i386
+    # underscore here asks it for __wine_thunk_stub_0 -- one underscore more
+    # than the object defines.  The OBJECT is decorated (see decorate());
+    # this side stays as written.
+    sym = lambda n: n
     out = ['LIBRARY %s' % dll, 'EXPORTS']
     for i, e in enumerate(exports):
-        out.append('    %s = wine_thunk_stub_%d%s'
-                   % (e['name'], i,
+        out.append('    %s = %s%s'
+                   % (e['name'], sym('wine_thunk_stub_%d' % i),
                       ' @%d' % e['ordinal'] if e.get('ordinal') else ''))
     info_ord = ord_limit + 1 if ord_limit else 0
-    out.append('    __wine_thunk_info = wine_thunk_info%s DATA'
-               % (' @%d' % info_ord if info_ord else ''))
+    out.append('    __wine_thunk_info = %s%s DATA'
+               % (sym('wine_thunk_info'),
+                  ' @%d' % info_ord if info_ord else ''))
     if have_com:
-        out.append('    __wine_com_thunk_info = wine_com_thunk_info%s DATA'
-                   % (' @%d' % (info_ord + 1) if info_ord else ''))
+        out.append('    __wine_com_thunk_info = %s%s DATA'
+                   % (sym('wine_com_thunk_info'),
+                      ' @%d' % (info_ord + 1) if info_ord else ''))
     return '\n'.join(out) + '\n'
 
 
@@ -1855,6 +1959,11 @@ def main():
                          'location column (last-resort arity oracle)')
     ap.add_argument('--strict', action='store_true',
                     help='treat any refused export as a fatal error')
+    ap.add_argument('--machine', default='x86_64', choices=sorted(MACHINES),
+                    help='guest machine to emit for.  The .thunks file '
+                         'describes a C surface, not a word size, so the same '
+                         'file produces both halves; Wine serves whichever a '
+                         'loading guest image needs.')
     ap.add_argument('--clang', default='clang')
     ap.add_argument('--linker', default='lld-link')
     ap.add_argument('--crt-define', action='append', default=None,
@@ -2113,7 +2222,7 @@ def main():
     outpath = args.out or os.path.join(args.outdir, dll)
     os.makedirs(os.path.dirname(outpath), exist_ok=True)
 
-    tag = '%s.%s' % (stem, args.body)
+    tag = '%s.%s.%s' % (stem, args.body, args.machine)
     spath = os.path.join(args.builddir, tag + '.s')
     opath = os.path.join(args.builddir, tag + '.o')
     dpath = os.path.join(args.builddir, tag + '.def')
@@ -2124,17 +2233,20 @@ def main():
     if lpath: os.makedirs(os.path.dirname(os.path.abspath(lpath)), exist_ok=True)
 
     with open(spath, 'w') as f:
-        f.write(emit_asm(dll, exports, args.body, com_ifaces))
+        f.write(emit_asm(dll, exports, args.body, com_ifaces, args.machine))
     with open(dpath, 'w') as f:
         f.write(emit_def(dll, exports, have_com=bool(com_ifaces),
-                         ord_limit=ord_limit))
+                         ord_limit=ord_limit, machine=args.machine))
 
-    run([args.clang, '-target', 'x86_64-windows-gnu', '-c', spath, '-o', opath],
+    mach = MACHINES[args.machine]
+    run([args.clang, '-target', mach['clang_target'], '-c', spath, '-o', opath],
         args.verbose)
-    run([args.linker, '/dll', '/machine:x64', '/nodefaultlib', '/noentry',
-         '/opt:noref', '/base:0x%x' % IMAGE_BASE, '/def:' + dpath,
-         ('/implib:' + lpath) if lpath else '/noimplib',
-         '/out:' + outpath, opath],
+    run([args.linker, '/dll', '/machine:' + mach['link_machine'],
+         '/nodefaultlib', '/noentry',
+         '/opt:noref', '/base:0x%x' % mach['image_base'], '/def:' + dpath]
+        + mach.get('link_extra', [])
+        + [('/implib:' + lpath) if lpath else '/noimplib',
+           '/out:' + outpath, opath],
         args.verbose)
 
     e_lfanew = stamp_builtin_signature(outpath)
@@ -2168,7 +2280,8 @@ def main():
     print("output       : %s" % outpath)
     print("e_lfanew     : 0x%x (signature stamped at 0x%02x..0x%02x)"
           % (e_lfanew, SIG_OFF, SIG_OFF + len(BUILTIN_SIG) - 1))
-    print("trap_off     : %d" % TRAP_OFF[args.body])
+    print("machine      : %s" % args.machine)
+    print("trap_off     : %d" % trap_off(args.body, args.machine))
     if com_ifaces:
         nslots = sum(i['slot_count'] for i in com_ifaces)
         print("com mode     : %d interface(s), %d vtable slot(s), %d bytes of "
