@@ -40,23 +40,29 @@ Win32 build of Styx are all PE32, and the WoW64 lane has never carried a real
 game — only `check-wow64-smoke.sh`.  Whatever Portal 2 hits is likely to be
 what all of them hit.
 
-## 3. The four things Cyberpunk is waiting on
+## 3. Cyberpunk: marshal plans for the modern ID3D12Device slots
 
-All named, none deep (`ppc64le/games/STATUS.md` has the run):
+The 2026-08-19 session closed everything the old item 3 listed and five more
+walls behind it — the full run is the Cyberpunk row in
+`ppc64le/games/STATUS.md`.  The game now creates its vkd3d D3D12 device
+(`fex nw-cp2077` is the launch; the appconfig and the staged prefix carry the
+recipe).  What stops it today, precisely:
 
-* four kernel32 exports the thunk generator refused —
-  `GetPhysicallyInstalledSystemMemory`, `RaiseFailFastException`,
-  `SetThreadStackGuarantee`, `SetThreadSelectedCpuSets`.  They are in
-  `kernel32.spec`, so the refusal reason is in the generator's own report;
-  read it before assuming they are hard.
-* `ws2_32` ordinal 12.
-* six C++ RTTI/EH entry points that the **real** `vcruntime140` forwards into
-  `ucrtbase` and this tree's guest `ucrtbase` does not export:
-  `__RTtypeid`, `__std_type_info_name`, `__std_type_info_destroy_list`,
-  `__std_exception_copy`, `__std_exception_destroy`, `_CxxThrowException`.
-  The last one deserves thought rather than a row: it is the C++ throw entry,
-  and this port deliberately refuses `__CxxFrameHandler3` because the EH
-  personality belongs to the guest.
+* the d3d12 winecom surface answers QI up through `ID3D12Device4` but
+  REFUSES slots 53/54 with "no marshal plan" — `CreateCommandList1` is one,
+  and the game Reset()s the NULL it didn't check.  The surface generator is
+  `ppc64le/dxvk/gen_winecom.py`-family; expect each newly-served slot to
+  expose the next until the CreateX surface of Device4..Device10 is covered.
+* `ID3D12DeviceRemovedExtendedDataSettings` slots 3/4 refuse too — DRED,
+  debug-only, safe to leave.
+* NVIDIA Streamline is stubbed per-prefix (ppc64le/streamline/), not yet
+  staged automatically by the proton tool; promote it to a staging rule like
+  msvcp140's when a second title wants it.
+* `_CxxThrowException`/`__CxxFrameHandler3/4` stay guest-owned: the REAL
+  vcruntime140+vcruntime140_1 are staged from Microsoft's redistributable
+  into sysx8664 (extractable with cabextract from vc_redist.x64.exe; nothing
+  ships in the tree).  The staging is manual in the cp2077 prefix today —
+  same promotion note as the Streamline stub.
 
 ## 4. The trampoline pool stops at six arguments
 
