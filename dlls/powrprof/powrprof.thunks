@@ -1,0 +1,17 @@
+# AMD64 thunk export spec -- powrprof.dll.
+#
+# Cyberpunk 2077 imports POWRPROF.dll statically.  A statically imported module
+# with no guest thunk is not a missing export -- it is a missing MODULE, which
+# is fatal before any of the game's own code runs: the guest loader finds the
+# native ppc64 builtin, correctly refuses to splice it into a guest call
+# (c000007b), and loader_init fails the whole image (c0000135).
+#
+# Nothing here is hand-written; the export list comes from this module's own
+# .spec.  powrprof.h is appended to the probe because nothing else in the tree
+# needs it, and without a declaration every export would be refused and the
+# module would be emitted with none -- which loads, and turns a loud failure
+# into a silent one.
+DLL powrprof.dll
+FROM-SPEC auto
+
+PROBE-EXTRA   powrprof.h

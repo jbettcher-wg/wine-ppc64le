@@ -1,0 +1,14 @@
+# AMD64 thunk export spec -- xinput9_1_0.dll.
+#
+# The oldest XInput redistributable name, and the one Cyberpunk 2077 imports
+# statically -- so, like powrprof below it in that game's import table, its
+# absence is fatal in the loader rather than at the first call.  The tree
+# already thunks xinput1_3 and xinput1_4; this is the same four entry points
+# under the name a 2077-era build links against.
+#
+# Export list from this module's own .spec; xinput.h is appended to the probe
+# for the four prototypes.
+DLL xinput9_1_0.dll
+FROM-SPEC auto
+
+PROBE-EXTRA   xinput.h

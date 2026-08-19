@@ -3,4 +3,5 @@ IMPORTLIB = powrprof
 IMPORTS   = advapi32
 
 SOURCES = \
+	powrprof.thunks \
 	powrprof.c

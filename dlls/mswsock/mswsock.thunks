@@ -1,0 +1,14 @@
+# AMD64 thunk export spec -- mswsock.dll.
+#
+# The Winsock service-provider half: AcceptEx, GetAcceptExSockaddrs and the
+# transmit/connect helpers a game's networking layer reaches for.  Cyberpunk
+# 2077's REDGalaxy64.dll imports it statically.
+#
+# Most of this .spec is forwards into ws2_32 (which is already thunked) and
+# stubs; both come out of the generator as they are, so what this file adds is
+# the module's existence in the guest namespace -- which is the thing that was
+# missing.
+DLL mswsock.dll
+FROM-SPEC auto
+
+PROBE-EXTRA   mswsock.h
