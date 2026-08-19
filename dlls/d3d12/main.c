@@ -95,6 +95,7 @@ static UINT64 hand_create_swapchain_for_hwnd( void *host, UINT slot, AMD64_CONTE
 static UINT64 hand_create_graphics_pso( void *host, UINT slot, AMD64_CONTEXT *ctx );
 static UINT64 hand_create_pipeline_state( void *host, UINT slot, AMD64_CONTEXT *ctx );
 static UINT64 hand_copy_texture_region( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static UINT64 hand_clear_dsv( void *host, UINT slot, AMD64_CONTEXT *ctx );
 
 /* Order is the generated header's hand_funcs[] order -- see the
  * "hand_funcs[] order" comment ppc64le/vkd3d/gen_winecom.py emits there. */
@@ -106,6 +107,7 @@ static const winecom_hand_fn d3d12_hand_funcs[] =
     hand_create_graphics_pso,
     hand_create_pipeline_state,
     hand_copy_texture_region,
+    hand_clear_dsv,
 };
 
 C_ASSERT( ARRAYSIZE(d3d12_hand_funcs) == D3D12_HAND_COUNT );
@@ -212,6 +214,35 @@ static UINT64 hand_resource_barrier( void *host, UINT slot, AMD64_CONTEXT *ctx )
     ret = unix_vtbl_call( host, slot, 3, args );
     if (copy) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, copy );
     return ret;   /* void method; RAX is scratch */
+}
+
+/* ID3D12GraphicsCommandList::ClearDepthStencilView(
+ * D3D12_CPU_DESCRIPTOR_HANDLE dsv, D3D12_CLEAR_FLAGS flags, FLOAT depth,
+ * UINT8 stencil, UINT num_rects, const D3D12_RECT *rects ): the FLOAT is
+ * why this is a hand slot.  MS-x64 put Depth in XMM3 (argument position 3),
+ * where the integer-wide invoker cannot see it, and the refusal this
+ * replaces silently cost every frame its depth clear -- the whole scene
+ * then rendered against stale depth ([MEASURED] 2026-08-19, Cyberpunk 2077
+ * -benchmark: dense screen-space speckle, gone with this walker).  The
+ * value crosses as raw bits and the unixlib's typed-float call
+ * (FP_SHAPE_CLEAR_DSV) reconstitutes it. */
+static UINT64 hand_clear_dsv( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    struct d3d12_fp_call_params p = { { 0 } };
+    NTSTATUS status;
+
+    p.args[0] = (UINT64)(ULONG_PTR)host;
+    p.args[1] = read_arg( ctx, 1 );                       /* the DSV handle */
+    p.args[2] = (UINT)read_arg( ctx, 2 );                 /* D3D12_CLEAR_FLAGS */
+    p.args[3] = ctx->FltSave.XmmRegisters[3].Low & 0xffffffffu;  /* Depth */
+    p.args[4] = (BYTE)read_arg( ctx, 4 );                 /* Stencil */
+    p.args[5] = (UINT)read_arg( ctx, 5 );                 /* NumRects */
+    p.args[6] = read_arg( ctx, 6 );                       /* pRects */
+    p.slot = slot;
+    p.shape = FP_SHAPE_CLEAR_DSV;
+    if ((status = D3D12_UNIX_CALL( call_fp, &p )))
+        ERR( "unix call_fp failed, status %08x\n", (UINT)status );
+    return 0;   /* void method; RAX is scratch */
 }
 
 /* ID3D12Device::CreateComputePipelineState( const

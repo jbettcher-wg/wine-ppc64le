@@ -166,6 +166,42 @@ static NTSTATUS d3d12_unix_flat( void *args )
     return STATUS_SUCCESS;
 }
 
+/* A float-bearing vtable slot: the integer-wide form cannot place the
+ * value, so each served shape is called through its real prototype and the
+ * float is reconstituted from the raw bits the PE side sent (unixlib.h,
+ * enum d3d12_fp_shape). */
+static NTSTATUS d3d12_unix_call_fp( void *args )
+{
+    struct d3d12_fp_call_params *p = args;
+    void **vtbl;
+
+    if (!p->args[0]) return STATUS_INVALID_PARAMETER;
+    vtbl = *(void ***)(ULONG_PTR)p->args[0];
+    switch (p->shape)
+    {
+    case FP_SHAPE_CLEAR_DSV:
+    {
+        /* D3D12_CPU_DESCRIPTOR_HANDLE is struct { SIZE_T } -- ELFv2 passes
+         * the one-member aggregate in a GPR, so UINT64 is its exact shape. */
+        typedef void (*clear_dsv_fn)( void *iface, UINT64 dsv_handle,
+                                      unsigned int clear_flags, float depth,
+                                      unsigned char stencil,
+                                      unsigned int num_rects,
+                                      const void *rects );
+        union { UINT32 bits; float f; } depth;
+
+        depth.bits = (UINT32)p->args[3];
+        ((clear_dsv_fn)vtbl[p->slot])( (void *)(ULONG_PTR)p->args[0],
+                                       p->args[1], (unsigned int)p->args[2],
+                                       depth.f, (unsigned char)p->args[4],
+                                       (unsigned int)p->args[5],
+                                       (const void *)(ULONG_PTR)p->args[6] );
+        return STATUS_SUCCESS;
+    }
+    }
+    return STATUS_INVALID_PARAMETER;
+}
+
 /* unix_present.c: the presentation factory (design §4). */
 extern NTSTATUS d3d12_unix_present_factory( void *args );
 
@@ -175,6 +211,7 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     d3d12_unix_call,
     d3d12_unix_flat,
     d3d12_unix_present_factory,
+    d3d12_unix_call_fp,
 };
 
 C_ASSERT( ARRAYSIZE(__wine_unix_call_funcs) == unix_funcs_count );

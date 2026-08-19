@@ -72,6 +72,27 @@ struct d3d12_flat_params
     UINT   argc;
 };
 
+/* A vtable slot whose prototype carries a by-value float cannot cross
+ * through the widest-integer form -- the value belongs in the other
+ * register file.  Each such slot the surface serves gets a TYPED call here:
+ * the PE side lifts the float out of the guest's XMM register and sends its
+ * raw bits in an integer slot, and the unix side calls the host slot
+ * through a correctly-typed function pointer.  One enum case per shape. */
+enum d3d12_fp_shape
+{
+    /* void (this, D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_CLEAR_FLAGS, FLOAT,
+     *       UINT8, UINT, const D3D12_RECT *) */
+    FP_SHAPE_CLEAR_DSV,
+};
+
+struct d3d12_fp_call_params
+{
+    UINT64 args[8];   /* integer view of the guest arguments; float
+                         positions carry the value's raw bits */
+    UINT   slot;
+    UINT   shape;     /* enum d3d12_fp_shape */
+};
+
 /* Create the unix-side presentation factory (unix_present.c): a host COM
  * object shaped like IDXGIFactory2 whose CreateSwapChainForHwnd builds a
  * vkd3d swapchain presenting through win32u's client-surface machinery
@@ -88,6 +109,7 @@ enum d3d12_unix_func
     unix_call,
     unix_flat,
     unix_present_factory,
+    unix_call_fp,
     unix_funcs_count
 };
 

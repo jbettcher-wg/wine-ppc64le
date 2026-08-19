@@ -289,6 +289,13 @@ HAND_SLOTS = [
     # pResource members are proxies; the walker copies both one-struct
     # arguments and unwraps them.
     ("ID3D12GraphicsCommandList::CopyTextureRegion", "hand_copy_texture_region"),
+    # The FLOAT-by-value slot every renderer calls each frame.  The refusal
+    # this replaces cost Cyberpunk 2077 its depth clears: every 3D pass then
+    # tested against stale depth/HTILE and the whole scene speckled
+    # ([MEASURED] 2026-08-19, the -benchmark A/B).  The walker lifts Depth
+    # out of guest XMM3 and crosses it as raw bits through the unixlib's
+    # typed-float call (FP_SHAPE_CLEAR_DSV).
+    ("ID3D12GraphicsCommandList::ClearDepthStencilView", "hand_clear_dsv"),
 ]
 
 # Refusals decided here rather than derived.  Keyed "Owner::Method".

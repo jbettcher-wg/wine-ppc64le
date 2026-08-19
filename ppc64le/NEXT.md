@@ -55,28 +55,29 @@ refusal cannot yet serve.  THE GAME RUNS: title screen at 245 fps, menus,
 character creation, all user-confirmed on screen.  What remains, in order of
 what is actually seen:
 
-* **Graphics corruption — STILL PRESENT.  Improved by the GTT finding,
-  not fixed, and the user's read is memory corruption.**  What is measured:
-  across runs 36-38 the dense speckle tracked `VKD3D_CONFIG=no_upload_hvv`
-  exactly (mesh shaders on or off), and dropping it (appconfig updated; the
-  V620's 30 GiB device heap is fully host-visible/ReBAR, the flag bought
-  nothing) made scenes visibly better — but the game is NOT clean: garbled
-  surfaces remain in ordinary play, and it looks like memory corruption at
-  scale.  `ppc64le/vkd3d/probes/copy_pattern_run.sh` cleared ONLY the quiet
-  single-buffer copy path: pattern upload->CopyTextureRegion->texture->
-  readback is byte-identical in BOTH placements, so this tree's marshal/
-  copy slots are not the corrupter — but that clears a path, not the
-  system.  Open, in the order worth measuring: (1) game-scale GTT/system-
-  memory DMA on the custom 4K POWER8 kernel (amdgpu TCE/window shape, high
-  physical pages) — the strongest lead given the no_upload_hvv split;
-  (2) a scaled-up probe (hundreds of MB, many concurrent uploads, GPU
-  under load) to make the corruption reproduce OUTSIDE the game, which is
-  the difference between a screenshot and a bug report; (3) whatever
-  writes guest-visible memory at scale in this port (mapped VRAM through
-  the emulator, wineserver shared sections) — "memory corruption" is the
-  user's read of the pattern and nothing measured yet contradicts it.
-  The probe's GTT leg stands as the tripwire: if the quiet case ever
-  fails, chase that before anything else.
+* **Graphics corruption — SOLVED (2026-08-19, the -benchmark sessions).**
+  It was never memory, DMA, or upload placement:
+  `ID3D12GraphicsCommandList::ClearDepthStencilView` passes FLOAT by value
+  and sat as a named refusal in the marshal table, so the game never
+  cleared depth and every 3D pass tested against stale depth/HTILE —
+  per-pixel confetti in dark scenes, a fixed dot lattice in haze (the
+  HTILE tile pattern), UI/Bink video untouched.  Served now by
+  `hand_clear_dsv` + the unixlib's typed-float call (`FP_SHAPE_CLEAR_DSV`
+  in dlls/d3d12/unixlib.h — the pattern the NEXT float-bearing slot should
+  reuse).  Benchmark (`Cyberpunk2077.exe -benchmark`, results JSON under
+  the prefix's Documents) renders clean end to end; avg fps unchanged at
+  ~15.6, the lane stays CPU-bound (item 6).  The elimination record, all
+  committed as probes: `host_vk_storm.c` (host Vulkan, no Wine/FEX,
+  7.7 GiB/leg, both placements, clean), `copy_storm_run.sh` (guest lane,
+  3 queue types, 3 fill modes, 2.3 GiB/leg, both placements, clean, with
+  staging-pre/roundtrip/staging-post verdict classes), cross-ISA
+  dxil-spirv byte-compare (2176 game shaders, zero divergent), and this
+  tree's vkd3d cross-built x86-64-PE running clean in the emulated lane.
+  What that record buys the next chaser: the whole guest->GPU data path
+  and the shader pipeline are PROVEN clean at game scale — when something
+  garbles next, look at what the log says was REFUSED first (`grep -a
+  refus` the run log; refuse_once prints ONCE per slot, so one line can
+  mean sixty times a second).
 * **Frame-latency waitable**: `GetFrameLatencyWaitableObject` returns NULL
   (unix_present.c, "the eventfd->semaphore relay is P5").  vkd3d's side
   already hands out a TAGGED eventfd (vkd3d-patches/0001); the lift is the

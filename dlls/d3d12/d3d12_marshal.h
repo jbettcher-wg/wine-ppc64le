@@ -134,7 +134,7 @@ enum d3d12_iface_index
     D3D12_IFACE_COUNT = 117
 };
 
-#define D3D12_HAND_COUNT 6
+#define D3D12_HAND_COUNT 7
 
 /* hand_funcs[] order in dlls/d3d12/main.c:
      *   0 hand_resource_barrier
@@ -143,6 +143,7 @@ enum d3d12_iface_index
      *   3 hand_create_graphics_pso
      *   4 hand_create_pipeline_state
      *   5 hand_copy_texture_region
+     *   6 hand_clear_dsv
  */
 
 
@@ -2646,9 +2647,7 @@ static const struct winecom_slot slots_ID3D12GraphicsCommandList[60] =
     { "ID3D12GraphicsCommandList::IASetVertexBuffers", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::SOSetTargets", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::OMSetRenderTargets", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000 },
-    { "ID3D12GraphicsCommandList::ClearDepthStencilView",
-      "ID3D12GraphicsCommandList::ClearDepthStencilView: passes FLOAT by value; the unixlib invoker calls the host vtable slot in the widest INTEGER form, so a float argument would be placed in the wrong register file entirely.  Serving it takes a hand-written stub, the kind ClearDepthStencilView has always waited for",
-      NULL, NULL, 7, 0, 0, 0, NULL, 0, 0, 0 },
+    { "ID3D12GraphicsCommandList::ClearDepthStencilView", NULL, NULL, NULL, 7, WINECOM_F_HAND, 6, 0, NULL, 0, 0, 0 },
     { "ID3D12GraphicsCommandList::ClearRenderTargetView", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewUint", NULL, cls_ID3D12GraphicsCommandList_49, xaux_ID3D12GraphicsCommandList_49, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewFloat", NULL, cls_ID3D12GraphicsCommandList_50, xaux_ID3D12GraphicsCommandList_50, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
@@ -2758,9 +2757,7 @@ static const struct winecom_slot slots_ID3D12GraphicsCommandList1[66] =
     { "ID3D12GraphicsCommandList::IASetVertexBuffers", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::SOSetTargets", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::OMSetRenderTargets", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000 },
-    { "ID3D12GraphicsCommandList::ClearDepthStencilView",
-      "ID3D12GraphicsCommandList::ClearDepthStencilView: passes FLOAT by value; the unixlib invoker calls the host vtable slot in the widest INTEGER form, so a float argument would be placed in the wrong register file entirely.  Serving it takes a hand-written stub, the kind ClearDepthStencilView has always waited for",
-      NULL, NULL, 7, 0, 0, 0, NULL, 0, 0, 0 },
+    { "ID3D12GraphicsCommandList::ClearDepthStencilView", NULL, NULL, NULL, 7, WINECOM_F_HAND, 6, 0, NULL, 0, 0, 0 },
     { "ID3D12GraphicsCommandList::ClearRenderTargetView", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewUint", NULL, cls_ID3D12GraphicsCommandList1_49, xaux_ID3D12GraphicsCommandList1_49, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewFloat", NULL, cls_ID3D12GraphicsCommandList1_50, xaux_ID3D12GraphicsCommandList1_50, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
@@ -2888,9 +2885,7 @@ static const struct winecom_slot slots_ID3D12GraphicsCommandList10[86] =
     { "ID3D12GraphicsCommandList::IASetVertexBuffers", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::SOSetTargets", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::OMSetRenderTargets", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000 },
-    { "ID3D12GraphicsCommandList::ClearDepthStencilView",
-      "ID3D12GraphicsCommandList::ClearDepthStencilView: passes FLOAT by value; the unixlib invoker calls the host vtable slot in the widest INTEGER form, so a float argument would be placed in the wrong register file entirely.  Serving it takes a hand-written stub, the kind ClearDepthStencilView has always waited for",
-      NULL, NULL, 7, 0, 0, 0, NULL, 0, 0, 0 },
+    { "ID3D12GraphicsCommandList::ClearDepthStencilView", NULL, NULL, NULL, 7, WINECOM_F_HAND, 6, 0, NULL, 0, 0, 0 },
     { "ID3D12GraphicsCommandList::ClearRenderTargetView", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewUint", NULL, cls_ID3D12GraphicsCommandList10_49, xaux_ID3D12GraphicsCommandList10_49, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewFloat", NULL, cls_ID3D12GraphicsCommandList10_50, xaux_ID3D12GraphicsCommandList10_50, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
@@ -3034,9 +3029,7 @@ static const struct winecom_slot slots_ID3D12GraphicsCommandList2[67] =
     { "ID3D12GraphicsCommandList::IASetVertexBuffers", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::SOSetTargets", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::OMSetRenderTargets", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000 },
-    { "ID3D12GraphicsCommandList::ClearDepthStencilView",
-      "ID3D12GraphicsCommandList::ClearDepthStencilView: passes FLOAT by value; the unixlib invoker calls the host vtable slot in the widest INTEGER form, so a float argument would be placed in the wrong register file entirely.  Serving it takes a hand-written stub, the kind ClearDepthStencilView has always waited for",
-      NULL, NULL, 7, 0, 0, 0, NULL, 0, 0, 0 },
+    { "ID3D12GraphicsCommandList::ClearDepthStencilView", NULL, NULL, NULL, 7, WINECOM_F_HAND, 6, 0, NULL, 0, 0, 0 },
     { "ID3D12GraphicsCommandList::ClearRenderTargetView", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewUint", NULL, cls_ID3D12GraphicsCommandList2_49, xaux_ID3D12GraphicsCommandList2_49, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewFloat", NULL, cls_ID3D12GraphicsCommandList2_50, xaux_ID3D12GraphicsCommandList2_50, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
@@ -3157,9 +3150,7 @@ static const struct winecom_slot slots_ID3D12GraphicsCommandList3[68] =
     { "ID3D12GraphicsCommandList::IASetVertexBuffers", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::SOSetTargets", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::OMSetRenderTargets", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000 },
-    { "ID3D12GraphicsCommandList::ClearDepthStencilView",
-      "ID3D12GraphicsCommandList::ClearDepthStencilView: passes FLOAT by value; the unixlib invoker calls the host vtable slot in the widest INTEGER form, so a float argument would be placed in the wrong register file entirely.  Serving it takes a hand-written stub, the kind ClearDepthStencilView has always waited for",
-      NULL, NULL, 7, 0, 0, 0, NULL, 0, 0, 0 },
+    { "ID3D12GraphicsCommandList::ClearDepthStencilView", NULL, NULL, NULL, 7, WINECOM_F_HAND, 6, 0, NULL, 0, 0, 0 },
     { "ID3D12GraphicsCommandList::ClearRenderTargetView", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewUint", NULL, cls_ID3D12GraphicsCommandList3_49, xaux_ID3D12GraphicsCommandList3_49, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewFloat", NULL, cls_ID3D12GraphicsCommandList3_50, xaux_ID3D12GraphicsCommandList3_50, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
@@ -3287,9 +3278,7 @@ static const struct winecom_slot slots_ID3D12GraphicsCommandList4[77] =
     { "ID3D12GraphicsCommandList::IASetVertexBuffers", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::SOSetTargets", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::OMSetRenderTargets", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000 },
-    { "ID3D12GraphicsCommandList::ClearDepthStencilView",
-      "ID3D12GraphicsCommandList::ClearDepthStencilView: passes FLOAT by value; the unixlib invoker calls the host vtable slot in the widest INTEGER form, so a float argument would be placed in the wrong register file entirely.  Serving it takes a hand-written stub, the kind ClearDepthStencilView has always waited for",
-      NULL, NULL, 7, 0, 0, 0, NULL, 0, 0, 0 },
+    { "ID3D12GraphicsCommandList::ClearDepthStencilView", NULL, NULL, NULL, 7, WINECOM_F_HAND, 6, 0, NULL, 0, 0, 0 },
     { "ID3D12GraphicsCommandList::ClearRenderTargetView", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewUint", NULL, cls_ID3D12GraphicsCommandList4_49, xaux_ID3D12GraphicsCommandList4_49, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewFloat", NULL, cls_ID3D12GraphicsCommandList4_50, xaux_ID3D12GraphicsCommandList4_50, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
@@ -3430,9 +3419,7 @@ static const struct winecom_slot slots_ID3D12GraphicsCommandList5[79] =
     { "ID3D12GraphicsCommandList::IASetVertexBuffers", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::SOSetTargets", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::OMSetRenderTargets", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000 },
-    { "ID3D12GraphicsCommandList::ClearDepthStencilView",
-      "ID3D12GraphicsCommandList::ClearDepthStencilView: passes FLOAT by value; the unixlib invoker calls the host vtable slot in the widest INTEGER form, so a float argument would be placed in the wrong register file entirely.  Serving it takes a hand-written stub, the kind ClearDepthStencilView has always waited for",
-      NULL, NULL, 7, 0, 0, 0, NULL, 0, 0, 0 },
+    { "ID3D12GraphicsCommandList::ClearDepthStencilView", NULL, NULL, NULL, 7, WINECOM_F_HAND, 6, 0, NULL, 0, 0, 0 },
     { "ID3D12GraphicsCommandList::ClearRenderTargetView", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewUint", NULL, cls_ID3D12GraphicsCommandList5_49, xaux_ID3D12GraphicsCommandList5_49, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewFloat", NULL, cls_ID3D12GraphicsCommandList5_50, xaux_ID3D12GraphicsCommandList5_50, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
@@ -3575,9 +3562,7 @@ static const struct winecom_slot slots_ID3D12GraphicsCommandList6[80] =
     { "ID3D12GraphicsCommandList::IASetVertexBuffers", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::SOSetTargets", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::OMSetRenderTargets", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000 },
-    { "ID3D12GraphicsCommandList::ClearDepthStencilView",
-      "ID3D12GraphicsCommandList::ClearDepthStencilView: passes FLOAT by value; the unixlib invoker calls the host vtable slot in the widest INTEGER form, so a float argument would be placed in the wrong register file entirely.  Serving it takes a hand-written stub, the kind ClearDepthStencilView has always waited for",
-      NULL, NULL, 7, 0, 0, 0, NULL, 0, 0, 0 },
+    { "ID3D12GraphicsCommandList::ClearDepthStencilView", NULL, NULL, NULL, 7, WINECOM_F_HAND, 6, 0, NULL, 0, 0, 0 },
     { "ID3D12GraphicsCommandList::ClearRenderTargetView", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewUint", NULL, cls_ID3D12GraphicsCommandList6_49, xaux_ID3D12GraphicsCommandList6_49, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewFloat", NULL, cls_ID3D12GraphicsCommandList6_50, xaux_ID3D12GraphicsCommandList6_50, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
@@ -3721,9 +3706,7 @@ static const struct winecom_slot slots_ID3D12GraphicsCommandList7[81] =
     { "ID3D12GraphicsCommandList::IASetVertexBuffers", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::SOSetTargets", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::OMSetRenderTargets", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000 },
-    { "ID3D12GraphicsCommandList::ClearDepthStencilView",
-      "ID3D12GraphicsCommandList::ClearDepthStencilView: passes FLOAT by value; the unixlib invoker calls the host vtable slot in the widest INTEGER form, so a float argument would be placed in the wrong register file entirely.  Serving it takes a hand-written stub, the kind ClearDepthStencilView has always waited for",
-      NULL, NULL, 7, 0, 0, 0, NULL, 0, 0, 0 },
+    { "ID3D12GraphicsCommandList::ClearDepthStencilView", NULL, NULL, NULL, 7, WINECOM_F_HAND, 6, 0, NULL, 0, 0, 0 },
     { "ID3D12GraphicsCommandList::ClearRenderTargetView", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewUint", NULL, cls_ID3D12GraphicsCommandList7_49, xaux_ID3D12GraphicsCommandList7_49, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewFloat", NULL, cls_ID3D12GraphicsCommandList7_50, xaux_ID3D12GraphicsCommandList7_50, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
@@ -3870,9 +3853,7 @@ static const struct winecom_slot slots_ID3D12GraphicsCommandList8[82] =
     { "ID3D12GraphicsCommandList::IASetVertexBuffers", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::SOSetTargets", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::OMSetRenderTargets", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000 },
-    { "ID3D12GraphicsCommandList::ClearDepthStencilView",
-      "ID3D12GraphicsCommandList::ClearDepthStencilView: passes FLOAT by value; the unixlib invoker calls the host vtable slot in the widest INTEGER form, so a float argument would be placed in the wrong register file entirely.  Serving it takes a hand-written stub, the kind ClearDepthStencilView has always waited for",
-      NULL, NULL, 7, 0, 0, 0, NULL, 0, 0, 0 },
+    { "ID3D12GraphicsCommandList::ClearDepthStencilView", NULL, NULL, NULL, 7, WINECOM_F_HAND, 6, 0, NULL, 0, 0, 0 },
     { "ID3D12GraphicsCommandList::ClearRenderTargetView", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewUint", NULL, cls_ID3D12GraphicsCommandList8_49, xaux_ID3D12GraphicsCommandList8_49, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewFloat", NULL, cls_ID3D12GraphicsCommandList8_50, xaux_ID3D12GraphicsCommandList8_50, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
@@ -4020,9 +4001,7 @@ static const struct winecom_slot slots_ID3D12GraphicsCommandList9[84] =
     { "ID3D12GraphicsCommandList::IASetVertexBuffers", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::SOSetTargets", NULL, NULL, NULL, 4, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000 },
     { "ID3D12GraphicsCommandList::OMSetRenderTargets", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000 },
-    { "ID3D12GraphicsCommandList::ClearDepthStencilView",
-      "ID3D12GraphicsCommandList::ClearDepthStencilView: passes FLOAT by value; the unixlib invoker calls the host vtable slot in the widest INTEGER form, so a float argument would be placed in the wrong register file entirely.  Serving it takes a hand-written stub, the kind ClearDepthStencilView has always waited for",
-      NULL, NULL, 7, 0, 0, 0, NULL, 0, 0, 0 },
+    { "ID3D12GraphicsCommandList::ClearDepthStencilView", NULL, NULL, NULL, 7, WINECOM_F_HAND, 6, 0, NULL, 0, 0, 0 },
     { "ID3D12GraphicsCommandList::ClearRenderTargetView", NULL, NULL, NULL, 5, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewUint", NULL, cls_ID3D12GraphicsCommandList9_49, xaux_ID3D12GraphicsCommandList9_49, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
     { "ID3D12GraphicsCommandList::ClearUnorderedAccessViewFloat", NULL, cls_ID3D12GraphicsCommandList9_50, xaux_ID3D12GraphicsCommandList9_50, 7, WINECOM_F_RET_VOID, 0, 0, NULL, 0, 0, 0x04, 0x00, 0x00, 0x00, 0x0010, 0x0000 },
@@ -6207,6 +6186,6 @@ static const struct winecom_iface d3d12_com_ifaces[D3D12_IFACE_COUNT] =
       3, NULL, 0 },
 };
 
-/* 2661 slot(s) marshalled, 74 hand-written, 63 refused with a named
+/* 2661 slot(s) marshalled, 85 hand-written, 52 refused with a named
  * reason, 351 IUnknown slot(s) served by the runtime; 1 interface(s)
  * (IUnknown itself) carry identity rows only. */
