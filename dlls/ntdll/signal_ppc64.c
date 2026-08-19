@@ -5650,6 +5650,47 @@ static const struct thunk_override thunk_overrides[] =
      * hook procedure is called by user32 for every message in the queue, and a
      * TIMERPROC is called from the message loop, so both are native code
      * holding a guest pointer for the life of the window. */
+    /* DIALOG PROCEDURES, which are the same class one entry point further on
+     * and were reached for the first time by DOOM (2016): user32 keeps a
+     * DLGPROC for the life of the dialog and calls it through call_dialog_proc
+     * for every message the dialog and its controls receive.  Nothing about
+     * that pointer says which machine it belongs to, so an unwrapped guest
+     * DLGPROC put the NATIVE ppc64 core on x86-64 bytes -- reported as an
+     * access violation INSIDE the game, at an address four bytes into one of
+     * its own functions, which reads exactly like the game dereferencing a
+     * null pointer and is nothing of the kind.  (report_native_pc_in_guest_image
+     * is what says so now.)
+     *
+     * The proc is the FOURTH argument of all eight entry points, and the two
+     * AorW forms differ only by a trailing flag, so the mask is the same for
+     * all ten rows.  A DLGPROC returns INT_PTR, not BOOL: DWLP_MSGRESULT is
+     * what carries the real answer for most messages, but the return value is
+     * read as a full pointer-width value, so the wide bit is set.
+     *
+     * DELIBERATELY ABSENT, and named so the next reader does not think it was
+     * forgotten: SetWindowLongPtr(DWLP_DLGPROC).  DWLP_DLGPROC is not a fixed
+     * index -- it is an offset into the window's EXTRA bytes, meaningful only
+     * for a window whose class reserved DLGWINDOWEXTRA -- so a row keyed on
+     * the index alone would wrap an ordinary application's extra-byte write
+     * and corrupt it.  A guest that sets its dialog procedure that way is
+     * still owed the wrap; it needs the window's class checked first. */
+    { L"user32.dll", "DialogBoxParamA",              5, NULL, 1u << 3, 1u << 3 },
+    { L"user32.dll", "DialogBoxParamW",              5, NULL, 1u << 3, 1u << 3 },
+    { L"user32.dll", "DialogBoxIndirectParamA",      5, NULL, 1u << 3, 1u << 3 },
+    { L"user32.dll", "DialogBoxIndirectParamW",      5, NULL, 1u << 3, 1u << 3 },
+    { L"user32.dll", "DialogBoxIndirectParamAorW",   6, NULL, 1u << 3, 1u << 3 },
+    { L"user32.dll", "CreateDialogParamA",           5, NULL, 1u << 3, 1u << 3 },
+    { L"user32.dll", "CreateDialogParamW",           5, NULL, 1u << 3, 1u << 3 },
+    { L"user32.dll", "CreateDialogIndirectParamA",   5, NULL, 1u << 3, 1u << 3 },
+    { L"user32.dll", "CreateDialogIndirectParamW",   5, NULL, 1u << 3, 1u << 3 },
+    { L"user32.dll", "CreateDialogIndirectParamAorW", 6, NULL, 1u << 3, 1u << 3 },
+    /* WINHTTP_STATUS_CALLBACK, the other half of the same DOOM finding, and
+     * the worse-behaved half: winhttp calls it from its own request threads,
+     * so the branch into guest code happens on a thread the game never made
+     * and long after the registration returned success.  Five arguments
+     * (HINTERNET, DWORD_PTR context, DWORD status, LPVOID info, DWORD len)
+     * and no return value, so cb_argc is 5 and no wide bit. */
+    { L"winhttp.dll", "WinHttpSetStatusCallback",    4, NULL, 1u << 1, 0, 5 },
     { L"user32.dll", "SetWindowsHookExA",  4, NULL, 1u << 1, 1u << 1 },
     { L"user32.dll", "SetWindowsHookExW",  4, NULL, 1u << 1, 1u << 1 },
     { L"user32.dll", "SetTimer",           4, NULL, 1u << 3 },
