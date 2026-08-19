@@ -30,15 +30,35 @@ Every gate's negative control must go red.  Two were added today
 individually; what has not been proven is that the other 31 still fail when
 they should, with 226 new rows in `thunk_overrides[]` underneath them.
 
-## 2. Portal 2, and the 32-bit lane in general
+## 2. The 32-bit lane: the i386 half of the dxvk thunk surface
 
-Portal 2 (appid 620) was launched on 2026-08-18 and did not start.  Nothing
-has been diagnosed.  Logs are in `steamapps/compatdata/620/`.
+**DIAGNOSED, SCOPED, NOT STARTED** (2026-08-19).  dexwin (Dex's Windows
+build, PE32, Unity 5) is the canary and it gets further than anyone knew:
+the i386 guest boots through the ABI-4 bridge and Unity puts its window up.
+It dies where the 32-bit lane has no graphics at all — i386 `dxgi.dll`'s
+forwards to `d3d11.__wine_dxvk_*` resolve to nothing, because this port's
+i386 d3d11 exports none of the dxvk surface (`err:module:
+find_forwarded_export`, four entries).  Portal 2, Half-Life 2 and the Win32
+Styx wait behind the same wall, so this is the whole 32-bit game lane in one
+piece of work.
 
-It matters beyond one game: Half-Life 2 and its episodes, FreeInfantry and the
-Win32 build of Styx are all PE32, and the WoW64 lane has never carried a real
-game — only `check-wow64-smoke.sh`.  Whatever Portal 2 hits is likely to be
-what all of them hit.
+`ppc64le/dxvk/docs/i386-lane-design.md` carries the design: an i386 COM
+emitter in spec2thunk (`int 0x80` stubs — the instruction the wow64 lane
+already routes into the OS_GENERIC sink), stub-RIP mapping in the bounded
+emu32 run loop, a `dispatch32` in libs/winecom that widens stdcall's 4-byte
+stack slots into the same `UINT64 args[]` everything downstream already
+speaks, and hand walkers for the descriptor structs an i386 guest lays out
+differently.
+
+That last set is MEASURED, not guessed: `ppc64le/dxvk/layout32.py` compiles
+all 297 D3D11_/DXGI_ aggregates from Wine's own headers for both guest
+targets and diffs size/alignment — **47 diverge**, and ~35 of those are
+content-protection/video surfaces (D3D11_AUTHENTICATED_*, VIDEO_DECODER_*)
+that no title of this era touches and should be refused by name.  The dozen
+that matter (INPUT_ELEMENT_DESC, SUBRESOURCE_DATA, MAPPED_SUBRESOURCE,
+SWAP_CHAIN_DESC, ADAPTER_DESC*, OUTPUT_DESC*, ...) are all on cold
+creation/query slots, one mechanical widen/narrow walker each.  The 250
+identical ones keep passing their pointer straight through, as on 64-bit.
 
 ## 3. Cyberpunk: from character creation to playable, and the graphics issues on the way
 
