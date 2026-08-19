@@ -55,14 +55,36 @@ refusal cannot yet serve.  THE GAME RUNS: title screen at 245 fps, menus,
 character creation, all user-confirmed on screen.  What remains, in order of
 what is actually seen:
 
-* **Graphics corruption**: the GAME VIEW itself draws garbled — dithered
-  blocks and black rectangles across the scene (user-corrected: this is not
-  the scan-UI's intentional glitch styling), and character models in
-  creation render as unlit silhouettes.  Nothing in the logs names it; suspects worth measuring first
-  are the served-copy paths (hand_copy_texture_region, CopyBufferRegion,
-  GetCopyableFootprints round trips) and whatever REDengine does with the
-  slots that still refuse quietly.  Compare a RADV capture against the
-  emulated GE-Proton lane on the same scene.
+* **Graphics corruption — the top item, and it is settings-independent.**
+  The user reached GAMEPLAY (prologue dialogue) and turned every graphics
+  setting to low or off: no real change.  The look: a fine, regular dithered
+  speckling over most textured surfaces — characters, walls, props — with
+  black rectangles, while UI text, lights and some flat surfaces render
+  clean.  That texture-granular pattern reads as CORRUPTED TEXTURE CONTENT
+  (block-compressed data with stale/garbage portions at some regular
+  stride), not as broken shading: geometry, lighting and the whole frame
+  loop are right.  Nothing in the logs names it.
+
+  Suspects, in the order worth measuring:
+  1. **The upload path through the emulator.**  REDengine fills its upload
+     heaps with wide/streaming SIMD stores; if FEX's non-temporal store
+     emulation drops or reorders partial cachelines into mapped memory, the
+     copy that follows uploads garbage at exactly this kind of stride.  The
+     emulated GE-Proton lane on the same box uses the same class of stores
+     THROUGH THE SAME FEX CORE, so first measure: same scene on the
+     emulated lane — if it is clean there, the difference is the native
+     port's mapping/copy path, not the JIT's stores.
+  2. **The served copy slots**: hand_copy_texture_region (new this session),
+     CopyBufferRegion, GetCopyableFootprints round trips, WriteToSubresource.
+     A targeted probe that uploads a known pattern through the guest-side
+     CopyTextureRegion path and reads it back would convict or clear the
+     whole family in one run (the d3d12 gate of commit 2f25f234 did exactly
+     this for the copy queue — extend it to the PlacedFootprint form).
+  3. **vkd3d/RADV on ppc64le itself** (shader or DCC issue on NAVI21 under
+     an untested host arch) — only after 1 and 2 come back clean.
+  Not suspects: marshalling of the draw-time slots (the frame composes
+  correctly), the swapchain (present is clean), descriptor copies (fixed
+  and verified this session).
 * **Frame-latency waitable**: `GetFrameLatencyWaitableObject` returns NULL
   (unix_present.c, "the eventfd->semaphore relay is P5").  vkd3d's side
   already hands out a TAGGED eventfd (vkd3d-patches/0001); the lift is the
