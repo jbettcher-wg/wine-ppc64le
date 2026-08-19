@@ -42,9 +42,10 @@ a Windows build, and the fix for all fifteen was one `.thunks` file each.
 | Warhammer 40,000: Boltgun | 2005010 | PE32+ | dead in `loader_init`, `c0000135`, 0 guest instructions | past the loader, and now **past the DRM stub** too |
 | Styx: Master of Shadows | 242640 | PE32+ | dead in `loader_init`, `c0000135`, 0 guest instructions | **past `loader_init`** — 58 modules, every DllMain runs; now stops in its own code on `mscoree._CorExeMain` (handoff #4) |
 | The Elder Scrolls V: Skyrim SE | 489830 | PE32+ | loader completes, then `c0000005` at the image entry | **past the DRM stub** — see the 2026-08-18 re-run below |
-| Half-Life 2 | 220 | **PE32** | refused — no 32-bit guest | unchanged, and correctly so |
-| FreeInfantry | 2830720 | **PE32** | refused — no 32-bit guest | unchanged, and correctly so |
-| Styx: Master of Shadows (Win32) | 242640 | **PE32** | refused — no 32-bit guest | unchanged, and correctly so |
+| Portal 2 | 620 | **PE32** | refused — no 32-bit guest | **attempted 2026-08-18 with the WoW64 lane and did not launch — not yet investigated**; logs in `steamapps/compatdata/620/` |
+| Half-Life 2 | 220 | **PE32** | refused — no 32-bit guest | 32-bit is served now; not attempted since |
+| FreeInfantry | 2830720 | **PE32** | refused — no 32-bit guest | 32-bit is served now; not attempted since |
+| Styx: Master of Shadows (Win32) | 242640 | **PE32** | refused — no 32-bit guest | 32-bit is served now; not attempted since |
 | Styx: Shards of Darkness | — | — | not installed (empty directory, no appmanifest) | — |
 | DOOM (2016) | 379720 | PE32+ | reached ~99% of startup, then `FATAL ERROR: Memory corruption before block!` and `rc=5`, every run | **past it** — the message was a misdiagnosis, not damage; see handoff #7 below |
 
