@@ -139,6 +139,16 @@ struct file_view
 #define VPROT_GUARD      0x10
 #define VPROT_COMMITTED  0x20
 #define VPROT_WRITEWATCH 0x40
+#define VPROT_NOSAO      0x80  /* hardware-TSO exempt: a page of a NATIVE-machine
+                                * image.  The emulator's barrier-free code never
+                                * executes there and native code has its own
+                                * (compiler-emitted) ordering, so these pages
+                                * skip PROT_SAO and its store-throughput cap --
+                                * the "emulation side only" envelope.  Guest-
+                                * machine images and every anonymous page keep
+                                * the bit; over-applying is always safe, so a
+                                * page that loses this marker merely gets SAO
+                                * back. */
 /* per-mapping protection flags */
 #define VPROT_ARM64EC          0x0100  /* view may contain ARM64EC code */
 #define VPROT_SYSTEM           0x0200  /* system view (underlying mmap not under our control) */
@@ -1383,8 +1393,9 @@ static int get_unix_prot( BYTE vprot )
     }
     if (!prot) prot = PROT_NONE;
     /* every accessible page the guest can reach carries PROT_SAO while
-     * hardware TSO is live; PROT_NONE guard/uncommitted pages stay pure */
-    else prot |= emu_hwtso_prot;
+     * hardware TSO is live; PROT_NONE guard/uncommitted pages stay pure,
+     * and native-machine image pages are exempt (VPROT_NOSAO above) */
+    else if (!(vprot & VPROT_NOSAO)) prot |= emu_hwtso_prot;
     return prot;
 }
 
@@ -3501,6 +3512,18 @@ static NTSTATUS virtual_map_image( HANDLE mapping, void **addr_ptr, SIZE_T *size
     if (NT_SUCCESS(status))
     {
         if (is_builtin && !offset) add_builtin_module( view->base, NULL );
+#ifdef __powerpc64__
+        /* the emulation-side-only hardware-TSO envelope: a NATIVE-machine
+         * image is executed by native code with its own ordering and its
+         * pages skip PROT_SAO (VPROT_NOSAO).  The marker is set whether or
+         * not HWTSO is live yet, because the bridge enables lazily and the
+         * retroactive sweep must already know which pages to leave alone.
+         * The machine test, not is_builtin: a guest-machine thunk half
+         * (an x86-64 PE this tree built) is builtin AND emulated, and its
+         * pages must carry the bit. */
+        if (pe_mapping->image.machine == IMAGE_FILE_MACHINE_POWERPC64)
+            set_page_vprot_bits( view->base, size, VPROT_NOSAO, 0 );
+#endif
         *addr_ptr = view->base;
         *size_ptr = size;
         emu_invalidate_code_range( view->base, size );
@@ -5073,6 +5096,8 @@ void virtual_enable_hwtso( unsigned int prot_bit )
     server_enter_uninterrupted_section( &virtual_mutex, &sigset );
     if (!emu_hwtso_prot)
     {
+        unsigned int swept = 0;
+
         emu_hwtso_prot = prot_bit;
 
         WINE_RB_FOR_EACH_ENTRY( view, &views_tree, struct file_view, entry )
@@ -5081,8 +5106,10 @@ void virtual_enable_hwtso( unsigned int prot_bit )
             BYTE commit = is_view_valloc( view ) ? 0 : VPROT_COMMITTED;
 
             mprotect_range( view->base, view->size, commit, 0 );
+            swept++;
             if (!emu_hwtso_prot) break;   /* a refusal mid-walk revoked it */
         }
+        TRACE( "swept %u views, prot bit now %#x\n", swept, emu_hwtso_prot );
     }
     server_leave_uninterrupted_section( &virtual_mutex, &sigset );
 }
