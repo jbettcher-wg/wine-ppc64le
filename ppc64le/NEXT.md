@@ -55,22 +55,28 @@ refusal cannot yet serve.  THE GAME RUNS: title screen at 245 fps, menus,
 character creation, all user-confirmed on screen.  What remains, in order of
 what is actually seen:
 
-* **Graphics corruption — MOSTLY FIXED, residue remains, root cause is
-  below this tree.**  The discriminator was measured across runs 36-38: the
-  speckle appears exactly when uploads go through GTT (VKD3D_CONFIG=
-  no_upload_hvv, since removed from the appconfig — heap 1 is 30 GiB of
-  full-ReBAR host-visible VRAM on this V620, so the flag bought nothing)
-  and the scene is clean when they stay in VRAM, mesh shaders on or off.
-  `ppc64le/vkd3d/probes/copy_pattern_run.sh` then drove a known pattern
-  through upload->texture->readback in BOTH placements: byte-identical both
-  ways, so the marshal/copy path is CLEARED and the quiet GTT case is fine
-  — the corruption needs game-scale GTT traffic, the shape of a
-  kernel/amdgpu DMA problem on the custom 4K POWER8 kernel, not a userspace
-  one.  What remains here: the residual speckle where vkd3d still touches
-  system memory at scale (fallbacks, readbacks) — worth quantifying with
-  VKD3D_DEBUG memory logging or a kernel-side look at amdgpu GTT/TCE
-  mapping on this kernel; and the probe's GTT leg stands as the tripwire
-  (if the quiet case ever starts failing, chase that first).
+* **Graphics corruption — STILL PRESENT.  Improved by the GTT finding,
+  not fixed, and the user's read is memory corruption.**  What is measured:
+  across runs 36-38 the dense speckle tracked `VKD3D_CONFIG=no_upload_hvv`
+  exactly (mesh shaders on or off), and dropping it (appconfig updated; the
+  V620's 30 GiB device heap is fully host-visible/ReBAR, the flag bought
+  nothing) made scenes visibly better — but the game is NOT clean: garbled
+  surfaces remain in ordinary play, and it looks like memory corruption at
+  scale.  `ppc64le/vkd3d/probes/copy_pattern_run.sh` cleared ONLY the quiet
+  single-buffer copy path: pattern upload->CopyTextureRegion->texture->
+  readback is byte-identical in BOTH placements, so this tree's marshal/
+  copy slots are not the corrupter — but that clears a path, not the
+  system.  Open, in the order worth measuring: (1) game-scale GTT/system-
+  memory DMA on the custom 4K POWER8 kernel (amdgpu TCE/window shape, high
+  physical pages) — the strongest lead given the no_upload_hvv split;
+  (2) a scaled-up probe (hundreds of MB, many concurrent uploads, GPU
+  under load) to make the corruption reproduce OUTSIDE the game, which is
+  the difference between a screenshot and a bug report; (3) whatever
+  writes guest-visible memory at scale in this port (mapped VRAM through
+  the emulator, wineserver shared sections) — "memory corruption" is the
+  user's read of the pattern and nothing measured yet contradicts it.
+  The probe's GTT leg stands as the tripwire: if the quiet case ever
+  fails, chase that before anything else.
 * **Frame-latency waitable**: `GetFrameLatencyWaitableObject` returns NULL
   (unix_present.c, "the eventfd->semaphore relay is P5").  vkd3d's side
   already hands out a TAGGED eventfd (vkd3d-patches/0001); the lift is the
