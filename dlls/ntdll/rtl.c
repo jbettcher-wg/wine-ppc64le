@@ -1389,13 +1389,74 @@ BOOL WINAPI RtlSetCurrentTransaction(HANDLE new_transaction)
  */
 void WINAPI RtlGetCurrentProcessorNumberEx(PROCESSOR_NUMBER *processor)
 {
-    static int warn_once;
+    /* NOT a stub any more, and the difference shows up on any machine with
+     * more than one processor group.
+     *
+     * This used to answer Group 0 and put NtGetCurrentProcessorNumber()'s
+     * value straight into Number.  Both halves are wrong once a second group
+     * exists: the group is not always 0, and Number is defined as the index
+     * WITHIN the group, not the machine-wide one.  [MEASURED] 2026-08-18,
+     * op4k (80 processors, 2 groups of 40): running on Linux CPU 155 -- which
+     * is Windows processor 79, group 1, index 39 -- it reported {group 0,
+     * number 79}, naming a processor group 0 does not have.  A guest that
+     * trusts the group cannot then address the processor it is on.
+     *
+     * The group sizes come from the RelationGroup record and are cached: they
+     * cannot change without processor hotplug, which nothing in this port
+     * copes with anyway.  Two threads racing here compute the same answer
+     * from the same immutable data, and `count` is published last so a reader
+     * either sees no cache or a complete one.
+     *
+     * Walking the sizes rather than dividing is what the contract in
+     * include/wine/cputopology.h guarantees: groups are filled in ascending
+     * Windows-index order, so group g owns a contiguous run, but the runs are
+     * not all the same length -- 33 and 32 on a 65-processor machine. */
+    /* Windows' own ceiling on processor groups.  Spelled here because this
+     * tree's headers do not define MAXIMUM_PROC_GROUPS, and the same number
+     * bounds WINE_MAX_CPU_GROUPS in include/wine/cputopology.h -- which this
+     * PE-side file must not include, since that header reads /sys. */
+    enum { MAX_PROC_GROUPS = 20 };
+    static ULONG cached_size[MAX_PROC_GROUPS];
+    static USHORT cached_count;
+    USHORT count = cached_count, g;
+    ULONG n;
 
-    if (!warn_once++)
-        FIXME("(%p) :semi-stub\n", processor);
+    if (!count)
+    {
+        SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *info;
+        ULONG len = 0, relation = RelationGroup;
 
-    processor->Group = 0;
-    processor->Number = NtGetCurrentProcessorNumber();
+        if (!NtQuerySystemInformationEx( SystemLogicalProcessorInformationEx, &relation,
+                                         sizeof(relation), NULL, 0, &len ) ||
+            len)
+        {
+            if ((info = RtlAllocateHeap( GetProcessHeap(), 0, len )))
+            {
+                if (!NtQuerySystemInformationEx( SystemLogicalProcessorInformationEx, &relation,
+                                                 sizeof(relation), info, len, &len ) &&
+                    info->Relationship == RelationGroup)
+                {
+                    USHORT i, active = info->Group.ActiveGroupCount;
+
+                    if (active > MAX_PROC_GROUPS) active = MAX_PROC_GROUPS;
+                    for (i = 0; i < active; i++)
+                        cached_size[i] = info->Group.GroupInfo[i].ActiveProcessorCount;
+                    count = active;
+                    cached_count = active;      /* published last */
+                }
+                RtlFreeHeap( GetProcessHeap(), 0, info );
+            }
+        }
+    }
+
+    n = NtGetCurrentProcessorNumber();
+    for (g = 0; count && g + 1 < count; g++)
+    {
+        if (n < cached_size[g]) break;
+        n -= cached_size[g];
+    }
+    processor->Group = count ? g : 0;
+    processor->Number = n;
     processor->Reserved = 0;
 }
 

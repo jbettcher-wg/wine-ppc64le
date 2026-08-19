@@ -136,6 +136,7 @@
 #include "wine/asm.h"
 #include "unix_private.h"
 #include "wine/debug.h"
+#include "wine/cputopology.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(ntdll);
 
@@ -317,6 +318,49 @@ static SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *logical_proc_info_ex;
 static unsigned int logical_proc_info_ex_size, logical_proc_info_ex_alloc_size;
 static SYSTEM_NUMA_INFORMATION numa_info;
 static ULONG_PTR system_cpu_mask;
+
+/* Sabotage levers for ppc64le/cpu's gate, on the CODE rather than on the
+ * gate's own assertions, after the WINEEMUNOARGWIDTH pattern in
+ * signal_ppc64.c: read once, and ERR loudly so a sabotaged run can never be
+ * mistaken for a normal one.  These are unix-side, so the unix environment
+ * (getenv) is the authoritative place to read them.
+ *
+ * WINEEMUNOCPUGROUPS=1 restores the pre-topology reporting exactly: one
+ * processor group, enumeration stopped at Linux CPU 64, masks in LINUX bit
+ * positions, and the 64-bit system affinity claim.  WINEEMUNOCPUMAP=1
+ * restores the identity mapping (Windows CPU i IS Linux CPU i) everywhere
+ * this side consumes the map; wineserver's affinity half answers to the same
+ * variable so one lever turns the whole mapping off. */
+BOOL ntdll_no_cpu_groups(void)
+{
+    static int off = -1;
+
+    if (off == -1)
+    {
+        const char *e = getenv( "WINEEMUNOCPUGROUPS" );
+        off = e && e[0] == '1';
+        if (off)
+            ERR( "WINEEMUNOCPUGROUPS: reporting one processor group and no "
+                 "CPU past Linux index 64, as before the topology work\n" );
+    }
+    return off;
+}
+
+BOOL ntdll_no_cpu_map(void)
+{
+    static int off = -1;
+
+    if (off == -1)
+    {
+        const char *e = getenv( "WINEEMUNOCPUMAP" );
+        off = e && e[0] == '1';
+        if (off)
+            ERR( "WINEEMUNOCPUMAP: Windows processor indices are raw Linux "
+                 "CPU numbers again; NtGetCurrentProcessorNumber can exceed "
+                 "the processor count\n" );
+    }
+    return off;
+}
 
 static pthread_mutex_t timezone_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -930,6 +974,12 @@ static DWORD count_bits( ULONG_PTR mask )
     return count;
 }
 
+#ifndef linux
+/* The helpers below can only describe ONE processor group: a single ULONG_PTR
+ * mask whose bit i is processor i.  That is sufficient for the macOS/BSD/hwloc
+ * paths, which keep them.  The Linux path derives real groups from
+ * wine/cputopology.h and has its own emitters further down, so these would be
+ * unused (and a -Wunused-function warning) there. */
 static BOOL logical_proc_info_ex_add_by_id( LOGICAL_PROCESSOR_RELATIONSHIP rel, DWORD id, ULONG_PTR mask )
 {
     SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *dataex;
@@ -1106,68 +1156,9 @@ static BOOL logical_proc_info_add_group( DWORD num_cpus, ULONG_PTR mask )
     system_cpu_mask |= mask;
     return TRUE;
 }
+#endif /* !linux -- single-group logical_proc_info helpers */
 
 #ifdef linux
-
-/* Helper function for counting bitmap values as commonly used by the Linux kernel
- * for storing CPU masks in sysfs. The format is comma separated lists of hex values
- * each max 32-bit e.g. "00ff" or even "00,00000000,0000ffff".
- *
- * Example files include:
- * - /sys/devices/system/cpu/cpu0/cache/index0/shared_cpu_map
- * - /sys/devices/system/cpu/cpu0/topology/thread_siblings
- */
-static BOOL sysfs_parse_bitmap(const char *filename, ULONG_PTR *mask)
-{
-    FILE *f;
-    unsigned int r;
-
-    f = fopen(filename, "r");
-    if (!f) return FALSE;
-
-    while (!feof(f))
-    {
-        char op;
-        if (!fscanf(f, "%x%c ", &r, &op)) break;
-        *mask = (sizeof(ULONG_PTR)>sizeof(int) ? *mask << (8 * sizeof(DWORD)) : 0) + r;
-    }
-    fclose( f );
-    return TRUE;
-}
-
-/* Helper function for counting number of elements in interval lists as used by
- * the Linux kernel. The format is comma separated list of intervals of which
- * each interval has the format of "begin-end" where begin and end are decimal
- * numbers. E.g. "0-7", "0-7,16-23"
- *
- * Example files include:
- * - /sys/devices/system/cpu/online
- * - /sys/devices/system/cpu/cpu0/cache/index0/shared_cpu_list
- * - /sys/devices/system/cpu/cpu0/topology/thread_siblings_list.
- */
-static BOOL sysfs_count_list_elements(const char *filename, unsigned int *result)
-{
-    FILE *f;
-
-    f = fopen(filename, "r");
-    if (!f) return FALSE;
-
-    while (!feof(f))
-    {
-        char op;
-        unsigned int beg, end;
-
-        if (!fscanf(f, "%u%c ", &beg, &op)) break;
-        if(op == '-')
-            fscanf(f, "%u%c ", &end, &op);
-        else
-            end = beg;
-
-        *result += end - beg + 1;
-    }
-    fclose( f );
-    return TRUE;
-}
 
 static void fill_performance_core_info(void)
 {
@@ -1206,232 +1197,489 @@ done:
     fclose(fpcore_list);
 }
 
-/* for 'data', max_len is the array count. for 'dataex', max_len is in bytes */
+/* ---------------------------------------------------------------------------
+ * Group-aware processor information, driven by wine/cputopology.h.
+ *
+ * Everything below works in WINDOWS processor indices, never raw Linux CPU
+ * numbers.  The two are not the same thing: Windows numbers processors
+ * densely, 0..N-1, in groups of at most 64, while Linux numbers CPUs however
+ * the firmware enumerated them.  [MEASURED] 2026-08-18, op4k (POWER8, SMT4
+ * out of an SMT8 part): 80 online CPUs numbered 0-3,8-11,...,152-155, NUMA
+ * nodes 0 and 8.  The old code here walked that sysfs numbering directly
+ * into single-ULONG_PTR masks and stopped at index 64, i.e. after 33 online
+ * CPUs, so GetActiveProcessorCount(ALL_PROCESSOR_GROUPS) said 32 while
+ * GetSystemInfo (from sysconf) said 80.
+ *
+ * On a dense x86 box (CPUs 0..N-1 all online, one node, N <= 64) the
+ * topology's mapping is the identity, everything lands in group 0, and every
+ * record below carries the same mask bits the old walk produced.  Boxes whose
+ * NUMA nodes interleave their CPU numbers get a DIFFERENT Windows numbering
+ * than before (node-major, the header's contract), but a numbering that all
+ * reporting here and wineserver's affinity path share.
+ *
+ * An affinity here is a set of (group, mask) pairs -- struct group_mask_set
+ * -- where bit i of mask[g] is the processor with index_in_group == i, and a
+ * unit spanning several groups (possible once a package or node holds more
+ * than 64 online CPUs) emits one GROUP_AFFINITY per spanned group.
+ */
+
+struct group_mask_set
+{
+    ULONG_PTR mask[WINE_MAX_CPU_GROUPS];   /* bit index_in_group, per group */
+};
+
+static void group_mask_set_add( struct group_mask_set *set,
+                                const struct wine_cpu_topology *topo, unsigned int win )
+{
+    set->mask[topo->group_of[win]] |= (ULONG_PTR)1 << topo->index_in_group[win];
+}
+
+/* number of groups the set spans (== GroupCount of the record describing it) */
+static unsigned int group_mask_set_groups( const struct group_mask_set *set )
+{
+    unsigned int g, n = 0;
+
+    for (g = 0; g < WINE_MAX_CPU_GROUPS; g++) if (set->mask[g]) n++;
+    return n;
+}
+
+static DWORD group_mask_set_bits( const struct group_mask_set *set )
+{
+    unsigned int g;
+    DWORD n = 0;
+
+    for (g = 0; g < WINE_MAX_CPU_GROUPS; g++) n += count_bits( set->mask[g] );
+    return n;
+}
+
+/* Parse a sysfs cpulist file ("0-3,8-11") into a group mask set.  Values are
+ * LINUX CPU numbers; each is translated through from_unix[], and a CPU with
+ * no Windows index (offline -- the kernel lists offline siblings in some of
+ * these files) is dropped, because an offline CPU must not appear in any
+ * affinity a guest can request.  Returns the smallest Windows index seen, or
+ * -1 if the file was missing/empty; *first_value receives the first Linux
+ * number listed (the kernel's id for the unit, used as a lookup key), or -1. */
+struct set_from_list_ctx
+{
+    const struct wine_cpu_topology *topo;
+    struct group_mask_set *set;
+    int min_win;
+    int first_value;
+};
+
+static void set_from_list_cb( void *ctx, unsigned int cpu )
+{
+    struct set_from_list_ctx *c = ctx;
+    int win;
+
+    if (c->first_value < 0) c->first_value = (int)cpu;
+    if (cpu >= WINE_MAX_UNIX_CPU) return;
+    if ((win = c->topo->from_unix[cpu]) < 0) return;   /* offline */
+    group_mask_set_add( c->set, c->topo, (unsigned int)win );
+    if (c->min_win < 0 || win < c->min_win) c->min_win = win;
+}
+
+static int set_from_list( const char *path, const struct wine_cpu_topology *topo,
+                          struct group_mask_set *set, int *first_value )
+{
+    struct set_from_list_ctx c = { topo, set, -1, -1 };
+
+    memset( set, 0, sizeof(*set) );
+    wine_cpu_parse_list( path, &c, set_from_list_cb );
+    if (first_value) *first_value = c.first_value;
+    return c.min_win;
+}
+
+/* The legacy SYSTEM_LOGICAL_PROCESSOR_INFORMATION record is one ULONG_PTR
+ * mask with no group field: it can only describe group 0, which is what the
+ * legacy API reports on a real multi-group Windows too (it answers for the
+ * caller's group).  A unit with no group-0 processors gets no legacy record.
+ * On a machine that fits in one group -- every dense x86 box up to 64 CPUs --
+ * group 0 is the whole machine and nothing is lost. */
+static BOOL add_legacy_proc_info( LOGICAL_PROCESSOR_RELATIONSHIP rel, ULONG_PTR mask_g0,
+                                  BYTE core_flags, const CACHE_DESCRIPTOR *cache, DWORD numa_node )
+{
+    SYSTEM_LOGICAL_PROCESSOR_INFORMATION *info;
+
+    if (!mask_g0) return TRUE;
+    if (!grow_logical_proc_buf()) return FALSE;
+
+    info = &logical_proc_info[logical_proc_info_len++];
+    memset( info, 0, sizeof(*info) );
+    info->Relationship = rel;
+    info->ProcessorMask = mask_g0;
+    switch (rel)
+    {
+    case RelationProcessorCore:
+        info->ProcessorCore.Flags = core_flags;
+        break;
+    case RelationCache:
+        info->Cache = *cache;
+        break;
+    case RelationNumaNode:
+        info->NumaNode.NodeNumber = numa_node;
+        break;
+    default:
+        break;
+    }
+    return TRUE;
+}
+
+static BOOL add_processor_ex( LOGICAL_PROCESSOR_RELATIONSHIP rel, BYTE flags, BYTE efficiency_class,
+                              const struct group_mask_set *set )
+{
+    SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *dataex;
+    unsigned int g, i = 0, n = group_mask_set_groups( set );
+    DWORD size;
+
+    if (!n) return TRUE;
+    size = log_proc_ex_size_plus( offsetof( PROCESSOR_RELATIONSHIP, GroupMask[n] ));
+    if (!grow_logical_proc_ex_buf( size )) return FALSE;
+
+    dataex = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)((char *)logical_proc_info_ex + logical_proc_info_ex_size);
+    memset( dataex, 0, size );
+    dataex->Relationship = rel;
+    dataex->Size = size;
+    dataex->Processor.Flags = flags;
+    dataex->Processor.EfficiencyClass = efficiency_class;
+    dataex->Processor.GroupCount = n;
+    for (g = 0; g < WINE_MAX_CPU_GROUPS; g++)
+    {
+        if (!set->mask[g]) continue;
+        dataex->Processor.GroupMask[i].Mask = set->mask[g];
+        dataex->Processor.GroupMask[i].Group = g;
+        i++;
+    }
+    logical_proc_info_ex_size += size;
+    return TRUE;
+}
+
+static BOOL add_cache_ex( const CACHE_DESCRIPTOR *cache, const struct group_mask_set *set )
+{
+    SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *dataex;
+    unsigned int g, i = 0, n = group_mask_set_groups( set );
+    DWORD size;
+
+    if (!n) return TRUE;
+    size = log_proc_ex_size_plus( offsetof( CACHE_RELATIONSHIP, GroupMasks[n] ));
+    if (!grow_logical_proc_ex_buf( size )) return FALSE;
+
+    dataex = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)((char *)logical_proc_info_ex + logical_proc_info_ex_size);
+    memset( dataex, 0, size );
+    dataex->Relationship = RelationCache;
+    dataex->Size = size;
+    dataex->Cache.Level = cache->Level;
+    dataex->Cache.Associativity = cache->Associativity;
+    dataex->Cache.LineSize = cache->LineSize;
+    dataex->Cache.CacheSize = cache->Size;
+    dataex->Cache.Type = cache->Type;
+    dataex->Cache.GroupCount = n;
+    for (g = 0; g < WINE_MAX_CPU_GROUPS; g++)
+    {
+        if (!set->mask[g]) continue;
+        dataex->Cache.GroupMasks[i].Mask = set->mask[g];
+        dataex->Cache.GroupMasks[i].Group = g;
+        i++;
+    }
+    logical_proc_info_ex_size += size;
+    return TRUE;
+}
+
+static BOOL add_numa_ex( DWORD node_id, const struct group_mask_set *set )
+{
+    SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *dataex;
+    unsigned int g, i = 0, n = group_mask_set_groups( set );
+    DWORD size;
+
+    /* A node whose CPUs are all out of view still gets a record, with a
+     * zero group-0 mask.  The real topology never produces one (node_ids
+     * only lists nodes with online CPUs), but the WINEEMUNOCPUGROUPS
+     * degraded view does, and that zero-mask node record is part of the
+     * behaviour the lever restores. */
+    if (!n) n = 1;
+    size = log_proc_ex_size_plus( offsetof( NUMA_NODE_RELATIONSHIP, GroupMasks[n] ));
+    if (!grow_logical_proc_ex_buf( size )) return FALSE;
+
+    dataex = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)((char *)logical_proc_info_ex + logical_proc_info_ex_size);
+    memset( dataex, 0, size );
+    dataex->Relationship = RelationNumaNode;
+    dataex->Size = size;
+    dataex->NumaNode.NodeNumber = node_id;
+    dataex->NumaNode.GroupCount = n;
+    for (g = 0; g < WINE_MAX_CPU_GROUPS; g++)
+    {
+        if (!set->mask[g]) continue;
+        dataex->NumaNode.GroupMasks[i].Mask = set->mask[g];
+        dataex->NumaNode.GroupMasks[i].Group = g;
+        i++;
+    }
+    logical_proc_info_ex_size += size;
+    return TRUE;
+}
+
+static BOOL add_group_ex( const struct wine_cpu_topology *topo )
+{
+    SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *dataex;
+    ULONG_PTR group_masks[WINE_MAX_CPU_GROUPS] = { 0 };
+    unsigned int g, w;
+    DWORD size = log_proc_ex_size_plus( offsetof( GROUP_RELATIONSHIP, GroupInfo[topo->group_count] ));
+
+    if (!grow_logical_proc_ex_buf( size )) return FALSE;
+
+    /* OR of the members' index_in_group bits rather than "the low size bits":
+     * the same value for the real topology, whose per-group indices are dense
+     * 0..size-1, but also right for the WINEEMUNOCPUGROUPS degraded view,
+     * whose indices are sparse Linux numbers. */
+    for (w = 0; w < topo->count; w++)
+        group_masks[topo->group_of[w]] |= (ULONG_PTR)1 << topo->index_in_group[w];
+
+    dataex = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)((char *)logical_proc_info_ex + logical_proc_info_ex_size);
+    memset( dataex, 0, size );
+    dataex->Relationship = RelationGroup;
+    dataex->Size = size;
+    dataex->Group.MaximumGroupCount = topo->group_count;
+    dataex->Group.ActiveGroupCount = topo->group_count;
+    for (g = 0; g < topo->group_count; g++)
+    {
+        /* MaximumProcessorCount == ActiveProcessorCount: we do not model CPU
+         * hot-add, and the old code reported its (single) group that way too. */
+        dataex->Group.GroupInfo[g].MaximumProcessorCount = topo->group_size[g];
+        dataex->Group.GroupInfo[g].ActiveProcessorCount = topo->group_size[g];
+        dataex->Group.GroupInfo[g].ActiveProcessorMask = group_masks[g];
+    }
+    logical_proc_info_ex_size += size;
+
+    /* Group 0's mask, for the generic single-group fallbacks outside this
+     * file section (the numa_info fallback in init_logical_proc_info). */
+    system_cpu_mask = dataex->Group.GroupInfo[0].ActiveProcessorMask;
+    return TRUE;
+}
+
+/* The topology as THIS FILE reports it: the real one, or -- under the
+ * WINEEMUNOCPUGROUPS lever -- a degraded copy that reproduces the
+ * pre-topology behaviour: only online CPUs with Linux number below 64, one
+ * group, and each CPU's mask bit at its LINUX number (index_in_group == the
+ * Linux CPU number), which is what makes the emitted masks come out
+ * Linux-shaped (0x0f0f0f0f0f0f0f0f on the measured POWER8) rather than
+ * dense.  node_ids are kept so the old zero-mask node-8 record reappears
+ * too.  Single-threaded first build, same as the real one's contract. */
+static const struct wine_cpu_topology *ntdll_cpu_topology(void)
+{
+    static struct wine_cpu_topology degraded;
+    static int built;
+
+    if (!ntdll_no_cpu_groups()) return wine_cpu_topology();
+    if (!built)
+    {
+        const struct wine_cpu_topology *real = wine_cpu_topology();
+        unsigned int w, i;
+
+        memset( &degraded, 0, sizeof(degraded) );
+        for (i = 0; i < WINE_MAX_UNIX_CPU; i++) degraded.from_unix[i] = -1;
+        for (i = 0; i < WINE_MAX_CPUS; i++) degraded.to_unix[i] = -1;
+        for (w = 0; w < real->count; w++)
+        {
+            int u = real->to_unix[w];
+
+            if (u < 0 || u >= (int)(8 * sizeof(ULONG_PTR))) continue;
+            degraded.to_unix[degraded.count]        = u;
+            degraded.from_unix[u]                   = (int)degraded.count;
+            degraded.group_of[degraded.count]       = 0;
+            degraded.index_in_group[degraded.count] = (unsigned char)u;
+            degraded.node_of[degraded.count]        = real->node_of[w];
+            degraded.count++;
+        }
+        degraded.group_count = 1;
+        degraded.group_size[0] = degraded.count;
+        degraded.node_count = real->node_count;
+        memcpy( degraded.node_ids, real->node_ids, sizeof(degraded.node_ids) );
+        built = 1;
+    }
+    return &degraded;
+}
+
 static NTSTATUS create_logical_proc_info(void)
 {
     static const char core_info[] = "/sys/devices/system/cpu/cpu%u/topology/%s";
     static const char cache_info[] = "/sys/devices/system/cpu/cpu%u/cache/index%u/%s";
-    static const char numa_info[] = "/sys/devices/system/node/node%u/cpumap";
 
-    FILE *fcpu_list, *fnuma_list, *f;
-    unsigned int beg, end, i, j, r, num_cpus = 0, max_cpus = 0;
-    char op, name[MAX_PATH];
-    ULONG_PTR all_cpus_mask = 0;
-
-    /* On systems with a large number of CPU cores (32 or 64 depending on 32-bit or 64-bit),
-     * we have issues parsing processor information:
-     * - ULONG_PTR masks as used in data structures can't hold all cores. Requires splitting
-     *   data appropriately into "processor groups". We are hard coding 1.
-     * - Thread affinity code in wineserver and our CPU parsing code here work independently.
-     *   So far the Windows mask applied directly to Linux, but process groups break that.
-     *   (NUMA systems you may have multiple non-full groups.)
-     */
-    if(sysfs_count_list_elements("/sys/devices/system/cpu/present", &max_cpus) && max_cpus > MAXIMUM_PROCESSORS)
+    const struct wine_cpu_topology *topo = ntdll_cpu_topology();
+    struct pkg_info
     {
-        FIXME("Improve CPU info reporting: system supports %u logical cores, but only %u supported!\n",
-                max_cpus, MAXIMUM_PROCESSORS);
-    }
-
-    /* AND ON A SPARSE ONLINE SET IT IS WORSE THAN THAT MESSAGE SAYS, which is
-     * why this note is here rather than left to be rediscovered.
-     *
-     * The loop below stops at a CPU whose INDEX reaches the width of an
-     * ULONG_PTR, because that is the widest affinity mask one processor group
-     * can hold.  Where CPU numbering is dense -- every x86 box -- index and
-     * count are the same thing and the cap costs you the cores past 64.
-     *
-     * POWER numbering is not dense.  A POWER8 running SMT4 out of an SMT8
-     * part reports `present` as 0-159 and `online` as
-     * 0-3,8-11,16-19,... -- four online out of every eight slots.  Index 64 is
-     * therefore reached after only 33 ONLINE cpus, so a machine with 80 of
-     * them tells a guest it has 32.
-     *
-     * [MEASURED] 2026-08-18, op4k (2 sockets x 10 cores x SMT4 = 80 online):
-     * GetSystemInfo said 80 -- it comes from sysconf(), not from here -- while
-     * GetActiveProcessorCount(ALL_PROCESSOR_GROUPS) said 32 and
-     * GetActiveProcessorGroupCount said 1.  A guest sizing a worker pool from
-     * the second gets 40%% of the machine, and the two answers disagreeing is
-     * itself a bug a program can trip over.
-     *
-     * Fixing it properly means giving up the assumption that Windows CPU i IS
-     * Linux CPU i, which is not local to this function: server/thread.c's
-     * set_thread_affinity() maps affinity bit i straight to CPU_SET(i), so the
-     * renumbering has to happen in both, from the same table, or threads get
-     * pinned to offline CPUs.  Past 64 it needs real processor groups, which
-     * upstream hard-codes to 1 (see the comment above).  Recorded rather than
-     * half-done.
-     */
+        unsigned int id;
+        struct group_mask_set set;
+    } *pkgs = NULL;
+    unsigned int *pkg_of = NULL;
+    unsigned int w, i, j, n, n_pkgs = 0;
+    NTSTATUS status = STATUS_NO_MEMORY;
+    char name[MAX_PATH];
+    FILE *f;
 
     fill_performance_core_info();
 
-    fcpu_list = fopen("/sys/devices/system/cpu/online", "r");
-    if (!fcpu_list) return STATUS_NOT_IMPLEMENTED;
+    if (!(pkg_of = calloc( topo->count, sizeof(*pkg_of) ))) goto done;
+    if (!(pkgs = calloc( topo->count, sizeof(*pkgs) ))) goto done;
 
-    while (!feof(fcpu_list))
+    /* Pass 1: which physical package each Windows processor belongs to.
+     * Packages are keyed by the kernel's physical_package_id ([MEASURED]
+     * 2026-08-18, op4k: 0 and 8, matching the node ids) and kept in order of
+     * first appearance, which is ascending Windows index. */
+    for (w = 0; w < topo->count; w++)
     {
-        if (!fscanf(fcpu_list, "%u%c ", &beg, &op)) break;
-        if (op == '-') fscanf(fcpu_list, "%u%c ", &end, &op);
-        else end = beg;
+        unsigned int id = 0;
 
-        for(i = beg; i <= end; i++)
+        snprintf( name, sizeof(name), core_info, topo->to_unix[w], "physical_package_id" );
+        if ((f = fopen( name, "r" )))
         {
-            unsigned int phys_core = 0;
-            ULONG_PTR thread_mask = 0;
+            if (fscanf( f, "%u", &id ) != 1) id = 0;
+            fclose( f );
+        }
+        for (i = 0; i < n_pkgs; i++) if (pkgs[i].id == id) break;
+        if (i == n_pkgs) pkgs[n_pkgs++].id = id;
+        pkg_of[w] = i;
+        group_mask_set_add( &pkgs[i].set, topo, w );
+    }
 
-            if (i > 8 * sizeof(ULONG_PTR)) break;
+    /* Pass 2: emit each package record, then the cores and caches inside it.
+     * THE INTERLEAVING IS LOAD-BEARING: create_smbios_processors() attributes
+     * the core records between one RelationProcessorPackage record and the
+     * next to the former, so a package's record must precede its cores'. */
+    for (i = 0; i < n_pkgs; i++)
+    {
+        if (!add_legacy_proc_info( RelationProcessorPackage, pkgs[i].set.mask[0], 0, NULL, 0 )) goto done;
+        if (!add_processor_ex( RelationProcessorPackage, 0, 0, &pkgs[i].set )) goto done;
 
-            snprintf(name, sizeof(name), core_info, i, "physical_package_id");
-            f = fopen(name, "r");
-            if (f)
+        for (w = 0; w < topo->count; w++)
+        {
+            struct group_mask_set set;
+            unsigned int u = topo->to_unix[w];
+            int min_win, first;
+
+            if (pkg_of[w] != i) continue;
+
+            /* A core is emitted once, by the smallest Windows index among its
+             * ONLINE siblings, with the online siblings as its mask.  The old
+             * code instead put the kernel's thread_siblings bitmap -- offline
+             * SMT slots included -- in the mask; offline CPUs must not be
+             * offered to a guest, so only online ones go in.  On a fully
+             * online dense box the two masks are identical. */
+            snprintf( name, sizeof(name), core_info, u, "thread_siblings_list" );
+            min_win = set_from_list( name, topo, &set, &first );
+            if (min_win < 0)   /* no topology directory: the CPU is a core of its own */
             {
-                fscanf(f, "%u", &r);
-                fclose(f);
+                memset( &set, 0, sizeof(set) );
+                group_mask_set_add( &set, topo, w );
+                min_win = w;
+                first = u;
             }
-            else r = 0;
-            if (!logical_proc_info_add_by_id( RelationProcessorPackage, r, (ULONG_PTR)1 << i ))
+            if (min_win == (int)w)
             {
-                fclose(fcpu_list);
-                return STATUS_NO_MEMORY;
+                BYTE flags = group_mask_set_bits( &set ) > 1 ? LTP_PC_SMT : 0;
+                BYTE eff_class = 0;
+
+                /* /sys/devices/cpu_core/cpus (Intel hybrid) is in LINUX CPU
+                 * numbering, so the lookup key stays the Linux number of the
+                 * core's first listed sibling, as before. */
+                if (first >= 0 && (unsigned int)first / 32 < performance_cores_capacity)
+                    eff_class = (performance_cores[first / 32] >> (first % 32)) & 1;
+
+                if (!add_legacy_proc_info( RelationProcessorCore, set.mask[0], flags, NULL, 0 )) goto done;
+                if (!add_processor_ex( RelationProcessorCore, flags, eff_class, &set )) goto done;
             }
 
-            /* Sysfs enumerates logical cores (and not physical cores), but Windows enumerates
-             * by physical core. Upon enumerating a logical core in sysfs, we register a physical
-             * core and all its logical cores. In order to not report physical cores multiple
-             * times, we pass a unique physical core ID to logical_proc_info_add_by_id and let
-             * that call figure out any duplication.
-             * Obtain a unique physical core ID from the first element of thread_siblings_list.
-             * This list provides logical cores sharing the same physical core. The IDs are based
-             * on kernel cpu core numbering as opposed to a hardware core ID like provided through
-             * 'core_id', so are suitable as a unique ID.
-             */
-
-            /* Mask of logical threads sharing same physical core in kernel core numbering. */
-            snprintf(name, sizeof(name), core_info, i, "thread_siblings");
-            if(!sysfs_parse_bitmap(name, &thread_mask)) thread_mask = 1<<i;
-
-            /* Needed later for NumaNode and Group. */
-            all_cpus_mask |= thread_mask;
-
-            snprintf(name, sizeof(name), core_info, i, "thread_siblings_list");
-            f = fopen(name, "r");
-            if (f)
-            {
-                fscanf(f, "%d%c", &phys_core, &op);
-                fclose(f);
-            }
-            else phys_core = i;
-
-            if (!logical_proc_info_add_by_id( RelationProcessorCore, phys_core, thread_mask ))
-            {
-                fclose(fcpu_list);
-                return STATUS_NO_MEMORY;
-            }
-
-            for (j = 0; j < 4; j++)
+            /* Caches: the same emit-once-by-smallest-owner rule replaces the
+             * old dedup-by-identical-mask, which is what it degenerated to. */
+            for (j = 0; j < 10; j++)
             {
                 CACHE_DESCRIPTOR cache = { .Associativity = 8, .LineSize = 64, .Type = CacheUnified, .Size = 64 * 1024 };
-                ULONG_PTR mask = 0;
+                unsigned int r;
+                char op = 0;
 
-                snprintf(name, sizeof(name), cache_info, i, j, "shared_cpu_map");
-                if(!sysfs_parse_bitmap(name, &mask)) continue;
+                snprintf( name, sizeof(name), cache_info, u, j, "shared_cpu_list" );
+                /* cache index directories are contiguous: the first missing one ends the walk */
+                if ((min_win = set_from_list( name, topo, &set, NULL )) < 0) break;
+                if (min_win != (int)w) continue;
 
-                snprintf(name, sizeof(name), cache_info, i, j, "level");
-                f = fopen(name, "r");
-                if(!f) continue;
-                fscanf(f, "%u", &r);
-                fclose(f);
+                snprintf( name, sizeof(name), cache_info, u, j, "level" );
+                if (!(f = fopen( name, "r" ))) continue;
+                r = 0;
+                if (fscanf( f, "%u", &r ) != 1) r = 0;
+                fclose( f );
+                if (!r) continue;
                 cache.Level = r;
 
-                snprintf(name, sizeof(name), cache_info, i, j, "ways_of_associativity");
-                if ((f = fopen(name, "r")))
+                /* [MEASURED] 2026-08-18, op4k: ways_of_associativity and
+                 * coherency_line_size exist but are EMPTY for L2/L3, so a
+                 * failed fscanf must leave the default alone rather than
+                 * assign stale bytes (the old code assigned r unchecked). */
+                snprintf( name, sizeof(name), cache_info, u, j, "ways_of_associativity" );
+                if ((f = fopen( name, "r" )))
                 {
-                    fscanf(f, "%u", &r);
-                    fclose(f);
-                    cache.Associativity = r;
+                    if (fscanf( f, "%u", &r ) == 1) cache.Associativity = r;
+                    fclose( f );
                 }
 
-                snprintf(name, sizeof(name), cache_info, i, j, "coherency_line_size");
-                if ((f = fopen(name, "r")))
+                snprintf( name, sizeof(name), cache_info, u, j, "coherency_line_size" );
+                if ((f = fopen( name, "r" )))
                 {
-                    fscanf(f, "%u", &r);
-                    fclose(f);
-                    cache.LineSize = r;
+                    if (fscanf( f, "%u", &r ) == 1) cache.LineSize = r;
+                    fclose( f );
                 }
 
-                snprintf(name, sizeof(name), cache_info, i, j, "size");
-                if ((f = fopen(name, "r")))
+                snprintf( name, sizeof(name), cache_info, u, j, "size" );
+                if ((f = fopen( name, "r" )))
                 {
-                    fscanf(f, "%u%c", &r, &op);
-                    fclose(f);
-                    if(op != 'K')
-                        WARN("unknown cache size %u%c\n", r, op);
-                    cache.Size = (op=='K' ? r*1024 : r);
+                    if (fscanf( f, "%u%c", &r, &op ) >= 1)
+                    {
+                        if (op != 'K') WARN("unknown cache size %u%c\n", r, op);
+                        cache.Size = (op == 'K' ? r * 1024 : r);
+                    }
+                    fclose( f );
                 }
 
-                snprintf(name, sizeof(name), cache_info, i, j, "type");
-                if ((f = fopen(name, "r")))
+                snprintf( name, sizeof(name), cache_info, u, j, "type" );
+                if ((f = fopen( name, "r" )))
                 {
-                    fscanf(f, "%s", name);
-                    fclose(f);
-                    if (!memcmp(name, "Data", 5))
-                        cache.Type = CacheData;
-                    else if(!memcmp(name, "Instruction", 11))
-                        cache.Type = CacheInstruction;
-                    else
-                        cache.Type = CacheUnified;
+                    if (fscanf( f, "%31s", name ) == 1)
+                    {
+                        if (!memcmp( name, "Data", 5 )) cache.Type = CacheData;
+                        else if (!memcmp( name, "Instruction", 11 )) cache.Type = CacheInstruction;
+                        else cache.Type = CacheUnified;
+                    }
+                    fclose( f );
                 }
 
-                if (!logical_proc_info_add_cache( mask, &cache ))
-                {
-                    fclose(fcpu_list);
-                    return STATUS_NO_MEMORY;
-                }
+                if (!add_legacy_proc_info( RelationCache, set.mask[0], 0, &cache, 0 )) goto done;
+                if (!add_cache_ex( &cache, &set )) goto done;
             }
         }
     }
-    fclose(fcpu_list);
 
-    num_cpus = count_bits(all_cpus_mask);
-
-    fnuma_list = fopen("/sys/devices/system/node/online", "r");
-    if (!fnuma_list)
+    /* NUMA nodes come straight from the topology.  The node ids are the
+     * KERNEL's ids, not a dense renumbering: [MEASURED] 2026-08-18, op4k has
+     * nodes 0 and 8, and a guest walking GetNumaHighestNodeNumber must find
+     * a node 8, not a node 1 that maps to nothing the kernel knows. */
+    for (n = 0; n < topo->node_count; n++)
     {
-        if (!logical_proc_info_add_numa_node( all_cpus_mask, 0 ))
-            return STATUS_NO_MEMORY;
-    }
-    else
-    {
-        while (!feof(fnuma_list))
-        {
-            if (!fscanf(fnuma_list, "%u%c ", &beg, &op))
-                break;
-            if (op == '-') fscanf(fnuma_list, "%u%c ", &end, &op);
-            else end = beg;
+        struct group_mask_set set;
 
-            for (i = beg; i <= end; i++)
-            {
-                ULONG_PTR mask = 0;
-
-                snprintf(name, sizeof(name), numa_info, i);
-                if (!sysfs_parse_bitmap( name, &mask )) continue;
-
-                if (!logical_proc_info_add_numa_node( mask, i ))
-                {
-                    fclose(fnuma_list);
-                    return STATUS_NO_MEMORY;
-                }
-            }
-        }
-        fclose(fnuma_list);
+        memset( &set, 0, sizeof(set) );
+        for (w = 0; w < topo->count; w++)
+            if (topo->node_of[w] == topo->node_ids[n]) group_mask_set_add( &set, topo, w );
+        if (!add_legacy_proc_info( RelationNumaNode, set.mask[0], 0, NULL, topo->node_ids[n] )) goto done;
+        if (!add_numa_ex( topo->node_ids[n], &set )) goto done;
     }
 
-    logical_proc_info_add_group( num_cpus, all_cpus_mask );
+    if (!add_group_ex( topo )) goto done;
 
+    status = STATUS_SUCCESS;
+done:
+    free( pkg_of );
+    free( pkgs );
     performance_cores_capacity = 0;
-    free(performance_cores);
+    free( performance_cores );
     performance_cores = NULL;
-
-    return STATUS_SUCCESS;
+    return status;
 }
 
 #elif defined(__APPLE__)
@@ -1711,20 +1959,28 @@ static NTSTATUS create_logical_proc_info(void)
 
 #ifdef linux
 
-static double tsc_from_jiffies[MAXIMUM_PROCESSORS];
+/* Indexed by WINDOWS processor index, 0..count-1.  It must NOT be sized or
+ * indexed by MAXIMUM_PROCESSORS: that public constant is MAXIMUM_PROC_PER_GROUP
+ * (64), the width of one group's affinity word, not a bound on the machine.
+ * The old array was indexed by Linux CPU number, which reaches 155 on the
+ * measured POWER8 -- 91 slots past the end of a 64-entry array. */
+static double tsc_from_jiffies[WINE_MAX_CPUS];
 
 static void init_tsc_frequency(void)
 {
+    const struct wine_cpu_topology *topo = wine_cpu_topology();
     unsigned long clk_tck = sysconf( _SC_CLK_TCK );
     char filename[128];
     unsigned long val;
     unsigned int i;
     FILE *f;
 
-    for (i = 0; i < MAXIMUM_PROCESSORS; ++i)
+    for (i = 0; i < topo->count; ++i)
     {
-        if (system_cpu_mask && !(system_cpu_mask & ((ULONG_PTR)1 << i))) continue;
-        snprintf( filename, sizeof(filename), "/sys/devices/system/cpu/cpu%d/cpufreq/base_frequency", i );
+        snprintf( filename, sizeof(filename), "/sys/devices/system/cpu/cpu%d/cpufreq/base_frequency",
+                  ntdll_no_cpu_map() ? i : topo->to_unix[i] );   /* lever: identity, as before */
+        /* the file exists for every online CPU or for none (one cpufreq
+         * driver per machine), so the first miss ends the walk, as before */
         if (!(f = fopen( filename, "r" ))) break;
         if (fscanf( f, "%lu", &val ) == 1) tsc_from_jiffies[i] = 1000.0 * val / clk_tck;
         fclose( f );
@@ -1773,19 +2029,34 @@ static void init_logical_proc_info(void)
         {
             if (p->Relationship == RelationNumaNode || p->Relationship == RelationNumaNodeEx)
             {
-                numa_info.ActiveProcessorsGroupAffinity[p->NumaNode.NodeNumber] = p->NumaNode.GroupMask;
-                ++numa_node_count;
+                /* NodeNumber is the KERNEL's node id and the kernel does not
+                 * number nodes densely: [MEASURED] 2026-08-18, op4k (POWER8)
+                 * has two nodes with ids 0 and 8.  So HighestNodeNumber is
+                 * the highest ID, not count-1 (which said 1 while node 8's
+                 * affinity sat unreachable at index 8), and an id past the
+                 * fixed array must be skipped, not written out of bounds.
+                 * A node spanning several groups can only publish its first
+                 * group's mask here: SYSTEM_NUMA_INFORMATION holds exactly
+                 * one GROUP_AFFINITY per node. */
+                if (p->NumaNode.NodeNumber < MAXIMUM_NUMA_NODE_COUNT)
+                {
+                    numa_info.ActiveProcessorsGroupAffinity[p->NumaNode.NodeNumber] = p->NumaNode.GroupMask;
+                    if (p->NumaNode.NodeNumber > numa_info.HighestNodeNumber)
+                        numa_info.HighestNodeNumber = p->NumaNode.NodeNumber;
+                    ++numa_node_count;
+                }
+                else FIXME( "NUMA node id %u exceeds MAXIMUM_NUMA_NODE_COUNT, not reported.\n",
+                            (unsigned int)p->NumaNode.NodeNumber );
             }
             p = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)((char *)p + p->Size);
         }
     }
     if (!numa_node_count)
     {
-        numa_node_count = 1;
         numa_info.ActiveProcessorsGroupAffinity[0].Group = 0;
         numa_info.ActiveProcessorsGroupAffinity[0].Mask = system_cpu_mask;
+        numa_info.HighestNodeNumber = 0;
     }
-    numa_info.HighestNodeNumber = numa_node_count - 1;
 }
 
 static void read_dev_urandom( void *buf, ULONG len )
@@ -1829,7 +2100,18 @@ void init_cpu_info(void)
 {
     long num;
 
-#ifdef _SC_NPROCESSORS_ONLN
+#ifdef linux
+    /* One source of truth.  The topology (wine/cputopology.h) and
+     * sysconf(_SC_NPROCESSORS_ONLN) both count the CPUs in
+     * /sys/devices/system/cpu/online, but reading it twice through different
+     * parsers is how GetSystemInfo and GetActiveProcessorCount came to
+     * disagree ([MEASURED] 2026-08-18, op4k: 80 vs 32).  Every group mask,
+     * NUMA record and per-CPU array below is sized from the topology, so the
+     * processor count must be too.  This is also the first use of the
+     * topology in this process: we are single-threaded here, which is the
+     * build-once contract the header asks for. */
+    num = wine_cpu_topology()->count;
+#elif defined(_SC_NPROCESSORS_ONLN)
     num = sysconf(_SC_NPROCESSORS_ONLN);
     if (num < 1)
     {
@@ -1887,7 +2169,14 @@ static NTSTATUS create_cpuset_info(SYSTEM_CPU_SET_INFORMATION *info)
     const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *proc_info;
     const DWORD cpu_info_size = logical_proc_info_ex_size;
     BYTE core_index, cache_index, max_cache_level;
-    unsigned int i, j, count;
+    unsigned int i, j, k, count;
+    /* Bit i of a GROUP_AFFINITY names processor group_base[Group] + i in the
+     * dense 0..count-1 numbering used for the CpuSet entries.  Groups are
+     * dense and consecutive by construction (RelationGroup lists them in
+     * order), so the base of group g is the total size of groups before it.
+     * The old code indexed CpuSet entries with the raw mask bit, which
+     * folded every group onto the first one's entries. */
+    unsigned int group_base[WINE_MAX_CPU_GROUPS] = {0};
     ULONG64 cpu_mask;
 
     if (!logical_proc_info_ex) return STATUS_NOT_IMPLEMENTED;
@@ -1902,6 +2191,16 @@ static NTSTATUS create_cpuset_info(SYSTEM_CPU_SET_INFORMATION *info)
         {
             if (max_cache_level < proc_info->Cache.Level)
                 max_cache_level = proc_info->Cache.Level;
+        }
+        else if (proc_info->Relationship == RelationGroup)
+        {
+            unsigned int base = 0;
+
+            for (j = 0; j < proc_info->Group.ActiveGroupCount && j < WINE_MAX_CPU_GROUPS; ++j)
+            {
+                group_base[j] = base;
+                base += proc_info->Group.GroupInfo[j].ActiveProcessorCount;
+            }
         }
         proc_info = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)((BYTE *)proc_info + proc_info->Size);
     }
@@ -1921,39 +2220,63 @@ static NTSTATUS create_cpuset_info(SYSTEM_CPU_SET_INFORMATION *info)
 
     for (i = 0; (char *)proc_info != (char *)logical_proc_info_ex + cpu_info_size; ++i)
     {
+        /* Records written by the single-group (non-Linux) emitters leave
+         * GroupCount zero with the mask in the first array slot, so zero
+         * reads as "one group".  Masks name at most 64 processors (the old
+         * loop shifted a ULONG64 by up to count-1, which past 63 is
+         * undefined, not just wrong). */
         if (proc_info->Relationship == RelationProcessorCore)
         {
-            if (proc_info->Processor.GroupCount != 1)
+            unsigned int n = proc_info->Processor.GroupCount ? proc_info->Processor.GroupCount : 1;
+
+            for (k = 0; k < n; ++k)
             {
-                FIXME("Unsupported group count %u.\n", proc_info->Processor.GroupCount);
-                continue;
+                const GROUP_AFFINITY *ga = &proc_info->Processor.GroupMask[k];
+                unsigned int base = ga->Group < WINE_MAX_CPU_GROUPS ? group_base[ga->Group] : 0;
+
+                cpu_mask = ga->Mask;
+                for (j = 0; j < 8 * sizeof(ULONG_PTR) && base + j < count; ++j)
+                    if (((ULONG64)1 << j) & cpu_mask)
+                    {
+                        info[base + j].CpuSet.CoreIndex = core_index;
+                        info[base + j].CpuSet.EfficiencyClass = proc_info->Processor.EfficiencyClass;
+                    }
             }
-            cpu_mask = proc_info->Processor.GroupMask[0].Mask;
-            for (j = 0; j < count; ++j)
-                if (((ULONG64)1 << j) & cpu_mask)
-                {
-                    info[j].CpuSet.CoreIndex = core_index;
-                    info[j].CpuSet.EfficiencyClass = proc_info->Processor.EfficiencyClass;
-                }
             ++core_index;
         }
         else if (proc_info->Relationship == RelationCache)
         {
             if (proc_info->Cache.Level == max_cache_level)
             {
-                cpu_mask = proc_info->Cache.GroupMask.Mask;
-                for (j = 0; j < count; ++j)
-                    if (((ULONG64)1 << j) & cpu_mask)
-                        info[j].CpuSet.LastLevelCacheIndex = cache_index;
+                unsigned int n = proc_info->Cache.GroupCount ? proc_info->Cache.GroupCount : 1;
+
+                for (k = 0; k < n; ++k)
+                {
+                    const GROUP_AFFINITY *ga = &proc_info->Cache.GroupMasks[k];
+                    unsigned int base = ga->Group < WINE_MAX_CPU_GROUPS ? group_base[ga->Group] : 0;
+
+                    cpu_mask = ga->Mask;
+                    for (j = 0; j < 8 * sizeof(ULONG_PTR) && base + j < count; ++j)
+                        if (((ULONG64)1 << j) & cpu_mask)
+                            info[base + j].CpuSet.LastLevelCacheIndex = cache_index;
+                }
             }
             ++cache_index;
         }
         else if (proc_info->Relationship == RelationNumaNode)
         {
-            cpu_mask = proc_info->NumaNode.GroupMask.Mask;
-            for (j = 0; j < count; ++j)
-                if (((ULONG64)1 << j) & cpu_mask)
-                    info[j].CpuSet.NumaNodeIndex = proc_info->NumaNode.NodeNumber;
+            unsigned int n = proc_info->NumaNode.GroupCount ? proc_info->NumaNode.GroupCount : 1;
+
+            for (k = 0; k < n; ++k)
+            {
+                const GROUP_AFFINITY *ga = &proc_info->NumaNode.GroupMasks[k];
+                unsigned int base = ga->Group < WINE_MAX_CPU_GROUPS ? group_base[ga->Group] : 0;
+
+                cpu_mask = ga->Mask;
+                for (j = 0; j < 8 * sizeof(ULONG_PTR) && base + j < count; ++j)
+                    if (((ULONG64)1 << j) & cpu_mask)
+                        info[base + j].CpuSet.NumaNodeIndex = proc_info->NumaNode.NodeNumber;
+            }
         }
         proc_info = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *)((char *)proc_info + proc_info->Size);
     }
@@ -2283,10 +2606,18 @@ static void create_smbios_processors( struct smbios_buffer *buf )
             core_count = thread_count = 0;
             break;
         case RelationProcessorCore:
+        {
+            /* Count the core's actual threads from its masks; "+1 if SMT"
+             * assumes SMT2 and undercounts an SMT4 POWER8 by half.  For an
+             * SMT2 or non-SMT core the bit count equals the old arithmetic.
+             * GroupCount 0 means a record from a single-group emitter. */
+            UINT gm, gm_count = p->Processor.GroupCount ? p->Processor.GroupCount : 1;
+
             core_count++;
-            thread_count++;
-            if (p->Processor.Flags & LTP_PC_SMT) thread_count++;
+            for (gm = 0; gm < gm_count; gm++)
+                thread_count += count_bits( p->Processor.GroupMask[gm].Mask );
             break;
+        }
         default:
             break;
         }
@@ -2823,9 +3154,11 @@ static void get_performance_info( SYSTEM_PERFORMANCE_INFORMATION *info )
 
 static void get_cpu_idle_cycle_times( ULONG64 *times )
 {
-    unsigned int index, host_index, count;
+    const struct wine_cpu_topology *topo = wine_cpu_topology();
+    unsigned int host_index, count;
     char line[256], name[32];
     unsigned long long idle;
+    int index;
     FILE *f;
 
     memset( times, 0, peb->NumberOfProcessors * sizeof(*times) );
@@ -2834,16 +3167,21 @@ static void get_cpu_idle_cycle_times( ULONG64 *times )
     /* skip combined cpu statistics line. */
     fgets( line, sizeof(line), f );
 
-    index = 0;
-    while (fgets( line, sizeof(line), f ) && index < peb->NumberOfProcessors)
+    while (fgets( line, sizeof(line), f ))
     {
         count = sscanf(line, "%s %*u %*u %*u %llu", name, &idle);
 
         if (count < 2 || strncmp( name, "cpu", 3 )) break;
+        /* "cpuN" is the LINUX number; the entry it fills and the frequency it
+         * is scaled by are both per WINDOWS index.  The old code kept a
+         * running index but scaled by tsc_from_jiffies[linux_number], reading
+         * past a 64-entry array when the numbering is sparse. */
         host_index = atoi( name + 3 );
-        if (system_cpu_mask && !(system_cpu_mask & ((ULONG_PTR)1 << host_index))) continue;
-        times[index] = idle * tsc_from_jiffies[host_index];
-        ++index;
+        if (host_index >= WINE_MAX_UNIX_CPU) continue;
+        if (ntdll_no_cpu_map()) index = host_index;   /* lever: identity, as before */
+        else index = topo->from_unix[host_index];
+        if (index < 0 || index >= (int)peb->NumberOfProcessors) continue;
+        times[index] = idle * tsc_from_jiffies[index];
     }
 
     fclose( f );
@@ -3578,6 +3916,7 @@ NTSTATUS WINAPI NtQuerySystemInformation( SYSTEM_INFORMATION_CLASS class,
             FILE *cpuinfo = fopen("/proc/stat", "r");
             if (cpuinfo)
             {
+                const struct wine_cpu_topology *topo = wine_cpu_topology();
                 unsigned long clk_tck = sysconf(_SC_CLK_TCK);
                 unsigned long usr,nice,sys,idle,remainder[8];
                 int i, count, id;
@@ -3596,12 +3935,20 @@ NTSTATUS WINAPI NtQuerySystemInformation( SYSTEM_INFORMATION_CLASS class,
                     for (i = 0; i + 5 < count; ++i) sys += remainder[i];
                     sys += idle;
                     usr += nice;
-                    id = atoi( name + 3 ) + 1;
-                    if (id > out_cpus) break;
-                    if (id > cpus) cpus = id;
-                    sppi[id-1].IdleTime.QuadPart   = (ULONGLONG)idle * 10000000 / clk_tck;
-                    sppi[id-1].KernelTime.QuadPart = (ULONGLONG)sys * 10000000 / clk_tck;
-                    sppi[id-1].UserTime.QuadPart   = (ULONGLONG)usr * 10000000 / clk_tck;
+                    /* "cpuN" is the LINUX number, which can exceed the
+                     * processor count (155 on the measured 80-CPU POWER8):
+                     * translate to the dense Windows index instead of using
+                     * it as one.  A line for a CPU outside the topology
+                     * (offline at build, hotplugged since) is skipped, not
+                     * misattributed. */
+                    id = atoi( name + 3 );
+                    if (id < 0 || id >= WINE_MAX_UNIX_CPU) continue;
+                    if (!ntdll_no_cpu_map()) id = topo->from_unix[id];   /* lever: raw Linux number, as before */
+                    if (id < 0 || id >= out_cpus) continue;
+                    if (id + 1 > cpus) cpus = id + 1;
+                    sppi[id].IdleTime.QuadPart   = (ULONGLONG)idle * 10000000 / clk_tck;
+                    sppi[id].KernelTime.QuadPart = (ULONGLONG)sys * 10000000 / clk_tck;
+                    sppi[id].UserTime.QuadPart   = (ULONGLONG)usr * 10000000 / clk_tck;
                 }
                 fclose(cpuinfo);
             }

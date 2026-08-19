@@ -74,6 +74,7 @@
 #include "ddk/wdm.h"
 #include "wine/server.h"
 #include "wine/debug.h"
+#include "wine/cputopology.h"
 #include "unix_private.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(thread);
@@ -2954,7 +2955,32 @@ ULONG WINAPI NtGetCurrentProcessorNumber(void)
 
 #if defined(HAVE_SCHED_GETCPU)
     int res = sched_getcpu();
-    if (res >= 0) return res;
+    if (res >= 0)
+    {
+        const struct wine_cpu_topology *topo = wine_cpu_topology();
+
+        /* Sabotage lever: the raw Linux number, exactly the pre-topology
+         * return value.  ntdll_no_cpu_map()'s own ERR announces the mode. */
+        if (ntdll_no_cpu_map()) return res;
+
+        /* sched_getcpu() returns the LINUX CPU number, and Linux does not
+         * number CPUs densely: [MEASURED] 2026-08-18, op4k (POWER8, SMT4)
+         * returns up to 155 on a machine every other API reports as 80
+         * processors, so a guest that sizes an array from the processor count
+         * and indexes it with this value writes out of bounds.  Translate to
+         * the dense Windows index.  On a dense box from_unix[i] == i and this
+         * returns exactly what it always did.
+         *
+         * A miss (an id the topology never saw) means the CPU came online
+         * after the table was built.  There is no honest index for it, so
+         * return 0 -- always a valid processor number -- and WARN rather
+         * than inventing one silently; callers treat this as a hint that can
+         * be stale by the time they act on it anyway. */
+        if (res < WINE_MAX_UNIX_CPU && topo->from_unix[res] >= 0)
+            return topo->from_unix[res];
+        WARN( "linux cpu %d is not in the topology, returning processor 0\n", res );
+        return 0;
+    }
 #elif defined(__APPLE__) && defined(MAC_OS_VERSION_11_0)
     if (__builtin_available( macOS 11.0, * ))
     {

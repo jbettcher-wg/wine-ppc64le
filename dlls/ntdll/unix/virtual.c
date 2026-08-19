@@ -90,6 +90,7 @@
 #include "wine/rbtree.h"
 #include "unix_private.h"
 #include "wine/debug.h"
+#include "wine/cputopology.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(virtual);
 WINE_DECLARE_DEBUG_CHANNEL(module);
@@ -3736,6 +3737,17 @@ void virtual_init(void)
 ULONG_PTR get_system_affinity_mask(void)
 {
     ULONG num_cpus = peb->NumberOfProcessors;
+
+#ifdef linux
+    /* A legacy affinity mask is relative to the caller's processor GROUP, so
+     * this is group 0's processor count, not min(all processors, 64).  The
+     * difference is not just an undercount: [MEASURED] 2026-08-18, op4k (80
+     * CPUs in 2 groups of 40), the old formula set 64 bits -- claiming 24
+     * processors that exist in no group -- while GetActiveProcessorCount(0)
+     * said 40.  On a machine that fits one group, group 0 is everything and
+     * the value is unchanged.  WINEEMUNOCPUGROUPS restores the old claim. */
+    if (!ntdll_no_cpu_groups()) num_cpus = wine_cpu_topology()->group_size[0];
+#endif
     if (num_cpus >= sizeof(ULONG_PTR) * 8) return ~(ULONG_PTR)0;
     return ((ULONG_PTR)1 << num_cpus) - 1;
 }
@@ -4519,7 +4531,12 @@ void virtual_init_user_shared_data(void)
     data->NumberOfPhysicalPages = info.MmNumberOfPhysicalPages;
     data->NXSupportPolicy       = NX_SUPPORT_POLICY_OPTIN;
     data->ActiveProcessorCount  = peb->NumberOfProcessors;
-    data->ActiveGroupCount      = 1;
+    /* Real group count, not 1: guests read this KUSER_SHARED_DATA field
+     * directly, and it must agree with the RelationGroup record ntdll
+     * reports ([MEASURED] 2026-08-18, op4k: 2 groups of 40).  On machines
+     * without /sys topology the header's fallback says 1, same as before.
+     * WINEEMUNOCPUGROUPS restores the hard-coded 1. */
+    data->ActiveGroupCount      = ntdll_no_cpu_groups() ? 1 : wine_cpu_topology()->group_count;
 
     switch (native_machine)
     {

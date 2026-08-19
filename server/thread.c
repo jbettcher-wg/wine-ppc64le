@@ -52,6 +52,8 @@
 #include "winternl.h"
 #include "ddk/wdm.h"
 
+#include "wine/cputopology.h"
+
 #include "file.h"
 #include "handle.h"
 #include "process.h"
@@ -737,23 +739,176 @@ struct thread *get_thread_from_pid( int pid )
     return NULL;
 }
 
+#ifdef HAVE_SCHED_SETAFFINITY
+
+/* WINEEMUNOCPUMAP=1 turns the translation below OFF -- Windows processor i is
+ * treated as Linux CPU i, exactly as this file behaved before the topology
+ * existed.  It is the negative control for ppc64le/cpu/check-affinity.sh: a
+ * gate that cannot go red proves nothing, and the honest way to make this one
+ * go red is to put the original defect back rather than to compare against a
+ * rule written down twice.
+ *
+ * ntdll reads the SAME variable name for the enumeration half, so one setting
+ * disables the whole mapping on both sides of the boundary.  Disabling only one
+ * side would be worse than disabling neither: the two would then disagree about
+ * what processor a bit means, which is the one failure this mapping exists to
+ * prevent.
+ *
+ * Read once into a static, and announced loudly, because a run with the mapping
+ * off must never be mistaken for a normal one. */
+static int cpu_map_disabled(void)
+{
+    static int disabled = -1;
+
+    if (disabled == -1)
+    {
+        const char *v = getenv( "WINEEMUNOCPUMAP" );
+
+        disabled = (v && *v && *v != '0');
+        if (disabled)
+            fprintf( stderr, "wineserver: WINEEMUNOCPUMAP is set -- thread affinity is NOT being "
+                             "translated; windows processor i is treated as linux cpu i, which is "
+                             "wrong on any machine whose cpus are not numbered densely.  This is a "
+                             "negative control, not a normal run.\n" );
+    }
+    return disabled;
+}
+
+/* Bit `bit` of an affinity mask names a Windows processor; return the Linux CPU
+ * that processor actually is, or -1 if the bit names nothing on this machine.
+ *
+ * The two numbering schemes are not the same thing, and assuming they were is
+ * what this function exists to stop.  [MEASURED] 2026-08-18, op4k (POWER8,
+ * SMT4-of-SMT8): the online CPUs are 0-3,8-11,16-19,...,152-155 -- four online
+ * out of every eight slots.  A guest asking for eight processors with mask 0xFF
+ * used to be handed Linux CPUs 0-7, of which 4-7 are offline, and
+ * sched_setaffinity returned SUCCESS while the thread ran on four.  A wrong
+ * number, silently, which is the failure this port cares about most.
+ *
+ * WHICH BIT MEANS WHICH PROCESSOR.  A Windows affinity mask is 64 bits and is
+ * relative to a processor GROUP, so bit `bit` means "the processor at index
+ * `bit` within my group".  The server is only ever told the mask, never the
+ * group (see the note above set_thread_affinity), so the only group it can
+ * honestly mean is group 0.  For group 0 the within-group index and the global
+ * Windows index coincide, because wine_cpu_topology_build() fills groups in
+ * order -- but that is an invariant of another file, so it is CHECKED here
+ * rather than assumed.  If it ever stops holding, this translates fewer bits
+ * instead of translating them to the wrong CPU.
+ *
+ * A DENSE MACHINE IS UNAFFECTED, and that is deliberate.  On a box whose online
+ * CPUs are 0..N-1 in one group, to_unix[i] == i and group_of[i] == 0 for every
+ * i < N, so every bit below N maps to itself.  Bits at or above N are dropped
+ * here where they used to be set, and that changes nothing the kernel does:
+ * sched_setaffinity intersects the requested set with the online CPUs, so a bit
+ * naming a CPU that does not exist never had an effect.  The resulting set is
+ * identical, bit for bit, to what today's code produces. */
+static int affinity_bit_to_unix_cpu( const struct wine_cpu_topology *topo, unsigned int bit )
+{
+    int cpu;
+
+    /* The negative control: every bit names the Linux CPU of the same number,
+     * which reproduces this function's absence exactly -- bits naming offline
+     * or nonexistent CPUs are handed to sched_setaffinity, which quietly drops
+     * them, and the caller is told nothing. */
+    if (cpu_map_disabled()) return bit < CPU_SETSIZE ? (int)bit : -1;
+
+    if (bit >= topo->count) return -1;                 /* past the last processor */
+    if (topo->group_of[bit] != 0) return -1;           /* group 1 and up: unreachable, see below */
+    if (topo->index_in_group[bit] != bit) return -1;   /* the invariant above did not hold */
+    cpu = topo->to_unix[bit];
+    /* cpu_set_t is a fixed CPU_SETSIZE (1024) bits; a Linux CPU number beyond
+     * that cannot be expressed in one and must not be truncated into some other
+     * CPU's bit.  Such a machine is not handled -- it is dropped, not guessed. */
+    if (cpu < 0 || cpu >= CPU_SETSIZE) return -1;
+    return cpu;
+}
+
+#endif  /* HAVE_SCHED_SETAFFINITY */
+
+/* -> nonzero if at least one bit of `affinity` names a processor that exists on
+ * this machine.  set_process_affinity() uses it to refuse a mask no thread
+ * could honour; see the comment there for why that check lives there and not
+ * in the per-thread loop. */
+int affinity_names_a_processor( affinity_t affinity )
+{
+#ifdef HAVE_SCHED_SETAFFINITY
+    const struct wine_cpu_topology *topo = wine_cpu_topology();
+    unsigned int i;
+
+    for (i = 0; i < 8 * sizeof(affinity); i++)
+        if ((affinity & ((affinity_t)1 << i)) && affinity_bit_to_unix_cpu( topo, i ) >= 0)
+            return 1;
+    return 0;
+#else
+    /* No affinity mechanism at all: nothing is translated, so nothing is
+     * refused beyond the empty mask. */
+    return affinity != 0;
+#endif
+}
+
+/* GROUPS, AND WHAT THIS CANNOT DO.  affinity_t is a bare 64-bit mask and every
+ * request that carries one -- set_thread_info, get_thread_info,
+ * set_process_info, get_process_info -- carries only the mask.  There is no
+ * group field anywhere in protocol.def, so the server cannot be told which
+ * group a mask belongs to and cannot describe a thread running in group 1.
+ * This implementation is therefore group-0-only, and says so rather than
+ * pretending otherwise.
+ *
+ * That is consistent with the client today, not a new hole: ntdll's
+ * ThreadGroupInformation setter rejects a nonzero Group outright, so no
+ * group != 0 request has ever reached here.  What it costs on a multi-group
+ * machine is reach -- [MEASURED] 2026-08-18, op4k: group 0 is NUMA node 0
+ * (Linux CPUs 0-3,8-11,...,72-75) and group 1 is node 8 (Linux CPUs
+ * 80-83,...,152-155), so 40 of this machine's 80 processors cannot be named by
+ * a guest at all.  Closing that needs a protocol change, not a change here. */
 int set_thread_affinity( struct thread *thread, affinity_t affinity )
 {
     int ret = 0;
 #ifdef HAVE_SCHED_SETAFFINITY
     if (thread->unix_tid != -1)
     {
+        const struct wine_cpu_topology *topo = wine_cpu_topology();
         cpu_set_t set;
-        int i;
-        affinity_t mask;
+        unsigned int i, named = 0;
 
         CPU_ZERO( &set );
-        for (i = 0, mask = 1; mask; i++, mask <<= 1)
-            if (affinity & mask) CPU_SET( i, &set );
+        for (i = 0; i < 8 * sizeof(affinity); i++)
+        {
+            int cpu;
 
-        ret = sched_setaffinity( thread->unix_tid, sizeof(set), &set );
+            if (!(affinity & ((affinity_t)1 << i))) continue;
+            if ((cpu = affinity_bit_to_unix_cpu( topo, i )) < 0) continue;
+            CPU_SET( cpu, &set );
+            named++;
+        }
+
+        /* Bits that name no processor are DROPPED rather than refused, because
+         * wineserver's own default masks are all-ones: a fresh process gets
+         * affinity ~0 and get_thread_affinity() below returns ~0 when it cannot
+         * read one.  Refusing a mask because some bit is out of range would
+         * fail every process start on any machine with fewer than 64
+         * processors in group 0.  Out-of-range bits from a guest have already
+         * been filtered before they get here, by ntdll against the system
+         * affinity mask and by set_thread_info against the process mask.
+         *
+         * A mask where NO bit names a processor is a different thing -- the
+         * guest asked to run on nothing that exists -- and is refused.  That is
+         * also what used to happen: an empty cpu_set_t makes sched_setaffinity
+         * return EINVAL, so this reports the same error without the syscall. */
+        if (!named)
+        {
+            errno = EINVAL;
+            ret = -1;
+        }
+        else ret = sched_setaffinity( thread->unix_tid, sizeof(set), &set );
     }
 #endif
+    /* The mask stored is the one the caller asked for, not the one that
+     * survived translation, because it is also the ceiling that
+     * set_thread_info checks later requests against; narrowing it here would
+     * quietly shrink what the thread is allowed to ask for next.  Nothing
+     * bogus reaches the guest from it: ntdll masks every reply with the system
+     * affinity mask. */
     if (!ret) thread->affinity = affinity;
     return ret;
 }
@@ -764,14 +919,30 @@ affinity_t get_thread_affinity( struct thread *thread )
 #ifdef HAVE_SCHED_SETAFFINITY
     if (thread->unix_tid != -1)
     {
+        const struct wine_cpu_topology *topo = wine_cpu_topology();
         cpu_set_t set;
         unsigned int i;
 
+        /* This is the from_unix[] direction, written as the inverse of the map
+         * the setter uses rather than as a from_unix[] lookup, so that set and
+         * get are exact inverses -- a guest that writes a mask and reads it
+         * back must see the same mask.  It also makes a bogus bit impossible by
+         * construction instead of by filtering: the only bits this can ever set
+         * are ones that named a real processor on the way out, so a Linux CPU
+         * with no Windows index simply has no bit to set. */
         if (!sched_getaffinity( thread->unix_tid, sizeof(set), &set ))
             for (i = 0; i < 8 * sizeof(mask); i++)
-                if (CPU_ISSET( i, &set )) mask |= (affinity_t)1 << i;
+            {
+                int cpu = affinity_bit_to_unix_cpu( topo, i );
+
+                if (cpu >= 0 && CPU_ISSET( cpu, &set )) mask |= (affinity_t)1 << i;
+            }
     }
 #endif
+    /* Unreadable affinity, or a thread confined entirely to processors outside
+     * group 0, both land here.  ~0 means "unknown, assume everything" and is
+     * what wineserver has always returned; for the second case it is not true,
+     * and it cannot be made true while the protocol has no group field. */
     if (!mask) mask = ~(affinity_t)0;
     return mask;
 }

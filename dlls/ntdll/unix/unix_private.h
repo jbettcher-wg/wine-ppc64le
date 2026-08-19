@@ -327,6 +327,8 @@ extern void *anon_mmap_fixed( void *start, size_t size, int prot, int flags );
 extern void *anon_mmap_alloc( size_t size, int prot );
 extern void virtual_init(void);
 extern ULONG_PTR get_system_affinity_mask(void);
+extern BOOL ntdll_no_cpu_groups(void);
+extern BOOL ntdll_no_cpu_map(void);
 extern UINT_PTR get_host_page_size(void);
 extern void virtual_get_system_info( SYSTEM_BASIC_INFORMATION *info, BOOL wow64 );
 extern NTSTATUS virtual_map_builtin_module( HANDLE mapping, void **module, SIZE_T *size,
