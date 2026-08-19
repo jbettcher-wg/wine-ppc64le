@@ -61,7 +61,7 @@
  * These are the Khronos headers vkd3d itself builds against. */
 #include <vulkan/vulkan_core.h>
 #define __VKD3D_UNKNOWN_H
-#include <vkd3d_dxgi1_4.h>
+#include <vkd3d_dxgi1_5.h>
 #include <vkd3d_swapchain_factory.h>
 
 #include "winternl.h"
@@ -171,6 +171,11 @@ static struct present_swapchain *impl_from_IDXGISwapChain3( IDXGISwapChain3 *ifa
     return CONTAINING_RECORD( iface, struct present_swapchain, IDXGISwapChain3_iface );
 }
 
+/* The pinned vkd3d headers stop at IDXGISwapChain3; the IID matches the
+ * roster row ppc64le/vkd3d/interfaces_d3d12.json carries for SwapChain4. */
+static const GUID IID_IDXGISwapChain4_local =
+    { 0x3d585d5a, 0xbd4a, 0x489e, { 0xb1, 0xf4, 0x3d, 0xbc, 0xb6, 0x45, 0x2f, 0xfb } };
+
 static HRESULT STDMETHODCALLTYPE swapchain_QueryInterface( IDXGISwapChain3 *iface, REFIID riid, void **object )
 {
     if (IsEqualGUID( riid, &IID_IUnknown )
@@ -179,7 +184,13 @@ static HRESULT STDMETHODCALLTYPE swapchain_QueryInterface( IDXGISwapChain3 *ifac
             || IsEqualGUID( riid, &IID_IDXGISwapChain )
             || IsEqualGUID( riid, &IID_IDXGISwapChain1 )
             || IsEqualGUID( riid, &IID_IDXGISwapChain2 )
-            || IsEqualGUID( riid, &IID_IDXGISwapChain3 ))
+            || IsEqualGUID( riid, &IID_IDXGISwapChain3 )
+            /* REDengine refuses to bring up its viewport on anything less:
+             * [MEASURED] Cyberpunk 2077 QIs IDXGISwapChain4 right after
+             * creation, and on E_NOINTERFACE releases the swapchain and
+             * asserts 'Failed to initialize viewport' (run 34).  The 4
+             * surface is one slot -- SetHDRMetaData, below. */
+            || IsEqualGUID( riid, &IID_IDXGISwapChain4_local ))
     {
         IDXGISwapChain3_AddRef( iface );
         *object = iface;
@@ -458,8 +469,34 @@ static HRESULT STDMETHODCALLTYPE swapchain_ResizeBuffers1( IDXGISwapChain3 *ifac
     return E_NOTIMPL;
 }
 
-static CONST_VTBL IDXGISwapChain3Vtbl present_swapchain_vtbl =
+/* IDXGISwapChain4 adds exactly one slot past the 3 surface. */
+static HRESULT STDMETHODCALLTYPE swapchain_SetHDRMetaData( IDXGISwapChain3 *iface,
+        DXGI_HDR_METADATA_TYPE type, UINT size, void *metadata )
 {
+    static BOOL logged;
+
+    if (!logged)
+    {
+        logged = TRUE;
+        FIXME( "type %u size %u: accepted and ignored; phase (a) presents SDR\n",
+               type, size );
+    }
+    return S_OK;
+}
+
+/* The vtable is IDXGISwapChain4-SHAPED -- 41 contiguous slots, because the
+ * marshal table dispatches by SLOT NUMBER and a guest holding the SwapChain4
+ * proxy will index slot 40 -- while the method signatures stay spelled on
+ * the 3 interface the rest of this file uses. */
+static CONST_VTBL struct
+{
+    IDXGISwapChain3Vtbl sc3;
+    HRESULT (STDMETHODCALLTYPE *SetHDRMetaData)( IDXGISwapChain3 *iface,
+            DXGI_HDR_METADATA_TYPE type, UINT size, void *metadata );
+}
+present_swapchain_vtbl =
+{
+    {
     swapchain_QueryInterface,
     swapchain_AddRef,
     swapchain_Release,
@@ -500,6 +537,8 @@ static CONST_VTBL IDXGISwapChain3Vtbl present_swapchain_vtbl =
     swapchain_CheckColorSpaceSupport,
     swapchain_SetColorSpace1,
     swapchain_ResizeBuffers1,
+    },
+    swapchain_SetHDRMetaData,
 };
 
 /* ------------------------------------------------------- the factory */
@@ -655,7 +694,7 @@ static HRESULT STDMETHODCALLTYPE factory_CreateSwapChainForHwnd( IDXGIFactory2 *
         hr = E_OUTOFMEMORY;
         goto done;
     }
-    object->IDXGISwapChain3_iface.lpVtbl = &present_swapchain_vtbl;
+    object->IDXGISwapChain3_iface.lpVtbl = &present_swapchain_vtbl.sc3;
     object->refs = 1;
     object->hwnd = (UINT64)(ULONG_PTR)hwnd;
     swap_desc = *desc;

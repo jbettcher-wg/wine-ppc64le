@@ -40,29 +40,42 @@ Win32 build of Styx are all PE32, and the WoW64 lane has never carried a real
 game — only `check-wow64-smoke.sh`.  Whatever Portal 2 hits is likely to be
 what all of them hit.
 
-## 3. Cyberpunk: marshal plans for the modern ID3D12Device slots
+## 3. Cyberpunk: from character creation to playable, and the graphics issues on the way
 
-The 2026-08-19 session closed everything the old item 3 listed and five more
-walls behind it — the full run is the Cyberpunk row in
-`ppc64le/games/STATUS.md`.  The game now creates its vkd3d D3D12 device
-(`fex nw-cp2077` is the launch; the appconfig and the staged prefix carry the
-recipe).  What stops it today, precisely:
+The 2026-08-19 sessions closed the old item 3 and everything behind it: the
+whole d3d12 marshal surface is generated again (`ppc64le/vkd3d/gen_winecom.py`
+-- the lane's lost generator, rewritten into the family; every one of the 117
+interfaces has a real table now), the 32-bit-stack-slot extension the flat
+lane already had is in the COM lane (`winecom_slot::dwordmask`, measured on
+CopyDescriptors' heap type), IPropertyStore is rostered, the swapchain call
+crosses from DXVK's factory to the d3d12 lane
+(`__wine_d3d12_create_swapchain_for_hwnd`), the phase-(a) swapchain answers
+`IDXGISwapChain4`, and `VKD3D_CONFIG=nodxr` hides the RT tier the state-object
+refusal cannot yet serve.  THE GAME RUNS: title screen at 245 fps, menus,
+character creation, all user-confirmed on screen.  What remains, in order of
+what is actually seen:
 
-* the d3d12 winecom surface answers QI up through `ID3D12Device4` but
-  REFUSES slots 53/54 with "no marshal plan" — `CreateCommandList1` is one,
-  and the game Reset()s the NULL it didn't check.  The surface generator is
-  `ppc64le/dxvk/gen_winecom.py`-family; expect each newly-served slot to
-  expose the next until the CreateX surface of Device4..Device10 is covered.
-* `ID3D12DeviceRemovedExtendedDataSettings` slots 3/4 refuse too — DRED,
-  debug-only, safe to leave.
-* NVIDIA Streamline is stubbed per-prefix (ppc64le/streamline/), not yet
-  staged automatically by the proton tool; promote it to a staging rule like
-  msvcp140's when a second title wants it.
-* `_CxxThrowException`/`__CxxFrameHandler3/4` stay guest-owned: the REAL
-  vcruntime140+vcruntime140_1 are staged from Microsoft's redistributable
-  into sysx8664 (extractable with cabextract from vc_redist.x64.exe; nothing
-  ships in the tree).  The staging is manual in the cp2077 prefix today —
-  same promotion note as the Streamline stub.
+* **Graphics corruption**: the character-scan UI panel draws garbled with
+  black rectangles, and character models in creation render as unlit
+  silhouettes.  Nothing in the logs names it; suspects worth measuring first
+  are the served-copy paths (hand_copy_texture_region, CopyBufferRegion,
+  GetCopyableFootprints round trips) and whatever REDengine does with the
+  slots that still refuse quietly.  Compare a RADV capture against the
+  emulated GE-Proton lane on the same scene.
+* **Frame-latency waitable**: `GetFrameLatencyWaitableObject` returns NULL
+  (unix_present.c, "the eventfd->semaphore relay is P5").  vkd3d's side
+  already hands out a TAGGED eventfd (vkd3d-patches/0001); the lift is the
+  relay a guest can `WaitForSingleObject` on -- an NT semaphore the unix side
+  releases when the eventfd pays out.  The game runs without it today.
+* **DXR honestly**: the `D3D12_STATE_OBJECT_DESC` walker
+  (ID3D12Device5::CreateStateObject and Device7::AddToStateObject), so nodxr
+  can come back out of the appconfig on hardware that can afford it.
+* **PipelineLibrary Load pair**: LoadGraphicsPipeline/LoadComputePipeline
+  refuse (desc structs carry the root signature); the game falls back to
+  fresh PSO creation every boot, which costs load time, not correctness.
+* The 15-ish `err:combase:__wine_com_refuse` flat-export refusals at boot and
+  the unknown syscom IID {77aa99a0-1bd6-484f-8bc7-2c654c9a9b6f} -- survived,
+  unidentified; name them with a +thunk trace when they matter.
 
 ## 4. The trampoline pool stops at six arguments
 
