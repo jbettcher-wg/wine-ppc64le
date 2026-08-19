@@ -1021,6 +1021,179 @@ __ASM_GLOBAL_FUNC( switch_fiber,
                    "ldr x30, [x1, #0x108]\n\t"      /* new->Pc */
                    "mov sp, x2\n\t"
                    "ret" )
+#elif defined(__powerpc64__)
+/* THE ELFv2 HALF OF A FIBER SWITCH.
+ *
+ * What has to be saved is exactly what ELFv2 makes non-volatile and what a
+ * resume needs: r14-r31, r1 (the stack), r2 (the TOC -- every module on this
+ * port is its own ELF shared object with its own), f14-f31, v20-v31, the
+ * condition register and the link register, which is where this fiber
+ * resumes.  Volatile registers are not saved: the caller of SwitchToFiber has
+ * already had to treat them as clobbered.
+ *
+ * Resuming jumps through CTR with r12 holding the target, which is the ELFv2
+ * global-entry contract -- and it is what lets init_fiber_context() point a
+ * brand new fiber at start_fiber without knowing start_fiber's TOC.
+ *
+ * No global-entry prologue: this function forms no TOC-relative address and
+ * makes no local call, and it has to record the CALLER's r2, not its own.
+ *
+ * stvx/lvx force-align their effective address down to 16 bytes.  CONTEXT is
+ * DECLSPEC_ALIGN(16) and Vr starts at 0x2a0, so every address here is aligned
+ * already -- the same contract RtlCaptureContext works under.  The offsets
+ * are asserted against the real CONTEXT below, so a layout change is a
+ * compile error rather than a fiber that resumes on somebody else's stack.
+ */
+extern void WINAPI switch_fiber( CONTEXT *old, CONTEXT *new );
+__ASM_GLOBAL_FUNC( switch_fiber,
+                   "stfd 14, 0x070(3)\n\t"
+                   "stfd 15, 0x078(3)\n\t"
+                   "stfd 16, 0x080(3)\n\t"
+                   "stfd 17, 0x088(3)\n\t"
+                   "stfd 18, 0x090(3)\n\t"
+                   "stfd 19, 0x098(3)\n\t"
+                   "stfd 20, 0x0a0(3)\n\t"
+                   "stfd 21, 0x0a8(3)\n\t"
+                   "stfd 22, 0x0b0(3)\n\t"
+                   "stfd 23, 0x0b8(3)\n\t"
+                   "stfd 24, 0x0c0(3)\n\t"
+                   "stfd 25, 0x0c8(3)\n\t"
+                   "stfd 26, 0x0d0(3)\n\t"
+                   "stfd 27, 0x0d8(3)\n\t"
+                   "stfd 28, 0x0e0(3)\n\t"
+                   "stfd 29, 0x0e8(3)\n\t"
+                   "stfd 30, 0x0f0(3)\n\t"
+                   "stfd 31, 0x0f8(3)\n\t"
+                   "std 1, 0x110(3)\n\t"        /* Gpr1: this fiber's stack */
+                   "std 2, 0x118(3)\n\t"        /* Gpr2: this module's TOC */
+                   "std 14, 0x178(3)\n\t"
+                   "std 15, 0x180(3)\n\t"
+                   "std 16, 0x188(3)\n\t"
+                   "std 17, 0x190(3)\n\t"
+                   "std 18, 0x198(3)\n\t"
+                   "std 19, 0x1a0(3)\n\t"
+                   "std 20, 0x1a8(3)\n\t"
+                   "std 21, 0x1b0(3)\n\t"
+                   "std 22, 0x1b8(3)\n\t"
+                   "std 23, 0x1c0(3)\n\t"
+                   "std 24, 0x1c8(3)\n\t"
+                   "std 25, 0x1d0(3)\n\t"
+                   "std 26, 0x1d8(3)\n\t"
+                   "std 27, 0x1e0(3)\n\t"
+                   "std 28, 0x1e8(3)\n\t"
+                   "std 29, 0x1f0(3)\n\t"
+                   "std 30, 0x1f8(3)\n\t"
+                   "std 31, 0x200(3)\n\t"
+                   "mfcr 0\n\t"
+                   "std 0, 0x208(3)\n\t"         /* Cr */
+                   "mflr 0\n\t"
+                   "std 0, 0x220(3)\n\t"         /* Iar: where this fiber resumes */
+                   "std 0, 0x228(3)\n\t"         /* Lr, kept equal to it */
+                   "addi 11, 3, 0x3e0\n\t"       /* &Vr[20] */
+                   "li 10, 0\n\t"
+                   "stvx 20, 11, 10\n\t"
+                   "li 10, 16\n\t"
+                   "stvx 21, 11, 10\n\t"
+                   "li 10, 32\n\t"
+                   "stvx 22, 11, 10\n\t"
+                   "li 10, 48\n\t"
+                   "stvx 23, 11, 10\n\t"
+                   "li 10, 64\n\t"
+                   "stvx 24, 11, 10\n\t"
+                   "li 10, 80\n\t"
+                   "stvx 25, 11, 10\n\t"
+                   "li 10, 96\n\t"
+                   "stvx 26, 11, 10\n\t"
+                   "li 10, 112\n\t"
+                   "stvx 27, 11, 10\n\t"
+                   "li 10, 128\n\t"
+                   "stvx 28, 11, 10\n\t"
+                   "li 10, 144\n\t"
+                   "stvx 29, 11, 10\n\t"
+                   "li 10, 160\n\t"
+                   "stvx 30, 11, 10\n\t"
+                   "li 10, 176\n\t"
+                   "stvx 31, 11, 10\n\t"
+                   /* ...and load the other fiber's, in the same order */
+                   "lfd 14, 0x070(4)\n\t"
+                   "lfd 15, 0x078(4)\n\t"
+                   "lfd 16, 0x080(4)\n\t"
+                   "lfd 17, 0x088(4)\n\t"
+                   "lfd 18, 0x090(4)\n\t"
+                   "lfd 19, 0x098(4)\n\t"
+                   "lfd 20, 0x0a0(4)\n\t"
+                   "lfd 21, 0x0a8(4)\n\t"
+                   "lfd 22, 0x0b0(4)\n\t"
+                   "lfd 23, 0x0b8(4)\n\t"
+                   "lfd 24, 0x0c0(4)\n\t"
+                   "lfd 25, 0x0c8(4)\n\t"
+                   "lfd 26, 0x0d0(4)\n\t"
+                   "lfd 27, 0x0d8(4)\n\t"
+                   "lfd 28, 0x0e0(4)\n\t"
+                   "lfd 29, 0x0e8(4)\n\t"
+                   "lfd 30, 0x0f0(4)\n\t"
+                   "lfd 31, 0x0f8(4)\n\t"
+                   "addi 11, 4, 0x3e0\n\t"
+                   "li 10, 0\n\t"
+                   "lvx 20, 11, 10\n\t"
+                   "li 10, 16\n\t"
+                   "lvx 21, 11, 10\n\t"
+                   "li 10, 32\n\t"
+                   "lvx 22, 11, 10\n\t"
+                   "li 10, 48\n\t"
+                   "lvx 23, 11, 10\n\t"
+                   "li 10, 64\n\t"
+                   "lvx 24, 11, 10\n\t"
+                   "li 10, 80\n\t"
+                   "lvx 25, 11, 10\n\t"
+                   "li 10, 96\n\t"
+                   "lvx 26, 11, 10\n\t"
+                   "li 10, 112\n\t"
+                   "lvx 27, 11, 10\n\t"
+                   "li 10, 128\n\t"
+                   "lvx 28, 11, 10\n\t"
+                   "li 10, 144\n\t"
+                   "lvx 29, 11, 10\n\t"
+                   "li 10, 160\n\t"
+                   "lvx 30, 11, 10\n\t"
+                   "li 10, 176\n\t"
+                   "lvx 31, 11, 10\n\t"
+                   "ld 14, 0x178(4)\n\t"
+                   "ld 15, 0x180(4)\n\t"
+                   "ld 16, 0x188(4)\n\t"
+                   "ld 17, 0x190(4)\n\t"
+                   "ld 18, 0x198(4)\n\t"
+                   "ld 19, 0x1a0(4)\n\t"
+                   "ld 20, 0x1a8(4)\n\t"
+                   "ld 21, 0x1b0(4)\n\t"
+                   "ld 22, 0x1b8(4)\n\t"
+                   "ld 23, 0x1c0(4)\n\t"
+                   "ld 24, 0x1c8(4)\n\t"
+                   "ld 25, 0x1d0(4)\n\t"
+                   "ld 26, 0x1d8(4)\n\t"
+                   "ld 27, 0x1e0(4)\n\t"
+                   "ld 28, 0x1e8(4)\n\t"
+                   "ld 29, 0x1f0(4)\n\t"
+                   "ld 30, 0x1f8(4)\n\t"
+                   "ld 31, 0x200(4)\n\t"
+                   "ld 0, 0x208(4)\n\t"
+                   "mtcr 0\n\t"
+                   "ld 12, 0x220(4)\n\t"        /* Iar -> r12: the ELFv2 entry contract */
+                   "mtctr 12\n\t"
+                   "mtlr 12\n\t"
+                   "ld 1, 0x110(4)\n\t"         /* the other fiber's stack */
+                   "ld 2, 0x118(4)\n\t"         /* ...and its module's TOC */
+                   "bctr" )
+
+C_ASSERT( offsetof(CONTEXT, Fpr14) == 0x070 );
+C_ASSERT( offsetof(CONTEXT, Gpr1)  == 0x110 );
+C_ASSERT( offsetof(CONTEXT, Gpr2)  == 0x118 );
+C_ASSERT( offsetof(CONTEXT, Gpr14) == 0x178 );
+C_ASSERT( offsetof(CONTEXT, Gpr31) == 0x200 );
+C_ASSERT( offsetof(CONTEXT, Cr)    == 0x208 );
+C_ASSERT( offsetof(CONTEXT, Iar)   == 0x220 );
+C_ASSERT( offsetof(CONTEXT, Lr)    == 0x228 );
+C_ASSERT( offsetof(CONTEXT, Vr[20]) == 0x3e0 );
 #else
 static void WINAPI switch_fiber( CONTEXT *old, CONTEXT *new )
 {
@@ -1064,6 +1237,27 @@ static void init_fiber_context( struct fiber_data *fiber )
 #elif defined(__aarch64__)
     fiber->context.Sp = (ULONG_PTR)fiber->stack_base;
     fiber->context.Pc = (ULONG_PTR)start_fiber;
+#elif defined(__powerpc64__)
+    {
+        ULONG_PTR sp = ((ULONG_PTR)fiber->stack_base & ~(ULONG_PTR)15) - 0x40;
+        ULONG_PTR toc;
+
+        /* An ELFv2 frame with a ZERO back chain, so an unwinder that walks
+         * into a fiber that has not run yet stops here instead of walking off
+         * the top of a fresh stack. */
+        *(ULONG_PTR *)sp = 0;
+        fiber->context.Gpr1 = sp;
+        fiber->context.Iar  = (ULONG_PTR)start_fiber;
+        /* AND THE TOC, which the other architectures have no equivalent of.
+         * switch_fiber enters through CTR with r12 = Iar, which is the ELFv2
+         * global-entry contract -- but start_fiber is static, so the compiler
+         * is entitled to give it no global entry prologue and to assume r2
+         * already holds this module's TOC.  It does, right here, so record
+         * it: a fiber started with r2 = 0 forms every global address in
+         * kernelbase against a null TOC. */
+        __asm__( "mr %0, 2" : "=r"(toc) );
+        fiber->context.Gpr2 = toc;
+    }
 #endif
 }
 
