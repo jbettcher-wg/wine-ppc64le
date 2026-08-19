@@ -1,89 +1,90 @@
-# The i386 half of the dxvk thunk surface — design and measured scope
+# The i386 half of the dxvk thunk surface — design, what is done, what is not
 
-Written 2026-08-19, the scoping session.  dexwin (Dex, PE32, Unity 5) is the
-canary: it boots through the ABI-4 bridge, Unity puts its window up, and then
-i386 dxgi.dll's forwards to `d3d11.__wine_dxvk_*` fail because the i386 build
-of this port's d3d11 exports none of the dxvk surface.  Portal 2 and HL2 wait
-behind the same wall.
+Started 2026-08-19.  dexwin (Dex, PE32, Unity 5) is the canary: the i386 guest
+boots through the ABI-4 bridge and Unity puts its window up, then dies with no
+graphics because i386 `dxgi.dll` forwards to `d3d11.__wine_dxvk_*` and this
+port's i386 d3d11 exports none of the dxvk surface.  Portal 2, Half-Life 2 and
+the Win32 Styx wait behind the same wall.
 
-## What the 64-bit lane does (the shape being mirrored)
+## Why this module and not the whole Win32 surface
 
-```
-guest x86-64 PE --> sysx8664\{d3d11,dxgi,d3d10core}.dll   (spec2thunk COM
-   |                 mode: trap stubs, 5-byte `mov r10,rcx; syscall` at
-   |                 16-byte stride, one array per interface,
-   |                 __wine_com_thunk_info describes them)
-   |  trap; ntdll maps RIP -> (iface, slot)
-   v
-native d3d11.dll __wine_com_dispatch( iface, slot, AMD64_CONTEXT* )
-   |  libs/winecom dispatch over d3d11_marshal.h
-   v
-d3d11.so unixlib --> libdxvk_d3d11.so / libdxvk_dxgi.so
-```
+The 64-bit lane thunks everything: a guest's imports bind to trap stubs and
+ntdll marshals MS-x64 to ELFv2, which works because guest and native are both
+LLP64 and a struct is the same bytes on both sides.
 
-## The four pieces of the i386 half
+The i386 lane is **real WoW64** (74f9b452924): Wine's own i386 builtins run
+under the emulator and convert at the SYSCALL boundary, where wow64.dll and
+wow64win.dll already carry ~1500 conversions.  Thunking the Win32 surface for
+i386 was rejected there on purpose.  So a `.thunks` file gets **no i386 half
+by default**; a module opts in with `GUEST-MACHINE i386`, and only three do —
+d3d11, dxgi, d3d10core — because this tree REPLACED their implementation with
+dxvk behind a unixlib, so their i386 build forwards to entries that exist only
+in the native ppc64 module.  No amount of WoW64 helps with that.
 
-1. **spec2thunk grows an i386 COM emitter.**  Stub body is `int 0x80`
-   (`CD 80`) — the exact instruction this FEXCore build already routes into
-   the same OS_GENERIC syscall sink the 64-bit lane's `0F 05` uses, RIP left
-   at the site (dlls/ntdll/unix/loader.c, "The 32-bit (WoW64) lane" banner).
-   Same per-interface arrays, same sorted-by-name order from the same JSON,
-   an i386-flavored `__wine_com_thunk_info`.  Flat exports
-   (D3D11CreateDevice &c.) get i386 trap stubs the same way — the 32-bit
-   lane's OTHER modules are Wine's real i386 builds and need no stubs, but
-   d3d11/dxgi/d3d10core REPLACE their implementations, same as on 64.
+## DONE (commit 9732a028c12), and verified
 
-2. **The wow64 run loop learns COM stub RIPs.**  Every emu32 run is bounded;
-   a bop returns to the PE-side loop with the guest context in hand
-   (wow64cpu_ppc64.c).  Today the loop knows the two canonical bop sites;
-   it gains the same exact-hit stub-range arithmetic ntdll's 64-bit
-   dispatcher uses, answering (iface, slot) and calling the native
-   namesake's 32-bit dispatch entry.
+1. **spec2thunk emits either guest machine** (`--machine i386`).  Stub body is
+   `int 0x80` (`CD 80`, trap_off 0) — the instruction this FEXCore build
+   routes into the same OS_GENERIC sink `0F 05` reaches on the 64-bit side.
+   i386 image base, `/safeseh:no` (a hand-written stub array carries no
+   handlers), and the leading underscore an i386 PE puts on symbol names: the
+   OBJECT is decorated, the `.def` is not, because lld-link decorates the
+   names a `.def` mentions itself.
+   Verified: PE32, `cd 80` at 16-byte stride, undecorated exports, COM stub
+   arrays present, Wine builtin signature stamped.
 
-3. **libs/winecom grows dispatch32.**  The guest is stdcall: EVERY argument
-   is a 4-byte stack slot at ESP+4+4n (the bounded-run context arrives as
-   AMD64_CONTEXT via emu32_context_to_bridge, ESP in Rsp).  dispatch32
-   widens into the same UINT64 args[] the 64-bit path builds and everything
-   downstream — classes, xaux, invoke, the unixlib — is UNCHANGED:
-     - scalars: zero-extend; `dwordsign` slots sign-extend (the table
-       already says which);
-     - pointers: zero-extend (wow64 guest lives below 4 GiB, so a widened
-       guest pointer IS a valid host pointer);
-     - interface-pointer ARRAYS (CA_IFACE_ARR_IN / _OUT_STATIC): the 4-byte
-       elements widen into a scratch array on the way in and narrow on the
-       way out — the count parameter the marshal table already names makes
-       this generic, and it covers the hot per-frame calls
-       (VSSetShaderResources, OMSetRenderTargets, SetConstantBuffers...);
-     - the divergent structs below get hand walkers, the d3d12 pattern.
+2. **makedep: `GUEST-MACHINE`, and `thunk_owns_arch()`** so the ordinary
+   from-source PE build is suppressed for a thunk-owned arch instead of both
+   rules naming one target and make picking by luck.  Configure the tree
+   `--enable-archs=ppc64,i386` for this lane.
+   Verified: full build green, zero overriding-recipe warnings, i386 kernel32
+   (2.1 MB) and user32 (6.2 MB) are Wine's own and untouched, beside the three
+   thunks at ~55 KB.
 
-4. **Hand walkers for the divergent descriptor structs.**  Measured with
-   `layout32` (this directory): compile the same 297 D3D11_/DXGI_ aggregates
-   from Wine's own headers for x86_64-windows and i386-windows, diff
-   size/align.  **47 of 297 diverge**, and they split:
-     - ~35 are D3D11_AUTHENTICATED_* / VIDEO_DECODER_* / KEY_EXCHANGE_*
-       content-protection and video surfaces no Unity-5/Source-era title
-       calls.  REFUSE these by name on the 32-bit path until a title
-       proves the need — the honest default this codebase already uses.
-     - The dozen a real game needs, each a mechanical widen/narrow:
-       D3D11_INPUT_ELEMENT_DESC, D3D11_SUBRESOURCE_DATA,
-       D3D11_MAPPED_SUBRESOURCE (out!), D3D11_SO_DECLARATION_ENTRY,
-       DXGI_SWAP_CHAIN_DESC, DXGI_ADAPTER_DESC/1/2/3, DXGI_OUTPUT_DESC/1,
-       DXGI_MAPPED_RECT (out), DXGI_PRESENT_PARAMETERS,
-       DXGI_SHARED_RESOURCE.
-   The affected slots are the creation/query calls (CreateBuffer,
-   CreateTexture*, CreateInputLayout, Map, CreateSwapChain*, GetDesc*,
-   Present1, MapDesktopSurface) — cold paths, one walker each.
+3. **Generated struct repacks** (`ppc64le/thunks/gen_repack32.py`,
+   `dlls/d3d11/d3d11_repack32.h`).  52 of 328 D3D11/DXGI aggregates lay out
+   differently for an i386 guest.  The scoping pass proposed hand-writing a
+   dozen walkers and refusing the rest as "no title of this era calls them" —
+   per-title triage inside a Wine port, wrong twice over: the divergences are
+   mechanical, and a fork of Wine owes every export it declares.  So the
+   generator measures instead (clang's own record layouts for both targets,
+   plus a sizeof pass for the widths the dump omits) and emits both directions
+   for all 52, recursing into nested divergent aggregates and refusing at
+   GENERATION time — never silently — anything it cannot decide.
+   Verified: compiles clean for ppc64le, x86_64-windows and i386-windows.
 
-## What does NOT need doing
+## NOT DONE — and the real crux, which is not the struct layouts
 
-- No repack for the 250 layout-identical structs: guest pointer passes
-  through, exactly as on 64.
-- No changes to the marshal tables, the unixlib, or dxvk itself.
-- No FEX work: `int 0x80` already reaches the sink.
+An i386 guest now binds d3d11 and traps at a stub that nothing answers.  Three
+pieces remain, and the third is much bigger than this document originally said.
 
-## Verification
+* **emu32 routing.**  `unix_emu32_run` classifies an exit by EIP: the two bop
+  addresses become SYSCALL/UNIXCALL and everything else becomes
+  `EMU32_RUN_FAULT`.  A stub trap therefore arrives as a fault today — safe,
+  and the honest failure — and needs a new reason plus a resolve step in
+  `BTCpuSimulate`.  Small.
 
-dexwin end to end: window -> D3D11 device -> Unity scene.  The d3d11-smoke
-gate gains a 32-bit leg (same probe source, i386 build, wow64 lane), and the
-layout32 scan joins the tree so the divergent list is re-derived rather than
-trusted.
+* **dispatch32 in libs/winecom.**  stdcall puts every argument in a 4-byte
+  stack slot at ESP+4+4n; widen into the same `UINT64 args[]` the 64-bit path
+  builds (the marshal table's existing `dwordmask`/`dwordsign` already say
+  which are narrow and which are signed), apply the repacks above to struct
+  parameters, and do the callee-pops return.  Medium, and well-bounded.
+
+* **THE CRUX: a proxy is pointer-width.**  `struct com_proxy`'s first member
+  IS the vtable pointer the guest dereferences, and `find_guest_module()`
+  walks `NtCurrentTeb()->Peb->LdrData` — the 64-bit loader's list.  For an
+  i386 guest every proxy handed out must be a 32-bit object with a 4-byte
+  vtable pointer, materialised from the i386 module's stub arrays, interned
+  separately, and reachable from the 32-bit loader namespace.  That is not a
+  parameter conversion; it is a second instantiation of the whole proxy
+  runtime, keyed by guest machine — comparable in size to the original 64-bit
+  COM bring-up.  Anything less produces a COM path that looks plausible and
+  hands a 32-bit guest a 64-bit vtable pointer, which is this codebase's most
+  expensive bug class.
+
+The stopping point was chosen there deliberately: everything above the crux is
+complete, measured and independently useful (the repack generator serves any
+surface, and the i386 emitter serves any module that opts in), and the crux is
+a design decision — one proxy runtime parameterised by guest width, or a
+separate 32-bit one — that deserves to be made on purpose rather than
+discovered halfway through an implementation.
