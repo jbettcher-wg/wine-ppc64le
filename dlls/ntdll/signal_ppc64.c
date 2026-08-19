@@ -397,6 +397,60 @@ static DWORD call_seh_handler( EXCEPTION_RECORD *rec, ULONG_PTR frame,
     return handler( rec, (void *)frame, context, dispatch );
 }
 
+/* Say WHERE a rejected frame actually is, not just that it is not between the
+ * TEB's two fields.
+ *
+ * "invalid frame X (limit-base)" tells you the frame is outside the stack the
+ * TEB currently describes.  It does not tell you which stack it IS on, and on
+ * this port that is the whole question: a thread running guest code has two --
+ * the native ppc64 one and the guest one -- and the TEB describes whichever
+ * machine is executing (see dlls/ntdll/unix/loader.c).  A frame that is on the
+ * native stack while the TEB describes the guest stack means the dispatcher
+ * was entered without the bounds being switched back; a frame in neither means
+ * something else entirely.
+ *
+ * NtQueryVirtualMemory answers that without needing anything from the unix
+ * side: the allocation base and size name the mapping the frame belongs to, so
+ * comparing it against the TEB's own region distinguishes the two cases.
+ * [MEASURED] 2026-08-18: DOOM produced `invalid frame 3fff490ff730
+ * (00003FF044032000-00003FF044130000)` -- a frame in the 0x3fff.. range while
+ * the TEB described a megabyte at 0x3ff044.., which are different mappings
+ * entirely, and this is what says so out loud. */
+static void report_invalid_frame( ULONG64 frame )
+{
+    MEMORY_BASIC_INFORMATION info;
+    SIZE_T len = 0;
+    NT_TIB *tib = (NT_TIB *)NtCurrentTeb();
+
+    if (!NtQueryVirtualMemory( GetCurrentProcess(), (void *)(ULONG_PTR)frame,
+                               MemoryBasicInformation, &info, sizeof(info), &len ) &&
+        len >= sizeof(info))
+    {
+        ERR( "  frame %I64x is in the mapping %p+%Ix (state %04x protect %04x); "
+             "the TEB describes %p-%p, which is %s mapping\n",
+             frame, info.AllocationBase, (SIZE_T)info.RegionSize,
+             (UINT)info.State, (UINT)info.Protect,
+             tib->StackLimit, tib->StackBase,
+             ((char *)tib->StackLimit >= (char *)info.AllocationBase &&
+              (char *)tib->StackLimit <  (char *)info.AllocationBase + info.RegionSize)
+                 ? "the SAME" : "a DIFFERENT" );
+    }
+    else ERR( "  frame %I64x is in no mapping at all\n", frame );
+
+    /* And what the TEB's own stack looks like, so the two can be compared by
+     * SIZE.  This port mirrors a thread's guest stack onto its native reserve,
+     * so a thread's two stacks are the same size -- if these two differ, they
+     * are not the two stacks of one thread and the unwind has left this
+     * thread's stack entirely. */
+    if (!NtQueryVirtualMemory( GetCurrentProcess(), tib->StackLimit,
+                               MemoryBasicInformation, &info, sizeof(info), &len ) &&
+        len >= sizeof(info))
+        ERR( "  the TEB's stack is in the mapping %p+%Ix, dealloc %p, "
+             "reserve %Ix\n", info.AllocationBase, (SIZE_T)info.RegionSize,
+             NtCurrentTeb()->DeallocationStack,
+             (SIZE_T)((char *)tib->StackBase - (char *)NtCurrentTeb()->DeallocationStack) );
+}
+
 static DWORD call_unwind_handler( EXCEPTION_RECORD *rec, ULONG_PTR frame,
                                   CONTEXT *context, void *dispatch, PEXCEPTION_ROUTINE handler )
 {
@@ -437,6 +491,7 @@ NTSTATUS call_seh_handlers( EXCEPTION_RECORD *rec, CONTEXT *orig_context )
         {
             ERR( "invalid frame %I64x (%p-%p)\n", dispatch.EstablisherFrame,
                  NtCurrentTeb()->Tib.StackLimit, NtCurrentTeb()->Tib.StackBase );
+            report_invalid_frame( dispatch.EstablisherFrame );
             rec->ExceptionFlags |= EXCEPTION_STACK_INVALID;
             break;
         }
@@ -532,6 +587,49 @@ void WINAPI KiUserExceptionDispatcher( EXCEPTION_RECORD *rec, CONTEXT *context )
      * guest state already parked in the TEB cpu area -- so the call is kept
      * for the contract, not for work it does today. */
     if (pWow64PrepareForException) pWow64PrepareForException( rec, context );
+
+    /* WHAT AN ACCESS VIOLATION WAS ACTUALLY TOUCHING.
+     *
+     * The guest's own crash reporter cannot be trusted for this -- DOOM's
+     * writes an all-zero register block with EFlags holding a native pointer
+     * fragment -- and +seh answers it only inside 22 GB of trace.  So the two
+     * fields that identify the fault are reported here directly: info[0] is
+     * 0 for a read, 1 for a write, 8 for an execute, and info[1] is the
+     * address that could not be touched.
+     *
+     * Bounded, because a guest that catches its own faults can raise thousands:
+     * the first few are what identify the bug, and the rest are the same one. */
+    if (rec->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && rec->NumberParameters >= 2)
+    {
+        static LONG reported;
+
+        if (InterlockedIncrement( &reported ) <= 8)
+        {
+            NT_TIB *tib = (NT_TIB *)NtCurrentTeb();
+            BOOL on_win32_stack = ((char *)context->Gpr1 >= (char *)tib->StackLimit &&
+                                   (char *)context->Gpr1 <  (char *)tib->StackBase);
+
+            /* WHICH STACK the interrupted code was on.  call_user_exception_
+             * dispatcher builds the dispatcher's frame on context->Gpr1, and
+             * call_seh_handlers then validates every unwound frame against the
+             * TEB's Win32 bounds -- so a fault taken while the emulator is on
+             * the unix stack produces frames that can never be valid.  Saying
+             * so here distinguishes "the guest handled it" from "it could not
+             * be delivered at all". */
+            ERR( "  interrupted sp=%p is on the %s stack (TEB %p-%p)\n",
+                 (void *)(ULONG_PTR)context->Gpr1,
+                 on_win32_stack ? "WIN32" : "UNIX/other",
+                 tib->StackLimit, tib->StackBase );
+        }
+        if (reported <= 8)
+            ERR( "access violation at %p: %s %p (info[0]=%Ix info[1]=%Ix)\n",
+                 rec->ExceptionAddress,
+                 rec->ExceptionInformation[0] == 0 ? "reading" :
+                 rec->ExceptionInformation[0] == 1 ? "writing" : "executing",
+                 (void *)rec->ExceptionInformation[1],
+                 (SIZE_T)rec->ExceptionInformation[0],
+                 (SIZE_T)rec->ExceptionInformation[1] );
+    }
 
     status = dispatch_exception( rec, context );
     RtlRaiseStatus( status );
@@ -679,6 +777,7 @@ void WINAPI RtlUnwindEx( PVOID end_frame, PVOID target_ip, EXCEPTION_RECORD *rec
         {
             ERR( "invalid frame %I64x (%p-%p)\n", dispatch.EstablisherFrame,
                  NtCurrentTeb()->Tib.StackLimit, NtCurrentTeb()->Tib.StackBase );
+            report_invalid_frame( dispatch.EstablisherFrame );
             rec->ExceptionFlags |= EXCEPTION_STACK_INVALID;
             break;
         }
