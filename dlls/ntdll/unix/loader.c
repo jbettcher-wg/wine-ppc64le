@@ -1467,7 +1467,6 @@ static void emu_teb_stack_switch( const struct emu_teb_stack *in, struct emu_teb
 
 static int emu_trap_thunk( void *thread, void *ctx, void *user )
 {
-    struct emu_teb_stack guest_saved;
     NTSTATUS status;
 
     /* The register file the bridge handed us IS the guest's, at the trapping
@@ -1482,9 +1481,18 @@ static int emu_trap_thunk( void *thread, void *ctx, void *user )
     emu_publish_guest_context( ctx, EMU_GUEST_TRAP );
 
     /* everything below this line is native code on the native stack */
-    emu_teb_stack_switch( &emu_native_teb_stack, &guest_saved );
+    emu_teb_stack_switch( &emu_native_teb_stack, NULL );
     status = call_emu_trap_dispatcher( p_emu_trap_dispatcher, ctx );
-    emu_teb_stack_switch( &guest_saved, NULL );
+    /* ...and back to the GUEST stack the run is on NOW, which is not always
+     * the one this trap arrived on: a guest fiber switch happens inside the
+     * trap and moves the run to another stack (unixcall_emu_fiber_stack).
+     * Restoring the snapshot taken above would put the TEB back on the
+     * stack the switch just left, and the resumed fiber would run on its own
+     * stack while being told it is on the other one -- silent until its
+     * first deep frame or its first exception.  emu_guest_teb_stack is the
+     * run's own record and a switch updates it, so it is the one to install;
+     * with no switch it holds exactly what the snapshot does. */
+    emu_teb_stack_switch( &emu_guest_teb_stack, NULL );
 
     emu_publish_guest_state( EMU_GUEST_RUNNING );
 
@@ -2042,6 +2050,44 @@ static NTSTATUS unixcall_emu_guest_stack( void *args )
 
 
 /***********************************************************************
+ *           unixcall_emu_fiber_stack
+ *
+ * The running run's guest stack bounds, read or written, and the HLT page.
+ *
+ * A guest fiber switch replaces the context the run resumes from, which is
+ * PE-side work -- but the bounds that context runs against are kept here,
+ * because they are the run's rather than the thread's: emu_teb_stack_switch
+ * sets the guest's TEB from them every time guest code starts executing, and
+ * dispatch_guest_frames validates every SEH frame against them.  A switch
+ * that moved the context and not these would leave a fiber running on its own
+ * stack while being told it is on the one before it.
+ *
+ * Only the innermost run's are touched, which is the only run a guest fiber
+ * switch can be made from: the switch arrives as a trap out of that run.
+ */
+static NTSTATUS unixcall_emu_fiber_stack( void *args )
+{
+    struct emu_fiber_params *params = args;
+
+    if (params->op == EMU_FIBER_SET_STACK)
+    {
+        if (!params->base || !params->limit) return STATUS_INVALID_PARAMETER;
+        emu_guest_stack_base    = params->base;
+        emu_guest_stack_limit   = params->dealloc ? params->dealloc : params->limit;
+        emu_guest_teb_stack.base    = params->base;
+        emu_guest_teb_stack.limit   = params->limit;
+        emu_guest_teb_stack.dealloc = params->dealloc ? params->dealloc : params->limit;
+        return STATUS_SUCCESS;
+    }
+    params->base    = emu_guest_teb_stack.base;
+    params->limit   = emu_guest_teb_stack.limit;
+    params->dealloc = emu_guest_teb_stack.dealloc;
+    params->hlt     = (ULONG_PTR)emu_hlt_page;
+    return STATUS_SUCCESS;
+}
+
+
+/***********************************************************************
  * The 32-bit (WoW64) lane.
  *
  * Everything below serves dlls/ntdll/wow64cpu_ppc64.c, the BTCpu* backend
@@ -2369,6 +2415,7 @@ static const unixlib_entry_t unix_call_funcs[] =
     system_time_precise,
     unixcall_emu_run_entry,
     unixcall_emu_guest_stack,
+    unixcall_emu_fiber_stack,
     unixcall_emu32_init,
     unixcall_emu32_thread,
     unixcall_emu32_run,
@@ -2395,6 +2442,7 @@ const unixlib_entry_t unix_call_wow64_funcs[] =
     system_time_precise,
     wow64_emu_run_entry,
     wow64_emu_run_entry,   /* unix_emu_guest_stack: same not-supported answer */
+    wow64_emu_run_entry,   /* unix_emu_fiber_stack: likewise */
     /* the emu32 group is the 64-bit CPU backend's own interface; nothing a
      * 32-bit caller could say through it is meaningful */
     wow64_emu_run_entry,   /* unix_emu32_init */

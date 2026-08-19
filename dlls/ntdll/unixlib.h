@@ -137,6 +137,29 @@ struct emu_guest_stack_params
     void *limit;   /* lowest address */
 };
 
+/* GUEST FIBERS: the two things the PE side cannot see for itself.
+ *
+ * A guest fiber is a guest stack and a saved guest CONTEXT, switched by
+ * replacing the context the running emulator run resumes from
+ * (dlls/ntdll/signal_ppc64.c, "guest fibers").  Two pieces of that live down
+ * here: the stack bounds the run is using -- which the guest's TEB is set
+ * from, and which therefore have to MOVE with a switch -- and the address of
+ * the HLT page, which is the return address a fiber's start routine is
+ * entered with, so that returning from it ends the run exactly as returning
+ * from a thread's entry point does.
+ */
+#define EMU_FIBER_QUERY      0   /* -> the running run's bounds, and hlt */
+#define EMU_FIBER_SET_STACK  1   /* install base/limit/dealloc as the run's */
+
+struct emu_fiber_params
+{
+    int        op;
+    void      *base;      /* highest address; the stack grows down */
+    void      *limit;     /* committed low bound: what the TEB shows */
+    void      *dealloc;   /* reserved low bound */
+    ULONG_PTR  hlt;       /* out (QUERY): the guest HLT page, 0 if none yet */
+};
+
 /* The 32-bit (WoW64) lane: the CPU backend wow64.dll drives through ntdll's
  * BTCpu* exports (dlls/ntdll/wow64cpu_ppc64.c) reaches the embedded emulator
  * through these three calls.  Unlike the AMD64 lane above, which keeps one
@@ -190,6 +213,7 @@ enum ntdll_unix_funcs
     unix_system_time_precise,
     unix_emu_run_entry,
     unix_emu_guest_stack,
+    unix_emu_fiber_stack,
     unix_emu32_init,
     unix_emu32_thread,
     unix_emu32_run,

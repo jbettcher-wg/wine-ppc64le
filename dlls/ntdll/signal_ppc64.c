@@ -5293,6 +5293,309 @@ static ULONG_PTR emu_CallWindowProc( const ULONG_PTR *a, void *native )
         ( proc, a[1], a[2], a[3], a[4] );
 }
 
+/***********************************************************************
+ *           guest fibers
+ *
+ * A fiber is a stack with a program counter parked on it, switched by hand.
+ * kernelbase implements them for native code and this port now has the ppc64
+ * half of that switch (dlls/kernelbase/thread.c, switch_fiber).  A GUEST
+ * fiber is served here instead, and does not go through kernelbase at all.
+ *
+ * WHY NOT SIMPLY LET THE GUEST USE kernelbase's.  It was tried, and the way
+ * it fails is worth writing down.  kernelbase gives each fiber a NATIVE
+ * stack; a guest fiber's start routine would then be an ordinary wrapped
+ * callback, so entering it opens a SECOND emulator run, and switching away
+ * from that fiber abandons that run without ever returning from it.  The
+ * emulator's per-thread state is not a stack of independent runs -- the trap
+ * this port dispatches from is called from INSIDE fexbridge_run -- so the
+ * outer run resumes holding the inner run's register file.  Measured: the
+ * first switch back from a fiber re-entered the fiber instead of returning
+ * to the switcher, forever.
+ *
+ * So a guest fiber is exactly what it is on Windows and nothing more: a
+ * guest stack plus a saved guest CONTEXT.  There is one emulator run per
+ * thread at any moment, and a switch REPLACES the context that run resumes
+ * from -- the same mechanism a guest __except already resumes through
+ * (emu_trap_ctx_rewritten).  No native stack per fiber, no nested run, and
+ * nothing the emulator has to be told.
+ *
+ * WHAT A SWITCH MOVES.  The saved context is the switching fiber's, fixed up
+ * as its own return: SwitchToFiber returns void, so the fiber resumes at the
+ * return address its CALL pushed, one slot further up its own stack.  The
+ * incoming fiber's context is installed wholesale, and the guest stack
+ * BOUNDS move with it -- the emulator lane keeps them per run, the guest's
+ * TEB is set from them, and every __chkstk probe and SEH frame check reads
+ * them.  A switch that moved the context and not the bounds would leave a
+ * fiber running on its own stack while being told it is on another's, which
+ * is silent until the first deep frame or the first exception.
+ *
+ * DOOM (2016) is the title that needs this: id Tech 6's job system is built
+ * on fibers, and every run died at kernelbase's `switch_fiber not
+ * implemented` FIXME before this existed.
+ */
+struct guest_fiber
+{
+    AMD64_CONTEXT  ctx;           /* where it resumes; valid while parked */
+    void          *param;         /* the argument its start routine gets */
+    void          *start;         /* guest LPFIBER_START_ROUTINE, or NULL for
+                                     the fiber a thread converted itself into */
+    void          *stack_base;    /* the guest stack: ours to free unless... */
+    void          *stack_limit;
+    void          *stack_alloc;
+    BOOL           owns_stack;    /* ...this is FALSE, for a converted thread,
+                                     whose stack belongs to the run */
+    BOOL           started;
+};
+
+static __thread struct guest_fiber *guest_current_fiber;
+
+/* The guest stack bounds the running emulator run is using, and the HLT page
+ * a guest entry frame returns to.  Both live on the unix side of this lane;
+ * see unixcall_emu_fiber_stack. */
+static NTSTATUS guest_fiber_stack( struct emu_fiber_params *params )
+{
+    return WINE_UNIX_CALL( unix_emu_fiber_stack, params );
+}
+
+static struct guest_fiber *guest_fiber_alloc(void)
+{
+    struct guest_fiber *fiber = RtlAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY,
+                                                 sizeof(*fiber) );
+    if (!fiber) RtlSetLastWin32Error( ERROR_NOT_ENOUGH_MEMORY );
+    return fiber;
+}
+
+/* ConvertThreadToFiber(Ex): the running guest execution becomes a fiber.  It
+ * keeps the stack it is already on -- the run's -- and its context is not
+ * written until it switches away, because until then the context IS the
+ * running one. */
+static ULONG_PTR emu_ConvertThreadToFiber( const ULONG_PTR *a, void *native )
+{
+    struct emu_fiber_params stack = { 0 };
+    struct guest_fiber *fiber;
+
+    if (guest_current_fiber)
+    {
+        RtlSetLastWin32Error( ERROR_ALREADY_FIBER );
+        return 0;
+    }
+    if (guest_fiber_stack( &stack ) || !stack.base)
+    {
+        ERR( "ConvertThreadToFiber outside a guest run: there is no guest stack "
+             "to make a fiber out of\n" );
+        RtlSetLastWin32Error( ERROR_INVALID_PARAMETER );
+        return 0;
+    }
+    if (!(fiber = guest_fiber_alloc())) return 0;
+    fiber->param       = (void *)a[0];
+    fiber->stack_base  = stack.base;
+    fiber->stack_limit = stack.limit;
+    fiber->stack_alloc = stack.dealloc;
+    fiber->owns_stack  = FALSE;
+    fiber->started     = TRUE;
+    guest_current_fiber = fiber;
+    /* IsThreadAFiber reads this and nothing else, and it is the one field a
+     * guest can observe without going through a call this file intercepts.
+     * Tib.FiberData is deliberately left alone: it is native kernelbase's
+     * record of a NATIVE fiber, and a pointer to one of ours in it would be
+     * freed by kernelbase the first time native code converted back. */
+    NtCurrentTeb()->HasFiberData = TRUE;
+    TRACE( "thread is now fiber %p on stack %p-%p\n", fiber, stack.limit, stack.base );
+    return (ULONG_PTR)fiber;
+}
+
+static ULONG_PTR emu_ConvertFiberToThread( const ULONG_PTR *a, void *native )
+{
+    struct guest_fiber *fiber = guest_current_fiber;
+
+    if (!fiber)
+    {
+        RtlSetLastWin32Error( ERROR_ALREADY_THREAD );
+        return 0;
+    }
+    guest_current_fiber = NULL;
+    NtCurrentTeb()->HasFiberData = FALSE;
+    RtlFreeHeap( GetProcessHeap(), 0, fiber );
+    return 1;
+}
+
+static ULONG_PTR emu_IsThreadAFiber( const ULONG_PTR *a, void *native )
+{
+    return guest_current_fiber != NULL;
+}
+
+/* CreateFiber(Ex): a guest stack and a context parked at the start routine.
+ *
+ * The context is COPIED from the one this call trapped out of and then
+ * edited, so every field a fresh one would have to invent -- the segment
+ * registers, EFlags, MxCsr, ContextFlags -- is the running guest's own
+ * rather than this file's guess at it.
+ *
+ * The entry frame is the MS-x64 shape the emulator's own run entry builds:
+ * 32 bytes of shadow space, a pushed return address, RCX carrying the single
+ * argument.  That return address is the HLT page, so a fiber whose start
+ * routine RETURNS ends the run -- which is what Windows does too: "if the
+ * fiber's start routine returns, the thread exits". */
+static ULONG_PTR emu_CreateFiber( const ULONG_PTR *a, void *native, ULONG_PTR stack_reserve,
+                                  ULONG_PTR stack_commit, void *start, void *param )
+{
+    struct emu_fiber_params stack = { 0 };
+    struct guest_fiber *fiber;
+    INITIAL_TEB teb_stack;
+    NTSTATUS status;
+    ULONG_PTR rsp;
+
+    if (!emu_current_trap_ctx)
+    {
+        ERR( "CreateFiber outside a guest trap: there is no guest context to "
+             "build a fiber's first one from\n" );
+        RtlSetLastWin32Error( ERROR_INVALID_PARAMETER );
+        return 0;
+    }
+    if (guest_fiber_stack( &stack ) || !stack.hlt)
+    {
+        ERR( "CreateFiber: the emulator lane has no HLT page, so a fiber whose "
+             "start routine returns would return to nowhere\n" );
+        RtlSetLastWin32Error( ERROR_INVALID_PARAMETER );
+        return 0;
+    }
+    if (!(fiber = guest_fiber_alloc())) return 0;
+
+    status = RtlCreateUserStack( stack_commit, stack_reserve, 0, 1, 1, &teb_stack );
+    if (status)
+    {
+        ERR( "cannot allocate a guest fiber stack (commit %Ix reserve %Ix): %08x\n",
+             stack_commit, stack_reserve, (UINT)status );
+        RtlFreeHeap( GetProcessHeap(), 0, fiber );
+        RtlSetLastWin32Error( ERROR_NOT_ENOUGH_MEMORY );
+        return 0;
+    }
+    fiber->param       = param;
+    fiber->start       = start;
+    fiber->stack_base  = teb_stack.StackBase;
+    fiber->stack_limit = teb_stack.StackLimit;
+    fiber->stack_alloc = teb_stack.DeallocationStack;
+    fiber->owns_stack  = TRUE;
+
+    fiber->ctx = *emu_current_trap_ctx;
+    rsp = ((ULONG_PTR)teb_stack.StackBase & ~(ULONG_PTR)15) - 0x28;
+    *(ULONG64 *)rsp = stack.hlt;
+    fiber->ctx.Rsp = rsp;
+    fiber->ctx.Rip = (ULONG64)(ULONG_PTR)start;
+    fiber->ctx.Rcx = (ULONG64)(ULONG_PTR)param;
+    fiber->ctx.Rax = 0;
+    TRACE( "fiber %p: start %p param %p stack %p-%p\n", fiber, start, param,
+           teb_stack.DeallocationStack, teb_stack.StackBase );
+    return (ULONG_PTR)fiber;
+}
+
+static ULONG_PTR emu_CreateFiber3( const ULONG_PTR *a, void *native )
+{
+    /* CreateFiber(dwStackSize, start, param): one size, which Windows treats
+     * as the COMMIT and reserves the image's default around. */
+    return emu_CreateFiber( a, native, 0, a[0], (void *)a[1], (void *)a[2] );
+}
+
+static ULONG_PTR emu_CreateFiberEx( const ULONG_PTR *a, void *native )
+{
+    /* CreateFiberEx(commit, reserve, flags, start, param).  FIBER_FLAG_FLOAT_
+     * SWITCH is ignored for the reason kernelbase ignores it: the whole guest
+     * context travels, floating point included, so the flag asks for
+     * something that already happens. */
+    return emu_CreateFiber( a, native, a[1], a[0], (void *)a[3], (void *)a[4] );
+}
+
+static void guest_fiber_free( struct guest_fiber *fiber )
+{
+    if (fiber->owns_stack && fiber->stack_alloc) RtlFreeUserStack( fiber->stack_alloc );
+    RtlFreeHeap( GetProcessHeap(), 0, fiber );
+}
+
+static ULONG_PTR emu_DeleteFiber( const ULONG_PTR *a, void *native )
+{
+    struct guest_fiber *fiber = (struct guest_fiber *)a[0];
+
+    if (!fiber) return 0;
+    if (fiber == guest_current_fiber)
+    {
+        /* Windows: deleting the RUNNING fiber terminates the thread.  Said
+         * out loud rather than done silently, because a guest that reaches
+         * this has almost certainly confused two fiber handles. */
+        ERR( "DeleteFiber on the running fiber %p: the thread ends here, which "
+             "is what Windows does\n", fiber );
+        guest_current_fiber = NULL;
+        NtCurrentTeb()->HasFiberData = FALSE;
+        guest_fiber_free( fiber );
+        RtlExitUserThread( 1 );
+    }
+    guest_fiber_free( fiber );
+    return 0;
+}
+
+/* SwitchToFiber(fiber).  The switch is a context replacement, so it happens
+ * entirely in the trap this call arrived through: the outgoing fiber's
+ * context is this trap's, fixed up as an ordinary void return, and the
+ * incoming fiber's context replaces it.  Nothing unwinds and nothing nests. */
+static ULONG_PTR emu_SwitchToFiber( const ULONG_PTR *a, void *native )
+{
+    static int no_fiber_stacks = -1;
+    struct guest_fiber *target = (struct guest_fiber *)a[0];
+    struct guest_fiber *cur = guest_current_fiber;
+    struct emu_fiber_params stack = { 0 };
+    AMD64_CONTEXT *ctx = emu_current_trap_ctx;
+
+    if (!target || !cur || !ctx)
+    {
+        ERR( "SwitchToFiber(%p) refused: current fiber %p, trap context %p -- a "
+             "switch needs a running guest fiber to switch away from\n",
+             target, cur, ctx );
+        return 0;
+    }
+    if (target == cur) return 0;
+
+    /* park the outgoing one, as its own return.  Its committed limit is read
+     * back rather than remembered: a stack that grew while this fiber ran
+     * moved it, and reinstalling the value from when the fiber was made would
+     * hand the guest a TEB describing pages it has already committed as if
+     * they were still guard. */
+    stack.op = EMU_FIBER_QUERY;
+    if (!guest_fiber_stack( &stack ) && stack.limit) cur->stack_limit = stack.limit;
+    memset( &stack, 0, sizeof(stack) );
+    cur->ctx      = *ctx;
+    cur->ctx.Rip  = *(DWORD64 *)(ULONG_PTR)ctx->Rsp;
+    cur->ctx.Rsp  = ctx->Rsp + 8;
+    cur->ctx.Rax  = 0;
+    cur->started  = TRUE;
+
+    /* ...and resume the incoming one in its place */
+    *ctx = target->ctx;
+    emu_trap_ctx_rewritten = TRUE;
+    guest_current_fiber = target;
+
+    /* THE BOUNDS MOVE WITH IT.  The negative control leaves them behind,
+     * which is the whole bug this pays for: the resumed fiber runs on its own
+     * stack while its TEB describes the last one's. */
+    if (no_fiber_stacks == -1)
+    {
+        no_fiber_stacks = emu_env_flag( L"WINEEMUNOFIBERSTATE" );
+        if (no_fiber_stacks)
+            ERR( "WINEEMUNOFIBERSTATE: a fiber switch will not move the guest "
+                 "stack bounds, so a resumed fiber is told whichever stack the "
+                 "last one left behind\n" );
+    }
+    if (!no_fiber_stacks)
+    {
+        stack.op      = EMU_FIBER_SET_STACK;
+        stack.base    = target->stack_base;
+        stack.limit   = target->stack_limit;
+        stack.dealloc = target->stack_alloc;
+        guest_fiber_stack( &stack );
+    }
+    TRACE( "fiber %p -> %p: rip %I64x rsp %I64x stack %p-%p\n", cur, target,
+           ctx->Rip, ctx->Rsp, target->stack_alloc, target->stack_base );
+    return 0;
+}
+
 /* winmm's open calls: the callback argument is a DWORD_PTR whose meaning is
  * decided by a flag in a LATER argument -- with CALLBACK_FUNCTION it is a
  * function pointer a native mixer thread calls, with CALLBACK_EVENT an event
@@ -5694,6 +5997,34 @@ static const struct thunk_override thunk_overrides[] =
     { L"user32.dll", "SetWindowsHookExA",  4, NULL, 1u << 1, 1u << 1 },
     { L"user32.dll", "SetWindowsHookExW",  4, NULL, 1u << 1, 1u << 1 },
     { L"user32.dll", "SetTimer",           4, NULL, 1u << 3 },
+    /* FIBERS.  The whole API, served here rather than by kernelbase: a guest
+     * fiber is a guest stack and a saved guest CONTEXT, and kernelbase's --
+     * which is a NATIVE stack and a native CONTEXT -- cannot be made to mean
+     * that.  See the block above emu_ConvertThreadToFiber for what was tried
+     * first and how it fails.  Every entry point is intercepted, including
+     * the two that only read state (IsThreadAFiber, ConvertFiberToThread),
+     * because a guest that got half its fiber answers from kernelbase and
+     * half from here would see two different threads.
+     *
+     * DOOM (2016) imports CreateFiberEx, SwitchToFiber, ConvertThreadToFiber
+     * and DeleteFiber from kernel32; kernelbase carries the same rows because
+     * a guest may import either. */
+    { L"kernel32.dll",   "ConvertThreadToFiber",   1, emu_ConvertThreadToFiber },
+    { L"kernel32.dll",   "ConvertThreadToFiberEx", 2, emu_ConvertThreadToFiber },
+    { L"kernel32.dll",   "ConvertFiberToThread",   0, emu_ConvertFiberToThread },
+    { L"kernel32.dll",   "CreateFiber",            3, emu_CreateFiber3 },
+    { L"kernel32.dll",   "CreateFiberEx",          5, emu_CreateFiberEx },
+    { L"kernel32.dll",   "SwitchToFiber",          1, emu_SwitchToFiber },
+    { L"kernel32.dll",   "DeleteFiber",            1, emu_DeleteFiber },
+    { L"kernel32.dll",   "IsThreadAFiber",         0, emu_IsThreadAFiber },
+    { L"kernelbase.dll", "ConvertThreadToFiber",   1, emu_ConvertThreadToFiber },
+    { L"kernelbase.dll", "ConvertThreadToFiberEx", 2, emu_ConvertThreadToFiber },
+    { L"kernelbase.dll", "ConvertFiberToThread",   0, emu_ConvertFiberToThread },
+    { L"kernelbase.dll", "CreateFiber",            3, emu_CreateFiber3 },
+    { L"kernelbase.dll", "CreateFiberEx",          5, emu_CreateFiberEx },
+    { L"kernelbase.dll", "SwitchToFiber",          1, emu_SwitchToFiber },
+    { L"kernelbase.dll", "DeleteFiber",            1, emu_DeleteFiber },
+    { L"kernelbase.dll", "IsThreadAFiber",         0, emu_IsThreadAFiber },
     /* the whole of modern OpenGL, which no opengl32 anywhere exports: see the
      * banner above emu_wglGetProcAddress.  wglGetDefaultProcAddress takes the
      * same row because it answers in the same namespace -- Wine's returns NULL
