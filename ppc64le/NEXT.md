@@ -125,15 +125,27 @@ what is actually seen:
   the unknown syscom IID {77aa99a0-1bd6-484f-8bc7-2c654c9a9b6f} -- survived,
   unidentified; name them with a +thunk trace when they matter.
 
-## 4. The trampoline pool stops at six arguments
+## 4. DONE -- the trampoline pool serves four through nine arguments
 
-`ppc64le/thunks/callback_holes.txt` lists 24 exports with no wrapping row.
-Fourteen of them are waiting on one thing: `wrap_guest_callback_ex` has
-fixed-arity dispatchers for four, five and six arguments and refuses anything
-else by name.  Extending it to seven, eight and nine closes
-`SetWinEventHook` (7), `DdeInitialize` (8), `WSAAccept` (8), `EventRegister`
-(7) and the `CopyFileEx`/`MoveFileWithProgress` family (9).  The pattern for
-five and six is already in the file; this is mechanical.
+Closed 2026-08-22.  `wrap_guest_callback_ex` has dispatcher pairs and
+guest-side argument thunks for seven, eight and nine arguments, and the
+fourteen exports that were waiting have rows: `SetWinEventHook` and
+`EventRegister` (7), `DdeInitializeA/W` (8, WIDE -- PFNCALLBACK returns a
+64-bit HDDEDATA) and `WSAAccept` (8), and the `CopyFileEx`/
+`MoveFileWithProgress`/`MoveFileTransacted` family (9, whose by-value
+LARGE_INTEGERs are plain 64-bit slots in both conventions -- no FP
+anywhere).  Seven kept the twelve-word tail-jump stub (identity in r10);
+eight and nine could not, because r3..r10 are all real arguments and ELFv2
+makes the parameter save area OPTIONAL when everything fits in registers,
+so those two arities emit a call-shaped stub instead -- build a 112-byte
+frame, store the guest target (and, at nine, the ninth argument forwarded
+from the caller's own parameter save area, which nine arguments force it
+to have) into the new frame's parameter area, bctrl, tear down.  All
+emitted encodings machine-verified with llvm-mc.  `callback_holes.txt` is
+down to the two deliberate classes (thread starts, IsBadCodePtr) and the
+audit's per-callback arity ceiling moved from six to nine with it.  None
+of the fourteen rows has been driven by a real title yet; the first
+DDE/WinEvent/progress-callback user is the live test.
 
 ## 5. Make a new title's first run boring
 

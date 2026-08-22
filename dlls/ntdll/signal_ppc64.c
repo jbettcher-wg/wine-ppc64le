@@ -1507,7 +1507,7 @@ struct thunk_override
                                       full 64 bits rather than a sign-extended
                                       32 (an LRESULT; see the trampoline pool) */
     UINT                 cb_argc;  /* how many arguments the CALLBACK itself
-                                      takes -- 4, 5 or 6, and 0 means the 4 that
+                                      takes -- 4 through 9, and 0 means the 4 that
                                       every row carried before this field
                                       existed.  Not the same number as `argc`
                                       above, which counts the arguments of the
@@ -2154,6 +2154,192 @@ static ULONG_PTR call_guest_function_args6( void *fn, ULONG_PTR a0, ULONG_PTR a1
         void      *fn;    /* 0x00 */
         ULONG_PTR  a[6];  /* 0x08 0x10 0x18 0x20 0x28 0x30 */
     } params = { fn, { a0, a1, a2, a3, a4, a5 } };
+
+    if (!thunk)
+    {
+        void *mem = NULL;
+        SIZE_T size = sizeof(thunk_code);
+        NTSTATUS status = NtAllocateVirtualMemory( GetCurrentProcess(), &mem, 0, &size,
+                                                   MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE );
+        if (status)
+        {
+            ERR( "no memory for the guest argument thunk, status %08x\n", (UINT)status );
+            return 0;
+        }
+        memcpy( mem, thunk_code, sizeof(thunk_code) );
+        if (InterlockedCompareExchangePointer( &thunk, mem, NULL ))
+        {
+            SIZE_T free_size = 0;
+            NtFreeVirtualMemory( GetCurrentProcess(), &mem, &free_size, MEM_RELEASE );
+        }
+    }
+    return call_guest_function( thunk, &params );
+}
+
+
+/***********************************************************************
+ *           call_guest_function_args7 / call_guest_function_args8 /
+ *           call_guest_function_args9
+ *
+ * The seven-, eight- and nine-argument forms, for the callback rows the pool
+ * refused until it had dispatchers for them: WINEVENTPROC and PENABLECALLBACK
+ * at seven, PFNCALLBACK and LPCONDITIONPROC at eight, LPPROGRESS_ROUTINE at
+ * nine.  The frame-building shape is exactly the one the five/six pair above
+ * earned the hard way, one more MS-x64 stack slot per extra argument:
+ * a4..a8 live at the callee's [rsp+0x28] through [rsp+0x48], so seven
+ * arguments still fit the 0x40 frame and eight and nine take 0x50 -- the
+ * eighth argument's slot is [rsp+0x40], one past the 0x40 frame's edge, and
+ * 0x50 is the next multiple of 16, which keeps RSP congruent to the
+ * alignment run_entry established.  Every write after the sub stays at or
+ * below the original RSP, the one direction the five-argument crash proved
+ * is actually mapped.
+ *
+ * Integer/pointer-only, all of them, in BOTH conventions -- which at nine
+ * arguments is a sentence that has to be earned rather than assumed:
+ * LPPROGRESS_ROUTINE's first four parameters are LARGE_INTEGERs BY VALUE,
+ * and an 8-byte aggregate is passed as a plain 64-bit value in the
+ * argument's own slot on MS-x64 and in the argument's own GPR on ELFv2.  No
+ * XMM register, no FPR, no skipped GPR slot on either side; see the FP note
+ * on call_native_thunk_fp if a float-bearing callback ever needs this pool.
+ * Byte arrays machine-verified with llvm-mc against the exact encodings
+ * below, the same discipline the five/six pair got from objdump.
+ */
+static ULONG_PTR call_guest_function_args7( void *fn, ULONG_PTR a0, ULONG_PTR a1,
+                                            ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4,
+                                            ULONG_PTR a5, ULONG_PTR a6 )
+{
+    static const BYTE thunk_code[] =
+    {
+        0x4c, 0x8b, 0x1c, 0x24,        /* mov r11,[rsp]        save run_entry's return addr */
+        0x48, 0x83, 0xec, 0x40,        /* sub rsp,0x40         into the stack's own free space below */
+        0x4c, 0x89, 0x1c, 0x24,        /* mov [rsp],r11        return addr back at the NEW frame's +0x00 */
+        0x48, 0x8b, 0x01,              /* mov rax,[rcx]       target */
+        0x48, 0x8b, 0x51, 0x10,        /* mov rdx,[rcx+0x10]  a1 */
+        0x4c, 0x8b, 0x41, 0x18,        /* mov r8,[rcx+0x18]   a2 */
+        0x4c, 0x8b, 0x49, 0x20,        /* mov r9,[rcx+0x20]   a3 */
+        0x4c, 0x8b, 0x51, 0x28,        /* mov r10,[rcx+0x28]  a4 */
+        0x4c, 0x89, 0x54, 0x24, 0x28,  /* mov [rsp+0x28],r10  a4's stack slot, new frame */
+        0x4c, 0x8b, 0x51, 0x30,        /* mov r10,[rcx+0x30]  a5 */
+        0x4c, 0x89, 0x54, 0x24, 0x30,  /* mov [rsp+0x30],r10  a5's stack slot, new frame */
+        0x4c, 0x8b, 0x51, 0x38,        /* mov r10,[rcx+0x38]  a6 */
+        0x4c, 0x89, 0x54, 0x24, 0x38,  /* mov [rsp+0x38],r10  a6's stack slot, new frame */
+        0x48, 0x8b, 0x49, 0x08,        /* mov rcx,[rcx+0x08]  a0 */
+        0xff, 0xe0,                    /* jmp rax */
+    };
+    static void *thunk;
+    struct
+    {
+        void      *fn;    /* 0x00 */
+        ULONG_PTR  a[7];  /* 0x08 0x10 0x18 0x20 0x28 0x30 0x38 */
+    } params = { fn, { a0, a1, a2, a3, a4, a5, a6 } };
+
+    if (!thunk)
+    {
+        void *mem = NULL;
+        SIZE_T size = sizeof(thunk_code);
+        NTSTATUS status = NtAllocateVirtualMemory( GetCurrentProcess(), &mem, 0, &size,
+                                                   MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE );
+        if (status)
+        {
+            ERR( "no memory for the guest argument thunk, status %08x\n", (UINT)status );
+            return 0;
+        }
+        memcpy( mem, thunk_code, sizeof(thunk_code) );
+        if (InterlockedCompareExchangePointer( &thunk, mem, NULL ))
+        {
+            SIZE_T free_size = 0;
+            NtFreeVirtualMemory( GetCurrentProcess(), &mem, &free_size, MEM_RELEASE );
+        }
+    }
+    return call_guest_function( thunk, &params );
+}
+
+static ULONG_PTR call_guest_function_args8( void *fn, ULONG_PTR a0, ULONG_PTR a1,
+                                            ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4,
+                                            ULONG_PTR a5, ULONG_PTR a6, ULONG_PTR a7 )
+{
+    static const BYTE thunk_code[] =
+    {
+        0x4c, 0x8b, 0x1c, 0x24,        /* mov r11,[rsp]        save run_entry's return addr */
+        0x48, 0x83, 0xec, 0x50,        /* sub rsp,0x50         a7's slot is +0x40, one past the
+                                        *                      0x40 frame; 0x50 keeps alignment */
+        0x4c, 0x89, 0x1c, 0x24,        /* mov [rsp],r11        return addr back at the NEW frame's +0x00 */
+        0x48, 0x8b, 0x01,              /* mov rax,[rcx]       target */
+        0x48, 0x8b, 0x51, 0x10,        /* mov rdx,[rcx+0x10]  a1 */
+        0x4c, 0x8b, 0x41, 0x18,        /* mov r8,[rcx+0x18]   a2 */
+        0x4c, 0x8b, 0x49, 0x20,        /* mov r9,[rcx+0x20]   a3 */
+        0x4c, 0x8b, 0x51, 0x28,        /* mov r10,[rcx+0x28]  a4 */
+        0x4c, 0x89, 0x54, 0x24, 0x28,  /* mov [rsp+0x28],r10  a4's stack slot, new frame */
+        0x4c, 0x8b, 0x51, 0x30,        /* mov r10,[rcx+0x30]  a5 */
+        0x4c, 0x89, 0x54, 0x24, 0x30,  /* mov [rsp+0x30],r10  a5's stack slot, new frame */
+        0x4c, 0x8b, 0x51, 0x38,        /* mov r10,[rcx+0x38]  a6 */
+        0x4c, 0x89, 0x54, 0x24, 0x38,  /* mov [rsp+0x38],r10  a6's stack slot, new frame */
+        0x4c, 0x8b, 0x51, 0x40,        /* mov r10,[rcx+0x40]  a7 */
+        0x4c, 0x89, 0x54, 0x24, 0x40,  /* mov [rsp+0x40],r10  a7's stack slot, new frame */
+        0x48, 0x8b, 0x49, 0x08,        /* mov rcx,[rcx+0x08]  a0 */
+        0xff, 0xe0,                    /* jmp rax */
+    };
+    static void *thunk;
+    struct
+    {
+        void      *fn;    /* 0x00 */
+        ULONG_PTR  a[8];  /* 0x08 0x10 0x18 0x20 0x28 0x30 0x38 0x40 */
+    } params = { fn, { a0, a1, a2, a3, a4, a5, a6, a7 } };
+
+    if (!thunk)
+    {
+        void *mem = NULL;
+        SIZE_T size = sizeof(thunk_code);
+        NTSTATUS status = NtAllocateVirtualMemory( GetCurrentProcess(), &mem, 0, &size,
+                                                   MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE );
+        if (status)
+        {
+            ERR( "no memory for the guest argument thunk, status %08x\n", (UINT)status );
+            return 0;
+        }
+        memcpy( mem, thunk_code, sizeof(thunk_code) );
+        if (InterlockedCompareExchangePointer( &thunk, mem, NULL ))
+        {
+            SIZE_T free_size = 0;
+            NtFreeVirtualMemory( GetCurrentProcess(), &mem, &free_size, MEM_RELEASE );
+        }
+    }
+    return call_guest_function( thunk, &params );
+}
+
+static ULONG_PTR call_guest_function_args9( void *fn, ULONG_PTR a0, ULONG_PTR a1,
+                                            ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4,
+                                            ULONG_PTR a5, ULONG_PTR a6, ULONG_PTR a7,
+                                            ULONG_PTR a8 )
+{
+    static const BYTE thunk_code[] =
+    {
+        0x4c, 0x8b, 0x1c, 0x24,        /* mov r11,[rsp]        save run_entry's return addr */
+        0x48, 0x83, 0xec, 0x50,        /* sub rsp,0x50         a8's slot is +0x48; same frame as eight */
+        0x4c, 0x89, 0x1c, 0x24,        /* mov [rsp],r11        return addr back at the NEW frame's +0x00 */
+        0x48, 0x8b, 0x01,              /* mov rax,[rcx]       target */
+        0x48, 0x8b, 0x51, 0x10,        /* mov rdx,[rcx+0x10]  a1 */
+        0x4c, 0x8b, 0x41, 0x18,        /* mov r8,[rcx+0x18]   a2 */
+        0x4c, 0x8b, 0x49, 0x20,        /* mov r9,[rcx+0x20]   a3 */
+        0x4c, 0x8b, 0x51, 0x28,        /* mov r10,[rcx+0x28]  a4 */
+        0x4c, 0x89, 0x54, 0x24, 0x28,  /* mov [rsp+0x28],r10  a4's stack slot, new frame */
+        0x4c, 0x8b, 0x51, 0x30,        /* mov r10,[rcx+0x30]  a5 */
+        0x4c, 0x89, 0x54, 0x24, 0x30,  /* mov [rsp+0x30],r10  a5's stack slot, new frame */
+        0x4c, 0x8b, 0x51, 0x38,        /* mov r10,[rcx+0x38]  a6 */
+        0x4c, 0x89, 0x54, 0x24, 0x38,  /* mov [rsp+0x38],r10  a6's stack slot, new frame */
+        0x4c, 0x8b, 0x51, 0x40,        /* mov r10,[rcx+0x40]  a7 */
+        0x4c, 0x89, 0x54, 0x24, 0x40,  /* mov [rsp+0x40],r10  a7's stack slot, new frame */
+        0x4c, 0x8b, 0x51, 0x48,        /* mov r10,[rcx+0x48]  a8 */
+        0x4c, 0x89, 0x54, 0x24, 0x48,  /* mov [rsp+0x48],r10  a8's stack slot, new frame */
+        0x48, 0x8b, 0x49, 0x08,        /* mov rcx,[rcx+0x08]  a0 */
+        0xff, 0xe0,                    /* jmp rax */
+    };
+    static void *thunk;
+    struct
+    {
+        void      *fn;    /* 0x00 */
+        ULONG_PTR  a[9];  /* 0x08 0x10 0x18 0x20 0x28 0x30 0x38 0x40 0x48 */
+    } params = { fn, { a0, a1, a2, a3, a4, a5, a6, a7, a8 } };
 
     if (!thunk)
     {
@@ -4975,24 +5161,43 @@ static ULONG_PTR emu_onexit( const ULONG_PTR *a, void *native )
  * (guest-threads.md composition rule 2).  One trampoline per distinct guest
  * target, found by lookup, so re-registration is idempotent and a callback
  * invoked a million times costs one slot; slots live for the process, like
- * allocate_stub's.  Each is twelve instructions:
+ * allocate_stub's.  Up to seven arguments each is twelve instructions:
  *
  *      r(3+argc) = guest target          (one past the last real argument)
- *      r12       = guest_callback_dispatch[5|6][_wide]  (its global entry)
+ *      r12       = guest_callback_dispatch[5-9][_wide]  (its global entry)
  *      mtctr r12 / bctr
  *
  * r3..r(2+argc) pass through untouched, so the dispatcher receives the
  * native caller's first argc integer arguments plus the guest target, and
  * argc arguments always travel for that slot's dispatcher (see
- * call_guest_function_args[5|6]).  ARITY IS PER SLOT, the same way WIDTH is
+ * call_guest_function_args[5-9]).  ARITY IS PER SLOT, the same way WIDTH is
  * (next paragraph): argc is 4 for every callback this pool carried until
  * SetWindowSubclass's SUBCLASSPROC (six arguments) and
  * InternetSetStatusCallback's INTERNET_STATUS_CALLBACK (five) needed their
  * own, so the identity register moves with it -- r7 at argc=4 (the original,
- * fixed shape), r8 at argc=5, r9 at argc=6 -- and is never one of the real
- * argument registers for that slot's arity.  code[12] does not grow: only
- * the register number written into the load-immediate at the top changes,
- * and r3..r(2+argc) were never touched to begin with.
+ * fixed shape), r8 at argc=5, r9 at argc=6, r10 at argc=7 -- and is never
+ * one of the real argument registers for that slot's arity.
+ *
+ * AT EIGHT THE TAIL JUMP RUNS OUT OF REGISTERS, and the stub changes shape
+ * rather than the rule changing meaning.  An eight-argument callback owns
+ * r3..r10 -- all eight ELFv2 argument registers -- so the identity has no
+ * register to ride, and the dispatcher's ninth parameter belongs in its
+ * caller's parameter save area, which a native caller invoking an
+ * eight-argument function pointer is NOT required to have allocated (ELFv2
+ * makes that area optional when every parameter fits in registers): a
+ * tail-jumping stub writing r1+96 would be writing memory nobody promised
+ * exists.  So the eight- and nine-argument stubs are a real CALL instead of
+ * a jump: the standard prologue (mflr/std/stdu) builds a 112-byte frame
+ * whose parameter save area is the dispatcher's by right, the guest target
+ * is stored there as the trailing parameter -- and, at nine, the ninth REAL
+ * argument is first copied over from the native caller's own parameter save
+ * area at old-r1+96, where ELFv2 guarantees it, because nine arguments
+ * force the caller to allocate one -- then bctrl, tear down, blr.  r3..r10
+ * still pass through untouched, the result rides back in r3 untouched, and
+ * the frame is back-chained with LR saved at the ABI's own slot (caller's
+ * frame +16), so a walker that follows back chains reads straight through
+ * it.  code[] grew from 12 words to 22 -- the nine-argument call stub's
+ * exact length -- to hold the larger shape.
  *
  * THE RETURN WIDTH IS PER SLOT, and the day the corpus demanded it has come.
  * The default is the guest's RAX with the low 32 bits sign-extended: every
@@ -5015,18 +5220,24 @@ static ULONG_PTR emu_onexit( const ULONG_PTR *a, void *native )
  */
 struct guest_callback_stub
 {
-    UINT  code[12];      /* r(3+argc) = guest_fn; r12 = dispatch; mtctr; bctr --
-                          * the identity register sits one past the last real
-                          * ELFv2 argument register, so a 4-argument slot
-                          * carries it in r7 (the original, fixed shape), a
-                          * 5-argument one in r8, a 6-argument one in r9 */
+    UINT  code[22];      /* 4-7 arguments, twelve words: r(3+argc) = guest_fn;
+                          * r12 = dispatch; mtctr; bctr -- the identity register
+                          * sits one past the last real ELFv2 argument register,
+                          * r7 for a 4-argument slot (the original, fixed shape)
+                          * through r10 for a 7-argument one.  8-9 arguments:
+                          * the call-shaped stub the pool banner describes --
+                          * prologue, guest_fn (and at nine the forwarded ninth
+                          * argument) stored into the new frame's parameter save
+                          * area, bctrl, epilogue -- twenty words at eight,
+                          * twenty-two at nine */
     void *guest_fn;      /* identity: one stub per target, and post-mortem */
     UINT  wide;          /* ...per WIDTH too: the other half of that identity */
     UINT  argc;          /* ...and per ARITY: the third and last part of it,
                           * since the same guest function can legitimately be
                           * registered as callbacks of different shapes.  Was
-                          * an unused `pad` field; one cache line per slot
-                          * either way. */
+                          * an unused `pad` field; a slot outgrew its single
+                          * cache line when code[] did, which nothing depended
+                          * on. */
 };
 
 /* Trampolines are handed OUT, so a full pool cannot be reallocated: native
@@ -5038,7 +5249,7 @@ struct guest_callback_stub
  * during startup -- and the old behaviour on exhaustion was to hand the RAW
  * guest pointer to native code, i.e. to schedule a c0000005 for later rather
  * than fail at the registration that caused it. */
-#define GUEST_CB_BLOCK 1024        /* stubs per block, a 64KB allocation */
+#define GUEST_CB_BLOCK 1024        /* stubs per block, a 104KB allocation */
 #define MAX_GUEST_CB_BLOCKS 64     /* 65536 callbacks before we genuinely stop */
 
 static struct guest_callback_stub *guest_cb_block[MAX_GUEST_CB_BLOCKS];
@@ -5181,6 +5392,140 @@ static ULONG_PTR guest_callback_dispatch6_wide( ULONG_PTR a0, ULONG_PTR a1, ULON
     return ret;
 }
 
+/* The seven-, eight- and nine-argument forms, for the rows
+ * wrap_guest_callback_ex refused by name until now: user32's WINEVENTPROC
+ * and advapi32's PENABLECALLBACK (seven), user32's DDE PFNCALLBACK and
+ * ws2_32's LPCONDITIONPROC (eight), and kernel32's LPPROGRESS_ROUTINE
+ * (nine).  Integer/pointer-only like every other row this pool carries --
+ * LPPROGRESS_ROUTINE's by-value LARGE_INTEGERs are ordinary 64-bit slots in
+ * both conventions; see the note beside call_guest_function_args7/8/9 above.
+ *
+ * At seven the trailing fn still rides an ELFv2 argument register (r10, the
+ * eighth and last).  At eight and nine it is the dispatcher's ninth or tenth
+ * parameter -- a STACK parameter, read from the caller's parameter save
+ * area, which is why those two arities need the call-shaped stub the pool
+ * banner describes: the stub builds the frame that parameter save area
+ * lives in.
+ *
+ * PFNCALLBACK is why the eight-argument pair ships a _wide form that is not
+ * merely symmetry: it returns HDDEDATA, a full 64-bit handle, and the
+ * default sign-extended-32 return would replace a handle's top half with a
+ * copy of bit 31 -- plausible, silent and wrong, the class this pool exists
+ * to kill. */
+static ULONG_PTR guest_callback_run7( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
+                                      ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5,
+                                      ULONG_PTR a6, void *fn, BOOL *ended )
+{
+    ULONG_PTR ret;
+
+    TRACE( "calling guest callback %p (%p,%p,%p,%p,%p,%p,%p)\n", fn,
+           (void *)a0, (void *)a1, (void *)a2, (void *)a3, (void *)a4,
+           (void *)a5, (void *)a6 );
+    ret = call_guest_function_args7( fn, a0, a1, a2, a3, a4, a5, a6 );
+    if ((*ended = guest_exit_requested)) return 0;
+    TRACE( "guest callback %p returned %p\n", fn, (void *)ret );
+    return ret;
+}
+
+static ULONG_PTR guest_callback_dispatch7( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
+                                           ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5,
+                                           ULONG_PTR a6, void *fn )
+{
+    BOOL ended;
+    ULONG_PTR ret = guest_callback_run7( a0, a1, a2, a3, a4, a5, a6, fn, &ended );
+
+    if (ended) return 0;
+    return (ULONG_PTR)(LONG_PTR)(LONG)ret;
+}
+
+static ULONG_PTR guest_callback_dispatch7_wide( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
+                                                ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5,
+                                                ULONG_PTR a6, void *fn )
+{
+    BOOL ended;
+    ULONG_PTR ret = guest_callback_run7( a0, a1, a2, a3, a4, a5, a6, fn, &ended );
+
+    if (ended) return 0;
+    return ret;
+}
+
+static ULONG_PTR guest_callback_run8( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
+                                      ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5,
+                                      ULONG_PTR a6, ULONG_PTR a7, void *fn, BOOL *ended )
+{
+    ULONG_PTR ret;
+
+    TRACE( "calling guest callback %p (%p,%p,%p,%p,%p,%p,%p,%p)\n", fn,
+           (void *)a0, (void *)a1, (void *)a2, (void *)a3, (void *)a4,
+           (void *)a5, (void *)a6, (void *)a7 );
+    ret = call_guest_function_args8( fn, a0, a1, a2, a3, a4, a5, a6, a7 );
+    if ((*ended = guest_exit_requested)) return 0;
+    TRACE( "guest callback %p returned %p\n", fn, (void *)ret );
+    return ret;
+}
+
+static ULONG_PTR guest_callback_dispatch8( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
+                                           ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5,
+                                           ULONG_PTR a6, ULONG_PTR a7, void *fn )
+{
+    BOOL ended;
+    ULONG_PTR ret = guest_callback_run8( a0, a1, a2, a3, a4, a5, a6, a7, fn, &ended );
+
+    if (ended) return 0;
+    return (ULONG_PTR)(LONG_PTR)(LONG)ret;
+}
+
+static ULONG_PTR guest_callback_dispatch8_wide( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
+                                                ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5,
+                                                ULONG_PTR a6, ULONG_PTR a7, void *fn )
+{
+    BOOL ended;
+    ULONG_PTR ret = guest_callback_run8( a0, a1, a2, a3, a4, a5, a6, a7, fn, &ended );
+
+    if (ended) return 0;
+    return ret;
+}
+
+static ULONG_PTR guest_callback_run9( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
+                                      ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5,
+                                      ULONG_PTR a6, ULONG_PTR a7, ULONG_PTR a8,
+                                      void *fn, BOOL *ended )
+{
+    ULONG_PTR ret;
+
+    TRACE( "calling guest callback %p (%p,%p,%p,%p,%p,%p,%p,%p,%p)\n", fn,
+           (void *)a0, (void *)a1, (void *)a2, (void *)a3, (void *)a4,
+           (void *)a5, (void *)a6, (void *)a7, (void *)a8 );
+    ret = call_guest_function_args9( fn, a0, a1, a2, a3, a4, a5, a6, a7, a8 );
+    if ((*ended = guest_exit_requested)) return 0;
+    TRACE( "guest callback %p returned %p\n", fn, (void *)ret );
+    return ret;
+}
+
+static ULONG_PTR guest_callback_dispatch9( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
+                                           ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5,
+                                           ULONG_PTR a6, ULONG_PTR a7, ULONG_PTR a8,
+                                           void *fn )
+{
+    BOOL ended;
+    ULONG_PTR ret = guest_callback_run9( a0, a1, a2, a3, a4, a5, a6, a7, a8, fn, &ended );
+
+    if (ended) return 0;
+    return (ULONG_PTR)(LONG_PTR)(LONG)ret;
+}
+
+static ULONG_PTR guest_callback_dispatch9_wide( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
+                                                ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5,
+                                                ULONG_PTR a6, ULONG_PTR a7, ULONG_PTR a8,
+                                                void *fn )
+{
+    BOOL ended;
+    ULONG_PTR ret = guest_callback_run9( a0, a1, a2, a3, a4, a5, a6, a7, a8, fn, &ended );
+
+    if (ended) return 0;
+    return ret;
+}
+
 /* emit `reg = val' as the classic five-instruction absolute load */
 static UINT *emit_load_imm64( UINT *p, UINT reg, ULONG_PTR val )
 {
@@ -5206,9 +5551,11 @@ static BOOL emu_env_flag( const WCHAR *name )
            value.Length && buf[0] == '1';
 }
 
-/* argc is 4, 5 or 6: which fixed-arity trampoline pair (dispatch,
- * dispatch_wide) the stub jumps to, and which register carries the guest_fn
- * identity -- see the comment on struct guest_callback_stub.code above. */
+/* argc is 4 through 9: which fixed-arity trampoline pair (dispatch,
+ * dispatch_wide) the stub hands control to, and -- through seven -- which
+ * register carries the guest_fn identity; at eight and nine the stub is the
+ * call-shaped one instead.  See the comment on struct
+ * guest_callback_stub.code above. */
 static void *wrap_guest_callback_ex( void *fn, BOOL wide, UINT argc )
 {
     static int nowrap = -1;
@@ -5227,11 +5574,14 @@ static void *wrap_guest_callback_ex( void *fn, BOOL wide, UINT argc )
     case 4: dispatch = (ULONG_PTR)(wide ? guest_callback_dispatch_wide  : guest_callback_dispatch);  break;
     case 5: dispatch = (ULONG_PTR)(wide ? guest_callback_dispatch5_wide : guest_callback_dispatch5); break;
     case 6: dispatch = (ULONG_PTR)(wide ? guest_callback_dispatch6_wide : guest_callback_dispatch6); break;
+    case 7: dispatch = (ULONG_PTR)(wide ? guest_callback_dispatch7_wide : guest_callback_dispatch7); break;
+    case 8: dispatch = (ULONG_PTR)(wide ? guest_callback_dispatch8_wide : guest_callback_dispatch8); break;
+    case 9: dispatch = (ULONG_PTR)(wide ? guest_callback_dispatch9_wide : guest_callback_dispatch9); break;
     default:
         ERR( "guest callback %p registered with unsupported arity %u\n", fn, argc );
         return fn;
     }
-    fn_reg = 3 + argc;
+    fn_reg = 3 + argc;   /* meaningful only for the tail-jump shape (argc <= 7) */
 
     if (nowrap == -1) nowrap = emu_env_flag( L"WINEEMUNOCBWRAP" );
     if (nowrap)
@@ -5309,10 +5659,52 @@ static void *wrap_guest_callback_ex( void *fn, BOOL wide, UINT argc )
 
     stub = &guest_cb_block[guest_cb_blocks - 1][guest_cb_count];
     p = stub->code;
-    p = emit_load_imm64( p, fn_reg, (ULONG_PTR)fn );
-    p = emit_load_imm64( p, 12, dispatch );
-    *p++ = 0x7D8903A6;   /* mtctr r12 */
-    *p++ = 0x4E800420;   /* bctr */
+    if (argc <= 7)
+    {
+        /* the original tail jump: the identity rides the register one past
+         * the last real argument, and the dispatcher returns straight to
+         * our caller */
+        p = emit_load_imm64( p, fn_reg, (ULONG_PTR)fn );
+        p = emit_load_imm64( p, 12, dispatch );
+        *p++ = 0x7D8903A6;   /* mtctr r12 */
+        *p++ = 0x4E800420;   /* bctr */
+    }
+    else
+    {
+        /* Eight or nine arguments: r3..r10 are all spoken for, so this is a
+         * real call with a frame of our own -- see the pool banner for why a
+         * tail jump cannot serve these two arities.  The frame is 112 bytes:
+         * the 32-byte header plus a parameter save area wide enough for the
+         * dispatcher's ten possible slots, 16-byte aligned.  Words
+         * machine-verified with llvm-mc, not reasoned about by eye. */
+        *p++ = 0x7C0802A6;               /* mflr r0 */
+        if (argc == 9)
+            *p++ = 0xE9610060;           /* ld   r11,96(r1) -- the ninth real
+                                          * argument, from the native caller's
+                                          * own parameter save area, which
+                                          * nine arguments oblige it to have */
+        *p++ = 0xF8010010;               /* std  r0,16(r1) -- LR, at the ABI's
+                                          * slot in the CALLER's frame */
+        *p++ = 0xF821FF91;               /* stdu r1,-112(r1) */
+        if (argc == 9)
+            *p++ = 0xF9610060;           /* std  r11,96(r1) -- slot 8: the
+                                          * ninth argument again, now in the
+                                          * dispatcher's parameter save area */
+        p = emit_load_imm64( p, 11, (ULONG_PTR)fn );
+        *p++ = (argc == 9) ? 0xF9610068  /* std  r11,104(r1) -- guest_fn as the
+                                          * dispatcher's trailing parameter:
+                                          * slot 9 at nine arguments... */
+                           : 0xF9610060; /* std  r11,96(r1)  -- ...slot 8 at
+                                          * eight */
+        p = emit_load_imm64( p, 12, dispatch );
+        *p++ = 0x7D8903A6;               /* mtctr r12 */
+        *p++ = 0x4E800421;               /* bctrl */
+        *p++ = 0x38210070;               /* addi r1,r1,112 */
+        *p++ = 0xE8010010;               /* ld   r0,16(r1) */
+        *p++ = 0x7C0803A6;               /* mtlr r0 */
+        *p++ = 0x4E800020;               /* blr -- r3 carries the dispatcher's
+                                          * result through untouched */
+    }
     stub->guest_fn = fn;
     stub->wide     = wide ? 1u : 0u;
     stub->argc     = argc;
@@ -6409,14 +6801,18 @@ static const struct thunk_override thunk_overrides[] =
      *   IsBadCodePtr -- probes a pointer, never calls it.  Wrapping would
      *   have it answer about the trampoline.
      *
-     *   Anything whose callback takes more than six arguments: the trampoline
-     *   pool has fixed-arity dispatchers for four, five and six, and refuses
-     *   anything else by name.  That is DdeInitialize (8), SetWinEventHook
-     *   (7), WSAAccept (8), EventRegister (7) and the CopyFileEx /
-     *   MoveFileWithProgress family (9).  They are listed in
-     *   ppc64le/thunks/callback_holes.txt, which the gate matches exactly, so
-     *   extending the pool is a change that shows up there.
+     *   Anything whose callback takes more than NINE arguments: the
+     *   trampoline pool has fixed-arity dispatchers for four through nine
+     *   and refuses anything else by name.  Seven through nine were added
+     *   for the rows below -- SetWinEventHook and EventRegister (7),
+     *   DdeInitialize and WSAAccept (8), the CopyFileEx /
+     *   MoveFileWithProgress family (9) -- which sat in
+     *   ppc64le/thunks/callback_holes.txt until the pool could carry them.
+     *   Nothing in the audited surface asks for more than nine today; the
+     *   day something does, the pool banner's eight/nine stub shape is the
+     *   pattern to extend.
      */
+    { L"advapi32.dll", "EventRegister",                      4, NULL, 1u << 1,             0,          7 },
     { L"advapi32.dll", "PerfStartProvider",                  3, NULL, 1u << 1,             0,          0 },
     { L"advapi32.dll", "ReadEncryptedFileRaw",               3, NULL, 1u << 0,             0,          0 },
     { L"advapi32.dll", "RegisterServiceCtrlHandlerA",        2, NULL, 1u << 1,             0,          0 },
@@ -6458,6 +6854,8 @@ static const struct thunk_override thunk_overrides[] =
     { L"imm32.dll", "ImmEnumRegisterWordW",               6, NULL, 1u << 1,             0,          0 },
 
     { L"kernel32.dll", "BindIoCompletionCallback",           3, NULL, 1u << 1,             0,          0 },
+    { L"kernel32.dll", "CopyFileExA",                        6, NULL, 1u << 2,             0,          9 },
+    { L"kernel32.dll", "CopyFileExW",                        6, NULL, 1u << 2,             0,          9 },
     { L"kernel32.dll", "CreateThreadpoolIo",                 4, NULL, 1u << 1,             0,          6 },
     { L"kernel32.dll", "CreateThreadpoolTimer",              3, NULL, 1u << 0,             0,          0 },
     { L"kernel32.dll", "CreateThreadpoolWait",               3, NULL, 1u << 0,             0,          0 },
@@ -6501,6 +6899,10 @@ static const struct thunk_override thunk_overrides[] =
     { L"kernel32.dll", "EnumUILanguagesA",                   3, NULL, 1u << 0,             0,          0 },
     { L"kernel32.dll", "EnumUILanguagesW",                   3, NULL, 1u << 0,             0,          0 },
     { L"kernel32.dll", "InitOnceExecuteOnce",                4, NULL, 1u << 1,             0,          0 },
+    { L"kernel32.dll", "MoveFileTransactedA",                6, NULL, 1u << 2,             0,          9 },
+    { L"kernel32.dll", "MoveFileTransactedW",                6, NULL, 1u << 2,             0,          9 },
+    { L"kernel32.dll", "MoveFileWithProgressA",              5, NULL, 1u << 2,             0,          9 },
+    { L"kernel32.dll", "MoveFileWithProgressW",              5, NULL, 1u << 2,             0,          9 },
     { L"kernel32.dll", "QueueUserAPC",                       3, NULL, 1u << 0,             0,          0 },
     { L"kernel32.dll", "QueueUserAPC2",                      4, NULL, 1u << 0,             0,          0 },
     { L"kernel32.dll", "QueueUserWorkItem",                  3, NULL, 1u << 0,             0,          0 },
@@ -6516,6 +6918,7 @@ static const struct thunk_override thunk_overrides[] =
     { L"kernel32.dll", "TrySubmitThreadpoolCallback",        3, NULL, 1u << 0,             0,          0 },
     { L"kernel32.dll", "WriteFileEx",                        5, NULL, 1u << 4,             0,          0 },
 
+    { L"kernelbase.dll", "CopyFileExW",                        6, NULL, 1u << 2,             0,          9 },
     { L"kernelbase.dll", "CreateThreadpoolIo",                 4, NULL, 1u << 1,             0,          6 },
     { L"kernelbase.dll", "CreateThreadpoolTimer",              3, NULL, 1u << 0,             0,          0 },
     { L"kernelbase.dll", "CreateThreadpoolWait",               3, NULL, 1u << 0,             0,          0 },
@@ -6544,7 +6947,9 @@ static const struct thunk_override thunk_overrides[] =
     { L"kernelbase.dll", "EnumTimeFormatsEx",                  4, NULL, 1u << 0,             0,          0 },
     { L"kernelbase.dll", "EnumTimeFormatsW",                   3, NULL, 1u << 0,             0,          0 },
     { L"kernelbase.dll", "EnumUILanguagesW",                   3, NULL, 1u << 0,             0,          0 },
+    { L"kernelbase.dll", "EventRegister",                      4, NULL, 1u << 1,             0,          7 },
     { L"kernelbase.dll", "InitOnceExecuteOnce",                4, NULL, 1u << 1,             0,          0 },
+    { L"kernelbase.dll", "MoveFileWithProgressW",              5, NULL, 1u << 2,             0,          9 },
     { L"kernelbase.dll", "PerfStartProvider",                  3, NULL, 1u << 1,             0,          0 },
     { L"kernelbase.dll", "QueueUserAPC",                       3, NULL, 1u << 0,             0,          0 },
     { L"kernelbase.dll", "QueueUserAPC2",                      4, NULL, 1u << 0,             0,          0 },
@@ -6624,6 +7029,8 @@ static const struct thunk_override thunk_overrides[] =
     { L"ucrtbase.dll", "_o__register_onexit_function",       2, NULL, 1u << 1,             0,          0 },
     { L"ucrtbase.dll", "signal",                             2, NULL, 1u << 1,             0,          0 },
 
+    { L"user32.dll", "DdeInitializeA",                     4, NULL, 1u << 1,             1u << 1,    8 },
+    { L"user32.dll", "DdeInitializeW",                     4, NULL, 1u << 1,             1u << 1,    8 },
     { L"user32.dll", "DrawStateA",                        10, NULL, 1u << 2,             0,          5 },
     { L"user32.dll", "DrawStateW",                        10, NULL, 1u << 2,             0,          5 },
     { L"user32.dll", "EnumChildWindows",                   3, NULL, 1u << 1,             0,          0 },
@@ -6643,6 +7050,7 @@ static const struct thunk_override thunk_overrides[] =
     { L"user32.dll", "SendMessageCallbackA",               6, NULL, 1u << 4,             0,          0 },
     { L"user32.dll", "SendMessageCallbackW",               6, NULL, 1u << 4,             0,          0 },
     { L"user32.dll", "SetCoalescableTimer",                5, NULL, 1u << 3,             0,          0 },
+    { L"user32.dll", "SetWinEventHook",                    7, NULL, 1u << 3,             0,          7 },
     { L"user32.dll", "SetWindowsHookA",                    2, NULL, 1u << 1,             1u << 1,    0 },
     { L"user32.dll", "SetWindowsHookW",                    2, NULL, 1u << 1,             1u << 1,    0 },
     { L"user32.dll", "UnhookWindowsHook",                  2, NULL, 1u << 1,             1u << 1,    0 },
@@ -6654,6 +7062,7 @@ static const struct thunk_override thunk_overrides[] =
     { L"winmm.dll", "mmioInstallIOProcW",                 3, NULL, 1u << 1,             1u << 1,    0 },
 
     { L"ws2_32.dll", "GetAddrInfoExW",                    10, NULL, 1u << 8,             0,          0 },
+    { L"ws2_32.dll", "WSAAccept",                          5, NULL, 1u << 3,             0,          8 },
     { L"ws2_32.dll", "WSAIoctl",                           9, NULL, 1u << 8,             0,          0 },
     { L"ws2_32.dll", "WSAProviderConfigChange",            3, NULL, 1u << 2,             0,          0 },
     { L"ws2_32.dll", "WSARecv",                            7, NULL, 1u << 6,             0,          0 },

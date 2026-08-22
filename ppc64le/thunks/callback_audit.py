@@ -203,10 +203,10 @@ def emit_rows( headers, findings, resolved, surface ):
                 continue
             ret, cb_argc = decomposed[t]
             size = (widths.get( t ) or [None])[0]
-            if cb_argc > 6:
-                # the pool has fixed-arity dispatchers for 4, 5 and 6 only
+            if cb_argc > 9:
+                # the pool has fixed-arity dispatchers for 4 through 9 only
                 print( '/* %s %s arg%d: %s takes %d arguments; the trampoline pool '
-                       'tops out at 6, so this needs the pool extended before it '
+                       'tops out at 9, so this needs the pool extended before it '
                        'can have a row */' % (dll, name, i, t, cb_argc) )
                 continue
             if ret == 'void':

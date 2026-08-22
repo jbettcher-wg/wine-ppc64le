@@ -3,7 +3,7 @@
 # Written by callback_audit.py --update-holes and matched EXACTLY by
 # check-callback-rows.sh: a new hole fails the gate, and so does a hole that
 # gets filled without being struck off here.  Every line below is a decision,
-# not an oversight, and the decisions are these three:
+# not an oversight, and the decisions are these two:
 #
 # 1. A THREAD'S START ROUTINE is already handled one layer down, by
 #    thread_start_is_guest_code() at RtlUserThreadStart -- which also gives
@@ -21,27 +21,6 @@ ntdll.dll NtCreateThreadEx arg4 PRTL_THREAD_START_ROUTINE
 ntdll.dll RtlCreateUserThread arg6 PRTL_THREAD_START_ROUTINE
 ntdll.dll RtlUserThreadStart arg0 PRTL_THREAD_START_ROUTINE
 #
-# 2. THE CALLBACK TAKES MORE THAN SIX ARGUMENTS.  The trampoline pool has
-#    fixed-arity dispatchers for four, five and six and refuses anything else
-#    by name (wrap_guest_callback_ex).  Extending it to seven, eight and nine
-#    is what these are waiting on: LPPROGRESS_ROUTINE takes nine,
-#    PFNCALLBACK and LPCONDITIONPROC eight, PENABLECALLBACK and WINEVENTPROC
-#    seven.
-advapi32.dll EventRegister arg1 PENABLECALLBACK
-kernel32.dll CopyFileExA arg2 LPPROGRESS_ROUTINE
-kernel32.dll CopyFileExW arg2 LPPROGRESS_ROUTINE
-kernel32.dll MoveFileTransactedA arg2 LPPROGRESS_ROUTINE
-kernel32.dll MoveFileTransactedW arg2 LPPROGRESS_ROUTINE
-kernel32.dll MoveFileWithProgressA arg2 LPPROGRESS_ROUTINE
-kernel32.dll MoveFileWithProgressW arg2 LPPROGRESS_ROUTINE
-kernelbase.dll CopyFileExW arg2 LPPROGRESS_ROUTINE
-kernelbase.dll EventRegister arg1 PENABLECALLBACK
-kernelbase.dll MoveFileWithProgressW arg2 LPPROGRESS_ROUTINE
-user32.dll DdeInitializeA arg1 PFNCALLBACK
-user32.dll DdeInitializeW arg1 PFNCALLBACK
-user32.dll SetWinEventHook arg3 WINEVENTPROC
-ws2_32.dll WSAAccept arg3 LPCONDITIONPROC
-#
-# 3. IsBadCodePtr PROBES a pointer and never calls it.  Wrapping would have it
+# 2. IsBadCodePtr PROBES a pointer and never calls it.  Wrapping would have it
 #    answer about the trampoline instead of about the guest's own code.
 kernel32.dll IsBadCodePtr arg0 FARPROC

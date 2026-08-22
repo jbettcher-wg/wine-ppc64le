@@ -407,11 +407,12 @@ static void main_mode( void )
      * but NOT through thunk_rip_cache_get/put, the two functions that actually
      * copy the entry field by field.  So the arity written on a miss was
      * dropped on the floor, and a HIT handed the caller an uninitialised
-     * `hit.cb_argc` -- stack garbage.  Garbage outside {4,5,6} takes
+     * `hit.cb_argc` -- stack garbage.  Garbage outside the pool's supported
+     * arities ({4,5,6} at the time; 4 through 9 today) takes
      * wrap_guest_callback_ex's default: arm, which logs "unsupported arity"
      * and RETURNS THE RAW GUEST POINTER to native code, which is precisely the
-     * failure this whole mechanism exists to prevent; garbage that happens to
-     * be 5 or 6 mints the wrong trampoline silently.
+     * failure this whole mechanism exists to prevent; garbage that lands on
+     * another supported arity mints the wrong trampoline silently.
      *
      * A gate that registers once cannot see any of that.  So: register a
      * SECOND, DIFFERENT guest handler through the SAME export -- the same RIP,
