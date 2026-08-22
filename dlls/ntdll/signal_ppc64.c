@@ -6413,6 +6413,7 @@ static const struct thunk_override thunk_overrides[] =
      * imported to avoid conflicts with Mingw"), so those two have no row
      * here; there is nothing for them to intercept. */
     { L"msvcr100.dll", "_onexit",           1, emu_onexit },
+    { L"msvcr120.dll", "_onexit",           1, emu_onexit },
     /* The C++ new-handler, `int (*)(size_t)`, which native operator new calls
      * when an allocation fails.  A plain cb_mask row rather than a handler,
      * and the shape it shares with SetUnhandledExceptionFilter below is the
@@ -6635,6 +6636,7 @@ static const struct thunk_override thunk_overrides[] =
      * OWN start routine; this is a different pointer on a different path. */
     { L"msvcrt.dll",   "_beginthread",     3, NULL, 1u << 0 },
     { L"msvcr100.dll", "_beginthread",     3, NULL, 1u << 0 },
+    { L"msvcr120.dll", "_beginthread",     3, NULL, 1u << 0 },
     { L"ucrtbase.dll", "_beginthread",     3, NULL, 1u << 0 },
     { L"ucrtbase.dll", "_o__beginthread",  3, NULL, 1u << 0 },
     /* _beginthreadex(security, stack_size, start, arglist, initflag, thrdaddr):
@@ -6649,6 +6651,7 @@ static const struct thunk_override thunk_overrides[] =
      * CreateThread the native _beginthreadex_trampoline. */
     { L"msvcrt.dll",   "_beginthreadex",     6, NULL, 1u << 2 },
     { L"msvcr100.dll", "_beginthreadex",     6, NULL, 1u << 2 },
+    { L"msvcr120.dll", "_beginthreadex",     6, NULL, 1u << 2 },
     { L"ucrtbase.dll", "_beginthreadex",     6, NULL, 1u << 2 },
     { L"ucrtbase.dll", "_o__beginthreadex",  6, NULL, 1u << 2 },
     /* _set_invalid_parameter_handler(handler): one argument, and it is the
@@ -6657,6 +6660,7 @@ static const struct thunk_override thunk_overrides[] =
      * (dlls/msvcrt/errno.c:549) that errno.c:468 prefers over the global one;
      * it is the same callback shape, so it is the same row. */
     { L"msvcr100.dll", "_set_invalid_parameter_handler",                    1, NULL, 1u << 0, 0, 5 },
+    { L"msvcr120.dll", "_set_invalid_parameter_handler",                    1, NULL, 1u << 0, 0, 5 },
     { L"ucrtbase.dll", "_set_invalid_parameter_handler",                    1, NULL, 1u << 0, 0, 5 },
     { L"ucrtbase.dll", "_o__set_invalid_parameter_handler",                 1, NULL, 1u << 0, 0, 5 },
     { L"ucrtbase.dll", "_set_thread_local_invalid_parameter_handler",       1, NULL, 1u << 0, 0, 5 },
@@ -6669,12 +6673,14 @@ static const struct thunk_override thunk_overrides[] =
      * is no forwarder row to add -- _purecall is the call site, not a
      * registration, and needs none. */
     { L"msvcr100.dll", "_set_purecall_handler",  1, NULL, 1u << 0 },
+    { L"msvcr120.dll", "_set_purecall_handler",  1, NULL, 1u << 0 },
     { L"ucrtbase.dll", "_set_purecall_handler",  1, NULL, 1u << 0 },
     /* __setusermatherr(func): `int (__cdecl *)(struct _exception *)` -- one
      * pointer argument, and the int return that math.c:129 actually tests.  All
      * three CRTs export it and none exports an _o_ forwarder for it. */
     { L"msvcrt.dll",   "__setusermatherr",  1, NULL, 1u << 0 },
     { L"msvcr100.dll", "__setusermatherr",  1, NULL, 1u << 0 },
+    { L"msvcr120.dll", "__setusermatherr",  1, NULL, 1u << 0 },
     { L"ucrtbase.dll", "__setusermatherr",  1, NULL, 1u << 0 },
     /* window procedures: the callback carried INSIDE A STRUCT, which no
      * argument-position mask can name, plus the other entry points through
@@ -6965,6 +6971,7 @@ static const struct thunk_override thunk_overrides[] =
     { L"kernelbase.dll", "WriteFileEx",                        5, NULL, 1u << 4,             0,          0 },
 
     { L"msvcr100.dll", "signal",                             2, NULL, 1u << 1,             0,          0 },
+    { L"msvcr120.dll", "signal",                             2, NULL, 1u << 1,             0,          0 },
 
     { L"msvcrt.dll", "signal",                             2, NULL, 1u << 1,             0,          0 },
 
