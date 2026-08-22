@@ -63,7 +63,8 @@ Honest, and in progress.
 | Running a **32-bit** PE | **works** — real Wine WoW64, the embedded emulator as the CPU backend; `ppc64le/wow64/check-wow64-smoke.sh` |
 | Processor topology | **all cores** — sparse CPU and NUMA numbering, real processor groups; `ppc64le/cpu/check-cpu-topology.sh` |
 | `mfmediaengine`, `evr`, `wmvcore` | **surface built, unexercised** — same roster, same instance; no title has driven one, and `ppc64le/mf/README.md` says so |
-| **A commercial game** | **no** — see "Where real games stop" |
+| **Commercial games** | **three play** — DOOM (2016), Cyberpunk 2077, The Witcher 3; `ppc64le/games/STATUS.md` is the per-title board |
+| Graphics for a **32-bit** guest | **not yet** — the i386 half of the dxvk thunk surface builds, but a call traps and nothing answers; `ppc64le/NEXT.md` item 2 |
 
 `ntdll` cannot be a PE and never will be: its TEB lives in an initial-exec
 `__thread`, and a PE image has nowhere to put a static TLS block. It is built as
@@ -270,15 +271,22 @@ things it was claimed to cover turned out not to be covered by it at all.
   client does land at `0,0` on the same compositor, so this is a winewayland
   question rather than a DXVK one, and it is recorded rather than fixed.)
 
-### Where real games stop
+### What real games needed
 
-**No commercial game runs yet.** Two were pointed at the port, and both got far
-enough to be useful rather than far enough to play — though one of them now
-stops for a reason that belongs to the game and its launcher rather than to
-this port, which is a different kind of "not yet".
+**Three commercial games play**: DOOM (2016), Cyberpunk 2077 and The Witcher 3,
+the last two through their own launchers and into live gameplay.
+`ppc64le/games/STATUS.md` is the board — every Windows title installed on the
+development machine, with the walls each one named in the order it hit them.
 
-Getting there closed a run of gaps that were structural rather than per-title,
-and each is worth naming because each will recur:
+That is the method, and it is worth stating because it decided what got built:
+one title finds a gap, the second title finds the same gap and proves it was
+never per-title. Almost every wall in this record was decidable before anything
+ran — an import table and an export table are both just tables, and
+`ppc64le/thunks/import_chain.py` walks a binary's whole static chain against
+this tree's guest thunk surface and names what would not bind.
+
+What follows is the run of gaps that closing them exposed. They were structural
+rather than per-title, and each is worth naming because each will recur:
 
 * the loader refused the *whole* search path for a guest image, so an
   application's own DLLs — `SDL2.dll` sitting beside the `.exe` that imports it
@@ -401,11 +409,13 @@ Rather than translate the MSVC C++ ABI, **Microsoft's own `msvcp140.dll` is
 loaded as an x86-64 guest module** and runs under the emulator — which only
 became possible once application DLLs resolved.
 
-Where the two stop today:
+Where the first two titles stopped, and what that cost:
 
-* **Quake II (2023 remaster)** — every DLL initializes and the game reaches its
-  own code, then dereferences a global that its one writer never set. Not a
-  thunk, sentinel or ABI problem.
+* **Quake II (2023 remaster)** — every DLL initialized and the game reached its
+  own code, then dereferenced a global that its one writer never set. Not a
+  thunk, sentinel or ABI problem. It has not been re-run since, because the
+  library drive it lives on is not mounted on the development machine — so
+  whether the gaps closed afterwards moved it is **unknown, not fixed**.
 * **DOOM (2016, Vulkan build)** — every import resolves, including all 252
   `vulkan-1` exports. The `STATUS_STACK_OVERFLOW` in `steam_api64.dll` this
   file used to record, and excused as Steam's DRM shim with no client to talk
@@ -460,8 +470,15 @@ Where the two stop today:
   header", so DOOM's crash-reporter setup called `0xdead0017`, the sentinel the
   loader hands a missing import — one `PROBE-EXTRA dbghelp.h` line), and every
   `GetSystemInfo` was answering `PROCESSOR_ARCHITECTURE_PPC64` to a program
-  made entirely of x86-64. No `vulkan-1` entry point is reached yet: the game
-  stops before it gets that far, on Steam rather than on graphics.
+  made entirely of x86-64. At the time of that run no `vulkan-1` entry point
+  was reached at all: the game stopped before it got that far, on Steam rather
+  than on graphics. **It plays now** — guest fibers and two more callback
+  classes were the last walls, and `ppc64le/games/STATUS.md` carries the rest
+  of that title's record, including the `FATAL ERROR: Memory corruption before
+  block!` that was never corruption. Nothing was damaged: swept from outside a
+  frozen process, ~19,600 live allocations had zero damaged canaries and all
+  13,578 of the game's own blocks still validated. It was `pdh.dll` failing to
+  load, and the game freeing a pointer its own allocator never returned.
 
 **System COM** now crosses. `CoCreateInstance` hands a guest a **proxy** whose
 vtable is the guest thunk module's own trap-stub array, so a guest calling a
