@@ -4927,8 +4927,16 @@ static void output_sources( struct makefile *make )
     {
         for (arch = 0; arch < archs.count; arch++)
         {
-            if (thunk_owns_arch( make, arch )) continue;
-            if (is_multiarch( arch ) || (!arch && make->so_builtin)) output_module( make, arch );
+            /* A thunk-owned arch gets no from-source module -- the guest thunk
+             * PE is this module's build for it.  The IMPORT LIBRARY is still
+             * ours to emit: winebuild derives it from the module's own .spec,
+             * so it describes the interface rather than the implementation,
+             * and spec2thunk numbers the thunk's ordinals from that same .spec
+             * the way winebuild does.  Every importer for that arch links
+             * against it -- suppressing it left dlls/d2d1/tests, dlls/d3d11/tests
+             * and dlls/dxva2/tests naming an i386 libd3d11.a that had no rule. */
+            if (!thunk_owns_arch( make, arch ))
+                if (is_multiarch( arch ) || (!arch && make->so_builtin)) output_module( make, arch );
             if (make->importlib && (is_multiarch( arch ) || (!arch && !is_native_arch_disabled( make ))))
                 output_import_lib( make, arch );
         }
