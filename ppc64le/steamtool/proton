@@ -52,9 +52,19 @@ wineserver=$tree/server/wineserver
 bridge=
 reg_fex=$(sed -n 's/^interpreter //p' /proc/sys/fs/binfmt_misc/FEX-x86_64 2>/dev/null)
 reg_bridge=${reg_fex:+${reg_fex%/Bin/FEX}/Source/Tools/FexBridge/libfexbridge.so}
+#
+# THE TREE'S OWN INSTALLED BRIDGE is the third candidate, and it is where
+# fexbridge/build-fexbridge.sh puts one -- beside ntdll.so, which is exactly
+# where ntdll's own loader looks when nothing names a bridge.  Having the
+# launcher search somewhere else is how the two disagree.
+#
+# The fex-ppc64le candidates that used to be here are GONE.  fastppcx86 is the
+# emulator; fex-ppc64le is retained as source for later POWER9 optimisation
+# work and has no build tree at all, so those paths could only ever miss --
+# and a miss here is silent, ending in "no bridge found" on a machine with a
+# working one.
 bridge_cands="${WINE_PPC64LE_FEXBRIDGE:-} ${reg_bridge:-} \
-$tree/../fex-ppc64le/build/Source/Tools/FexBridge/libfexbridge.so \
-$HOME/Projects/power8/fex-ppc64le/build/Source/Tools/FexBridge/libfexbridge.so"
+$tree/dlls/ntdll/libfexbridge.so"
 
 # A 32-BIT-CAPABLE BRIDGE WINS, and the order above is otherwise unchanged.
 #
@@ -345,6 +355,38 @@ fi
 # file in the tree into it would be a new mechanism to no purpose.
 sys32=$prefix/drive_c/windows/system32
 foreign=$compat/pfx/drive_c/windows/system32
+
+# WHAT MACHINE IS THAT PE?  Staging exists to put an x86-64 module where a
+# guest can load it, so staging anything else is worse than staging nothing:
+# the file lands with the right NAME and the wrong INSTRUCTION SET, and the
+# guest gets a module it cannot execute instead of an honest "absent".
+#
+# [MEASURED 2026-08-22] this was not hypothetical.  run-native exports
+# STEAM_COMPAT_DATA_PATH=$prefix and this script then builds its prefix at
+# $compat/pfx -- so $foreign and $sys32 were THE SAME DIRECTORY, the "foreign
+# Proton prefix" was our own, and the msvcp100 block copied this port's NATIVE
+# ppc64 builtin (machine 0x1f3) into sysx8664.  Verified on a real prefix:
+# sysx8664/msvcp100.dll came out 0x1f3 while every hand-staged file was 0x8664.
+# The Styx fix this block exists for has therefore never worked outside a
+# launch that had a genuine Proton prefix beside it.
+#
+# e_lfanew is a LE u32 at 0x3c; Machine is a LE u16 at e_lfanew+4.  Assembled
+# from bytes rather than read as a word so the answer does not depend on the
+# host's endianness.
+pe_machine() {
+    _off=$(od -An -tu4 -j60 -N4 "$1" 2>/dev/null | tr -d ' \n')
+    case ${_off:-x} in ''|*[!0-9]*) return 1 ;; esac
+    _b=$(od -An -tx1 -j$((_off + 4)) -N2 "$1" 2>/dev/null | tr -d ' \n')
+    [ ${#_b} -eq 4 ] || return 1
+    printf '%s%s\n' "$(printf %s "$_b" | cut -c3-4)" "$(printf %s "$_b" | cut -c1-2)"
+}
+
+# $foreign is only foreign if it is not us.  Same directory means there is no
+# other prefix to borrow from, and every "copy" would be a self-copy of a
+# native builtin.
+if [ "$(cd "$foreign" 2>/dev/null && pwd -P)" = "$(cd "$sys32" 2>/dev/null && pwd -P)" ]; then
+    foreign=
+fi
 mfc_have=0 mfc_missing=
 
 for dll in mfc140u.dll mfc140.dll; do
@@ -449,7 +491,8 @@ for dll in msvcp100.dll; do
     if [ -f "$sysx8664/$dll" ]; then
         continue
     fi
-    if [ -f "$foreign/$dll" ]; then
+    if [ -n "$foreign" ] && [ -f "$foreign/$dll" ] &&
+       [ "$(pe_machine "$foreign/$dll")" = "8664" ]; then
         mkdir -p "$sysx8664" 2>/dev/null
         if cp -f "$foreign/$dll" "$sysx8664/.$dll.tmp" 2>/dev/null &&
            mv -f "$sysx8664/.$dll.tmp" "$sysx8664/$dll" 2>/dev/null; then
