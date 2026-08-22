@@ -89,6 +89,21 @@ index 8f2bc998..461307a8 100644
          memcpy(buffer + len, lpName, (name_len + 1) * sizeof(WCHAR));
          name_str.MaximumLength = name_str.Length = (len + name_len) * sizeof(WCHAR);
          name_str.MaximumLength += sizeof(WCHAR);
+diff --git a/src/wsi/foreign/wsi_monitor_foreign.cpp b/src/wsi/foreign/wsi_monitor_foreign.cpp
+--- a/src/wsi/foreign/wsi_monitor_foreign.cpp
++++ b/src/wsi/foreign/wsi_monitor_foreign.cpp
+@@ -39,8 +39,9 @@ namespace dxvk::wsi {
+     if (hMonitor != reinterpret_cast<HMONITOR>(kMonitorId))
+       return false;
+ 
+-    const std::wstring name = LR"(\\.\DISPLAY1)";
++    static const char name[] = "\\\\.\\DISPLAY1";
+     std::memset(Name, 0, sizeof(Name));
+-    name.copy(Name, name.length(), 0);
++    for (size_t i = 0; name[i] && i < 31; i++)
++      Name[i] = static_cast<WCHAR>(name[i]);
+     return true;
+   }
 diff --git a/src/wsi/glfw/wsi_monitor_glfw.cpp b/src/wsi/glfw/wsi_monitor_glfw.cpp
 index 358fb146..469ca351 100644
 --- a/src/wsi/glfw/wsi_monitor_glfw.cpp
