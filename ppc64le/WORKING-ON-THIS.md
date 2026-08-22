@@ -70,6 +70,14 @@ this produced: a monitor that reported a game running when it had exited, a
 batch that killed itself.  Match the exact binary (`pgrep -x witcher3.exe`) or
 break the pattern (`pkill -f tmp/w3"loop".sh`).
 
+**But `pgrep -x` silently matches nothing when the name exceeds 15
+characters** — the kernel's `comm` is capped there.  `pgrep -x
+quake2ex_steam.exe` (18) returns no match and prints its warning to *stderr*,
+so in a script the empty result reads as "not running", which is the exact
+wrong answer this trap was supposed to prevent.  Check the length first, and
+for longer names match on the truncated comm (`pgrep -x quake2ex_steam`) or
+anchor a `-f` pattern on the full path.
+
 **`wine foo.exe` leaves two `wine-preloader` processes** whose command lines
 both name the exe, and only one ever runs guest code.  A loop that keeps the
 last match will sample the wrong one — this produced "zero SAO pages" from a
@@ -81,12 +89,16 @@ Xwayland root window is black to `import` and `ffmpeg -f x11grab`.  What works:
 
 ```sh
 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus \
-XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 \
+XDG_RUNTIME_DIR=/run/user/1000 \
+WAYLAND_DISPLAY=$(basename "$(ls /run/user/1000/wayland-[0-9] | head -1)") \
   spectacle -b -n -o shot.png
 ```
 
 All three variables are required — `spectacle` dumps core without
-`WAYLAND_DISPLAY`.
+`WAYLAND_DISPLAY`.  **Do not hardcode the socket name.**  This file said
+`wayland-0` for a while and the live socket was `wayland-1`; the number is
+assigned per compositor start, so a recipe that names one is a recipe that
+core-dumps on the next boot.  Derive it, as above.
 
 **Driving a game without a human**: `python3 ~/fex-scripts/sendkey.py KEY_ENTER
 --delay 0.5` injects seat-wide through uinput.  Focus the game window first;

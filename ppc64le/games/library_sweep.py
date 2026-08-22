@@ -211,10 +211,24 @@ def launch_candidates(facts):
 
 # --------------------------------------------------------------- verdict
 
-def audit(paths, src, build, sibling):
-    """import_chain's answer, as (fatal module list, missing export count)."""
+def audit(paths, src, build):
+    """import_chain's answer, as (fatal module list, missing export count).
+
+    EVERY subject's own directory is a sibling directory, not just the first
+    one's.  A title that ships more than one build of itself puts each build's
+    private DLLs beside that build: The Witcher 3 has bin/x64/witcher3.exe and
+    bin/x64_dx12/witcher3.exe, and sl.interposer.dll, libxess.dll and the
+    GFSDK_Aftermath/SSAO_D3D12 pair exist ONLY under x64_dx12.  Deriving one
+    sibling dir from subjects[0] and applying it to both made the DX12 build's
+    own shipped DLLs invisible, and the title -- which plays -- was reported
+    WILL NOT LOAD, the verdict reserved for a module that kills the process
+    before its entry point.  A tool that condemns working titles does not get
+    used.
+    """
     import import_chain
-    holes = import_chain.walk(list(paths), build, src, [sibling],
+    paths = list(paths)
+    siblings = sorted({os.path.dirname(p) for p in paths})
+    holes = import_chain.walk(paths, build, src, siblings,
                               out=open(os.devnull, 'w'), log=open(os.devnull, 'w'))
     modules, exports = [], 0
     for who, target, what in holes:
@@ -253,8 +267,11 @@ def build_facts(args):
                                               'libfexbridge.so'))
     except OSError:
         pass
-    cands.append(os.path.join(os.path.dirname(args.src), 'fex-ppc64le', 'build',
-                              'Source', 'Tools', 'FexBridge', 'libfexbridge.so'))
+    # Where build-fexbridge.sh installs it, which is where ntdll's loader looks.
+    # The old candidate here named a fex-ppc64le build tree; fastppcx86 is the
+    # emulator now and that tree has no binaries, so this reported "no bridge
+    # found" on a machine with a working one.
+    cands.append(os.path.join(args.build, 'dlls', 'ntdll', 'libfexbridge.so'))
     for c in cands:
         if os.path.isfile(c):
             out['bridge'] = c
@@ -303,8 +320,7 @@ def verdict(app, facts, args):
         return 'UNAUDITED', note or 'run again with --audit to check its imports'
     subjects = [e['path'] for e in cands if e['machine'] == 0x8664][:args.max_exes]
     try:
-        modules, exports = audit(subjects, args.src, args.build,
-                                 os.path.dirname(subjects[0]))
+        modules, exports = audit(subjects, args.src, args.build)
     except Exception as e:                       # a malformed PE is a finding
         return 'UNREADABLE', 'import audit failed: %s' % e
     if modules:
