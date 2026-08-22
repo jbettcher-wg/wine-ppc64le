@@ -65,6 +65,63 @@
                                     an untyped void** -- is about the SIGNATURE
                                     and stands in both directions, and does not
                                     get this flag. */
+#define WINECOM_F_RET_QWORD  16 /* the return value is an 8-byte scalar in the
+                                   GUEST's own ABI.  An x86-64 guest never
+                                   needed the distinction (everything comes
+                                   back in RAX), which is why no table carried
+                                   it; an i386 guest returns 64 bits in
+                                   EDX:EAX and 32 in EAX alone, so a stub that
+                                   does not know the width either truncates
+                                   ID3D11Fence::GetCompletedValue or hands
+                                   back a stale EDX as the upper half -- a
+                                   plausible number, not a crash.  Set from
+                                   the i386 clang oracle's sizeof of the
+                                   declared return type, never from the type's
+                                   NAME: SIZE_T is 8 bytes on one guest and 4
+                                   on the other, and ID3D10Blob::GetBufferSize
+                                   returning it gets NO flag for exactly that
+                                   reason.
+                                     These two spellings -- EAX, EDX:EAX --
+                                   are the ONLY return classes the geometry
+                                   can express.  i386 returns float and
+                                   double in x87 ST(0), so a slot whose
+                                   return type clang says is floating-point
+                                   (GetResourceMinLOD, GetNPatchMode) gets
+                                   NO WINECOM_F_I386_GEOM at all: reading its
+                                   "return" out of EAX would hand back
+                                   garbage AND leave ST(0) unpopped, an x87
+                                   stack that is all NaN eight calls later. */
+#define WINECOM_F_I386_GEOM  32 /* qwordmask and WINECOM_F_RET_QWORD were
+                                   DERIVED, from clang's own i386 layout of
+                                   every parameter of this slot, and together
+                                   with argc they lay out the i386 stdcall
+                                   frame: parameter i -- counting AFTER
+                                   `this`, the same indexing as every other
+                                   mask in this struct, NOT the stack-slot
+                                   index -- occupies two 4-byte stack slots
+                                   where qwordmask has bit i, one where it
+                                   does not, and the callee pops
+                                   4*argc + 4*popcount(qwordmask) bytes.
+                                   Same reading rule as xmask: without this
+                                   flag a zero qwordmask cannot be told from
+                                   "the generator never looked" -- a table
+                                   generated before this field existed, or a
+                                   slot whose frame the mask cannot express (a
+                                   by-value GUID is four slots, a float
+                                   return is ST(0)) -- so a 32-bit lane MUST
+                                   treat its absence as "no geometry" and
+                                   fail closed, not as "every parameter is
+                                   one slot".
+                                     TODAY THAT RULE IS CONTRACT, NOT
+                                   ENFORCEMENT.  No code in this tree reads
+                                   qwordmask, WINECOM_F_RET_QWORD or this
+                                   flag yet -- there is no i386 consumer, and
+                                   the 64-bit dispatcher never looks at them
+                                   -- so "fails closed" describes what the
+                                   first 32-bit reader MUST be written to do,
+                                   not something any code currently does.  Do
+                                   not mistake this paragraph for a check
+                                   that exists. */
 
 /* Compatibility spellings for generated tables and client code that predate
  * the shared library (dlls/d3d12).  Same values, one authority. */
@@ -231,10 +288,59 @@ struct winecom_slot
                                    been regenerated keep their latent stack
                                    hazard until they are. */
     unsigned short dwordsign;   /* bit i: that four-byte parameter is SIGNED
-                                   (INT, LONG, an enum -- int underneath), so
-                                   it is sign-extended; unsigned ones are
+                                   (INT, LONG, BOOL -- int underneath -- and
+                                   any enum whose UNDERLYING type is signed),
+                                   so it is sign-extended; unsigned ones are
                                    zero-extended.  ELFv2's own rule, applied
-                                   as written. */
+                                   as written -- to the declared type as
+                                   CLANG parses it, never to a name-list
+                                   guess.  "An enum is int underneath" is
+                                   NOT a rule the generators use any more:
+                                   DXGI_COLOR_SPACE_TYPE carries the
+                                   enumerator DXGI_COLOR_SPACE_CUSTOM =
+                                   0xffffffff, which makes its underlying
+                                   type UNSIGNED in the C the native callee
+                                   is compiled as, so it zero-extends --
+                                   sign-extending it handed the callee
+                                   0xFFFFFFFFFFFFFFFF where the ABI demands
+                                   0x00000000FFFFFFFF. */
+    unsigned short qwordmask;   /* bit i: parameter i is EIGHT bytes in the
+                                   i386 guest's own ABI -- TWO 4-byte stdcall
+                                   stack slots, where every unmarked parameter
+                                   of the slot is one.  Meaningful only under
+                                   WINECOM_F_I386_GEOM, whose banner has the
+                                   frame arithmetic.
+
+                                   This mask exists because "8-byte class on
+                                   the x86-64 guest" names TWO different i386
+                                   widths and no field could tell them apart:
+                                   HANDLE / HWND / SIZE_T / ULONG_PTR and
+                                   every pointer shrink to 4 bytes and ONE
+                                   slot on i386, while UINT64 /
+                                   D3D12_GPU_VIRTUAL_ADDRESS stay 8 bytes and
+                                   TWO -- so ID3D11Fence::Signal(fence,
+                                   UINT64) has its value at a different stack
+                                   offset than any pointer-taking neighbour,
+                                   and a 32-bit lane that guessed from the
+                                   64-bit tables would read a value that is
+                                   half fence-value, half whatever came next:
+                                   plausible, wrong, and silent.  The widths
+                                   come from the i386 clang oracle
+                                   (gen_winecom.py asks sizeof for the exact
+                                   declared type, the ppc64le/dxvk/layout32.py
+                                   mechanism), NEVER from a name list -- a
+                                   name list is how HANDLE and UINT64 ended up
+                                   in one bucket to begin with.
+
+                                   unsigned short like dwordmask, sixteen
+                                   parameter positions; a slot with an 8-byte
+                                   parameter past bit 15 REFUSES AT GENERATION
+                                   TIME rather than truncating the mask.  A
+                                   table generated before this field existed
+                                   has 0 here AND lacks WINECOM_F_I386_GEOM,
+                                   so a 32-bit reader sees "no geometry", not
+                                   "all narrow" -- that pairing is what makes
+                                   this append safe. */
 };
 
 /* winecom_iface flags */

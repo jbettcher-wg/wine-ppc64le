@@ -106,17 +106,37 @@ TYPEDEF_INTEGER = {
 # seven -- a stack slot -- and vkd3d's 64-bit switch missed an enum whose low
 # half said 0, printing "Unhandled descriptor heap type 0" 32768 times per
 # scene while every descriptor copy silently did nothing.  The roster's enums
-# join DWORD_SIGNED at run time (an enum is int underneath).
+# join the dword CLASS at run time; their SIGNEDNESS is asked of clang per
+# declared type, never assumed -- see below.
+#
+# THE SIGN COLUMN IS CLANG'S, NOT THESE LISTS'.  The two name lists decide
+# only that a type is dword-WIDE (and crosscheck_width64 makes clang confirm
+# both the width and the sign they imply); whether the runtime sign- or
+# zero-extends comes from the oracle's own probe of the declared type,
+# exactly the way the widths are derived.  "An enum is int underneath" was a
+# lie this file used to tell: DXGI_COLOR_SPACE_TYPE carries the enumerator
+# DXGI_COLOR_SPACE_CUSTOM = 0xffffffff, which forces its underlying type
+# UNSIGNED in GNU C -- the C the native callee is compiled as -- so the
+# ELFv2 callee is entitled to a ZERO-extended register, and the blanket
+# sign-extension handed vkd3d 0xFFFFFFFFFFFFFFFF where the ABI demands
+# 0x00000000FFFFFFFF (IDXGISwapChain3::SetColorSpace1).  An enum whose
+# underlying type really is signed (a negative enumerator) still
+# sign-extends, because clang says so, not because a rule guessed.
+#
+# BOOL and WINBOOL sit in the SIGNED list: both are `typedef int` underneath,
+# clang measures them signed, and the dxvk sibling surface has always
+# sign-extended them -- identical for every value a well-formed BOOL holds,
+# and the ELFv2-correct extension for any other int value.
 #
 # Every by-value type must land in exactly one of: NARROW_BYVAL, these two,
 # QWORD_BYVAL, BYVAL_AGGREGATE -- a byval_ok type with no width is refused,
 # because "probably 32 bits" is how a stack slot's stale upper half reaches a
 # callee that trusts it.
 DWORD_UNSIGNED = frozenset("""
-    UINT ULONG DWORD BOOL WINBOOL UINT32 DXGI_USAGE unsigned
+    UINT ULONG DWORD UINT32 DXGI_USAGE unsigned
 """.split())
 DWORD_SIGNED = frozenset("""
-    INT LONG INT32 HRESULT int long
+    INT LONG INT32 HRESULT BOOL WINBOOL int long
 """.split())
 QWORD_BYVAL = frozenset("""
     UINT64 INT64 SIZE_T SSIZE_T LONGLONG ULONGLONG ULONG64 LONG64 QWORD
@@ -159,6 +179,429 @@ def narrow_of(p):
         if re.search(pat, p.raw):
             return w
     return None
+
+
+# --------------------------------------------------------------------------
+# the i386 width oracle -- what the OTHER guest's ABI says each by-value
+# type measures.
+#
+# The 64-bit masks above answer "how wide is this argument on the x86-64
+# guest", and they can afford to be name lists because every name was checked
+# against that one ABI.  The i386 guest gets no such shortcut: the 8-byte
+# class SPLITS over there.  HANDLE, HWND, SIZE_T, ULONG_PTR and every pointer
+# shrink to 4 bytes -- ONE stdcall stack slot -- while UINT64 and
+# D3D12_GPU_VIRTUAL_ADDRESS stay 8 bytes and TWO, so ID3D11Fence::Signal's
+# value sits at a different stack offset than any pointer-taking neighbour,
+# and a lane that guessed from the 64-bit tables would read half fence-value,
+# half whatever came next: plausible, wrong, silent.  A name list is exactly
+# how those two widths ended up in one bucket, so the widths are asked of
+# clang itself, per declared type, for BOTH guest targets -- the
+# ppc64le/dxvk/layout32.py mechanism: compile a sizeof array with -S, read
+# the .long values back out of the assembly, never execute anything.  The
+# x86-64 answers double as a lie detector for the name lists above: any
+# disagreement stops generation, because it would mean the committed 64-bit
+# tables were already wrong.
+#
+# The oracle publishes into `struct winecom_slot::qwordmask` (bit i: that
+# parameter is TWO 4-byte slots) and WINECOM_F_RET_QWORD (the return is
+# EDX:EAX, not EAX), both guarded by WINECOM_F_I386_GEOM -- the xmask rule: a
+# table that predates the field reads as "no geometry", never as "all
+# narrow".  And the emitted geometry is CHECKED against a second opinion
+# before it may be written: every covered slot is re-declared
+# __attribute__((stdcall)) verbatim from the roster and clang's own @N symbol
+# decoration -- the callee-popped byte count, computed by clang laying out
+# the whole frame -- must equal what argc and qwordmask predict.
+# --------------------------------------------------------------------------
+
+I386_TARGET = "i386-windows-gnu"
+AMD64_TARGET = "x86_64-windows-gnu"
+
+# Tokens that can end a multi-word builtin type, so the name stripper below
+# knows "unsigned int" carries no parameter name while "UINT64 value" does.
+C_TYPE_TAIL = frozenset(
+    "int char short long unsigned signed float double".split())
+
+
+def byval_spelling(raw):
+    """The C type expression of a star-free, bracket-free declaration: the
+    declared text with qualifiers and the parameter NAME stripped.  The
+    result is handed to clang, which ERRORS on anything this got wrong
+    rather than mis-measuring it -- the stripper cannot silently lie."""
+    t = re.sub(r'\b(const|volatile)\b', ' ', " ".join(raw.split()))
+    toks = t.split()
+    if len(toks) > 1 and toks[-1] not in C_TYPE_TAIL:
+        toks = toks[:-1]
+    return " ".join(toks)
+
+
+class I386Oracle:
+    """sizeof/signedness/floating-point-ness per type spelling, per guest
+    target, from clang.
+
+    `sign_names`: single-token spellings signedness may be asked of (the
+    integer-class roster); a struct cannot be cast from -1, so everything
+    else gets a constant 0 in the sign column and nobody reads it.  The
+    FP column has no such gate: it is a _Generic over an unevaluated
+    dereference, which compiles for any object type and answers 1 only for
+    float/double/long double -- the types i386 returns in x87 ST(0) rather
+    than EAX, which is why slot_geometry refuses to publish a return
+    register class for them.
+
+    `fallback_prelude`: a SECOND header world for names the surface's own
+    headers never declare.  The d3d12 roster's DXGI rows carry enums
+    (DXGI_MEMORY_SEGMENT_GROUP and friends) that exist in Wine's dxgi
+    headers but in no vkd3d header; the two worlds cannot share one
+    translation unit (both define the interfaces), so a name the first TU
+    reports UNDECLARED is retried in the second, and a name neither world
+    declares stops generation.  Nothing is ever guessed on the way."""
+
+    def __init__(self, clang, prelude, incdirs, sign_names, tag,
+                 fallback_prelude="", fallback_incdirs=None):
+        self.clang = clang
+        self.prelude = prelude
+        self.fallback_prelude = fallback_prelude
+        self.incdirs = [d for d in incdirs if d]
+        self.fallback_incdirs = ([d for d in fallback_incdirs if d]
+                                 if fallback_incdirs else self.incdirs)
+        self.sign_names = set(sign_names)
+        self.tag = tag
+        self.cache = {}          # spelling -> (w32, w64, signed, fp)
+        self.fallback_ids = set()   # identifiers only the fallback declares
+
+    def _sign_ok(self, s):
+        toks = s.split()
+        return (all(t in C_TYPE_TAIL for t in toks)
+                or (len(toks) == 1 and toks[0] in self.sign_names))
+
+    UNDECLARED = re.compile(
+        r"(?:use of undeclared identifier|unknown type name)\s+'(\w+)'")
+
+    def _run(self, src_text, target, what, fatal=True, incdirs=None):
+        """-> assembly text, or (None, stderr) with fatal=False."""
+        import subprocess
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            c = os.path.join(td, "winecom_%s.c" % what)
+            with open(c, "w") as fh:
+                fh.write(src_text)
+            asm = c[:-2] + ".s"
+            cmd = ([self.clang, "-target", target, "-O0", "-S", "-o", asm,
+                    "-nostdlibinc"]
+                   + ["-I" + d for d in (incdirs or self.incdirs)] + [c])
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            if r.returncode:
+                if not fatal:
+                    return None, r.stderr
+                sys.exit("gen_winecom: the %s %s probe does not compile for "
+                         "%s, and a width that cannot be measured must not "
+                         "be guessed.\ncommand: %s\n%s"
+                         % (self.tag, what, target, " ".join(cmd),
+                            r.stderr[:4000]))
+            with open(asm) as fh:
+                return fh.read(), None
+
+    def _width_src(self, spellings, prelude):
+        src = prelude + "const unsigned int winecom_probe[] = {\n"
+        for s in spellings:
+            sign = ("(unsigned int)((%s)-1 < (%s)0)" % (s, s)
+                    if self._sign_ok(s) else "0u")
+            # The dereference is UNEVALUATED (_Generic reads only the type),
+            # so this compiles for any object type -- structs included --
+            # and cannot be fooled by a typedef the way a name list can.
+            fp = ("(unsigned int)_Generic(*(%s *)0, float: 1, double: 1, "
+                  "long double: 1, default: 0)" % s)
+            src += "    (unsigned int)sizeof(%s), %s, %s,\n" % (s, sign, fp)
+        src += "};\n"
+        return src
+
+    def _measure_batch(self, todo, prelude, incdirs=None):
+        vals = {}
+        for target in (I386_TARGET, AMD64_TARGET):
+            text, _ = self._run(self._width_src(todo, prelude), target,
+                                "width", incdirs=incdirs)
+            m = re.search(r'^_?winecom_probe:\n((?:\s+\.long\s+\d+[^\n]*\n)+)',
+                          text, re.M)
+            got = ([int(x) for x in re.findall(r'\.long\s+(\d+)', m.group(1))]
+                   if m else [])
+            if len(got) != 3 * len(todo):
+                sys.exit("gen_winecom: read %d width-probe values for %d "
+                         "types from the %s %s assembly; the compiler did "
+                         "not answer what the source asked"
+                         % (len(got), len(todo), self.tag, target))
+            vals[target] = got
+        for i, s in enumerate(todo):
+            s32, g32, f32 = vals[I386_TARGET][3 * i:3 * i + 3]
+            s64, g64, f64 = vals[AMD64_TARGET][3 * i:3 * i + 3]
+            if g32 != g64:
+                sys.exit("gen_winecom: %s is signed on one guest and "
+                         "unsigned on the other; no marshal class expresses "
+                         "that and this generator will not pick a side" % s)
+            if f32 != f64:
+                sys.exit("gen_winecom: %s is floating-point on one guest "
+                         "and not the other, which cannot happen for a type "
+                         "both targets parse; the probe is broken, not the "
+                         "type" % s)
+            self.cache[s] = (s32, s64, bool(g32), bool(f32))
+
+    def measure(self, spellings):
+        todo = sorted(set(spellings) - set(self.cache))
+        if not todo:
+            return
+        # Partition: names the surface headers do not declare move to the
+        # fallback world.  The trial compile is i386-only and non-fatal; the
+        # real measurements below are fatal, so nothing unmeasured survives.
+        main_set = list(todo)
+        fb_set = []
+        for _ in range(8):
+            _, err = self._run(self._width_src(main_set, self.prelude),
+                               I386_TARGET, "width", fatal=False)
+            if err is None:
+                break
+            missing = set(self.UNDECLARED.findall(err))
+            moved = [s for s in main_set
+                     if missing & set(re.findall(r'\w+', s))]
+            if not missing or not moved or not self.fallback_prelude:
+                sys.exit("gen_winecom: the %s width probe does not compile "
+                         "and no fallback header world declares what is "
+                         "missing:\n%s" % (self.tag, err[:4000]))
+            self.fallback_ids |= missing
+            fb_set += moved
+            main_set = [s for s in main_set if s not in moved]
+        if main_set:
+            self._measure_batch(main_set, self.prelude)
+        if fb_set:
+            self._measure_batch(sorted(fb_set), self.fallback_prelude,
+                                self.fallback_incdirs)
+
+    def width32(self, s):
+        return self.cache[s][0]
+
+    def width64(self, s):
+        return self.cache[s][1]
+
+    def is_signed(self, s):
+        return self.cache[s][2]
+
+    def is_fp(self, s):
+        return self.cache[s][3]
+
+    def check_stdcall_frames(self, entries, alias_map):
+        """entries: (key, params, argc, qwordmask) for every slot whose
+        geometry will be published.  Declares each one stdcall, verbatim
+        from the roster, and requires clang's @N callee-pop decoration to
+        equal 4*argc + 4*popcount(qwordmask).  Any disagreement stops
+        generation: two independent derivations of the same frame may not
+        differ and both still be trusted."""
+        if not entries:
+            return 0
+
+        def decl_lines(batch, prelude):
+            lines = [prelude]
+            for n, (key, params, argc, qm) in enumerate(batch):
+                ptext = ""
+                for praw in params:
+                    praw = " ".join(praw.split())
+                    for old, new in alias_map.items():
+                        praw = re.sub(r'\b%s\b' % re.escape(old), new, praw)
+                    ptext += ", " + praw
+                lines.append("void __attribute__((stdcall)) winecom_chk_%d"
+                             "(void *wcthis%s);" % (n, ptext))
+            lines.append("const void *winecom_chk_refs[] = {")
+            lines += ["    (const void *)&winecom_chk_%d," % n
+                      for n in range(len(batch))]
+            lines.append("};")
+            return "\n".join(lines) + "\n"
+
+        # Slots spelled with names only the fallback world declares are
+        # checked THERE -- same ABI, different header copy.  The partition
+        # is discovered the same way measure() discovers it: clang says
+        # which identifiers the main world lacks, and the entries naming
+        # them move over; nothing unmoved is left unchecked.
+        main_e = list(entries)
+        fb_e = [e for e in main_e
+                if set(re.findall(r'\w+', " ".join(e[1])))
+                & self.fallback_ids]
+        main_e = [e for e in main_e if e not in fb_e]
+        text = None
+        for _ in range(8):
+            if not main_e:
+                text = ""
+                break
+            text, err = self._run(decl_lines(main_e, self.prelude),
+                                  I386_TARGET, "frame", fatal=False)
+            if err is None:
+                break
+            missing = set(self.UNDECLARED.findall(err))
+            moved = [e for e in main_e
+                     if missing & set(re.findall(r'\w+', " ".join(e[1])))]
+            if not missing or not moved or not self.fallback_prelude:
+                sys.exit("gen_winecom: the %s frame probe does not compile "
+                         "and no fallback header world declares what is "
+                         "missing:\n%s" % (self.tag, err[:4000]))
+            fb_e += moved
+            main_e = [e for e in main_e if e not in moved]
+        found = {}
+        for batch, text_ready, prelude, what, incs in (
+                (main_e, text, self.prelude, "frame", None),
+                (fb_e, None, self.fallback_prelude, "frame_fb",
+                 self.fallback_incdirs)):
+            if not batch:
+                continue
+            if text_ready is None:
+                text_ready, _ = self._run(decl_lines(batch, prelude),
+                                          I386_TARGET, what, incdirs=incs)
+            got = {int(a): int(b)
+                   for a, b in re.findall(r'winecom_chk_(\d+)@(\d+)',
+                                          text_ready)}
+            for n, e in enumerate(batch):
+                found[id(e)] = got.get(n)
+        bad = []
+        for e in entries:
+            key, params, argc, qm = e
+            want = 4 * argc + 4 * bin(qm).count("1")
+            got = found.get(id(e))
+            if got != want:
+                bad.append("  %s: table geometry says the callee pops %d "
+                           "bytes, clang's stdcall decoration says %s"
+                           % (key, want, got))
+        if bad:
+            sys.exit("gen_winecom: the emitted i386 geometry DISAGREES with "
+                     "clang's own frame layout for %d slot(s); refusing to "
+                     "write a table either half of the toolchain would "
+                     "contradict:\n%s" % (len(bad), "\n".join(bad)))
+        return len(entries)
+
+
+def slot_geometry(slot, oracle):
+    """-> (qwordmask, ret_qword, unproven_reason).  The i386 stdcall frame of
+    one slot, independent of its marshal classification: EVERY slot needs
+    geometry -- a refused slot still has to pop the right number of bytes
+    before it can so much as answer E_NOTIMPL.  An 8-byte parameter past bit
+    15 of qwordmask stops generation outright: the alternative is a silently
+    truncated mask, the exact bug class this field exists to prevent."""
+    qm = 0
+    unproven = None
+    for i, praw in enumerate(slot["params"]):
+        p = Param(praw)
+        if p.stars:              # pointers and decayed arrays: one 4-byte slot
+            continue
+        w = oracle.width32(byval_spelling(p.raw))
+        if w == 8:
+            if i >= 16:
+                sys.exit("gen_winecom: %s::%s has an 8-byte by-value "
+                         "parameter in argument position %d, past the "
+                         "sixteen bits qwordmask covers.  Widen the mask; "
+                         "truncating it silently is not an option."
+                         % (slot["owner"], slot["name"], i + 1))
+            qm |= 1 << i
+        elif w not in (1, 2, 4):
+            unproven = ("by-value %s measures %d bytes on the i386 guest, "
+                        "which qwordmask cannot spell (one or two 4-byte "
+                        "slots)" % (byval_spelling(p.raw), w))
+    ret_q = False
+    rraw = slot["ret"]
+    if rraw != "void" and not slot.get("aggregate_return"):
+        rp = Param(rraw)
+        if rp.stars == 0:
+            rsp = byval_spelling(rraw)
+            if oracle.is_fp(rsp):
+                # i386 returns float and double in x87 ST(0).  The contract
+                # these fields publish can spell EAX and EDX:EAX and nothing
+                # else, so an FP return gets NO geometry and a 32-bit lane
+                # fails closed on it -- the alternative is a consumer that
+                # reads garbage out of EAX and leaves ST(0) unpopped, NaN
+                # after eight calls.  Asked of clang (the _Generic probe),
+                # not of a token list: a typedef spelling of float must not
+                # slip through as "EAX".
+                unproven = ("the %s return value is floating-point, which "
+                            "i386 returns in x87 ST(0); neither EAX nor "
+                            "EDX:EAX describes it, so no geometry is "
+                            "published and a 32-bit lane must fail closed"
+                            % rsp)
+            else:
+                rw = oracle.width32(rsp)
+                if rw == 8:
+                    ret_q = True
+                elif rw not in (1, 2, 4):
+                    unproven = ("the %s return value measures %d bytes on "
+                                "the i386 guest, which is neither EAX nor "
+                                "EDX:EAX" % (rsp, rw))
+    return qm, ret_q, unproven
+
+
+def collect_spellings(ifaces):
+    """Every by-value parameter and by-value return spelling in the roster,
+    so the oracle can measure them in one batch."""
+    sp = set()
+    for iface in ifaces.values():
+        for s in iface["slots"] or ():
+            for praw in s["params"]:
+                p = Param(praw)
+                if not p.stars:
+                    sp.add(byval_spelling(p.raw))
+            rraw = s["ret"]
+            if rraw != "void" and not s.get("aggregate_return"):
+                if Param(rraw).stars == 0:
+                    sp.add(byval_spelling(rraw))
+    return sp
+
+
+def crosscheck_width64(ifaces, oracle, dword_class):
+    """The lie detector: every by-value parameter the NAME LISTS above claim
+    a 64-bit width for must measure exactly that under clang's
+    x86_64-windows-gnu -- AND every name the two sign lists claim a
+    signedness for must measure exactly that signedness.  The width half
+    caught nothing for years while the sign half did not exist, and the
+    DXGI_COLOR_SPACE_TYPE sign lie stood certified; now a name misfiled in
+    DWORD_SIGNED/DWORD_UNSIGNED stops generation the same way a misfiled
+    width does.  (Enums make no name-list sign claim at all -- their
+    signedness is read straight off clang, so there is nothing to
+    cross-check; the g32==g64 gate in the oracle already pins it per
+    target.)  A disagreement means the committed 64-bit tables were already
+    wrong, and generation stops rather than perpetuating it.  Mirrors
+    classify()'s own precedence: narrow, `long long`, dword, qword,
+    aggregate."""
+    bad = []
+    for iface in ifaces.values():
+        for s in iface["slots"] or ():
+            for i, praw in enumerate(s["params"]):
+                p = Param(praw)
+                if p.stars:
+                    continue
+                narrow = narrow_of(p)
+                if narrow:
+                    expected = narrow[0]
+                elif re.search(r'\blong\s+long\b', p.raw):
+                    expected = 8
+                elif p.base in dword_class:
+                    expected = 4
+                elif p.base in QWORD_BYVAL:
+                    expected = 8
+                elif p.base in BYVAL_AGGREGATE:
+                    expected = 8
+                else:
+                    continue     # no width claim; classify() refuses these
+                sp = byval_spelling(p.raw)
+                got = oracle.width64(sp)
+                if got != expected:
+                    bad.append("  %s::%s arg %d (%s): name lists say %d "
+                               "byte(s), clang's x86-64 layout says %d"
+                               % (s["owner"], s["name"], i + 1, p.raw,
+                                  expected, got))
+                if p.base in DWORD_UNSIGNED or p.base in DWORD_SIGNED:
+                    claimed = p.base in DWORD_SIGNED
+                    if oracle.is_signed(sp) != claimed:
+                        bad.append("  %s::%s arg %d (%s): the sign lists "
+                                   "say %s, clang says %s"
+                                   % (s["owner"], s["name"], i + 1, p.raw,
+                                      "signed" if claimed else "unsigned",
+                                      "signed" if oracle.is_signed(sp)
+                                      else "unsigned"))
+    if bad:
+        sys.exit("gen_winecom: the 64-bit width/sign NAME LISTS disagree "
+                 "with clang for %d parameter(s); the committed tables "
+                 "would already be wrong and this generator will not add "
+                 "to that:\n%s" % (len(bad), "\n".join(sorted(set(bad)))))
 
 
 # 8-byte aggregates that are ONE integer register on both the MS-x64 and the
@@ -464,8 +907,8 @@ class Plan:
         self.ret_via_arg = False
 
 
-def classify(key, slot, ifaces, iface_index, byval_ok, dword_signed,
-             bearing, why_bearing):
+def classify(key, slot, ifaces, iface_index, byval_ok, dword_class,
+             bearing, why_bearing, oracle):
     """-> Plan, or raise Refused(reason)."""
     params = [Param(p) for p in slot["params"]]
     for p in params:
@@ -541,17 +984,22 @@ def classify(key, slot, ifaces, iface_index, byval_ok, dword_signed,
                 plan.narrow_params.append((i, p.base, narrow[0], narrow[1]))
             elif re.search(r'\blong\s+long\b', p.raw):
                 pass    # 8 bytes; Param.base kept only the first `long`
-            elif p.base in DWORD_UNSIGNED or p.base in dword_signed:
+            elif p.base in dword_class:
                 # Four bytes: clean in a register, stale-topped on the stack
                 # -- see DWORD_UNSIGNED above for the CopyDescriptors
                 # measurement.  Sixteen mask bits cover every argc here.
+                # The EXTENSION is clang's call, not a name list's: ELFv2
+                # says signed types sign-extend and unsigned types
+                # zero-extend, and whether the declared type is signed --
+                # an enum's underlying type included -- is asked of the
+                # oracle, the same probe the widths come from.
                 if i >= 16:
                     raise Refused(
                         "passes a 4-byte %s by value in argument position %d, "
                         "past the sixteen parameters dwordmask covers"
                         % (p.base, i + 1))
                 plan.dwordmask |= 1 << i
-                if p.base in dword_signed:
+                if oracle.is_signed(byval_spelling(p.raw)):
                     plan.dwordsign |= 1 << i
             elif p.base not in QWORD_BYVAL:
                 raise Refused(
@@ -661,13 +1109,16 @@ def c_guid(u):
         a, b, c, ",".join("0x" + d4[i:i + 2] for i in range(0, 16, 2)))
 
 
-def generate(roster, prefix, header_dir):
+def generate(roster, prefix, header_dir, oracle):
     ifaces = roster["interfaces"]
     order = sorted(ifaces)
     iface_index = {n: i for i, n in enumerate(order)}
     byval_ok = (set(BYVAL_INTEGER) | set(roster["enums"])
                 | set(TYPEDEF_INTEGER))
-    dword_signed = set(DWORD_SIGNED) | set(roster["enums"])
+    dword_class = set(DWORD_UNSIGNED) | set(DWORD_SIGNED) | set(roster["enums"])
+    oracle.sign_names |= byval_ok
+    oracle.measure(collect_spellings(ifaces))
+    crosscheck_width64(ifaces, oracle, dword_class)
     # Scan every header the roster's interfaces were generated from.  A
     # missing directory is a HARD ERROR: a struct whose definition the scan
     # never saw is not refused -- it is PASSED THROUGH, the one outcome this
@@ -688,9 +1139,14 @@ def generate(roster, prefix, header_dir):
 
     out = []
     w = out.append
-    stats = dict(marshalled=0, refused=0, hand=0, identity=0, iunknown=0)
+    stats = dict(marshalled=0, refused=0, hand=0, identity=0, iunknown=0,
+                 geom=0, geom_unproven=0, qword_slots=0, ret_qword=0)
     refusal_log = []
     narrow_log = []
+    qword_log = []
+    unproven_log = []
+    chk_entries = []
+    chk_seen = set()
 
     w("""/* GENERATED by ppc64le/vkd3d/gen_winecom.py -- do not edit.
  *
@@ -731,13 +1187,38 @@ def generate(roster, prefix, header_dir):
                 stats["iunknown"] += 1
                 continue
             argc = 1 + len(s["params"])
+            # The i386 frame geometry is computed for EVERY row -- hand and
+            # refused included: a refused slot still has to pop the right
+            # number of bytes before it can so much as answer E_NOTIMPL.
+            qm, retq, geo_unproven = slot_geometry(s, oracle)
+            gflags = []
+            if geo_unproven is None:
+                gflags.append("WINECOM_F_I386_GEOM")
+                if retq:
+                    gflags.append("WINECOM_F_RET_QWORD")
+                stats["geom"] += 1
+                if (key, argc, qm) not in chk_seen:
+                    chk_seen.add((key, argc, qm))
+                    chk_entries.append((key, s["params"], argc, qm))
+                if qm:
+                    stats["qword_slots"] += 1
+                if retq:
+                    stats["ret_qword"] += 1
+                if qm or retq:
+                    qword_log.append((key, qm, retq))
+            else:
+                stats["geom_unproven"] += 1
+                unproven_log.append((key, geo_unproven))
             flags = []
             if s["ret"] == "void":
                 flags.append("WINECOM_F_RET_VOID")
             if key in hand_index:
                 rows.append('    { "%s", NULL, NULL, NULL, %d,'
-                            ' WINECOM_F_HAND, %d, 0, NULL, 0, 0, 0 },'
-                            % (key, argc, hand_index[key]))
+                            ' %s, %d, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0,'
+                            ' 0x%04x },'
+                            % (key, argc,
+                               "|".join(["WINECOM_F_HAND"] + gflags),
+                               hand_index[key], qm))
                 stats["hand"] += 1
                 continue
             plan = None
@@ -745,13 +1226,16 @@ def generate(roster, prefix, header_dir):
             if reason is None:
                 try:
                     plan = classify(key, s, ifaces, iface_index, byval_ok,
-                                    dword_signed, bearing, why_bearing)
+                                    dword_class, bearing, why_bearing,
+                                    oracle)
                 except Refused as e:
                     reason = str(e)
             if reason is not None:
                 rows.append('    { "%s",\n      "%s: %s",\n'
-                            '      NULL, NULL, %d, 0, 0, 0, NULL, 0, 0, 0 },'
-                            % (key, key, reason.replace('"', "'"), argc))
+                            '      NULL, NULL, %d, %s, 0, 0, NULL, 0, 0, 0,'
+                            ' 0, 0, 0, 0, 0, 0x%04x },'
+                            % (key, key, reason.replace('"', "'"), argc,
+                               "|".join(gflags) or "0", qm))
                 stats["refused"] += 1
                 refusal_log.append((n, s["slot"], key, reason))
                 continue
@@ -776,12 +1260,15 @@ def generate(roster, prefix, header_dir):
                              % (kname, ", ".join(str(x) for x in caux)))
             for np in plan.narrow_params:
                 narrow_log.append((key,) + np)
+            flags += gflags
             rows.append('    { "%s", NULL, %s, %s, %d, %s, %d, %d, %s, 0, 0,'
-                        ' 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%04x, 0x%04x },'
+                        ' 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%04x, 0x%04x,'
+                        ' 0x%04x },'
                         % (key, cname, xname, argc,
                            "|".join(flags) or "0", plan.aux, plan.aux2, kname,
                            plan.xmask, plan.narrowmask, plan.narrowwide,
-                           plan.narrowsign, plan.dwordmask, plan.dwordsign))
+                           plan.narrowsign, plan.dwordmask, plan.dwordsign,
+                           qm))
             stats["marshalled"] += 1
 
         if len(slots) <= 3:
@@ -815,12 +1302,22 @@ def generate(roster, prefix, header_dir):
              "NULL" if t is None else "slots_" + n))
     w("};")
 
+    # The second opinion on every published frame: clang's own stdcall @N.
+    checked = oracle.check_stdcall_frames(chk_entries, IFACE_ALIASES)
+
     w("\n/* %d slot(s) marshalled, %d hand-written, %d refused with a named\n"
       " * reason, %d IUnknown slot(s) served by the runtime; %d interface(s)\n"
-      " * (IUnknown itself) carry identity rows only. */"
+      " * (IUnknown itself) carry identity rows only.\n"
+      " * i386 geometry: %d row(s) carry WINECOM_F_I386_GEOM (%d distinct\n"
+      " * frames re-checked against clang's stdcall @N decoration), %d with\n"
+      " * a non-zero qwordmask, %d returning EDX:EAX; %d row(s) publish no\n"
+      " * i386 geometry and a 32-bit lane must fail closed on them. */"
       % (stats["marshalled"], stats["hand"], stats["refused"],
-         stats["iunknown"], stats["identity"]))
-    return "\n".join(out) + "\n", stats, refusal_log, narrow_log
+         stats["iunknown"], stats["identity"],
+         stats["geom"], checked, stats["qword_slots"], stats["ret_qword"],
+         stats["geom_unproven"]))
+    return ("\n".join(out) + "\n", stats, refusal_log, narrow_log,
+            qword_log, unproven_log)
 
 
 def main():
@@ -834,19 +1331,75 @@ def main():
     ap.add_argument("--out")
     ap.add_argument("--check", metavar="FILE")
     ap.add_argument("--report", action="store_true")
+    ap.add_argument("--clang", default="clang",
+                    help="the compiler the i386 width oracle asks")
+    ap.add_argument("--build-include", default=None,
+                    help="directory holding Wine's widl-GENERATED headers "
+                         "(wtypes.h and friends); defaults to the sibling "
+                         "wine-build/include when it exists")
     args = ap.parse_args()
 
     with open(args.roster) as fh:
         roster = json.load(fh)
-    text, stats, refusals, narrows = generate(roster, args.prefix,
-                                              args.headers)
+
+    if not os.path.isdir(args.headers):
+        sys.exit("gen_winecom: %s is not a directory.  The vkd3d widl "
+                 "headers are generated by ppc64le/vkd3d/gen-headers.sh; "
+                 "generating without them silently drops every struct "
+                 "refusal." % args.headers)
+    wine_root = os.path.abspath(os.path.join(HERE, "..", ".."))
+    build_inc = args.build_include
+    if build_inc is None:
+        cand = os.path.abspath(os.path.join(wine_root, "..",
+                                            "wine-build", "include"))
+        build_inc = cand if os.path.isdir(cand) else None
+    prelude = "".join('#include "%s"\n' % f
+                      for f in sorted(os.listdir(args.headers))
+                      if f.endswith(".h"))
+    # The roster was generated by dxvk-ppc64le's gen_interfaces.py, so its
+    # DXGI rows carry names from DXVK's vendored MinGW dxgi headers that no
+    # vkd3d header declares (DXGI_MEMORY_SEGMENT_GROUP, WINBOOL) -- the
+    # fallback world is therefore THOSE headers, not a guess.  WINBOOL is
+    # the one base type the vendored headers leave to MinGW's windef.h
+    # (their own copy sits under `#if 0`, widl's convention); mingw-w64
+    # spells it `typedef int WINBOOL;` and so does this shim.
+    shim = "typedef int WINBOOL;\n"
+    dxvk_directx = os.path.abspath(os.path.join(
+        HERE, "..", "dxvk", "src", "include", "native", "directx"))
+    oracle = I386Oracle(args.clang, shim + prelude,
+                        [args.headers,
+                         os.path.join(HERE, "src", "include"), build_inc,
+                         os.path.join(wine_root, "include"),
+                         os.path.join(wine_root, "include", "msvcrt")],
+                        set(), args.prefix,
+                        fallback_prelude=shim + "#include <dxgi1_6.h>\n",
+                        fallback_incdirs=[dxvk_directx, build_inc,
+                                          os.path.join(wine_root, "include"),
+                                          os.path.join(wine_root, "include",
+                                                       "msvcrt")])
+
+    text, stats, refusals, narrows, qwords, unproven = generate(
+        roster, args.prefix, args.headers, oracle)
 
     print("surface %s: %d marshalled, %d hand-written, %d refused, "
           "%d IUnknown, %d identity-only interface(s)"
           % (roster["surface"], stats["marshalled"], stats["hand"],
              stats["refused"], stats["iunknown"], stats["identity"]))
+    print("i386 geometry: %d row(s) published, %d qword-marked, %d EDX:EAX "
+          "return(s), %d without geometry (fail closed)"
+          % (stats["geom"], stats["qword_slots"], stats["ret_qword"],
+             stats["geom_unproven"]))
 
     if args.report:
+        print("\nslots whose i386 frame differs from all-dwords "
+              "(qwordmask / EDX:EAX return):")
+        for key, qmv, retq in sorted(set(qwords)):
+            print("  %-64s qwordmask 0x%04x%s"
+                  % (key, qmv, "  ret EDX:EAX" if retq else ""))
+        if unproven:
+            print("\nslots publishing NO i386 geometry, and why:")
+            for key, why in sorted(set(unproven)):
+                print("  %-64s %s" % (key, why))
         print("\nnarrow by-value parameters (extended by the runtime):")
         for key, i, base, width, signed in narrows:
             print("  %-60s arg %d: %d-byte %s%s"
