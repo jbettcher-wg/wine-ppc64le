@@ -140,6 +140,14 @@ struct thread_data
      * block` out of dlopen.  thread_data has room and is already where the
      * per-thread guest fault record lives. */
     int          emu_guest_ctx_state;
+    /* EMU_GUEST_TRAP publishes a POINTER to the bridge's live trap frame
+     * instead of copying it: the frame outlives the whole published window by
+     * construction (emu_trap_thunk() republishes RUNNING before it returns and
+     * the frame dies after that), the only reader is this same thread in a
+     * signal handler, and the 1232-byte copy per trap was ~5% of the
+     * GameThread [MEASURED 2026-08-27].  The buffer below still serves
+     * FAULT/ENDED, whose source frame does not outlive the run loop. */
+    const AMD64_CONTEXT *emu_guest_ctx_ptr;
     AMD64_CONTEXT emu_guest_ctx;
     struct list  entry;             /* entry in TEB list */
     char         debug_info[0x800]; /* debug_info structure */
@@ -149,9 +157,31 @@ struct thread_data
 
 extern pthread_key_t thread_data_key;
 
+/* The key's initial-exec mirror, filled at the two places the key is set
+ * (virtual_init_threading, server_init_thread).  get_thread_data() is on the
+ * per-crossing path -- the trap thunk publishes through it and the syscall
+ * paths reach it several times per dispatch -- and pthread_getspecific() was
+ * 3.3% of the GameThread in the 2026-08-27 profile.  An initial-exec access
+ * is one ld off the thread pointer.
+ *
+ * Initial-exec in a dlopen()ed library is safe HERE because this module
+ * already carries one (ppc64_unix_teb in unix/signal_ppc64.c), so its whole
+ * PT_TLS block is already allocated out of glibc's static TLS surplus; one
+ * more pointer changes that block by 8 bytes, not in kind.  The 1232-byte
+ * lesson recorded at struct thread_data::emu_guest_ctx is about growing the
+ * BLOCK past the surplus, not about the access model. */
+extern __thread struct thread_data *thread_data_cache __attribute__((tls_model("initial-exec")));
+
 static inline struct thread_data *get_thread_data(void)
 {
-    return pthread_getspecific( thread_data_key );
+    struct thread_data *data = thread_data_cache;
+
+    /* The fallback covers exactly the window the mirror cannot: a thread
+     * between pthread_setspecific() and nothing, which is no thread at all --
+     * both are written at the same two lines.  It stays because a NULL check
+     * is free and a missed writer would otherwise turn into reads of a NULL
+     * thread_data on some future thread that gets its key another way. */
+    return data ? data : pthread_getspecific( thread_data_key );
 }
 
 /* thread private data, stored in NtCurrentTeb()->GdiTebBatch */

@@ -179,6 +179,7 @@ static const BYTE VIRTUAL_Win32Flags[16] =
 static struct wine_rb_tree views_tree;
 static pthread_mutex_t virtual_mutex;
 pthread_key_t thread_data_key = 0;
+__thread struct thread_data *thread_data_cache __attribute__((tls_model("initial-exec")));
 
 static const UINT page_shift = 12;
 static const UINT_PTR page_mask = 0xfff;
@@ -4155,6 +4156,7 @@ TEB *virtual_alloc_first_teb(void)
     list_add_head( &teb_list, &thread_data->entry );
     pthread_key_create( &thread_data_key, NULL );
     pthread_setspecific( thread_data_key, thread_data );
+    thread_data_cache = thread_data;
     return teb;
 }
 

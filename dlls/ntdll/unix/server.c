@@ -1787,6 +1787,7 @@ void server_init_thread( struct thread_data *data )
 
     data->pthread_id = pthread_self();
     pthread_setspecific( thread_data_key, data );
+    thread_data_cache = data;
 
     reply_pipe = init_thread_pipe( data );
     SERVER_START_REQ( init_thread )

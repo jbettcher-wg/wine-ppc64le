@@ -1175,15 +1175,27 @@ static void emu_load_bridge(void)
 }
 
 
+/* Every per-thread variable on the trap path is initial-exec, and the choice
+ * is measured, not stylistic: the default global-dynamic model costs one
+ * __tls_get_addr_opt call per access, and emu_trap_thunk() touches several of
+ * these on EVERY crossing -- __tls_get_addr_opt was 3.6% of the GameThread in
+ * the 2026-08-27 profile.  Space-wise the model is free: this module's PT_TLS
+ * is already static-allocated at dlopen because ppc64_unix_teb is initial-exec
+ * (one IE variable commits the whole block), so the attribute changes only the
+ * access sequence.  See thread_data_cache in unix_private.h for the same
+ * reasoning and the static-TLS-surplus caveat that DOES bound the block's
+ * size. */
+#define EMU_THREAD_VAR __thread __attribute__((tls_model("initial-exec")))
+
 /* set when the PE dispatcher ended the run because the guest called
  * ExitThread, so that a deliberate exit is not reported as an emulator
  * failure.  Per thread: it describes this thread's run, nothing else. */
-static __thread BOOL emu_thread_exit_requested;
+static EMU_THREAD_VAR BOOL emu_thread_exit_requested;
 
 /* set when the PE dispatcher ended the run because a guest exception went
  * unhandled at guest level (RaiseException with no consuming handler); the
  * record itself waits PE-side.  Same per-thread protocol as the exit flag. */
-static __thread BOOL emu_thread_exc_pending;
+static EMU_THREAD_VAR BOOL emu_thread_exc_pending;
 
 /* WINEEMUNOFAULTSTASH=1: skip the fault-record stash, the S2 negative
  * control -- the dispatched record must visibly degrade to code-only,
@@ -1198,8 +1210,8 @@ static int emu_no_stack_size = -1;
 
 /* the innermost run's guest stack bounds on this thread (base > limit, the
  * stack grows down); guest TEB frames are validated against these */
-static __thread void *emu_guest_stack_base;
-static __thread void *emu_guest_stack_limit;
+static EMU_THREAD_VAR void *emu_guest_stack_base;
+static EMU_THREAD_VAR void *emu_guest_stack_limit;
 
 /* Non-zero for exactly the extent of the p_fexbridge_run() calls below: a
  * fault landing while it is set happened while the bridge was executing guest
@@ -1218,7 +1230,7 @@ static __thread void *emu_guest_stack_limit;
  * missing for the rest of that outer run: the process would die natively
  * again, and only for programs that use callbacks -- the ones most likely to
  * have a __try around the call in the first place. */
-static __thread UINT emu_run_depth;
+static EMU_THREAD_VAR UINT emu_run_depth;
 
 /* Windows reserves the low 64K of every process's address space precisely so
  * that a dereference of a null-derived pointer faults rather than reading
@@ -1324,8 +1336,31 @@ static void emu_publish_guest_context( const AMD64_CONTEXT *ctx, int state )
                  "a debugger attaching to this process sees the emulator's registers only\n" );
     }
     if (emu_no_dbg_ctx || !data) return;
-    data->emu_guest_ctx_state = state;
+    if (state == EMU_GUEST_TRAP)
+    {
+        /* The hot path: one crossing per guest API call, ~1.3M/s in the
+         * Cyberpunk flythrough.  The frame `ctx` names is the bridge's and is
+         * live for exactly as long as this state stands -- emu_trap_thunk()
+         * publishes RUNNING before its frame can die -- so the reader
+         * (emu_get_guest_context, same thread, from a signal) copies from the
+         * pointer instead of this path copying 1232 bytes per trap.
+         *
+         * Store order is the correctness: the pointer must be in place before
+         * the state that licenses reading it, and the fence stops the compiler
+         * from reordering the two stores across a signal's arrival point.
+         * Same-thread signal delivery makes CPU order a non-issue. */
+        data->emu_guest_ctx_ptr = ctx;
+        __atomic_signal_fence( __ATOMIC_SEQ_CST );
+        data->emu_guest_ctx_state = state;
+        return;
+    }
+    /* The cold states copy, and in copy-then-state order for the same signal
+     * window: a reader that interrupts the memcpy still sees the OLD state
+     * describing the OLD (complete) content, never a fresh label on a
+     * half-written block. */
     if (ctx) data->emu_guest_ctx = *ctx;
+    __atomic_signal_fence( __ATOMIC_SEQ_CST );
+    data->emu_guest_ctx_state = state;
 }
 
 /***********************************************************************
@@ -1347,9 +1382,16 @@ BOOL emu_get_guest_context( AMD64_CONTEXT *ctx )
     switch (data->emu_guest_ctx_state)
     {
     case EMU_GUEST_TRAP:
+        /* published as a pointer to the bridge's live trap frame; see
+         * emu_publish_guest_context() for why the frame is guaranteed live
+         * for as long as this state stands */
+        if (!data->emu_guest_ctx_ptr) return FALSE;
+        *ctx = *data->emu_guest_ctx_ptr;
+        goto synth_segments;
     case EMU_GUEST_FAULT:
     case EMU_GUEST_ENDED:
         *ctx = data->emu_guest_ctx;
+    synth_segments:
         /* The segment selectors, SYNTHESISED rather than reported, and that
          * distinction is the point: the bridge's CONTEXT does not carry them
          * because guest code never changes them, so there is nothing to copy
@@ -1431,10 +1473,10 @@ struct emu_teb_stack
 
 /* the native stack of this thread.  Captured once: init_thread_stack() sets
  * it at thread creation and nothing moves it afterwards. */
-static __thread struct emu_teb_stack emu_native_teb_stack;
+static EMU_THREAD_VAR struct emu_teb_stack emu_native_teb_stack;
 
 /* the innermost run's guest stack as the TEB last knew it */
-static __thread struct emu_teb_stack emu_guest_teb_stack;
+static EMU_THREAD_VAR struct emu_teb_stack emu_guest_teb_stack;
 
 static void emu_capture_native_teb_stack(void)
 {
@@ -1707,6 +1749,7 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
     struct thread_data *data = get_thread_data();
     struct emu_teb_stack prev_teb_stack, native_saved;
     AMD64_CONTEXT ctx = { 0 }, prev_guest_ctx;
+    const AMD64_CONTEXT *prev_guest_ptr;
     EXCEPTION_RECORD rec;
     INITIAL_TEB stack;
     NTSTATUS status;
@@ -1807,8 +1850,13 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
     emu_guest_teb_stack.limit   = stack.StackLimit;
     emu_guest_teb_stack.dealloc = stack.DeallocationStack;
 
-    /* ...and the guest register file a debugger reads, for the same reason */
+    /* ...and the guest register file a debugger reads, for the same reason.
+     * A TRAP state is published as a pointer into the outer trap's frame,
+     * which is still live below us for the whole nested run, so the pointer
+     * is what gets saved and restored; the deep buffer only matters for the
+     * states that publish through it. */
     prev_guest_state = data ? data->emu_guest_ctx_state : EMU_GUEST_NONE;
+    prev_guest_ptr = data ? data->emu_guest_ctx_ptr : NULL;
     if (data) prev_guest_ctx = data->emu_guest_ctx;
     else memset( &prev_guest_ctx, 0, sizeof(prev_guest_ctx) );
 
@@ -1913,7 +1961,12 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
      * state of whatever ran BEFORE the fault, which is a wrong answer wearing
      * a right answer's clothes.  Every other ending restores. */
     if (status != STATUS_EMU_GUEST_EXCEPTION)
-        emu_publish_guest_context( &prev_guest_ctx, prev_guest_state );
+    {
+        if (prev_guest_state == EMU_GUEST_TRAP)
+            emu_publish_guest_context( prev_guest_ptr, prev_guest_state );
+        else
+            emu_publish_guest_context( &prev_guest_ctx, prev_guest_state );
+    }
 
     stack_addr = stack.DeallocationStack;
     /* A NESTED run that ended on STATUS_EMU_GUEST_EXCEPTION keeps its STACK,

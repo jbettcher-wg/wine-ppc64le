@@ -151,6 +151,18 @@ C_ASSERT( CONTEXT_FULL == 0x800017 );
 __attribute__((visibility("hidden"))) __thread TEB *ppc64_current_teb
     __attribute__((tls_model("initial-exec")));
 
+/* Every other per-thread variable in this file is initial-exec too, for the
+ * cost and not the semantics: the default global-dynamic model is one
+ * __tls_get_addr_opt call per access, paid on the per-crossing path
+ * (emu_trap_dispatch touches several of these on every trap), and measured at
+ * 3.6% of the GameThread on 2026-08-27.  The model costs no static TLS:
+ * ppc64_current_teb above already commits this module's whole PT_TLS block to
+ * the static area at load, so the attribute only changes the access sequence.
+ * What DOES stay bounded is the block's SIZE -- see the 1232-byte lesson at
+ * struct thread_data::emu_guest_ctx in unix/unix_private.h before adding a
+ * large variable here. */
+#define EMU_THREAD_VAR __thread __attribute__((tls_model("initial-exec")))
+
 TEB * WINAPI NtCurrentTeb(void)
 {
     return ppc64_current_teb;
@@ -1891,13 +1903,13 @@ void WINAPI emu_exception_dispatch( ULONG id, void *args, ULONG len );
  * guest code is THAT handler's -- "issued at the depth the handler runs at" is
  * the exact question, and a deeper run (the handler called a guest callback
  * which unwound) is a different one that must not be answered as if it were. */
-static __thread UINT guest_run_depth;
+static EMU_THREAD_VAR UINT guest_run_depth;
 
 /* Set by an RtlUnwindEx that belongs to a guest language handler running in a
  * nested run: the run must END so that the frame walk which started it can
  * perform the unwind against the FAULTING stack, and this is what makes
  * emu_trap_dispatch end it.  Cleared here, by the initiator of that run. */
-static __thread BOOL guest_unwind_run_end;
+static EMU_THREAD_VAR BOOL guest_unwind_run_end;
 
 /* The guest stack of the last nested run that ended for an unwind, handed
  * over unfreed by the unix side (emu_run_entry_params.kept_stack) because the
@@ -1905,7 +1917,7 @@ static __thread BOOL guest_unwind_run_end;
  * immediately: call_guest_handler_run() moves it into the request's
  * guest_unwind_target, and the frame walk sweeps it after every funclet it
  * runs (the collided road has no guest_handler_call to carry it). */
-static __thread void *guest_kept_run_stack;
+static EMU_THREAD_VAR void *guest_kept_run_stack;
 
 static void free_guest_run_stack( void *addr )
 {
@@ -2604,8 +2616,8 @@ C_ASSERT( sizeof(struct guest_exception_pointers) == 16 );
  * a guest filter sits as a trampoline already), NtTerminateProcess -- turns
  * it into a correctly-coded, reported death instead of "emulator bridge
  * failed (1)".  Per thread, consumed exactly once. */
-static __thread BOOL guest_exc_pending;
-static __thread EXCEPTION_RECORD guest_exc_rec;
+static EMU_THREAD_VAR BOOL guest_exc_pending;
+static EMU_THREAD_VAR EXCEPTION_RECORD guest_exc_rec;
 
 /* THE RE-RAISE IS NOT RE-ENTRANT, AND A REAL GAME PROVED IT.
  *
@@ -2643,21 +2655,21 @@ static __thread EXCEPTION_RECORD guest_exc_rec;
  * this loop).  Dispatching a native exception costs a CONTEXT plus the whole
  * handler chain; entering that with less than this left is how the log's
  * c00000fd storm began, and it is diagnosable only before the fact. */
-static __thread void *guest_exc_raising;   /* NULL, or where the report began */
-static __thread EXCEPTION_RECORD guest_exc_first;
+static EMU_THREAD_VAR void *guest_exc_raising;   /* NULL, or where the report began */
+static EMU_THREAD_VAR EXCEPTION_RECORD guest_exc_first;
 #define GUEST_EXC_STACK_FLOOR (64 * 1024)
 
 /* the trap CONTEXT the innermost emu_trap_dispatch on this thread is
  * serving: what a raise-style override (emu_RaiseException) dispatches
  * against.  Saved/restored around each dispatch, so nesting works. */
-static __thread AMD64_CONTEXT *emu_current_trap_ctx;
+static EMU_THREAD_VAR AMD64_CONTEXT *emu_current_trap_ctx;
 
 /* Set by an override that has REPLACED that CONTEXT wholesale rather than
  * returned a value into it -- a guest raise whose __except was found by the
  * frame walk, which resumes in another frame.  emu_trap_dispatch's ordinary
  * "pop the return address, store RAX" fixup is wrong in that case and only in
  * that case.  Saved/restored alongside emu_current_trap_ctx. */
-static __thread BOOL emu_trap_ctx_rewritten;
+static EMU_THREAD_VAR BOOL emu_trap_ctx_rewritten;
 
 /* Guest vectored handlers, recorded at REGISTRATION through the thunk
  * overrides below -- the atexit pattern: a pointer handed through a guest
@@ -2892,7 +2904,7 @@ struct guest_unwind_state
     BOOL                       collided;   /* a funclet started a second unwind... */
     struct guest_unwind_target again;      /* ...to here */
 };
-static __thread struct guest_unwind_state *guest_unwind_state;
+static EMU_THREAD_VAR struct guest_unwind_state *guest_unwind_state;
 
 /***********************************************************************
  *           guest_unwind_current
@@ -2969,14 +2981,14 @@ struct guest_handler_call
     BOOL                       unwound;    /* it called RtlUnwindEx instead of returning */
     struct guest_unwind_target target;     /* ...and this is what it asked for */
 };
-static __thread struct guest_handler_call *guest_handler_call;
+static EMU_THREAD_VAR struct guest_handler_call *guest_handler_call;
 
 /* Recursion bound on guest exception dispatch.  A filter or __finally funclet
  * runs as guest code and can fault, which dispatches again from inside this
  * dispatch; a handful of levels is legitimate, an unbounded number is a fault
  * loop that would otherwise consume the native stack silently. */
 #define GUEST_SEH_MAX_DEPTH 8
-static __thread UINT guest_seh_depth;
+static EMU_THREAD_VAR UINT guest_seh_depth;
 
 /* Bound on the frame walk itself.  Guest code with no exception directory
  * unwinds as a leaf -- pop eight bytes and call them a return address -- so a
@@ -5052,8 +5064,8 @@ static void run_guest_atexit_handlers(void)
  * thread is an ordinary native Wine thread again before any native teardown
  * runs, which is the load-bearing ordering.
  */
-static __thread BOOL guest_exit_requested;
-static __thread ULONG guest_exit_code;
+static EMU_THREAD_VAR BOOL guest_exit_requested;
+static EMU_THREAD_VAR ULONG guest_exit_code;
 
 static ULONG_PTR emu_ExitThread( const ULONG_PTR *a, void *native )
 {
@@ -5184,7 +5196,7 @@ static LONG xstat_lock;                  /* interning only; never counting */
  * plain, because a shared tick counter would be a contended cache line
  * written by every crossing -- the exact cost this instrumentation must not
  * add.  A power of two so the test is a mask. */
-static __thread UINT xstat_tick;
+static EMU_THREAD_VAR UINT xstat_tick;
 #define XSTAT_TICK_MASK 0xfffff
 
 #define XSTAT_NO_ROW (~0u)
@@ -6320,7 +6332,7 @@ static BOOL guest_fiber_valid( const struct guest_fiber *fiber )
     return fiber && !((ULONG_PTR)fiber & 7) && fiber->magic == GUEST_FIBER_MAGIC;
 }
 
-static __thread struct guest_fiber *guest_current_fiber;
+static EMU_THREAD_VAR struct guest_fiber *guest_current_fiber;
 
 /* WHAT THE TEB HAS TO SAY, because two of the fiber API's four answers are
  * not calls at all.  GetCurrentFiber() and GetFiberData() are macros that
