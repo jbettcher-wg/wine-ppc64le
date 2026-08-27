@@ -44,12 +44,27 @@ give the sweep its own Xvfb.  And it takes about half an hour, so it is a
 
 ## 2. The 32-bit lane: the i386 half of the dxvk thunk surface
 
-**DIAGNOSED, SCOPED, NOT STARTED** (2026-08-19).  dexwin (Dex's Windows
-build, PE32, Unity 5) is the canary and it gets further than anyone knew:
-the i386 guest boots through the ABI-4 bridge and Unity puts its window up.
-It dies where the 32-bit lane has no graphics at all — i386 `dxgi.dll`'s
-forwards to `d3d11.__wine_dxvk_*` resolve to nothing, because this port's
-i386 d3d11 exports none of the dxvk surface (`err:module:
+**DIAGNOSED, SCOPED, GEOMETRY LANDED — emitter still to write** (updated
+2026-08-22).  The winecom table can now describe an i386 stdcall frame:
+`winecom_slot::qwordmask` distinguishes true 64-bit scalars (UINT64,
+D3D12_GPU_VIRTUAL_ADDRESS — two i386 stack slots) from pointer-sized values
+(HANDLE, SIZE_T, ULONG_PTR — one), which the old QWORD_BYVAL class conflated.
+`WINECOM_F_RET_QWORD` marks EDX:EAX return, and `WINECOM_F_I386_GEOM` is the
+contract flag a reader must consult before trusting the fields.  Widths come
+from clang for the i386 target — never from name matching, which is exactly
+how HANDLE and UINT64 ended up in one bucket the first time.  314 rows gained
+qword markings and 11 return EDX:EAX; float-returning slots refuse geometry
+rather than lying about it (i386 returns float in x87 ST(0), and a lane
+trusting a wrong flag would return garbage and leak x87 stack entries; the
+seven refused are d3d11's GetResourceMinLOD and d3d9's GetNPatchMode).
+Nothing in the tree READS any of the new fields yet, so the fail-closed rule
+is a CONTRACT and not an enforcement — the header now says so.
+
+dexwin (Dex's Windows build, PE32, Unity 5) is the canary and it gets further
+than anyone knew: the i386 guest boots through the ABI-4 bridge and Unity puts
+its window up.  It dies where the 32-bit lane has no graphics at all — i386
+`dxgi.dll`'s forwards to `d3d11.__wine_dxvk_*` resolve to nothing, because
+this port's i386 d3d11 exports none of the dxvk surface (`err:module:
 find_forwarded_export`, four entries).  Portal 2, Half-Life 2 and the Win32
 Styx wait behind the same wall, so this is the whole 32-bit game lane in one
 piece of work.
