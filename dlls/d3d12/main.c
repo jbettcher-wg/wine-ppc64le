@@ -96,6 +96,15 @@ static UINT64 hand_create_graphics_pso( void *host, UINT slot, AMD64_CONTEXT *ct
 static UINT64 hand_create_pipeline_state( void *host, UINT slot, AMD64_CONTEXT *ctx );
 static UINT64 hand_copy_texture_region( void *host, UINT slot, AMD64_CONTEXT *ctx );
 static UINT64 hand_clear_dsv( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static UINT64 hand_load_graphics_pipeline( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static UINT64 hand_load_compute_pipeline( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static UINT64 hand_load_pipeline( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static UINT64 hand_om_set_depth_bounds( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static UINT64 hand_rs_set_depth_bias( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static UINT64 hand_begin_render_pass( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static UINT64 hand_barrier_groups( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static UINT64 hand_create_state_object( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static UINT64 hand_add_to_state_object( void *host, UINT slot, AMD64_CONTEXT *ctx );
 
 /* Order is the generated header's hand_funcs[] order -- see the
  * "hand_funcs[] order" comment ppc64le/vkd3d/gen_winecom.py emits there. */
@@ -108,6 +117,15 @@ static const winecom_hand_fn d3d12_hand_funcs[] =
     hand_create_pipeline_state,
     hand_copy_texture_region,
     hand_clear_dsv,
+    hand_load_graphics_pipeline,
+    hand_load_compute_pipeline,
+    hand_load_pipeline,
+    hand_om_set_depth_bounds,
+    hand_rs_set_depth_bias,
+    hand_begin_render_pass,
+    hand_barrier_groups,
+    hand_create_state_object,
+    hand_add_to_state_object,
 };
 
 C_ASSERT( ARRAYSIZE(d3d12_hand_funcs) == D3D12_HAND_COUNT );
@@ -350,38 +368,32 @@ static UINT64 hand_create_graphics_pso( void *host, UINT slot, AMD64_CONTEXT *ct
     return (UINT64)(UINT)hr;
 }
 
-/* ID3D12Device2::CreatePipelineState( const D3D12_PIPELINE_STATE_STREAM_DESC
- * *desc, REFIID riid, void **ppv ): the desc is a stream of subobjects --
+/* A D3D12_PIPELINE_STATE_STREAM_DESC is a stream of subobjects --
  * a type enum, a naturally-aligned payload, a stride padded to pointer size,
  * the exact layout vkd3d's own
  * vkd3d_pipeline_state_desc_from_d3d12_stream_desc walks -- and the
  * ROOT_SIGNATURE payload is a guest proxy.  The stream is copied and the
  * proxy unwrapped in the copy; a subobject type the pinned vkd3d headers do
  * not name stops the walk, because a cursor that cannot advance cannot
- * prove the rest of the stream carries no proxies. */
-static UINT64 hand_create_pipeline_state( void *host, UINT slot, AMD64_CONTEXT *ctx )
+ * prove the rest of the stream carries no proxies.  Shared by
+ * hand_create_pipeline_state and hand_load_pipeline; on success the desc
+ * points at the heap copy returned through *copy_out (NULL for an empty
+ * stream) and the caller frees it after the host call. */
+static HRESULT pso_stream_unwrap( D3D12_PIPELINE_STATE_STREAM_DESC *desc, char **copy_out )
 {
-    const D3D12_PIPELINE_STATE_STREAM_DESC *src = (const void *)(ULONG_PTR)read_arg( ctx, 1 );
-    const GUID *riid = (const GUID *)(ULONG_PTR)read_arg( ctx, 2 );
-    void **ppv = (void **)(ULONG_PTR)read_arg( ctx, 3 );
-    D3D12_PIPELINE_STATE_STREAM_DESC desc;
-    UINT64 args[D3D12_UNIX_MAX_ARGS] = { 0 };
-    char *copy = NULL, *ptr, *end;
-    HRESULT hr;
-    UINT idx;
+    char *copy, *ptr, *end;
 
-    if (!src || !ppv) return (UINT64)(UINT)E_INVALIDARG;
-    desc = *src;
-    if (desc.SizeInBytes && desc.pPipelineStateSubobjectStream)
+    *copy_out = NULL;
+    if (!desc->SizeInBytes || !desc->pPipelineStateSubobjectStream) return S_OK;
+    if (!(copy = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0,
+                                  desc->SizeInBytes )))
+        return E_OUTOFMEMORY;
+    memcpy( copy, desc->pPipelineStateSubobjectStream, desc->SizeInBytes );
+    desc->pPipelineStateSubobjectStream = copy;
+
     {
-        if (!(copy = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0,
-                                      desc.SizeInBytes )))
-            return (UINT64)(UINT)E_OUTOFMEMORY;
-        memcpy( copy, desc.pPipelineStateSubobjectStream, desc.SizeInBytes );
-        desc.pPipelineStateSubobjectStream = copy;
-
         ptr = copy;
-        end = copy + desc.SizeInBytes;
+        end = copy + desc->SizeInBytes;
 #define ALIGN_PTR(x) (((x) + sizeof(void *) - 1) & ~(sizeof(void *) - 1))
 #define WALK_SUBOBJECT(type_enum, type_name, fixup)                          \
         case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ ## type_enum:              \
@@ -439,30 +451,37 @@ static UINT64 hand_create_pipeline_state( void *host, UINT slot, AMD64_CONTEXT *
 #undef WALK_SUBOBJECT
 #undef ALIGN_PTR
     }
+    *copy_out = copy;
+    return S_OK;
+
+malformed:
+    ERR( "malformed pipeline state stream (%Iu bytes)\n", desc->SizeInBytes );
+    RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, copy );
+    return E_INVALIDARG;
+}
+
+/* ID3D12Device2::CreatePipelineState( const D3D12_PIPELINE_STATE_STREAM_DESC
+ * *desc, REFIID riid, void **ppv ) -- pso_stream_unwrap above is the
+ * walker. */
+static UINT64 hand_create_pipeline_state( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    const D3D12_PIPELINE_STATE_STREAM_DESC *src = (const void *)(ULONG_PTR)read_arg( ctx, 1 );
+    const GUID *riid = (const GUID *)(ULONG_PTR)read_arg( ctx, 2 );
+    void **ppv = (void **)(ULONG_PTR)read_arg( ctx, 3 );
+    D3D12_PIPELINE_STATE_STREAM_DESC desc;
+    UINT64 args[D3D12_UNIX_MAX_ARGS] = { 0 };
+    char *copy;
+    HRESULT hr;
+
+    if (!src || !ppv) return (UINT64)(UINT)E_INVALIDARG;
+    desc = *src;
+    if (FAILED(hr = pso_stream_unwrap( &desc, &copy ))) return (UINT64)(UINT)hr;
     args[1] = (UINT64)(ULONG_PTR)&desc;
     args[2] = (UINT64)(ULONG_PTR)riid;
     args[3] = (UINT64)(ULONG_PTR)ppv;
     hr = (HRESULT)unix_vtbl_call( host, slot, 4, args );
     if (copy) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, copy );
-    if (SUCCEEDED(hr) && *ppv)
-    {
-        idx = winecom_iface_from_iid( riid );
-        if (idx == ~0u)
-        {
-            ERR( "CreatePipelineState returned unknown IID %s\n",
-                 debugstr_guid(riid) );
-            winecom_host_release( *ppv );
-            *ppv = NULL;
-            return (UINT64)(UINT)E_NOINTERFACE;
-        }
-        *ppv = com_wrap( *ppv, idx );
-    }
-    return (UINT64)(UINT)hr;
-
-malformed:
-    ERR( "malformed pipeline state stream (%Iu bytes)\n", desc.SizeInBytes );
-    if (copy) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, copy );
-    return (UINT64)(UINT)E_INVALIDARG;
+    return (UINT64)(UINT)winecom_wrap_out_iface( hr, riid, ppv );
 }
 
 /* ID3D12GraphicsCommandList::CopyTextureRegion( const
@@ -496,6 +515,439 @@ static UINT64 hand_copy_texture_region( void *host, UINT slot, AMD64_CONTEXT *ct
     args[5] = (UINT64)(ULONG_PTR)(src ? &src_copy : NULL);
     args[6] = read_arg( ctx, 6 );
     return unix_vtbl_call( host, slot, 7, args );   /* void method; RAX is scratch */
+}
+
+/* ID3D12PipelineLibrary::LoadGraphicsPipeline( LPCWSTR name, const
+ * D3D12_GRAPHICS_PIPELINE_STATE_DESC *desc, REFIID riid, void **ppv ):
+ * CreateGraphicsPipelineState's desc walk, one name earlier in the frame.
+ * A name the host library does not hold answers E_INVALIDARG and the
+ * caller falls back to full PSO creation -- serving the slot is what
+ * makes that fallback reachable. */
+static UINT64 hand_load_graphics_pipeline( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    const WCHAR *name = (const WCHAR *)(ULONG_PTR)read_arg( ctx, 1 );
+    const D3D12_GRAPHICS_PIPELINE_STATE_DESC *src = (const void *)(ULONG_PTR)read_arg( ctx, 2 );
+    const GUID *riid = (const GUID *)(ULONG_PTR)read_arg( ctx, 3 );
+    void **ppv = (void **)(ULONG_PTR)read_arg( ctx, 4 );
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC desc;
+    UINT64 args[D3D12_UNIX_MAX_ARGS] = { 0 };
+    HRESULT hr;
+
+    if (!src || !ppv) return (UINT64)(UINT)E_INVALIDARG;
+    desc = *src;
+    desc.pRootSignature = com_unwrap( desc.pRootSignature );
+    args[1] = (UINT64)(ULONG_PTR)name;
+    args[2] = (UINT64)(ULONG_PTR)&desc;
+    args[3] = (UINT64)(ULONG_PTR)riid;
+    args[4] = (UINT64)(ULONG_PTR)ppv;
+    hr = (HRESULT)unix_vtbl_call( host, slot, 5, args );
+    return (UINT64)(UINT)winecom_wrap_out_iface( hr, riid, ppv );
+}
+
+/* ID3D12PipelineLibrary::LoadComputePipeline: the compute twin of the
+ * slot above. */
+static UINT64 hand_load_compute_pipeline( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    const WCHAR *name = (const WCHAR *)(ULONG_PTR)read_arg( ctx, 1 );
+    const D3D12_COMPUTE_PIPELINE_STATE_DESC *src = (const void *)(ULONG_PTR)read_arg( ctx, 2 );
+    const GUID *riid = (const GUID *)(ULONG_PTR)read_arg( ctx, 3 );
+    void **ppv = (void **)(ULONG_PTR)read_arg( ctx, 4 );
+    D3D12_COMPUTE_PIPELINE_STATE_DESC desc;
+    UINT64 args[D3D12_UNIX_MAX_ARGS] = { 0 };
+    HRESULT hr;
+
+    if (!src || !ppv) return (UINT64)(UINT)E_INVALIDARG;
+    desc = *src;
+    desc.pRootSignature = com_unwrap( desc.pRootSignature );
+    args[1] = (UINT64)(ULONG_PTR)name;
+    args[2] = (UINT64)(ULONG_PTR)&desc;
+    args[3] = (UINT64)(ULONG_PTR)riid;
+    args[4] = (UINT64)(ULONG_PTR)ppv;
+    hr = (HRESULT)unix_vtbl_call( host, slot, 5, args );
+    return (UINT64)(UINT)winecom_wrap_out_iface( hr, riid, ppv );
+}
+
+/* ID3D12PipelineLibrary1::LoadPipeline( LPCWSTR name, const
+ * D3D12_PIPELINE_STATE_STREAM_DESC *desc, REFIID riid, void **ppv ):
+ * CreatePipelineState's stream walk behind a library name. */
+static UINT64 hand_load_pipeline( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    const WCHAR *name = (const WCHAR *)(ULONG_PTR)read_arg( ctx, 1 );
+    const D3D12_PIPELINE_STATE_STREAM_DESC *src = (const void *)(ULONG_PTR)read_arg( ctx, 2 );
+    const GUID *riid = (const GUID *)(ULONG_PTR)read_arg( ctx, 3 );
+    void **ppv = (void **)(ULONG_PTR)read_arg( ctx, 4 );
+    D3D12_PIPELINE_STATE_STREAM_DESC desc;
+    UINT64 args[D3D12_UNIX_MAX_ARGS] = { 0 };
+    char *copy;
+    HRESULT hr;
+
+    if (!src || !ppv) return (UINT64)(UINT)E_INVALIDARG;
+    desc = *src;
+    if (FAILED(hr = pso_stream_unwrap( &desc, &copy ))) return (UINT64)(UINT)hr;
+    args[1] = (UINT64)(ULONG_PTR)name;
+    args[2] = (UINT64)(ULONG_PTR)&desc;
+    args[3] = (UINT64)(ULONG_PTR)riid;
+    args[4] = (UINT64)(ULONG_PTR)ppv;
+    hr = (HRESULT)unix_vtbl_call( host, slot, 5, args );
+    if (copy) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, copy );
+    return (UINT64)(UINT)winecom_wrap_out_iface( hr, riid, ppv );
+}
+
+/* ID3D12GraphicsCommandList1::OMSetDepthBounds( FLOAT min, FLOAT max ):
+ * an all-float frame, the same wrong-register-file problem
+ * ClearDepthStencilView had -- MS-x64 put the values in XMM1/XMM2 where
+ * the integer-wide invoker cannot see them.  The raw bits cross and the
+ * unixlib's typed call (FP_SHAPE_DEPTH_BOUNDS) reconstitutes them. */
+static UINT64 hand_om_set_depth_bounds( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    struct d3d12_fp_call_params p = { { 0 } };
+    NTSTATUS status;
+
+    p.args[0] = (UINT64)(ULONG_PTR)host;
+    p.args[1] = ctx->FltSave.XmmRegisters[1].Low & 0xffffffffu;   /* Min */
+    p.args[2] = ctx->FltSave.XmmRegisters[2].Low & 0xffffffffu;   /* Max */
+    p.slot = slot;
+    p.shape = FP_SHAPE_DEPTH_BOUNDS;
+    if ((status = D3D12_UNIX_CALL( call_fp, &p )))
+        ERR( "unix call_fp failed, status %08x\n", (UINT)status );
+    return 0;   /* void method; RAX is scratch */
+}
+
+/* ID3D12GraphicsCommandList9::RSSetDepthBias( FLOAT bias, FLOAT clamp,
+ * FLOAT slope_scaled_bias ): XMM1..XMM3, same shape as the slot above. */
+static UINT64 hand_rs_set_depth_bias( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    struct d3d12_fp_call_params p = { { 0 } };
+    NTSTATUS status;
+
+    p.args[0] = (UINT64)(ULONG_PTR)host;
+    p.args[1] = ctx->FltSave.XmmRegisters[1].Low & 0xffffffffu;   /* DepthBias */
+    p.args[2] = ctx->FltSave.XmmRegisters[2].Low & 0xffffffffu;   /* DepthBiasClamp */
+    p.args[3] = ctx->FltSave.XmmRegisters[3].Low & 0xffffffffu;   /* SlopeScaledDepthBias */
+    p.slot = slot;
+    p.shape = FP_SHAPE_DEPTH_BIAS;
+    if ((status = D3D12_UNIX_CALL( call_fp, &p )))
+        ERR( "unix call_fp failed, status %08x\n", (UINT)status );
+    return 0;   /* void method; RAX is scratch */
+}
+
+/* ID3D12GraphicsCommandList4::BeginRenderPass( UINT n, const
+ * D3D12_RENDER_PASS_RENDER_TARGET_DESC *rts, const
+ * D3D12_RENDER_PASS_DEPTH_STENCIL_DESC *ds, D3D12_RENDER_PASS_FLAGS flags ):
+ * the only interface members are the resolve source/dest resources inside
+ * each ENDING_ACCESS -- a BeginningAccess carries clear values only. */
+static UINT64 hand_begin_render_pass( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    UINT n = (UINT)read_arg( ctx, 1 );
+    const D3D12_RENDER_PASS_RENDER_TARGET_DESC *rts = (const void *)(ULONG_PTR)read_arg( ctx, 2 );
+    const D3D12_RENDER_PASS_DEPTH_STENCIL_DESC *ds = (const void *)(ULONG_PTR)read_arg( ctx, 3 );
+    D3D12_RENDER_PASS_DEPTH_STENCIL_DESC ds_copy;
+    D3D12_RENDER_PASS_RENDER_TARGET_DESC *copy = NULL;
+    UINT64 args[D3D12_UNIX_MAX_ARGS] = { 0 };
+    UINT64 ret;
+    UINT i;
+
+    if (n && rts)
+    {
+        if (!(copy = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0,
+                                      n * sizeof(*copy) )))
+            return (UINT64)(UINT)E_OUTOFMEMORY;
+        memcpy( copy, rts, n * sizeof(*copy) );
+        for (i = 0; i < n; i++)
+            if (copy[i].EndingAccess.Type == D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_RESOLVE)
+            {
+                copy[i].EndingAccess.Resolve.pSrcResource =
+                    com_unwrap( copy[i].EndingAccess.Resolve.pSrcResource );
+                copy[i].EndingAccess.Resolve.pDstResource =
+                    com_unwrap( copy[i].EndingAccess.Resolve.pDstResource );
+            }
+    }
+    if (ds)
+    {
+        ds_copy = *ds;
+        if (ds_copy.DepthEndingAccess.Type == D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_RESOLVE)
+        {
+            ds_copy.DepthEndingAccess.Resolve.pSrcResource =
+                com_unwrap( ds_copy.DepthEndingAccess.Resolve.pSrcResource );
+            ds_copy.DepthEndingAccess.Resolve.pDstResource =
+                com_unwrap( ds_copy.DepthEndingAccess.Resolve.pDstResource );
+        }
+        if (ds_copy.StencilEndingAccess.Type == D3D12_RENDER_PASS_ENDING_ACCESS_TYPE_RESOLVE)
+        {
+            ds_copy.StencilEndingAccess.Resolve.pSrcResource =
+                com_unwrap( ds_copy.StencilEndingAccess.Resolve.pSrcResource );
+            ds_copy.StencilEndingAccess.Resolve.pDstResource =
+                com_unwrap( ds_copy.StencilEndingAccess.Resolve.pDstResource );
+        }
+    }
+    args[1] = n;
+    args[2] = (UINT64)(ULONG_PTR)(copy ? copy : rts);
+    args[3] = (UINT64)(ULONG_PTR)(ds ? &ds_copy : NULL);
+    /* flags is the fifth slot -- a STACK argument, stale-topped above
+     * bit 31 (see hand_copy_texture_region) */
+    args[4] = (UINT)read_arg( ctx, 4 );
+    ret = unix_vtbl_call( host, slot, 5, args );
+    if (copy) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, copy );
+    return ret;   /* void method; RAX is scratch */
+}
+
+/* ID3D12GraphicsCommandList7::Barrier( UINT32 n, const D3D12_BARRIER_GROUP
+ * *groups ): each group points at an array of buffer/texture/global
+ * barriers, and the buffer and texture elements carry ID3D12Resource*.
+ * Both levels are copied and the resources unwrapped in the copies; a
+ * global group's array carries no interfaces and passes through. */
+static UINT64 hand_barrier_groups( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    UINT n = (UINT)read_arg( ctx, 1 );
+    const D3D12_BARRIER_GROUP *src = (const void *)(ULONG_PTR)read_arg( ctx, 2 );
+    D3D12_BARRIER_GROUP *copy = NULL;
+    UINT64 args[D3D12_UNIX_MAX_ARGS] = { 0 };
+    HRESULT hr = S_OK;
+    UINT64 ret;
+    UINT i, j;
+
+    if (n && src)
+    {
+        if (!(copy = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0,
+                                      n * sizeof(*copy) )))
+            return (UINT64)(UINT)E_OUTOFMEMORY;
+        memcpy( copy, src, n * sizeof(*copy) );
+        for (i = 0; i < n && SUCCEEDED(hr); i++)
+        {
+            UINT nb = copy[i].NumBarriers;
+            if (!nb) continue;
+            switch (copy[i].Type)
+            {
+            case D3D12_BARRIER_TYPE_BUFFER:
+            {
+                D3D12_BUFFER_BARRIER *b;
+                if (!(b = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0,
+                                           nb * sizeof(*b) )))
+                {
+                    hr = E_OUTOFMEMORY;
+                    break;
+                }
+                memcpy( b, copy[i].pBufferBarriers, nb * sizeof(*b) );
+                for (j = 0; j < nb; j++) b[j].pResource = com_unwrap( b[j].pResource );
+                copy[i].pBufferBarriers = b;
+                break;
+            }
+            case D3D12_BARRIER_TYPE_TEXTURE:
+            {
+                D3D12_TEXTURE_BARRIER *t;
+                if (!(t = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0,
+                                           nb * sizeof(*t) )))
+                {
+                    hr = E_OUTOFMEMORY;
+                    break;
+                }
+                memcpy( t, copy[i].pTextureBarriers, nb * sizeof(*t) );
+                for (j = 0; j < nb; j++) t[j].pResource = com_unwrap( t[j].pResource );
+                copy[i].pTextureBarriers = t;
+                break;
+            }
+            case D3D12_BARRIER_TYPE_GLOBAL:
+                break;   /* no interface members */
+            default:
+                WARN( "unknown barrier group type %u passed through\n", copy[i].Type );
+                break;
+            }
+        }
+    }
+    if (SUCCEEDED(hr))
+    {
+        args[1] = n;
+        args[2] = (UINT64)(ULONG_PTR)(copy ? copy : src);
+        ret = unix_vtbl_call( host, slot, 3, args );
+    }
+    else
+    {
+        /* calling with unfixed proxies would hand vkd3d guest pointers;
+         * dropping the barriers is the lesser wrong and it is logged */
+        ERR( "out of memory copying %u barrier group(s); call dropped\n", n );
+        ret = (UINT64)(UINT)hr;
+    }
+    if (copy)
+    {
+        for (i = 0; i < n; i++)
+            if (copy[i].pGlobalBarriers != src[i].pGlobalBarriers)
+                RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0,
+                             (void *)copy[i].pGlobalBarriers );
+        RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, copy );
+    }
+    return ret;   /* void method; RAX is scratch */
+}
+
+/* The D3D12_STATE_OBJECT_DESC walker: DXR state objects hide their
+ * interface pointers behind D3D12_STATE_SUBOBJECT's const void* payloads
+ * (the reason the generator refuses the raw struct).  The subobject array
+ * is copied; the payloads that carry interfaces (the two root-signature
+ * kinds, EXISTING_COLLECTION) are copied and unwrapped; a
+ * SUBOBJECT_TO_EXPORTS_ASSOCIATION's pointer at another subobject is
+ * remapped into the copy, because the callee resolves the association
+ * against the array it is handed.  Payload types that provably carry no
+ * interfaces pass through pointing at guest memory (vkd3d deep-copies at
+ * create).  Anything else fails closed -- a payload this walker cannot
+ * name could hide a proxy. */
+static HRESULT state_object_desc_unwrap( const D3D12_STATE_OBJECT_DESC *src,
+                                         D3D12_STATE_OBJECT_DESC *out, void **blob )
+{
+    SIZE_T extra = 0, subs;
+    D3D12_STATE_SUBOBJECT *sub;
+    char *payload;
+    UINT i;
+
+    *out = *src;
+    *blob = NULL;
+    if (!src->NumSubobjects || !src->pSubobjects) return S_OK;
+
+    for (i = 0; i < src->NumSubobjects; i++)
+    {
+        switch (src->pSubobjects[i].Type)
+        {
+        case D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE:
+        case D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE:
+            extra += sizeof(D3D12_GLOBAL_ROOT_SIGNATURE);
+            break;
+        case D3D12_STATE_SUBOBJECT_TYPE_EXISTING_COLLECTION:
+            extra += sizeof(D3D12_EXISTING_COLLECTION_DESC);
+            break;
+        case D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION:
+            extra += sizeof(D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION);
+            break;
+        case D3D12_STATE_SUBOBJECT_TYPE_STATE_OBJECT_CONFIG:
+        case D3D12_STATE_SUBOBJECT_TYPE_NODE_MASK:
+        case D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY:
+        case D3D12_STATE_SUBOBJECT_TYPE_DXIL_SUBOBJECT_TO_EXPORTS_ASSOCIATION:
+        case D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP:
+        case D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG:
+        case D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG:
+        case D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG1:
+            break;
+        default:
+            ERR( "state object subobject %u has type %u this walker cannot "
+                 "prove interface-free\n", i, src->pSubobjects[i].Type );
+            return E_INVALIDARG;
+        }
+    }
+
+    subs = src->NumSubobjects * sizeof(*sub);
+    if (!(sub = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, subs + extra )))
+        return E_OUTOFMEMORY;
+    memcpy( sub, src->pSubobjects, subs );
+    payload = (char *)sub + subs;
+
+    for (i = 0; i < src->NumSubobjects; i++)
+    {
+        const void *desc = src->pSubobjects[i].pDesc;
+        if (!desc) continue;   /* the callee's validation problem, not ours */
+        switch (sub[i].Type)
+        {
+        case D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE:
+        {
+            D3D12_GLOBAL_ROOT_SIGNATURE *rs = (void *)payload;
+            *rs = *(const D3D12_GLOBAL_ROOT_SIGNATURE *)desc;
+            rs->pGlobalRootSignature = com_unwrap( rs->pGlobalRootSignature );
+            sub[i].pDesc = rs;
+            payload += sizeof(*rs);
+            break;
+        }
+        case D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE:
+        {
+            D3D12_LOCAL_ROOT_SIGNATURE *rs = (void *)payload;
+            *rs = *(const D3D12_LOCAL_ROOT_SIGNATURE *)desc;
+            rs->pLocalRootSignature = com_unwrap( rs->pLocalRootSignature );
+            sub[i].pDesc = rs;
+            payload += sizeof(*rs);
+            break;
+        }
+        case D3D12_STATE_SUBOBJECT_TYPE_EXISTING_COLLECTION:
+        {
+            D3D12_EXISTING_COLLECTION_DESC *ec = (void *)payload;
+            *ec = *(const D3D12_EXISTING_COLLECTION_DESC *)desc;
+            ec->pExistingCollection = com_unwrap( ec->pExistingCollection );
+            sub[i].pDesc = ec;
+            payload += sizeof(*ec);
+            break;
+        }
+        case D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION:
+        {
+            D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION *as = (void *)payload;
+            *as = *(const D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION *)desc;
+            if (as->pSubobjectToAssociate)
+            {
+                SIZE_T idx = as->pSubobjectToAssociate - src->pSubobjects;
+                if (as->pSubobjectToAssociate < src->pSubobjects ||
+                    idx >= src->NumSubobjects)
+                {
+                    ERR( "association subobject %u points outside the "
+                         "subobject array\n", i );
+                    RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, sub );
+                    return E_INVALIDARG;
+                }
+                as->pSubobjectToAssociate = &sub[idx];
+            }
+            sub[i].pDesc = as;
+            payload += sizeof(*as);
+            break;
+        }
+        default:
+            break;   /* pass-through types stay pointing at guest memory */
+        }
+    }
+    out->pSubobjects = sub;
+    *blob = sub;
+    return S_OK;
+}
+
+/* ID3D12Device5::CreateStateObject( const D3D12_STATE_OBJECT_DESC *desc,
+ * REFIID riid, void **ppv ): the DXR entry VKD3D_CONFIG=nodxr has been
+ * hiding -- with the walker above it can be offered honestly. */
+static UINT64 hand_create_state_object( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    const D3D12_STATE_OBJECT_DESC *src = (const void *)(ULONG_PTR)read_arg( ctx, 1 );
+    const GUID *riid = (const GUID *)(ULONG_PTR)read_arg( ctx, 2 );
+    void **ppv = (void **)(ULONG_PTR)read_arg( ctx, 3 );
+    D3D12_STATE_OBJECT_DESC desc;
+    UINT64 args[D3D12_UNIX_MAX_ARGS] = { 0 };
+    void *blob;
+    HRESULT hr;
+
+    if (!src || !ppv) return (UINT64)(UINT)E_INVALIDARG;
+    if (FAILED(hr = state_object_desc_unwrap( src, &desc, &blob )))
+        return (UINT64)(UINT)hr;
+    args[1] = (UINT64)(ULONG_PTR)&desc;
+    args[2] = (UINT64)(ULONG_PTR)riid;
+    args[3] = (UINT64)(ULONG_PTR)ppv;
+    hr = (HRESULT)unix_vtbl_call( host, slot, 4, args );
+    if (blob) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, blob );
+    return (UINT64)(UINT)winecom_wrap_out_iface( hr, riid, ppv );
+}
+
+/* ID3D12Device7::AddToStateObject( const D3D12_STATE_OBJECT_DESC *addition,
+ * ID3D12StateObject *grow_from, REFIID riid, void **ppv ): the walker
+ * above plus one interface argument. */
+static UINT64 hand_add_to_state_object( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    const D3D12_STATE_OBJECT_DESC *src = (const void *)(ULONG_PTR)read_arg( ctx, 1 );
+    void *grow_from = (void *)(ULONG_PTR)read_arg( ctx, 2 );
+    const GUID *riid = (const GUID *)(ULONG_PTR)read_arg( ctx, 3 );
+    void **ppv = (void **)(ULONG_PTR)read_arg( ctx, 4 );
+    D3D12_STATE_OBJECT_DESC desc;
+    UINT64 args[D3D12_UNIX_MAX_ARGS] = { 0 };
+    void *blob;
+    HRESULT hr;
+
+    if (!src || !ppv) return (UINT64)(UINT)E_INVALIDARG;
+    if (FAILED(hr = state_object_desc_unwrap( src, &desc, &blob )))
+        return (UINT64)(UINT)hr;
+    args[1] = (UINT64)(ULONG_PTR)&desc;
+    args[2] = (UINT64)(ULONG_PTR)com_unwrap( grow_from );
+    args[3] = (UINT64)(ULONG_PTR)riid;
+    args[4] = (UINT64)(ULONG_PTR)ppv;
+    hr = (HRESULT)unix_vtbl_call( host, slot, 5, args );
+    if (blob) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, blob );
+    return (UINT64)(UINT)winecom_wrap_out_iface( hr, riid, ppv );
 }
 
 /* ---------------------------------------------------------- flat entries */

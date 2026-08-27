@@ -83,6 +83,10 @@ enum d3d12_fp_shape
     /* void (this, D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_CLEAR_FLAGS, FLOAT,
      *       UINT8, UINT, const D3D12_RECT *) */
     FP_SHAPE_CLEAR_DSV,
+    /* void (this, FLOAT, FLOAT) -- OMSetDepthBounds */
+    FP_SHAPE_DEPTH_BOUNDS,
+    /* void (this, FLOAT, FLOAT, FLOAT) -- RSSetDepthBias */
+    FP_SHAPE_DEPTH_BIAS,
 };
 
 struct d3d12_fp_call_params

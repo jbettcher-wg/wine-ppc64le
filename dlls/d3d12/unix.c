@@ -198,6 +198,30 @@ static NTSTATUS d3d12_unix_call_fp( void *args )
                                        (const void *)(ULONG_PTR)p->args[6] );
         return STATUS_SUCCESS;
     }
+    case FP_SHAPE_DEPTH_BOUNDS:
+    {
+        typedef void (*depth_bounds_fn)( void *iface, float min, float max );
+        union { UINT32 bits; float f; } fmin, fmax;
+
+        fmin.bits = (UINT32)p->args[1];
+        fmax.bits = (UINT32)p->args[2];
+        ((depth_bounds_fn)vtbl[p->slot])( (void *)(ULONG_PTR)p->args[0],
+                                          fmin.f, fmax.f );
+        return STATUS_SUCCESS;
+    }
+    case FP_SHAPE_DEPTH_BIAS:
+    {
+        typedef void (*depth_bias_fn)( void *iface, float bias, float clamp,
+                                       float slope_scaled_bias );
+        union { UINT32 bits; float f; } bias, clamp, slope;
+
+        bias.bits  = (UINT32)p->args[1];
+        clamp.bits = (UINT32)p->args[2];
+        slope.bits = (UINT32)p->args[3];
+        ((depth_bias_fn)vtbl[p->slot])( (void *)(ULONG_PTR)p->args[0],
+                                        bias.f, clamp.f, slope.f );
+        return STATUS_SUCCESS;
+    }
     }
     return STATUS_INVALID_PARAMETER;
 }

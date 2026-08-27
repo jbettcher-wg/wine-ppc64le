@@ -662,11 +662,11 @@ PLAIN_PP = {
 FLOAT_TOKENS = re.compile(r'\b(FLOAT|float|double|DOUBLE)\b')
 
 # Structs that carry an interface pointer behind a `const void *` payload the
-# transitive scan below cannot see through.  Named here so the refusal states
-# the mechanism.  The two Device slots that matter most are NOT refused --
-# they are HAND_SLOTS -- but the SAME structs also appear on
-# ID3D12PipelineLibrary1::LoadPipeline and the DXR family, and those stay
-# refused until a title is measured hitting them.
+# transitive scan below cannot see through.  Named here so a refusal states
+# the mechanism.  Every rostered slot that takes one is a HAND_SLOT today
+# (the stream walker and the state-object walker in dlls/d3d12/main.c); the
+# dict stays so a FUTURE slot that grows one of these payloads refuses with
+# the mechanism named instead of passing a hidden proxy through.
 CARRIER_STRUCTS = {
     "D3D12_PIPELINE_STATE_STREAM_DESC":
         "a subobject stream whose ROOT_SIGNATURE subobject is an "
@@ -739,6 +739,28 @@ HAND_SLOTS = [
     # out of guest XMM3 and crosses it as raw bits through the unixlib's
     # typed-float call (FP_SHAPE_CLEAR_DSV).
     ("ID3D12GraphicsCommandList::ClearDepthStencilView", "hand_clear_dsv"),
+    # The pipeline-library load path: the create walkers' desc walks behind
+    # a library name.  Cyberpunk 2077 hits both of the first pair on every
+    # boot ([MEASURED] 2026-08-19 run log); refused, its pipeline cache
+    # could never load and every PSO was rebuilt.
+    ("ID3D12PipelineLibrary::LoadGraphicsPipeline", "hand_load_graphics_pipeline"),
+    ("ID3D12PipelineLibrary::LoadComputePipeline",  "hand_load_compute_pipeline"),
+    ("ID3D12PipelineLibrary1::LoadPipeline",        "hand_load_pipeline"),
+    # The remaining FLOAT-by-value frames, hand_clear_dsv's shape
+    # (FP_SHAPE_DEPTH_BOUNDS / FP_SHAPE_DEPTH_BIAS).
+    ("ID3D12GraphicsCommandList1::OMSetDepthBounds", "hand_om_set_depth_bounds"),
+    ("ID3D12GraphicsCommandList9::RSSetDepthBias",   "hand_rs_set_depth_bias"),
+    # Render passes and enhanced barriers: interface pointers inside the
+    # resolve params / barrier arrays, shallow-copied and unwrapped the
+    # way hand_resource_barrier always did it.
+    ("ID3D12GraphicsCommandList4::BeginRenderPass",  "hand_begin_render_pass"),
+    ("ID3D12GraphicsCommandList7::Barrier",          "hand_barrier_groups"),
+    # The DXR state-object walker CARRIER_STRUCTS describes: subobject
+    # payload copies, proxy unwraps, association-pointer remap into the
+    # copy.  With these two served, VKD3D_CONFIG=nodxr stops being the only
+    # honest answer on hardware whose driver exposes ray tracing.
+    ("ID3D12Device5::CreateStateObject",             "hand_create_state_object"),
+    ("ID3D12Device7::AddToStateObject",              "hand_add_to_state_object"),
 ]
 
 # Refusals decided here rather than derived.  Keyed "Owner::Method".
