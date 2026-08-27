@@ -74,7 +74,20 @@ struct com_proxy
     LONG        refs;         /* guest-visible refcount, served here */
     UINT        iface;        /* index into wc_surface->ifaces[] */
     struct com_proxy *next;   /* intern-table chain */
+    /* The cached answer of this interface's WINECOM_F_CONST_QWORD slot, if it
+     * has one.  0 = not yet cached, which is also the "cannot cache" sentinel
+     * (see the flag's contract in wine/winecom.h).  Written by the dispatcher
+     * after the slot's first real call, read by GUEST code -- the snippet
+     * install_const_getters() emits does `mov rax,[rcx+0x20]` -- so the
+     * offset is part of the guest ABI and pinned by the C_ASSERT below. */
+    UINT64      cached_qword;
 };
+#ifdef _WIN64
+/* the guest ABI pin for the 64-bit lane's snippet; the i386 build of this
+ * library lays the struct out differently AND would need i386 snippet
+ * encoding, so the fast path is 64-bit-lane-only -- see install_const_getters */
+C_ASSERT( offsetof(struct com_proxy, cached_qword) == 0x20 );
+#endif
 
 #define INTERN_BUCKETS 256
 
@@ -228,6 +241,119 @@ static BOOL com_check_module( HMODULE guest, const struct com_thunk_info **info_
     return TRUE;
 }
 
+/***********************************************************************
+ *           install_const_getters
+ *
+ * The guest-side fast path for WINECOM_F_CONST_QWORD slots -- the COM lane's
+ * analog of spec2thunk's FAST_PATH_EXPORTS, but installed at RUNTIME by
+ * rewriting the materialised vtable slot, which works here because winecom
+ * owns the vtable it built (the flat lane's exports are IAT-bound and cannot
+ * be re-pointed after the fact).
+ *
+ * Cyberpunk calls ID3D12Resource::GetGPUVirtualAddress 88,016 times a second
+ * mid-flythrough [MEASURED 2026-08-27, crossings table] -- a nullary getter of
+ * a value that never changes for a given buffer, each call a full trap, a
+ * dispatch and an NtCallbackReturn.  After this, only the FIRST call on each
+ * object crosses; the dispatcher stashes the answer in the proxy and every
+ * later call is served by 10 bytes of guest x86 with no trap at all.
+ *
+ * Per flagged slot, the vtable entry is re-pointed at this snippet:
+ *
+ *     48 8b 41 20            mov  rax, [rcx+0x20]   ; proxy->cached_qword
+ *     48 85 c0               test rax, rax
+ *     74 01                  je   fallback          ; 0 = not cached yet
+ *     c3                     ret
+ *   fallback:
+ *     ff 25 00 00 00 00      jmp  [rip+0]           ; the slot's own trap stub
+ *     <8-byte stub address>
+ *
+ * The fallback jumps to the ORIGINAL stub address, so the trap arrives with
+ * the RIP the dispatcher already maps and with RCX untouched (the stub does
+ * its own R10 rescue) -- the slow path is byte-identical to a world where
+ * this function never ran.  The proxy identity test is untouched too: it
+ * matches the vtable BASE addresses, never slot contents.
+ *
+ * The snippets live in one PAGE_EXECUTE_READWRITE allocation, fully written
+ * before any guest thread can see their addresses (the vtable rewrite below
+ * is the publication), the same pattern as the callback trampoline pool.
+ *
+ * WINEEMUNOCOMCONSTGET=1 is the negative control: no snippet is installed,
+ * every call keeps trapping, and the crossing counter's row for the slot is
+ * what a gate asserts against.  The dispatcher's cache STORE stays on either
+ * way; it is harmless without a reader.
+ */
+static void install_const_getters( void )
+{
+#ifndef _WIN64
+    /* The i386 lane would need its own snippet encoding, its own
+     * cached_qword offset AND the 32-bit proxy runtime that does not exist
+     * yet (i386-lane-design.md, the crux).  Fail closed: every call keeps
+     * trapping, which is the lane's current behaviour for everything. */
+    return;
+}
+#else
+    static const UINT snippet_stride = 32;   /* 24 bytes used, 16-aligned */
+    unsigned char *block, *code;
+    SIZE_T size;
+    UINT i, n, count = 0;
+
+    for (i = 0; i < wc_surface->iface_count; i++)
+    {
+        const struct winecom_iface *itf = &wc_surface->ifaces[i];
+        if (!itf->slots) continue;
+        for (n = 0; n < itf->slot_count; n++)
+            if (itf->slots[n].flags & WINECOM_F_CONST_QWORD) count++;
+    }
+    if (!count) return;
+    if (com_env_flag( L"WINEEMUNOCOMCONSTGET" ))
+    {
+        ERR( "%s: WINEEMUNOCOMCONSTGET=1 -- %u const-getter slots stay "
+             "trapping on every call\n", wc_surface->name, count );
+        return;
+    }
+
+    block = NULL;
+    size = count * snippet_stride;
+    if (NtAllocateVirtualMemory( NtCurrentProcess(), (void **)&block, 0, &size,
+                                 MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE ))
+    {
+        ERR( "%s: no memory for %u const-getter snippets; slots stay "
+             "trapping\n", wc_surface->name, count );
+        return;
+    }
+
+    code = block;
+    for (i = 0; i < wc_surface->iface_count; i++)
+    {
+        const struct winecom_iface *itf = &wc_surface->ifaces[i];
+        if (!itf->slots) continue;
+        for (n = 0; n < itf->slot_count; n++)
+        {
+            UINT64 *vslot;
+            unsigned char *p = code;
+
+            if (!(itf->slots[n].flags & WINECOM_F_CONST_QWORD)) continue;
+            vslot = &guest_vtbl_block[iface_slot_base[i] + n];
+
+            *p++ = 0x48; *p++ = 0x8b; *p++ = 0x41;             /* mov rax,[rcx+disp8] */
+            *p++ = (unsigned char)offsetof(struct com_proxy, cached_qword);
+            *p++ = 0x48; *p++ = 0x85; *p++ = 0xc0;             /* test rax,rax */
+            *p++ = 0x74; *p++ = 0x01;                          /* je fallback */
+            *p++ = 0xc3;                                       /* ret */
+            *p++ = 0xff; *p++ = 0x25;                          /* jmp [rip+0] */
+            *p++ = 0x00; *p++ = 0x00; *p++ = 0x00; *p++ = 0x00;
+            memcpy( p, vslot, sizeof(UINT64) );                /* the trap stub */
+
+            TRACE( "%s: %s::%s slot %u served guest-side from %p "
+                   "(fallback stub %p)\n", wc_surface->name, itf->name,
+                   itf->slots[n].name, n, code, *(void **)vslot );
+            *vslot = (UINT64)(ULONG_PTR)code;
+            code += snippet_stride;
+        }
+    }
+}
+#endif  /* _WIN64 */
+
 /* Build the guest vtables from a guest module's published stub arrays. */
 static BOOL com_runtime_init_once( void )
 {
@@ -291,6 +417,7 @@ static BOOL com_runtime_init_once( void )
     }
     TRACE( "%s: materialised %u guest vtable slots across %u interfaces from %p\n",
            wc_surface->name, total_slots, i, guest );
+    install_const_getters();
     if (nowrap)
         ERR( "%s: WINEEMUNOCOMWRAP=1 -- interface pointers will cross RAW; "
              "expect guest calls into native vtables\n", wc_surface->name );
@@ -465,6 +592,7 @@ void *winecom_wrap( void *host, UINT iface )
     p->host = host;
     p->refs = 1;
     p->iface = iface;
+    p->cached_qword = 0;   /* the heap does not zero, and 0 is the sentinel */
     p->next = intern[bucket];
     intern[bucket] = p;
     RtlLeaveCriticalSection( &wc_cs );
@@ -981,5 +1109,15 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
         ctx->Rax = 0;
     else
         ctx->Rax = ret;
+
+    /* The other half of install_const_getters(): the first real call caches
+     * its answer in the proxy, and the guest-side snippet serves every later
+     * one.  A plain aligned 8-byte store -- the value is immutable by the
+     * flag's contract, so a racing second first-call stores the same bytes,
+     * and a guest thread that reads it mid-publication reads either 0 (and
+     * traps, correctly) or the value. */
+    if (sl->flags & WINECOM_F_CONST_QWORD)
+        proxy->cached_qword = ret;
+
     return STATUS_SUCCESS;
 }

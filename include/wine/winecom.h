@@ -122,6 +122,21 @@
                                    not something any code currently does.  Do
                                    not mistake this paragraph for a check
                                    that exists. */
+#define WINECOM_F_CONST_QWORD 64 /* The slot is a NULLARY getter (argc == 1,
+                                   `this` only) returning an 8-byte scalar
+                                   that is IMMUTABLE for the object's lifetime
+                                   once it is nonzero -- GetGPUVirtualAddress:
+                                   a buffer's VA never changes and a
+                                   non-buffer answers 0.  The runtime may
+                                   cache the answer in the proxy and serve
+                                   later calls from GUEST code with no
+                                   crossing at all; zero is the cannot-cache
+                                   sentinel, so an object whose honest answer
+                                   is zero simply keeps trapping, which is
+                                   correct and merely unaccelerated.  A
+                                   generator must set this only from
+                                   per-method knowledge of the API contract,
+                                   never from a name pattern. */
 
 /* Compatibility spellings for generated tables and client code that predate
  * the shared library (dlls/d3d12).  Same values, one authority. */

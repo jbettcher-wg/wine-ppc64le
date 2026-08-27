@@ -764,6 +764,21 @@ HAND_SLOTS = [
 ]
 
 # Refusals decided here rather than derived.  Keyed "Owner::Method".
+# WINECOM_F_CONST_QWORD: nullary getters whose 8-byte answer is immutable for
+# the object's lifetime once nonzero, so the runtime caches it in the proxy
+# and serves later calls from guest code with no crossing (winecom.c,
+# install_const_getters).  CURATED from per-method API knowledge, never a name
+# pattern: a D3D12 buffer's GPU VA is assigned at creation and fixed until
+# release, and a non-buffer resource answers 0, which is the runtime's
+# cannot-cache sentinel.  The generator hard-fails if a listed method is not
+# actually (this)-only with a qword return, so the list cannot silently drift
+# from the headers.
+CONST_QWORD_GETTERS = {
+    "ID3D12Resource::GetGPUVirtualAddress",
+    "ID3D12Resource1::GetGPUVirtualAddress",
+    "ID3D12Resource2::GetGPUVirtualAddress",
+}
+
 REFUSALS = {}
 
 # void** out-parameters that are blocks of memory rather than untyped
@@ -1234,6 +1249,13 @@ def generate(roster, prefix, header_dir, oracle):
             flags = []
             if s["ret"] == "void":
                 flags.append("WINECOM_F_RET_VOID")
+            if key in CONST_QWORD_GETTERS:
+                if argc != 1 or not retq:
+                    raise SystemExit(
+                        "%s is listed in CONST_QWORD_GETTERS but is not a "
+                        "(this)-only qword getter (argc %d, retq %s); the "
+                        "list has drifted from the headers" % (key, argc, retq))
+                flags.append("WINECOM_F_CONST_QWORD")
             if key in hand_index:
                 rows.append('    { "%s", NULL, NULL, NULL, %d,'
                             ' %s, %d, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0,'
