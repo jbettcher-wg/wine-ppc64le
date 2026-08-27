@@ -263,8 +263,6 @@ direction measured no further.
 * `SetThreadGroupAffinity(group 1)` needs a `group` field in
   `server/protocol.def`; `check-cpu-topology.sh` reports it as a LIMIT and
   re-arms itself when the field appears.
-* Quake II is on a library drive that is not mounted (the co-dev's
-  machine; a note for their turn).
 * `mfmediaengine`, `evr`, `wmvcore` have a built COM surface no title has
   driven.
 * The callback audit cannot see a callback that arrives inside a **struct**
