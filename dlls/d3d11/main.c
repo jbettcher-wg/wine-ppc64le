@@ -421,6 +421,7 @@ static UINT64 hand_clear_depth_stencil_view( void *host, UINT slot, AMD64_CONTEX
     p.self = (UINT64)(ULONG_PTR)host;
     p.res = (UINT64)(ULONG_PTR)view_host;
     p.a = (UINT)read_arg( ctx, 2 );                 /* ClearFlags */
+    __wine_emu_materialize_ctx( ctx );   /* lazy-ctx contract, wine/winecom.h */
     p.f = *(const float *)&ctx->FltSave.XmmRegisters[3];
     p.b = (UINT8)read_arg( ctx, 4 );                /* Stencil */
     p.slot = slot;
@@ -443,6 +444,7 @@ static UINT64 hand_set_resource_min_lod( void *host, UINT slot, AMD64_CONTEXT *c
     }
     p.self = (UINT64)(ULONG_PTR)host;
     p.res = (UINT64)(ULONG_PTR)res;
+    __wine_emu_materialize_ctx( ctx );   /* lazy-ctx contract, wine/winecom.h */
     p.f = *(const float *)&ctx->FltSave.XmmRegisters[2];
     p.slot = slot;
     p.shape = FLOAT_SHAPE_RES_FLOAT;
@@ -470,6 +472,9 @@ static UINT64 hand_get_resource_min_lod( void *host, UINT slot, AMD64_CONTEXT *c
     p.slot = slot;
     p.shape = FLOAT_SHAPE_RES_RET_FLOAT;
     if (D3D11_UNIX_CALL( float, &p )) ERR( "unix float call failed\n" );
+    /* a write to a still-lazy FP group is IGNORED at resume: materialize
+     * first (lazy-ctx contract, wine/winecom.h) */
+    __wine_emu_materialize_ctx( ctx );
     memset( &ctx->FltSave.XmmRegisters[0], 0, sizeof(ctx->FltSave.XmmRegisters[0]) );
     *(float *)&ctx->FltSave.XmmRegisters[0] = p.ret;
     return 0;

@@ -260,6 +260,7 @@ static UINT64 hand_clear_dsv( void *host, UINT slot, AMD64_CONTEXT *ctx )
     p.args[0] = (UINT64)(ULONG_PTR)host;
     p.args[1] = read_arg( ctx, 1 );                       /* the DSV handle */
     p.args[2] = (UINT)read_arg( ctx, 2 );                 /* D3D12_CLEAR_FLAGS */
+    __wine_emu_materialize_ctx( ctx );   /* lazy-ctx contract, wine/winecom.h */
     p.args[3] = ctx->FltSave.XmmRegisters[3].Low & 0xffffffffu;  /* Depth */
     p.args[4] = (BYTE)read_arg( ctx, 4 );                 /* Stencil */
     p.args[5] = (UINT)read_arg( ctx, 5 );                 /* NumRects */
@@ -612,6 +613,7 @@ static UINT64 hand_om_set_depth_bounds( void *host, UINT slot, AMD64_CONTEXT *ct
     NTSTATUS status;
 
     p.args[0] = (UINT64)(ULONG_PTR)host;
+    __wine_emu_materialize_ctx( ctx );   /* lazy-ctx contract, wine/winecom.h */
     p.args[1] = ctx->FltSave.XmmRegisters[1].Low & 0xffffffffu;   /* Min */
     p.args[2] = ctx->FltSave.XmmRegisters[2].Low & 0xffffffffu;   /* Max */
     p.slot = slot;
@@ -629,6 +631,7 @@ static UINT64 hand_rs_set_depth_bias( void *host, UINT slot, AMD64_CONTEXT *ctx 
     NTSTATUS status;
 
     p.args[0] = (UINT64)(ULONG_PTR)host;
+    __wine_emu_materialize_ctx( ctx );   /* lazy-ctx contract, wine/winecom.h */
     p.args[1] = ctx->FltSave.XmmRegisters[1].Low & 0xffffffffu;   /* DepthBias */
     p.args[2] = ctx->FltSave.XmmRegisters[2].Low & 0xffffffffu;   /* DepthBiasClamp */
     p.args[3] = ctx->FltSave.XmmRegisters[3].Low & 0xffffffffu;   /* SlopeScaledDepthBias */

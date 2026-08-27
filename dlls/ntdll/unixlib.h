@@ -231,6 +231,11 @@ enum ntdll_unix_funcs
     unix_emu32_invalidate,
     unix_emu_xstat_init,
     unix_emu_xstat_dump,
+    /* args IS the AMD64_CONTEXT* of the innermost trap: fill the lazily
+     * skipped EFLAGS/FP groups from the live guest state before PE code
+     * reads or rewrites them.  A no-op when the lazy declaration is off or
+     * the bridge predates ABI 5.  See emu_ctx_materialize_full(). */
+    unix_emu_ctx_materialize,
 };
 
 extern unixlib_handle_t __wine_unixlib_handle;

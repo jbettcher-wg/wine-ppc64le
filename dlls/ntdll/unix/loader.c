@@ -1044,6 +1044,10 @@ static int  (*p_fexbridge_run)( void *thread, void *ctx );
 static void (*p_fexbridge_invalidate_code_range)( ULONGLONG start, ULONGLONG length );
 static UINT (*p_fexbridge_hwtso_prot)(void);
 static UINT (*p_fexbridge_hwtso_refused)( ULONGLONG start, ULONGLONG length );
+/* ABI 5: lazy trap contexts.  Optional like the TSO pair -- an older bridge
+ * simply stays eager, and emu_ctx_lazy_mask stays 0. */
+static UINT (*p_fexbridge_declare_trap_ctx)( UINT lazy_mask );
+static int  (*p_fexbridge_ctx_materialize)( void *thread, void *ctx, UINT flags );
 
 /* fexbridge_run results and CONTEXT flags, mirrored from fexbridge.h (the
  * header is not vendored into the tree; the values are ABI). */
@@ -1053,6 +1057,15 @@ static UINT (*p_fexbridge_hwtso_refused)( ULONGLONG start, ULONGLONG length );
 #define EMU_CTX_AMD64   0x00100000u
 #define EMU_CTX_CONTROL (EMU_CTX_AMD64 | 0x1u)
 #define EMU_CTX_INTEGER (EMU_CTX_AMD64 | 0x2u)
+#define EMU_CTX_FLOATING_POINT (EMU_CTX_AMD64 | 0x8u)
+/* ABI 5 lazy-trap markers: set in a trap CONTEXT's ContextFlags when the
+ * group's bytes were NOT stored; fexbridge_ctx_materialize fills the group
+ * and clears its marker.  Outside every winnt AMD64 ContextFlags bit. */
+#define EMU_CTX_LAZY_EFLAGS (EMU_CTX_AMD64 | 0x100u)
+#define EMU_CTX_LAZY_FLOAT  (EMU_CTX_AMD64 | 0x200u)
+
+/* the mask fexbridge_declare_trap_ctx() actually granted; 0 = fully eager */
+static UINT emu_ctx_lazy_mask;
 
 static pthread_once_t emu_bridge_once = PTHREAD_ONCE_INIT;
 static NTSTATUS emu_bridge_status;
@@ -1165,6 +1178,10 @@ static void emu_load_bridge(void)
     /* optional (no ABI bump): an older bridge simply has no hardware TSO */
     p_fexbridge_hwtso_prot    = dlsym( so, "fexbridge_hwtso_prot" );
     p_fexbridge_hwtso_refused = dlsym( so, "fexbridge_hwtso_refused" );
+    /* ABI 5, optional the same way: absent means every trap CONTEXT stays
+     * eagerly complete, which is exactly the old contract */
+    p_fexbridge_declare_trap_ctx = dlsym( so, "fexbridge_declare_trap_ctx" );
+    p_fexbridge_ctx_materialize  = dlsym( so, "fexbridge_ctx_materialize" );
     /* ABI 4: the 32-bit (WoW64) lane.  Resolved unconditionally like the
      * rest; their absence is diagnosed where the 32-bit lane starts, not
      * here, so a 64-bit-only bridge keeps serving the AMD64 lane exactly as
@@ -1364,6 +1381,52 @@ static void emu_publish_guest_context( const AMD64_CONTEXT *ctx, int state )
 }
 
 /***********************************************************************
+ *           emu_ctx_materialize_full
+ *
+ * Fill a lazy trap CONTEXT's skipped EFLAGS/FP groups from the live guest
+ * state (bridge ABI 5).  One call, both groups: every caller is a cold path
+ * (a debugger read, an exception, a fiber, an FP-typed thunk) where the cost
+ * that matters is the crossing already being paid, not the group split.
+ *
+ * Idempotent and cheap when there is nothing to do -- the bridge checks the
+ * markers -- so callers invoke it unconditionally.  The thread handle is the
+ * calling thread's own: a trap CONTEXT only ever surfaces on the thread that
+ * trapped, and nested traps publish the innermost frame, whose spill is the
+ * one the bridge reads.
+ */
+/* WINEEMUNOCTXMAT=1: every materialize call becomes a no-op, which is the
+ * consumer side FORGETTING the contract on purpose.  With the bridge's
+ * FEXBRIDGE_CTX_POISON=1 armed, an FP-typed call then computes with the
+ * poison pattern and a value-checking gate goes red -- the pair is the
+ * negative control that proves the consumer audit is load-bearing.  Read
+ * once, outside signal context, like every other lever here. */
+static int emu_no_ctx_mat = -1;
+
+static void emu_ctx_materialize_full( AMD64_CONTEXT *ctx )
+{
+    void *thread;
+
+    if (!emu_ctx_lazy_mask || !ctx) return;
+    if (emu_no_ctx_mat == -1)
+    {
+        const char *str = getenv( "WINEEMUNOCTXMAT" );
+        emu_no_ctx_mat = (str && *str == '1');
+        if (emu_no_ctx_mat)
+            ERR( "WINEEMUNOCTXMAT: lazy trap contexts will NOT be materialized; "
+                 "every EFLAGS/FP consumer reads unfilled state\n" );
+    }
+    if (emu_no_ctx_mat) return;
+    if (!p_fexbridge_current_thread || !(thread = p_fexbridge_current_thread())) return;
+    p_fexbridge_ctx_materialize( thread, ctx, EMU_CTX_CONTROL | EMU_CTX_FLOATING_POINT );
+}
+
+static NTSTATUS unixcall_emu_ctx_materialize( void *args )
+{
+    emu_ctx_materialize_full( args );
+    return STATUS_SUCCESS;
+}
+
+/***********************************************************************
  *           emu_get_guest_context
  *
  * The calling thread's guest register file, if it has one that is exact.
@@ -1384,8 +1447,13 @@ BOOL emu_get_guest_context( AMD64_CONTEXT *ctx )
     case EMU_GUEST_TRAP:
         /* published as a pointer to the bridge's live trap frame; see
          * emu_publish_guest_context() for why the frame is guaranteed live
-         * for as long as this state stands */
+         * for as long as this state stands.  Under the lazy declaration the
+         * frame may still be missing its EFLAGS/FP bytes -- a debugger wants
+         * all of them, so materialize first.  The cast un-consts the live
+         * frame for exactly that: filling skipped groups in place is the
+         * bridge's documented mechanism, not a mutation of guest state. */
         if (!data->emu_guest_ctx_ptr) return FALSE;
+        emu_ctx_materialize_full( (AMD64_CONTEXT *)data->emu_guest_ctx_ptr );
         *ctx = *data->emu_guest_ctx_ptr;
         goto synth_segments;
     case EMU_GUEST_FAULT:
@@ -2055,6 +2123,26 @@ static NTSTATUS unixcall_emu_run_entry( void *args )
         {
             p_emu_trap_dispatcher = params->trap_dispatcher;
             p_fexbridge_set_trap_handler( emu_trap_thunk, NULL );
+            /* The consumer declaration (bridge ABI 5): this side promises to
+             * call fexbridge_ctx_materialize before reading OR writing a trap
+             * CONTEXT's EFLAGS or FP group, and the bridge stops building
+             * them on every crossing -- ~4-5% of the GameThread was that
+             * reconstruction for hops that read neither [2026-08-27 profile].
+             * Every consumer is audited and routed through
+             * emu_ctx_materialize_full(); the promise is tested by the gate's
+             * FEXBRIDGE_CTX_POISON lever, and WINEEMUNOLAZYCTX=1 is this
+             * side's refusal -- the negative control that puts the eager
+             * world back without touching the bridge. */
+            if (p_fexbridge_declare_trap_ctx && p_fexbridge_ctx_materialize)
+            {
+                const char *str = getenv( "WINEEMUNOLAZYCTX" );
+                if (str && *str == '1')
+                    ERR( "WINEEMUNOLAZYCTX: trap contexts stay eager; the lazy "
+                         "EFLAGS/FP path is off\n" );
+                else
+                    emu_ctx_lazy_mask = p_fexbridge_declare_trap_ctx( EMU_CTX_LAZY_EFLAGS |
+                                                                      EMU_CTX_LAZY_FLOAT );
+            }
         }
         else if (p_emu_trap_dispatcher != params->trap_dispatcher)
         {
@@ -2772,6 +2860,7 @@ static const unixlib_entry_t unix_call_funcs[] =
     unixcall_emu32_invalidate,
     unixcall_emu_xstat_init,
     unixcall_emu_xstat_dump,
+    unixcall_emu_ctx_materialize,
 };
 
 
@@ -2804,6 +2893,7 @@ const unixlib_entry_t unix_call_wow64_funcs[] =
     wow64_emu_run_entry,   /* unix_emu_xstat_init: the sink counts native-lane
                               crossings, which a wow64 caller does not make */
     wow64_emu_run_entry,   /* unix_emu_xstat_dump */
+    wow64_emu_run_entry,   /* unix_emu_ctx_materialize: 64-bit trap frames only */
 };
 
 #endif  /* _WIN64 */

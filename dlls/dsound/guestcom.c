@@ -101,6 +101,9 @@ static void *host_slot( void *host, UINT slot )
  * fifth and sixth floats are past XMM3, needs the stack half of this. */
 static float read_float_arg( const AMD64_CONTEXT *ctx, UINT n )
 {
+    /* the lazy-ctx contract (wine/winecom.h): the FP group may not be there
+     * until asked for; idempotent, so once per argument is merely honest */
+    __wine_emu_materialize_ctx( (AMD64_CONTEXT *)ctx );
     if (n < 4) return *(const float *)&ctx->FltSave.XmmRegisters[n];
     return *(const float *)(ULONG_PTR)(ctx->Rsp + 8 + n * (UINT64)8);
 }

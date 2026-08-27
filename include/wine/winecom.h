@@ -427,6 +427,24 @@ struct winecom_surface
  * here: generator drift is a load failure, not slot misalignment. */
 extern BOOL winecom_attach( const struct winecom_surface *surface );
 
+/* THE LAZY-CONTEXT CONTRACT FOR HAND WALKERS (ntdll private export).  Under
+ * the bridge's lazy trap declaration a trap CONTEXT arrives WITHOUT its
+ * EFLAGS and floating-point bytes; a hand walker that reads an XMM argument
+ * or writes an XMM return must call this first, every time -- it is
+ * idempotent, a no-op when the world is eager, and the only correct way to
+ * see those fields.  Reading without it sees garbage (a recognizable poison
+ * pattern under the gate's FEXBRIDGE_CTX_POISON=1 lever); writing without it
+ * is silently ignored at resume.  Declared here because every FP hand walker
+ * in the tree already includes this header; implemented in ntdll's PE side
+ * (signal_ppc64.c), which owns the trap path.  Only the ppc64 build has the
+ * export (or a trap path): the i386 builtins compile these same hand-walker
+ * sources for the WoW64 lane, where the call compiles away. */
+#ifdef __powerpc64__
+extern void CDECL __wine_emu_materialize_ctx( AMD64_CONTEXT *ctx );
+#else
+#define __wine_emu_materialize_ctx( ctx ) do { (void)(ctx); } while (0)
+#endif
+
 /* The COM-trap dispatch loop; the client's __wine_com_dispatch export calls
  * this after its own lazy initialisation.  Contract as established with
  * ntdll: STATUS_SUCCESS means fully served including ctx->Rax. */

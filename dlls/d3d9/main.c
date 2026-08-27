@@ -568,6 +568,7 @@ static UINT64 hand_d3d9_set_npatch_mode( void *host, UINT slot, AMD64_CONTEXT *c
     struct d3d9_float_params p = { 0 };
 
     p.self = (UINT64)(ULONG_PTR)host;
+    __wine_emu_materialize_ctx( ctx );   /* lazy-ctx contract, wine/winecom.h */
     p.f = *(const float *)&ctx->FltSave.XmmRegisters[1];
     p.slot = slot;
     p.shape = D3D9_FLOAT_SET;
@@ -591,6 +592,9 @@ static UINT64 hand_d3d9_get_npatch_mode( void *host, UINT slot, AMD64_CONTEXT *c
     p.slot = slot;
     p.shape = D3D9_FLOAT_GET;
     if (D3D9_UNIX_CALL( float, &p )) ERR( "unix float call failed\n" );
+    /* a write to a still-lazy FP group is IGNORED at resume: materialize
+     * first (lazy-ctx contract, wine/winecom.h) */
+    __wine_emu_materialize_ctx( ctx );
     memset( &ctx->FltSave.XmmRegisters[0], 0, sizeof(ctx->FltSave.XmmRegisters[0]) );
     *(float *)&ctx->FltSave.XmmRegisters[0] = p.ret_f;
     return 0;

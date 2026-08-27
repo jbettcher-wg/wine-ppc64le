@@ -2664,6 +2664,32 @@ static EMU_THREAD_VAR EXCEPTION_RECORD guest_exc_first;
  * against.  Saved/restored around each dispatch, so nesting works. */
 static EMU_THREAD_VAR AMD64_CONTEXT *emu_current_trap_ctx;
 
+/* Under the bridge's lazy declaration (ABI 5, made by the unix side at
+ * handler registration) a trap CONTEXT arrives WITHOUT its EFLAGS and FP
+ * bytes, and any consumer that reads or rewrites those groups must fill them
+ * first.  This is that fill: a no-op when the declaration is off, idempotent
+ * when the groups are already there, so every consumer calls it
+ * unconditionally.  The audited consumers are the FP-typed thunk branch in
+ * emu_trap_dispatch, the raise/unwind family that hands the CONTEXT to guest
+ * handlers, RtlCaptureContext, and the fiber pair that parks and replaces it
+ * wholesale; the ordinary integer thunk hop -- nearly every crossing -- calls
+ * nothing and pays for nothing, which is the point of the whole mechanism.
+ * The gate's FEXBRIDGE_CTX_POISON lever is what catches a consumer this list
+ * misses: poisoned values fail its value checks instead of working by luck. */
+static void materialize_trap_ctx( AMD64_CONTEXT *ctx )
+{
+    WINE_UNIX_CALL( unix_emu_ctx_materialize, ctx );
+}
+
+/* The same fill for the FP hand walkers in OTHER PE modules (d3d12, d3d11,
+ * d3d9, dsound, xaudio2, combase) -- they read XMM arguments and write XMM
+ * returns on the trap CONTEXT winecom hands them, and cannot reach this
+ * module's unixcall table.  Contract in wine/winecom.h. */
+void CDECL __wine_emu_materialize_ctx( AMD64_CONTEXT *ctx )
+{
+    materialize_trap_ctx( ctx );
+}
+
 /* Set by an override that has REPLACED that CONTEXT wholesale rather than
  * returned a value into it -- a guest raise whose __except was found by the
  * frame walk, which resumes in another frame.  emu_trap_dispatch's ordinary
@@ -3841,6 +3867,7 @@ static NTSTATUS guest_unwind_in_place( const struct guest_unwind_target *target 
         return STATUS_NOT_IMPLEMENTED;
     }
     WINE_UNIX_CALL( unix_emu_guest_stack, &stack );
+    materialize_trap_ctx( ctx );   /* the walk reads it whole and rewrites it whole */
 
     /* The frame the walk must start at is the CALLER of the entry point that
      * asked to unwind, which is where x86-64 RtlUnwindEx's first virtual
@@ -4698,6 +4725,7 @@ static ULONG_PTR emu_RaiseException( const ULONG_PTR *a, void *native )
     }
     /* the address of the raise is the return address its CALL pushed */
     rec.ExceptionAddress = (void *)*(ULONG_PTR *)(ULONG_PTR)ctx->Rsp;
+    materialize_trap_ctx( ctx );   /* guest handlers receive this CONTEXT whole */
     dispatch_guest_raise( &rec, ctx );
     return 0;
 }
@@ -4714,6 +4742,7 @@ static ULONG_PTR emu_RtlRaiseException( const ULONG_PTR *a, void *native )
     }
     rec = *(const EXCEPTION_RECORD *)a[0];   /* layout-identical; asserted above */
     rec.ExceptionAddress = (void *)*(ULONG_PTR *)(ULONG_PTR)ctx->Rsp;
+    materialize_trap_ctx( ctx );   /* guest handlers receive this CONTEXT whole */
     dispatch_guest_raise( &rec, ctx );
     return 0;
 }
@@ -4892,6 +4921,7 @@ static ULONG_PTR emu_RtlCaptureContext( const ULONG_PTR *a, void *native )
         ERR( "no trap context for guest RtlCaptureContext(%p)\n", out );
         return 0;
     }
+    materialize_trap_ctx( ctx );   /* the capture is a whole-CONTEXT read */
     *out = *ctx;
     out->Rip  = *(DWORD64 *)(ULONG_PTR)ctx->Rsp;
     out->Rsp  = ctx->Rsp + 8;
@@ -6473,6 +6503,7 @@ static ULONG_PTR emu_CreateFiber( const ULONG_PTR *a, void *native, ULONG_PTR st
     fiber->stack_alloc = teb_stack.DeallocationStack;
     fiber->owns_stack  = TRUE;
 
+    materialize_trap_ctx( emu_current_trap_ctx );   /* the copy takes EFlags/MxCsr too */
     fiber->ctx = *emu_current_trap_ctx;
     rsp = ((ULONG_PTR)teb_stack.StackBase & ~(ULONG_PTR)15) - 0x28;
     *(ULONG64 *)rsp = stack.hlt;
@@ -6564,6 +6595,9 @@ static ULONG_PTR emu_SwitchToFiber( const ULONG_PTR *a, void *native )
     stack.op = EMU_FIBER_QUERY;
     if (!guest_fiber_stack( &stack ) && stack.limit) cur->stack_limit = stack.limit;
     memset( &stack, 0, sizeof(stack) );
+    /* the park copies the whole register file AND the wholesale replace below
+     * writes the whole register file: both halves need the groups real */
+    materialize_trap_ctx( ctx );
     cur->ctx      = *ctx;
     cur->ctx.Rip  = *(DWORD64 *)(ULONG_PTR)ctx->Rsp;
     cur->ctx.Rsp  = ctx->Rsp + 8;
@@ -8733,6 +8767,9 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
             ULONG_PTR gpr[THUNK_MAX_ARGS];
             double fpr[THUNK_MAX_FP_ARGS], fp_ret = 0.0;
 
+            /* FP arguments are read out of XmmRegisters and an FP return is
+             * written into XmmRegisters[0]: both sides of the lazy contract */
+            materialize_trap_ctx( ctx );
             marshal_thunk_args_fp( ctx, argc, THUNK_SIG_NARROW(sig), widths, signs, fp, gpr, fpr );
             ret = call_native_thunk_fp( proc, gpr, fpr, &fp_ret );
 
