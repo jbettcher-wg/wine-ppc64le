@@ -123,6 +123,13 @@ command -v ss    >/dev/null || skip "need ss (iproute2) for the teardown layer"
 # no indication of where they came from.  A gate that raises dialogs has to
 # own the screen it raises them on -- the same rule check-fullscreen-smoke.sh
 # follows with its private weston.
+# $OUT must exist BEFORE the Xvfb block below writes its log into it.  This
+# used to sit after the block and worked only when /tmp/launch-smoke survived
+# from an earlier run; the first run after a reboot skipped on "could not
+# start a private Xvfb" whose real cause was the redirect failing [MEASURED
+# 2026-08-27].
+mkdir -p "$OUT" || skip "cannot create $OUT"
+
 XVFB_PID=
 if [ -z "${LAUNCH_SMOKE_USE_CALLER_DISPLAY:-}" ]; then
     command -v Xvfb >/dev/null || \
@@ -150,8 +157,6 @@ fi
 
 [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] || \
     skip "set DISPLAY (or WAYLAND_DISPLAY): with no driver a message box cannot be created, and the negative control would prove nothing"
-
-mkdir -p "$OUT" || skip "cannot create $OUT"
 
 # ---------------------------------------------------------------------------
 # The guest probe, and the REFUSED image it is pointed at.
