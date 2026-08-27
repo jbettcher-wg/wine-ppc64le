@@ -256,6 +256,27 @@ if [ -f "$appcfg" ]; then
     done < "$appcfg"
 fi
 
+# The lane's own JIT defaults, applied after the per-title file so a Steam
+# launch option or a title's .env wins.  This is the emulated stack's
+# default game recipe ("lazy" in launchers.bak/fexplay-wtsmc, plus the fex
+# wrapper's X87 default) plus hardware TSO -- without these a native-lane
+# launch runs strict SMC checks and a software barrier on every memory op
+# against an emulated lane that never does, which is a configuration gap,
+# not an architecture measurement.  FEX_HWTSO is sound (PROT_SAO pages,
+# probe + refusal closure in the bridge; smaps `ar` VmFlags is the tell it
+# is live) and was verified end to end before it was made a default here.
+# WINE_PPC64LE_STRIP_FEX_ENV=1 above still strips ALL of it for a launch
+# that needs the bridge's own bare defaults.
+for kv in FEX_HWTSO=1 FEX_SMCCHECKS=mtrack FEX_SMCSOFTINVALIDATE=1 \
+          FEX_SMCLAZYINVAL=1 FEX_SMCFILEIMMUTABLE=1 FEX_SMCLAZYLINK=1 \
+          FEX_X87REDUCEDPRECISION=1; do
+    name=${kv%%=*}
+    if eval "[ -z \"\${$name:-}\" ]"; then
+        export "$kv"
+        say "lane default $kv"
+    fi
+done
+
 echo
 echo "===== environment handed to the native wine ====="
 env | sort
