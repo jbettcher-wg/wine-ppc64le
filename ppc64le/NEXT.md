@@ -269,11 +269,19 @@ rest is boundary overhead, and it decomposes into named work:
 So the frame thread's ceiling is not JIT throughput -- it is the PRICE
 and the COUNT of guest<->native crossings.  The levers, in order:
 
-  1. **Cheapen the crossing** (bridge + dispatcher): lazy EFLAGS/XMM
-     reconstruction (a thunk hop with an integer ABI does not need
-     either), and per-thread caching of the TLS/TEB pointers the
-     dispatcher currently re-resolves every hop.  ~24% of the thread is
-     sitting in this mechanical per-hop work.
+  1. **Cheapen the crossing -- DONE (2026-08-27, second sitting).**
+     Three wine-side costs deleted in `aefb21d8c74` (initial-exec TLS on
+     all 23 per-thread trap-path variables + the thread_data pthread key's
+     IE mirror + the 1232-byte debugger publish becoming a pointer), and
+     the bridge half in fex-src `8a4b975fa` + this tree's `cc5e5d5b320`
+     (bridge ABI 5: EFLAGS/XMM are not reconstructed per trap; the
+     audited consumers materialize on demand, ppc64le/cpu/check-lazy-ctx.sh
+     is the falsifiable gate).  Measured across the three commits, same
+     -benchmark protocol: __tls_get_addr_opt 3.6% -> absent,
+     pthread_getspecific 3.3% -> 1.4%, libc memcpy 5.8% -> below the
+     profile cutoff, ReconstructCompactedEFLAGS/XMM -> absent; scene fps
+     22.34/22.91 (two baseline legs) -> 23.95, and JIT'd guest code
+     31% -> 37% of the GameThread.
   2. **Delete the hottest crossings** -- THE COUNT IS IN, and it names
      them.  `WINE_PPC64LE_TRAP_STATS=<path>` counts every crossing per
      call site (flat export, COM slot, syscall, guest callback);
@@ -336,6 +344,36 @@ and the COUNT of guest<->native crossings.  The levers, in order:
      the dispatcher expects.  The next candidate is NOT PeekMessage
      (real queue semantics) and NOT GetTickCount (dead).  It is the COM
      class, which is now the largest by far and wants batching.
+
+     **The COM class got its first two answers (2026-08-27, second
+     sitting).**  `GetGPUVirtualAddress` is served guest-side from the
+     proxy (`2cd77653d45`, WINECOM_F_CONST_QWORD): 88,016/s -> 25/s in
+     the flythrough window, one crossing per distinct buffer ever.  And
+     the top of the class -- SetGraphicsRootDescriptorTable, both Draws,
+     IASetVertex/IndexBuffer, SetPipelineState, SetComputeRootDescriptor-
+     Table, SetGraphicsRoot32BitConstant, ~385k crossings/s between them
+     -- records guest-side into a per-command-list ring replayed in order
+     at the object's next real trap (the call journal in
+     libs/winecom/winecom.c; the big comment above install_journal is the
+     correctness argument wall by wall).  WINEEMUNOCOMJOURNAL=1 and
+     WINEEMUNOCOMCONSTGET=1 are the levers.
+
+     [MEASURED] the journal leg: SetGraphicsRootDescriptorTable 176,243/s
+     -> 10/s, DrawIndexedInstanced 66k -> 10/s, IASetIndexBuffer 51k ->
+     4/s, IASetVertexBuffers 55k -> 73/s (the residue is the >8-views and
+     ring-full fallbacks, working as designed), SetPipelineState 12.6k ->
+     0.2/s.  COM class 780k/s -> 359k/s, ALL crossings 2.9M/s -> 2.18M/s.
+     Scene fps is FLAT (23.5-24.0 vs 23.95 before), and the reason is
+     worth keeping: command recording happens on the ~25 redDispatcher
+     WORKER threads, not on the GameThread the frame rate is bound by --
+     the journal buys back worker-side CPU (and total crossings), not
+     GameThread time.  Whether that headroom turns into fps at SMT2 or
+     under the performance governor is unmeasured.
+
+     The remaining unbatched hot rows are the DEVICE-side descriptor pair
+     (CopyDescriptors 176k/s + CreateConstantBufferView 99k/s -- now rows
+     one and two of the COM class), which want a descriptor-shadow design,
+     ResourceBarrier (9.5k/s, struct arrays), and PeekMessageW.
   3. **Name the memcpy 6.7%**: game streaming vs marshal copies --
      annotate call sites before optimizing either.
 HWTSO/PROT_SAO is NO LONGER FEXInterpreter-only: fastppcx86 `d4168c1ec`

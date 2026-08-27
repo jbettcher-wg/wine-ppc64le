@@ -50,6 +50,7 @@
  */
 
 #include <stdarg.h>
+#include <string.h>
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -81,12 +82,27 @@ struct com_proxy
      * install_const_getters() emits does `mov rax,[rcx+0x20]` -- so the
      * offset is part of the guest ABI and pinned by the C_ASSERT below. */
     UINT64      cached_qword;
+    /* The call journal (install_journal): a per-proxy ring the guest-side
+     * snippets append hot void-returning command-list calls into instead of
+     * trapping, drained IN ORDER at this object's next real trap (or when it
+     * crosses as an argument).  jr_pos is written by GUEST code -- one
+     * recording thread per command list, by D3D12's own rules -- and reset
+     * by the drain, which runs on that same thread inside its trap.  All
+     * three offsets are guest ABI, pinned below. */
+    BYTE       *jr_base;      /* 0x28: NULL = no journal for this proxy */
+    UINT64      jr_pos;       /* 0x30: bytes used, guest-written */
+    UINT64      jr_cap;       /* 0x38: bytes available */
+    BOOL        jr_draining;  /* re-entrancy fuse for the drain */
 };
 #ifdef _WIN64
-/* the guest ABI pin for the 64-bit lane's snippet; the i386 build of this
+/* the guest ABI pin for the 64-bit lane's snippets; the i386 build of this
  * library lays the struct out differently AND would need i386 snippet
- * encoding, so the fast path is 64-bit-lane-only -- see install_const_getters */
+ * encoding, so the fast paths are 64-bit-lane-only -- see
+ * install_const_getters / install_journal */
 C_ASSERT( offsetof(struct com_proxy, cached_qword) == 0x20 );
+C_ASSERT( offsetof(struct com_proxy, jr_base) == 0x28 );
+C_ASSERT( offsetof(struct com_proxy, jr_pos)  == 0x30 );
+C_ASSERT( offsetof(struct com_proxy, jr_cap)  == 0x38 );
 #endif
 
 #define INTERN_BUCKETS 256
@@ -354,6 +370,423 @@ static void install_const_getters( void )
 }
 #endif  /* _WIN64 */
 
+/***********************************************************************
+ *           the call journal
+ *
+ * [MEASURED 2026-08-27, crossings table] the top of the COM class is a
+ * handful of void-returning ID3D12GraphicsCommandList methods -- descriptor
+ * table binds, draws, vertex/index buffer binds, pipeline binds -- at
+ * ~385,000 crossings a second between them, every one a full trap, dispatch
+ * and NtCallbackReturn for a call whose only effect is to append a command
+ * to a recording.  So the recording moves guest-side: each journaled slot's
+ * vtable entry becomes a snippet that appends {slot, args} to a per-proxy
+ * ring, and the ring is REPLAYED IN ORDER through invoke_marshalled() -- the
+ * same classifier, narrowing and translate-in the live path uses -- at the
+ * object's next real trap.  N crossings become one.
+ *
+ * WHY THIS IS CORRECT, wall by wall:
+ *   ORDER    a command list is recorded by one thread at a time (D3D12's own
+ *            rule); everything journaled is list-scoped state, and any
+ *            NON-journaled call on the same list (ResourceBarrier, Close,
+ *            CopyResource...) traps, and the dispatch drains the ring BEFORE
+ *            serving it, so interleavings replay exactly as issued.
+ *   EXECUTE  Close is not journaled, so the ring is empty by the time D3D12
+ *            allows ExecuteCommandLists; and the classifier drains any
+ *            forward proxy crossing as an argument anyway (wc_forward_host),
+ *            so even an off-contract execute sees the drained state.
+ *   ARGS     everything recorded is by-value, a proxy pointer the drain
+ *            unwraps through the ordinary classifier, or a struct COPIED
+ *            INTO the record by the snippet (IASetIndexBuffer's 16 bytes,
+ *            IASetVertexBuffers' up-to-8 views) -- nothing in the ring
+ *            dangles when the app frees its stack frame after the call.
+ *   RETURNS  journal-eligible slots return void; RAX after the snippet is
+ *            scratch, exactly as after a real void method.
+ *   FULL     a full ring falls back to the slot's own trap stub, whose
+ *            dispatch drains first -- the slow path is the old path.
+ *
+ * The slots are CURATED BY NAME below from per-method API knowledge (the
+ * same honesty rule as CONST_QWORD_GETTERS), and install refuses a slot
+ * whose table row stopped matching the curated shape -- fail closed to
+ * trapping, never to a wrong record.  WINEEMUNOCOMJOURNAL=1 is the negative
+ * control: no snippets, no rings, every call traps and the crossing counter
+ * shows the rows again.
+ */
+
+enum journal_shape
+{
+    JSH_REG1 = 1,   /* 1 arg,  rdx                         rec 16  */
+    JSH_REG2,       /* 2 args, rdx r8                      rec 24  */
+    JSH_REG3,       /* 3 args, rdx r8 r9                   rec 32  */
+    JSH_DRAW4,      /* 4 args, rdx r8 r9 stack             rec 40  */
+    JSH_DRAW5,      /* 5 args, rdx r8 r9 stack stack       rec 48  */
+    JSH_IBV,        /* ptr -> 16 bytes inline              rec 32  */
+    JSH_VBV,        /* start count ptr -> <=8 x 24 inline  rec 224 */
+};
+
+static const struct journal_slot_def
+{
+    const char *name;
+    enum journal_shape shape;
+    UINT argc;                  /* including `this` -- must match the row */
+}
+journal_slots[] =
+{
+    { "ID3D12GraphicsCommandList::SetGraphicsRootDescriptorTable", JSH_REG2, 3 },
+    { "ID3D12GraphicsCommandList::SetComputeRootDescriptorTable",  JSH_REG2, 3 },
+    { "ID3D12GraphicsCommandList::SetPipelineState",               JSH_REG1, 2 },
+    { "ID3D12GraphicsCommandList::SetGraphicsRoot32BitConstant",   JSH_REG3, 4 },
+    { "ID3D12GraphicsCommandList::DrawIndexedInstanced",           JSH_DRAW5, 6 },
+    { "ID3D12GraphicsCommandList::DrawInstanced",                  JSH_DRAW4, 5 },
+    { "ID3D12GraphicsCommandList::IASetIndexBuffer",               JSH_IBV,  2 },
+    { "ID3D12GraphicsCommandList::IASetVertexBuffers",             JSH_VBV,  4 },
+};
+
+#define JOURNAL_RING_SIZE  0x8000   /* 32K a list; ~150 records of the fattest shape */
+#define JOURNAL_MAX_REC    224
+
+static UINT journal_rec_bytes( enum journal_shape shape )
+{
+    switch (shape)
+    {
+    case JSH_REG1:  return 16;
+    case JSH_REG2:  return 24;
+    case JSH_REG3:  return 32;
+    case JSH_DRAW4: return 40;
+    case JSH_DRAW5: return 48;
+    case JSH_IBV:   return 32;
+    case JSH_VBV:   return 224;
+    }
+    return 0;
+}
+
+/* which interfaces have at least one journaled slot -- winecom_wrap gives
+ * their proxies a ring */
+static unsigned char *iface_journaled;
+static BOOL journal_on;
+
+static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct winecom_slot *sl,
+                                   struct com_proxy *proxy, UINT iface, UINT slot,
+                                   const UINT64 *rawargs, UINT64 *rax_out );
+
+/* Replay every record in `p`'s ring, oldest first, then reset the ring.
+ * Runs on the recording thread inside its own trap in the ordered cases; the
+ * argument-crossing case can be another thread, where D3D12's Close-before-
+ * execute rule means an empty ring unless the app is racing itself -- the
+ * acquire/release pair keeps even that read coherent. */
+static void wc_journal_drain( struct com_proxy *p )
+{
+    UINT64 pos;
+    BYTE *r, *end;
+
+    if (!p->jr_base || p->jr_draining) return;
+    pos = __atomic_load_n( &p->jr_pos, __ATOMIC_ACQUIRE );
+    if (!pos) return;
+    p->jr_draining = TRUE;
+
+    r = p->jr_base;
+    end = r + (pos <= p->jr_cap ? pos : 0);   /* a corrupt pos drains nothing */
+    if (end == r)
+        ERR( "journal pos %I64u beyond cap %I64u on %s proxy %p; dropping the ring\n",
+             pos, p->jr_cap, wc_surface->ifaces[p->iface].name, p );
+
+    while (r + 8 <= end)
+    {
+        UINT key    = *(UINT *)r;
+        UINT sizesh = *(UINT *)(r + 4);
+        UINT iface  = key >> 16, slot = key & 0xffff;
+        UINT bytes  = sizesh & 0xffffff;
+        enum journal_shape shape = sizesh >> 24;
+        const UINT64 *a = (const UINT64 *)(r + 8);
+        UINT64 rawargs[16] = { 0 }, rax;
+        const struct winecom_iface *itf;
+        const struct winecom_slot *sl;
+        NTSTATUS status;
+
+        if (iface >= wc_surface->iface_count || bytes < 16 || bytes > JOURNAL_MAX_REC ||
+            r + bytes > end || bytes != journal_rec_bytes( shape ))
+        {
+            ERR( "corrupt journal record (key %08x size/shape %08x) on proxy %p; "
+                 "dropping the rest of the ring\n", key, sizesh, p );
+            break;
+        }
+        itf = &wc_surface->ifaces[iface];
+        if (slot >= itf->slot_count || !itf->slots)
+        {
+            ERR( "journal record names %s slot %u which the table does not have; "
+                 "dropping the rest of the ring\n", itf->name, slot );
+            break;
+        }
+        sl = &itf->slots[slot];
+
+        switch (shape)
+        {
+        case JSH_REG1:  rawargs[1] = a[0]; break;
+        case JSH_REG2:  rawargs[1] = a[0]; rawargs[2] = a[1]; break;
+        case JSH_REG3:  rawargs[1] = a[0]; rawargs[2] = a[1]; rawargs[3] = a[2]; break;
+        case JSH_DRAW4: rawargs[1] = a[0]; rawargs[2] = a[1]; rawargs[3] = a[2];
+                        rawargs[4] = a[3]; break;
+        case JSH_DRAW5: rawargs[1] = a[0]; rawargs[2] = a[1]; rawargs[3] = a[2];
+                        rawargs[4] = a[3]; rawargs[5] = a[4]; break;
+        case JSH_IBV:
+            /* a[0] is the guest's original pointer, kept for its NULLness;
+             * the bytes it pointed at live in the record */
+            rawargs[1] = a[0] ? (UINT64)(ULONG_PTR)(r + 16) : 0;
+            break;
+        case JSH_VBV:
+            rawargs[1] = a[0];
+            rawargs[2] = a[1];
+            rawargs[3] = a[2] ? (UINT64)(ULONG_PTR)(r + 32) : 0;
+            break;
+        }
+
+        status = invoke_marshalled( itf, sl, p, iface, slot, rawargs, &rax );
+        if (status)
+            ERR( "journal replay of %s failed, status %08x; continuing\n",
+                 sl->name, (UINT)status );
+        r += bytes;
+    }
+
+    __atomic_store_n( &p->jr_pos, 0, __ATOMIC_RELEASE );
+    p->jr_draining = FALSE;
+}
+
+#ifdef _WIN64
+/***********************************************************************
+ *           install_journal
+ *
+ * Emit the guest-side recording snippets and point the journaled slots'
+ * vtable entries at them.  Byte encodings llvm-mc-verified (the source .s is
+ * in the commit message's session); every snippet is:
+ *
+ *     mov  rax, [rcx+0x28]        ; ring base; NULL -> fallback
+ *     test rax, rax ; jz fb
+ *     mov  r10, [rcx+0x30]        ; pos
+ *     lea  r11, [r10+REC]
+ *     cmp  r11, [rcx+0x38] ; ja fb
+ *     add  rax, r10
+ *     mov  dword [rax], KEY       ; (iface<<16)|slot
+ *     mov  dword [rax+4], REC|SHAPE<<24
+ *     ... shape stores ...
+ *     mov  [rcx+0x30], r11 ; ret
+ * fb: jmp [rip+0] ; .quad trap_stub
+ */
+struct snippet_buf
+{
+    BYTE *p;
+    BYTE *fixups[8];   /* rel8 sites that must land on the fallback */
+    UINT nfix;
+};
+
+static void sb_emit( struct snippet_buf *b, const void *bytes, UINT n )
+{
+    memcpy( b->p, bytes, n );
+    b->p += n;
+}
+
+static void sb_emit_jcc_fb( struct snippet_buf *b, BYTE opc )
+{
+    BYTE ins[2] = { opc, 0 };
+    b->fixups[b->nfix++] = b->p + 1;
+    sb_emit( b, ins, 2 );
+}
+
+static void install_journal( void )
+{
+    static const BYTE pre1[] = { 0x48, 0x8b, 0x41, 0x28,       /* mov rax,[rcx+0x28] */
+                                 0x48, 0x85, 0xc0 };           /* test rax,rax */
+    static const BYTE pre2[] = { 0x4c, 0x8b, 0x51, 0x30 };     /* mov r10,[rcx+0x30] */
+    static const BYTE pre4[] = { 0x4c, 0x3b, 0x59, 0x38 };     /* cmp r11,[rcx+0x38] */
+    static const BYTE pre6[] = { 0x4c, 0x01, 0xd0 };           /* add rax,r10 */
+    static const BYTE st_rdx[]  = { 0x48, 0x89, 0x50, 0x08 };  /* mov [rax+8],rdx */
+    static const BYTE st_r8[]   = { 0x4c, 0x89, 0x40, 0x10 };  /* mov [rax+16],r8 */
+    static const BYTE st_r9[]   = { 0x4c, 0x89, 0x48, 0x18 };  /* mov [rax+24],r9 */
+    static const BYTE st_stk4[] = { 0x4c, 0x8b, 0x54, 0x24, 0x28,   /* mov r10,[rsp+0x28] */
+                                    0x4c, 0x89, 0x50, 0x20 };       /* mov [rax+0x20],r10 */
+    static const BYTE st_stk5[] = { 0x4c, 0x8b, 0x54, 0x24, 0x30,   /* mov r10,[rsp+0x30] */
+                                    0x4c, 0x89, 0x50, 0x28 };       /* mov [rax+0x28],r10 */
+    static const BYTE ibv_cp[]  = { 0x48, 0x85, 0xd2,               /* test rdx,rdx */
+                                    0x74, 0x0f,                     /* jz +15 (over the copy) */
+                                    0x4c, 0x8b, 0x12,               /* mov r10,[rdx] */
+                                    0x4c, 0x89, 0x50, 0x10,         /* mov [rax+0x10],r10 */
+                                    0x4c, 0x8b, 0x52, 0x08,         /* mov r10,[rdx+8] */
+                                    0x4c, 0x89, 0x50, 0x18 };       /* mov [rax+0x18],r10 */
+    static const BYTE vbv_guard[] = { 0x49, 0x83, 0xf8, 0x08 };     /* cmp r8,8 */
+    /* The copy loop's data temp is R8, NOT r11: r11 carries the new ring
+     * position into the epilogue, and the first cut of this loop used it as
+     * the temp -- so jr_pos got the last copied qword, a vkd3d GPU VA, and
+     * the drain dropped every ring as corrupt [MEASURED 2026-08-27, the
+     * first journal leg: "journal pos 702...  beyond cap"].  R8 held
+     * NumViews, which is already both stored in the record and folded into
+     * rdx as the qword count by the time the loop runs. */
+    static const BYTE vbv_cp[]  = { 0x4d, 0x85, 0xc9,               /* test r9,r9 */
+                                    0x74, 0x1d,                     /* jz +29 (over the loop) */
+                                    0x4c, 0x89, 0xc2,               /* mov rdx,r8 */
+                                    0x48, 0x8d, 0x14, 0x52,         /* lea rdx,[rdx+rdx*2] */
+                                    0x45, 0x31, 0xd2,               /* xor r10d,r10d */
+                                    /* loop: */
+                                    0x49, 0x39, 0xd2,               /* cmp r10,rdx */
+                                    0x73, 0x0e,                     /* jae +14 (out of the loop) */
+                                    0x4f, 0x8b, 0x04, 0xd1,         /* mov r8,[r9+r10*8] */
+                                    0x4e, 0x89, 0x44, 0xd0, 0x20,   /* mov [rax+r10*8+0x20],r8 */
+                                    0x49, 0xff, 0xc2,               /* inc r10 */
+                                    0xeb, 0xed };                   /* jmp loop (-19) */
+    static const BYTE epi[] = { 0x4c, 0x89, 0x59, 0x30,        /* mov [rcx+0x30],r11 */
+                                0xc3 };                        /* ret */
+    static const BYTE fb[]  = { 0xff, 0x25, 0x00, 0x00, 0x00, 0x00 };  /* jmp [rip+0] */
+
+    static const UINT snippet_stride = 160;   /* the fattest (VBV) is ~120 */
+    unsigned char *block, *code;
+    SIZE_T size;
+    UINT i, n, j, k, count = 0;
+
+    if (!(iface_journaled = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap,
+                                             HEAP_ZERO_MEMORY, wc_surface->iface_count )))
+        return;
+
+    for (i = 0; i < wc_surface->iface_count; i++)
+    {
+        const struct winecom_iface *itf = &wc_surface->ifaces[i];
+        if (!itf->slots) continue;
+        for (n = 0; n < itf->slot_count; n++)
+            for (j = 0; j < ARRAYSIZE(journal_slots); j++)
+                if (itf->slots[n].name && !strcmp( itf->slots[n].name, journal_slots[j].name ))
+                    count++;
+    }
+    if (!count) return;
+    if (com_env_flag( L"WINEEMUNOCOMJOURNAL" ))
+    {
+        ERR( "WINEEMUNOCOMJOURNAL=1 -- %u journal slots stay trapping on every call\n", count );
+        return;
+    }
+
+    block = NULL;
+    size = count * snippet_stride;
+    if (NtAllocateVirtualMemory( NtCurrentProcess(), (void **)&block, 0, &size,
+                                 MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE ))
+    {
+        ERR( "no memory for %u journal snippets; slots stay trapping\n", count );
+        return;
+    }
+
+    code = block;
+    for (i = 0; i < wc_surface->iface_count; i++)
+    {
+        const struct winecom_iface *itf = &wc_surface->ifaces[i];
+        if (!itf->slots) continue;
+        for (n = 0; n < itf->slot_count; n++)
+        {
+            const struct journal_slot_def *def = NULL;
+            const struct winecom_slot *sl = &itf->slots[n];
+            struct snippet_buf b = { code };
+            UINT64 *vslot;
+            UINT rec;
+            BYTE tmp[16];
+
+            for (j = 0; j < ARRAYSIZE(journal_slots); j++)
+                if (sl->name && !strcmp( sl->name, journal_slots[j].name ))
+                { def = &journal_slots[j]; break; }
+            if (!def) continue;
+
+            /* fail closed to trapping if the table row stopped matching the
+             * curated shape -- a drifted roster must never produce a wrong
+             * record */
+            if (sl->refuse || (sl->flags & WINECOM_F_HAND) ||
+                !(sl->flags & WINECOM_F_RET_VOID) || sl->argc != def->argc)
+            {
+                ERR( "journal slot %s does not match its curated shape "
+                     "(argc %u, flags %x); it stays trapping\n",
+                     sl->name, sl->argc, sl->flags );
+                continue;
+            }
+
+            rec = journal_rec_bytes( def->shape );
+            vslot = &guest_vtbl_block[iface_slot_base[i] + n];
+
+            sb_emit( &b, pre1, sizeof(pre1) );
+            sb_emit_jcc_fb( &b, 0x74 );                   /* jz fb */
+            sb_emit( &b, pre2, sizeof(pre2) );
+            tmp[0] = 0x4d; tmp[1] = 0x8d; tmp[2] = 0x9a;  /* lea r11,[r10+rec] */
+            *(UINT *)(tmp + 3) = rec;
+            sb_emit( &b, tmp, 7 );
+            sb_emit( &b, pre4, sizeof(pre4) );
+            sb_emit_jcc_fb( &b, 0x77 );                   /* ja fb */
+            if (def->shape == JSH_VBV)
+            {
+                sb_emit( &b, vbv_guard, sizeof(vbv_guard) );
+                sb_emit_jcc_fb( &b, 0x77 );               /* ja fb: count > 8 */
+            }
+            sb_emit( &b, pre6, sizeof(pre6) );
+            tmp[0] = 0xc7; tmp[1] = 0x00;                 /* mov dword [rax],key */
+            *(UINT *)(tmp + 2) = (i << 16) | n;
+            sb_emit( &b, tmp, 6 );
+            tmp[0] = 0xc7; tmp[1] = 0x40; tmp[2] = 0x04;  /* mov dword [rax+4],rec|shape */
+            *(UINT *)(tmp + 3) = rec | ((UINT)def->shape << 24);
+            sb_emit( &b, tmp, 7 );
+
+            switch (def->shape)
+            {
+            case JSH_REG1:
+                sb_emit( &b, st_rdx, sizeof(st_rdx) );
+                break;
+            case JSH_REG2:
+                sb_emit( &b, st_rdx, sizeof(st_rdx) );
+                sb_emit( &b, st_r8, sizeof(st_r8) );
+                break;
+            case JSH_REG3:
+                sb_emit( &b, st_rdx, sizeof(st_rdx) );
+                sb_emit( &b, st_r8, sizeof(st_r8) );
+                sb_emit( &b, st_r9, sizeof(st_r9) );
+                break;
+            case JSH_DRAW4:
+                sb_emit( &b, st_rdx, sizeof(st_rdx) );
+                sb_emit( &b, st_r8, sizeof(st_r8) );
+                sb_emit( &b, st_r9, sizeof(st_r9) );
+                sb_emit( &b, st_stk4, sizeof(st_stk4) );
+                break;
+            case JSH_DRAW5:
+                sb_emit( &b, st_rdx, sizeof(st_rdx) );
+                sb_emit( &b, st_r8, sizeof(st_r8) );
+                sb_emit( &b, st_r9, sizeof(st_r9) );
+                sb_emit( &b, st_stk4, sizeof(st_stk4) );
+                sb_emit( &b, st_stk5, sizeof(st_stk5) );
+                break;
+            case JSH_IBV:
+                sb_emit( &b, st_rdx, sizeof(st_rdx) );
+                sb_emit( &b, ibv_cp, sizeof(ibv_cp) );
+                break;
+            case JSH_VBV:
+                sb_emit( &b, st_rdx, sizeof(st_rdx) );
+                sb_emit( &b, st_r8, sizeof(st_r8) );
+                sb_emit( &b, st_r9, sizeof(st_r9) );
+                sb_emit( &b, vbv_cp, sizeof(vbv_cp) );
+                break;
+            }
+            sb_emit( &b, epi, sizeof(epi) );
+
+            /* the fallback: every recorded rel8 jump lands here */
+            for (k = 0; k < b.nfix; k++)
+            {
+                LONG_PTR d = b.p - (b.fixups[k] + 1);
+                *b.fixups[k] = (BYTE)d;
+            }
+            sb_emit( &b, fb, sizeof(fb) );
+            memcpy( b.p, vslot, sizeof(UINT64) );         /* the trap stub */
+            b.p += 8;
+
+            TRACE( "journal: %s slot %u recorded guest-side from %p "
+                   "(shape %u rec %u, fallback stub %p)\n",
+                   sl->name, n, code, def->shape, rec, *(void **)vslot );
+            *vslot = (UINT64)(ULONG_PTR)code;
+            iface_journaled[i] = 1;
+            code += snippet_stride;
+        }
+    }
+    journal_on = TRUE;
+}
+#else
+static void install_journal( void ) { }
+#endif  /* _WIN64 */
+
 /* Build the guest vtables from a guest module's published stub arrays. */
 static BOOL com_runtime_init_once( void )
 {
@@ -418,6 +851,7 @@ static BOOL com_runtime_init_once( void )
     TRACE( "%s: materialised %u guest vtable slots across %u interfaces from %p\n",
            wc_surface->name, total_slots, i, guest );
     install_const_getters();
+    install_journal();
     if (nowrap)
         ERR( "%s: WINEEMUNOCOMWRAP=1 -- interface pointers will cross RAW; "
              "expect guest calls into native vtables\n", wc_surface->name );
@@ -593,6 +1027,24 @@ void *winecom_wrap( void *host, UINT iface )
     p->refs = 1;
     p->iface = iface;
     p->cached_qword = 0;   /* the heap does not zero, and 0 is the sentinel */
+    p->jr_base = NULL;
+    p->jr_pos = 0;
+    p->jr_cap = 0;
+    p->jr_draining = FALSE;
+    if (journal_on && iface_journaled[iface])
+    {
+        /* one recording ring per journaled object; a failed allocation just
+         * leaves the snippets on their fallback path -- every call traps,
+         * which is the old world */
+        SIZE_T ring = JOURNAL_RING_SIZE;
+        void *mem = NULL;
+        if (!NtAllocateVirtualMemory( NtCurrentProcess(), &mem, 0, &ring,
+                                      MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE ))
+        {
+            p->jr_base = mem;
+            p->jr_cap = JOURNAL_RING_SIZE;
+        }
+    }
     p->next = intern[bucket];
     intern[bucket] = p;
     RtlLeaveCriticalSection( &wc_cs );
@@ -656,6 +1108,11 @@ BOOL wc_forward_host( void *ptr, void **host_out )
     *host_out = NULL;
     if (!ptr) return FALSE;
     if (!(p = proxy_from_pointer( ptr ))) return FALSE;
+    /* An object crossing as an ARGUMENT (ExecuteCommandLists, ExecuteBundle)
+     * must be current before the callee sees it.  D3D12's Close-before-
+     * execute rule means this normally finds an empty ring -- Close trapped
+     * and drained -- so this is the belt to that braces. */
+    wc_journal_drain( p );
     *host_out = p->host;
     return TRUE;
 }
@@ -701,6 +1158,15 @@ static ULONG proxy_release( struct com_proxy *p )
     {
         TRACE( "destroying proxy %p (%s host %p)\n", p,
                wc_surface->ifaces[p->iface].name, host );
+        if (p->jr_base)
+        {
+            /* whatever is still in the ring dies with the object: a released
+             * command list's unreplayed records could only ever have fed a
+             * recording nobody can execute any more */
+            SIZE_T ring = 0;
+            void *mem = p->jr_base;
+            NtFreeVirtualMemory( NtCurrentProcess(), &mem, &ring, MEM_RELEASE );
+        }
         host_release_iface( host, iface );
         RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, p );
     }
@@ -805,11 +1271,22 @@ static void release_borrows( const UINT64 *args, const UINT *borrowed, UINT coun
         winecom_to_native_end( (void *)(ULONG_PTR)args[borrowed[n]] );
 }
 
-NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
+/***********************************************************************
+ *           invoke_marshalled
+ *
+ * The marshalling core of winecom_dispatch, over an argument ARRAY instead
+ * of a trap CONTEXT: rawargs[i] is argument i exactly as
+ * winecom_read_arg(ctx, i) would have produced it (index 0, `this`, is
+ * ignored -- the proxy parameter is the authority).  Split out so the
+ * journal drain can replay recorded calls through the SAME classifier,
+ * narrowing, translate-in and refusal logic the live trap path uses -- two
+ * marshallers would be two places for the next dwordmask bug to hide.
+ * On STATUS_SUCCESS *rax_out is what RAX must carry back to the guest.
+ */
+static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct winecom_slot *sl,
+                                   struct com_proxy *proxy, UINT iface, UINT slot,
+                                   const UINT64 *rawargs, UINT64 *rax_out )
 {
-    const struct winecom_iface *itf;
-    const struct winecom_slot *sl;
-    struct com_proxy *proxy;
     UINT64 args[16] = { 0 };
     UINT64 arr_buf[32];
     UINT64 *arr_heap = NULL;
@@ -817,71 +1294,15 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
     UINT i, n, ppv_idx = 0, riid_idx = 0;
     UINT out_static_idx[8], n_out_static = 0;
     UINT out_arr_idx[8], n_out_arr = 0;
-    /* Argument positions holding a REVERSE proxy this call minted for a
-     * guest-implemented in-parameter.  Borrowed for the duration of the call
-     * and given back on every path out of it -- see release_borrows(). */
     UINT borrowed[16], n_borrowed = 0;
     const UINT64 *arr_borrowed = NULL;
     UINT n_arr_borrowed = 0;
     BOOL have_ppv = FALSE;
 
-    if (!com_ready()) return STATUS_DLL_INIT_FAILED;
-    if (iface >= wc_surface->iface_count) return STATUS_INVALID_PARAMETER;
-    itf = &wc_surface->ifaces[iface];
-    if (slot >= itf->slot_count) return STATUS_INVALID_PARAMETER;
-
-    proxy = (struct com_proxy *)(ULONG_PTR)ctx->R10;
-    if (!proxy)
-    {
-        ERR( "%s slot %u called with NULL this\n", itf->name, slot );
-        ctx->Rax = (UINT)E_INVALIDARG;
-        return STATUS_SUCCESS;
-    }
-    if (proxy->iface != iface)
-        WARN( "proxy %p says iface %u (%s), stub says %u (%s)\n", proxy,
-              proxy->iface, wc_surface->ifaces[proxy->iface].name, iface, itf->name );
-
-    /* IUnknown's three slots head every vtable and are served from the proxy
-     * table; Release of the last reference is the only crossing. */
-    if (slot < 3)
-    {
-        switch (slot)
-        {
-        case 0:
-            ctx->Rax = (UINT)proxy_qi( proxy,
-                                       (const GUID *)(ULONG_PTR)ctx->Rdx,
-                                       (void **)(ULONG_PTR)ctx->R8 );
-            break;
-        case 1:
-            ctx->Rax = proxy_addref( proxy );
-            break;
-        case 2:
-            ctx->Rax = proxy_release( proxy );
-            break;
-        }
-        return STATUS_SUCCESS;
-    }
-
-    sl = itf->slots ? &itf->slots[slot] : NULL;
-    if (!sl || sl->refuse)
-    {
-        refuse_once( iface, slot, sl ? sl->name : NULL, sl ? sl->refuse : NULL );
-        ctx->Rax = (UINT)E_NOTIMPL;
-        return STATUS_SUCCESS;
-    }
-
-    TRACE( "%s (iface %u slot %u argc %u)\n", sl->name, iface, slot, sl->argc );
-
-    if (sl->flags & WINECOM_F_HAND)
-    {
-        ctx->Rax = wc_surface->hand_funcs[sl->aux]( proxy->host, slot, ctx );
-        return STATUS_SUCCESS;
-    }
-
     args[0] = (UINT64)(ULONG_PTR)proxy->host;
     for (i = 1; i < sl->argc; i++)
     {
-        UINT64 raw = winecom_read_arg( ctx, i );
+        UINT64 raw = rawargs[i];
         switch (sl->cls ? sl->cls[i - 1] : WINECOM_CA_PASS)
         {
         case WINECOM_CA_PASS:
@@ -940,7 +1361,7 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
                              "this surface cannot reverse-proxy" );
                 if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
                 release_borrows( args, borrowed, n_borrowed );
-                ctx->Rax = (UINT)E_NOTIMPL;
+                *rax_out = (UINT)E_NOTIMPL;
                 return STATUS_SUCCESS;
             }
             args[i] = (UINT64)(ULONG_PTR)host;
@@ -967,7 +1388,7 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
                              "table; the generator must emit one" );
                 if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
                 release_borrows( args, borrowed, n_borrowed );
-                ctx->Rax = (UINT)E_NOTIMPL;
+                *rax_out = (UINT)E_NOTIMPL;
                 return STATUS_SUCCESS;
             }
             if (raw && n_out_arr < ARRAYSIZE(out_arr_idx))
@@ -989,14 +1410,14 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
                              "relay" );
                 if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
                 release_borrows( args, borrowed, n_borrowed );
-                ctx->Rax = (UINT)E_NOTIMPL;
+                *rax_out = (UINT)E_NOTIMPL;
                 return STATUS_SUCCESS;
             }
             args[i] = 0;
             break;
         case WINECOM_CA_IFACE_ARR_IN:
         {
-            UINT count = (UINT)winecom_read_arg( ctx, sl->aux2 + 1 );
+            UINT count = (UINT)rawargs[sl->aux2 + 1];
             void *const *src = (void *const *)(ULONG_PTR)raw;
             UINT64 *dst;
 
@@ -1010,7 +1431,7 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
                                                          count * sizeof(*dst) )))
             {
                 release_borrows( args, borrowed, n_borrowed );
-                ctx->Rax = (UINT)E_OUTOFMEMORY;
+                *rax_out = (UINT)E_OUTOFMEMORY;
                 return STATUS_SUCCESS;
             }
             for (n = 0; n < count; n++)
@@ -1032,7 +1453,7 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
                     while (n--) winecom_to_native_end( (void *)(ULONG_PTR)dst[n] );
                     if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
                     release_borrows( args, borrowed, n_borrowed );
-                    ctx->Rax = (UINT)E_NOTIMPL;
+                    *rax_out = (UINT)E_NOTIMPL;
                     return STATUS_SUCCESS;
                 }
                 dst[n] = (UINT64)(ULONG_PTR)host;
@@ -1047,7 +1468,7 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
                          "runtime marshal path" );
             if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
             release_borrows( args, borrowed, n_borrowed );
-            ctx->Rax = (UINT)E_NOTIMPL;
+            *rax_out = (UINT)E_NOTIMPL;
             return STATUS_SUCCESS;
         }
     }
@@ -1096,7 +1517,7 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
     {
         UINT idx = out_arr_idx[n];
         void **out = (void **)(ULONG_PTR)args[idx];
-        UINT count = (UINT)winecom_read_arg( ctx, sl->caux[idx - 1] + 1 );
+        UINT count = (UINT)rawargs[sl->caux[idx - 1] + 1];
         UINT k;
 
         for (k = 0; k < count; k++)
@@ -1104,11 +1525,11 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
     }
 
     if (sl->flags & WINECOM_F_RET_VIA_ARG)
-        ctx->Rax = args[1];   /* == the callee's return value */
+        *rax_out = args[1];   /* == the callee's return value */
     else if (sl->flags & WINECOM_F_RET_VOID)
-        ctx->Rax = 0;
+        *rax_out = 0;
     else
-        ctx->Rax = ret;
+        *rax_out = ret;
 
     /* The other half of install_const_getters(): the first real call caches
      * its answer in the proxy, and the guest-side snippet serves every later
@@ -1120,4 +1541,81 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
         proxy->cached_qword = ret;
 
     return STATUS_SUCCESS;
+}
+
+NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
+{
+    const struct winecom_iface *itf;
+    const struct winecom_slot *sl;
+    struct com_proxy *proxy;
+    UINT i;
+
+    if (!com_ready()) return STATUS_DLL_INIT_FAILED;
+    if (iface >= wc_surface->iface_count) return STATUS_INVALID_PARAMETER;
+    itf = &wc_surface->ifaces[iface];
+    if (slot >= itf->slot_count) return STATUS_INVALID_PARAMETER;
+
+    proxy = (struct com_proxy *)(ULONG_PTR)ctx->R10;
+    if (!proxy)
+    {
+        ERR( "%s slot %u called with NULL this\n", itf->name, slot );
+        ctx->Rax = (UINT)E_INVALIDARG;
+        return STATUS_SUCCESS;
+    }
+    if (proxy->iface != iface)
+        WARN( "proxy %p says iface %u (%s), stub says %u (%s)\n", proxy,
+              proxy->iface, wc_surface->ifaces[proxy->iface].name, iface, itf->name );
+
+    /* Everything the guest journaled on this object happened BEFORE the call
+     * that is trapping now: replay it first, whatever this call is -- a
+     * non-journaled method, a journaled one whose ring filled, Close, or
+     * Release.  This is what makes the recorded order the issued order. */
+    wc_journal_drain( proxy );
+
+    /* IUnknown's three slots head every vtable and are served from the proxy
+     * table; Release of the last reference is the only crossing. */
+    if (slot < 3)
+    {
+        switch (slot)
+        {
+        case 0:
+            ctx->Rax = (UINT)proxy_qi( proxy,
+                                       (const GUID *)(ULONG_PTR)ctx->Rdx,
+                                       (void **)(ULONG_PTR)ctx->R8 );
+            break;
+        case 1:
+            ctx->Rax = proxy_addref( proxy );
+            break;
+        case 2:
+            ctx->Rax = proxy_release( proxy );
+            break;
+        }
+        return STATUS_SUCCESS;
+    }
+
+    sl = itf->slots ? &itf->slots[slot] : NULL;
+    if (!sl || sl->refuse)
+    {
+        refuse_once( iface, slot, sl ? sl->name : NULL, sl ? sl->refuse : NULL );
+        ctx->Rax = (UINT)E_NOTIMPL;
+        return STATUS_SUCCESS;
+    }
+
+    TRACE( "%s (iface %u slot %u argc %u)\n", sl->name, iface, slot, sl->argc );
+
+    if (sl->flags & WINECOM_F_HAND)
+    {
+        ctx->Rax = wc_surface->hand_funcs[sl->aux]( proxy->host, slot, ctx );
+        return STATUS_SUCCESS;
+    }
+
+    {
+        UINT64 rawargs[16] = { 0 }, rax = 0;
+        NTSTATUS st;
+
+        for (i = 1; i < sl->argc && i < 16; i++) rawargs[i] = winecom_read_arg( ctx, i );
+        st = invoke_marshalled( itf, sl, proxy, iface, slot, rawargs, &rax );
+        if (st == STATUS_SUCCESS) ctx->Rax = rax;
+        return st;
+    }
 }

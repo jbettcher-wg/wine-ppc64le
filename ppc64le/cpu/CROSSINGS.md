@@ -162,3 +162,35 @@ semantics.  `GetSystemTimePreciseAsFileTime` is 2,489/s and reads the realtime
 clock, which NTP can step; the timebase cannot serve it without a published
 realtime epoch that moves under a reader.  The COM class did not move and is
 now the largest by far; those rows want a batching design, not a fast path.
+
+## What was done about the COM class (2026-08-27, second sitting)
+
+Two mechanisms in libs/winecom, both installed at attach by rewriting the
+materialised vtable slots (the COM lane's runtime analog of
+`FAST_PATH_EXPORTS`), both 64-bit-lane-only, each with its own lever:
+
+* **Const-qword getters** (`WINECOM_F_CONST_QWORD`, lever
+  `WINEEMUNOCOMCONSTGET=1`): the dispatcher caches the first real answer in
+  the proxy and 24 bytes of guest x86 serve every later call.
+  [MEASURED] `ID3D12Resource::GetGPUVirtualAddress` 88,016/s → 25/s in the
+  flythrough window; 7,418 crossings over the whole process life — one per
+  distinct buffer — against 6.5M served guest-side.
+* **The call journal** (lever `WINEEMUNOCOMJOURNAL=1`): the hot
+  void-returning `ID3D12GraphicsCommandList` methods (descriptor-table
+  binds, draws, vertex/index binds, pipeline binds — ~385k crossings/s
+  between them) append `{slot, args}` records to a per-proxy ring from guest
+  code and the ring replays in order through the marshalling core at the
+  object's next real trap.  The correctness argument, wall by wall, is the
+  comment above `install_journal` in winecom.c.
+  [MEASURED] SetGraphicsRootDescriptorTable 176,243/s → 10/s, both draws and
+  both IA binds likewise (IASetVertexBuffers keeps 73/s of >8-views and
+  ring-full fallbacks, by design); COM class 780k/s → 359k/s, all crossings
+  2.9M/s → 2.18M/s.  Scene fps is FLAT: the recording ran on the
+  redDispatcher worker threads, not the GameThread the frame rate is bound
+  by, so the journal buys worker CPU and total crossings, not frame time on
+  this title as configured.
+
+The still-unbatched hot rows are the DEVICE-side pair — `CopyDescriptors`
+(176k/s) + `CreateConstantBufferView` (99k/s), which are free-threaded and
+want a descriptor-shadow design — `ResourceBarrier` (9.5k/s, struct arrays),
+and `PeekMessageW`.
