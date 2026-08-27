@@ -245,10 +245,44 @@ mirror the fexplay-wtsmc knob set into the native lane's env (per-title
 .env or a steamtool/proton default), re-run the `-benchmark` A/B --
 parked until the user calls for it.
 
-What remains after parity: the GameThread itself.  Next instrument is a
-perf profile of that one tid mid-benchmark (`FEX_GLOBALJITNAMING=1`
-writes /tmp/perf-<pid>.map, and the bridge honors it now) to split its
-92% between JIT'd guest code, bridge helpers, and TSO barrier overhead.
+**Parity landed and the split is MEASURED (2026-08-26).**  The lane
+defaults are in `steamtool/proton` now -- FEX_HWTSO=1 plus the lazy SMC
+recipe, applied after the per-title .env so a caller still wins -- and
+the bridge confirms in the log: "FEX_HWTSO live: PROT_SAO carries
+ordering, no TSO barriers emitted".  FEX_SPINCOLLAPSE=128 rides in
+Cyberpunk's .env (the emulated lane's own K sweep; UNSET IS OFF).
+
+The GameThread perf split (30s mid-flythrough, 27k samples, tid-scoped,
+JIT map live): **JIT'd guest code is only ~37%** of the thread.  The
+rest is boundary overhead, and it decomposes into named work:
+
+  * ~17% trap/dispatch machinery: emu_trap_dispatch 5.5,
+    __wine_syscall_dispatcher 4.0, call/return user_mode_callback 3.5,
+    call_emu_trap_dispatcher 1.4, emu_trap_thunk/publish/teb_switch 2.6.
+  * ~14% bridge, over half of it guest-state pack/unpack per crossing:
+    Reconstruct/SetCompactedEFLAGS 4.2, XMM state sync 2.1.
+  * ~7% TLS resolution per hop: __tls_get_addr_opt 3.4,
+    pthread_getspecific 2.6, NtCurrentTeb 0.8.
+  * ~8% libc memcpy/memset; ~5% win32u (PeekMessage, get_tick_count,
+    shared queue); clock_gettime + getrusage ~1.5.
+
+So the frame thread's ceiling is not JIT throughput -- it is the PRICE
+and the COUNT of guest<->native crossings.  The levers, in order:
+
+  1. **Cheapen the crossing** (bridge + dispatcher): lazy EFLAGS/XMM
+     reconstruction (a thunk hop with an integer ABI does not need
+     either), and per-thread caching of the TLS/TEB pointers the
+     dispatcher currently re-resolves every hop.  ~24% of the thread is
+     sitting in this mechanical per-hop work.
+  2. **Delete the hottest crossings**: the tick/QPC/PeekMessage shape
+     says the game polls time and input at frame frequency through full
+     traps.  Windows serves GetTickCount/QPC from KUSER_SHARED_DATA in
+     user space with NO syscall; if the guest lane traps for these,
+     serving them guest-side from the shared page removes whole
+     crossing classes.  First step: count trap exits by slot name to
+     rank them (the profile shows cost, not frequency).
+  3. **Name the memcpy 6.7%**: game streaming vs marshal copies --
+     annotate call sites before optimizing either.
 HWTSO/PROT_SAO is NO LONGER FEXInterpreter-only: fastppcx86 `d4168c1ec`
 re-hosts the probe and the refusal/revocation closure in the bridge,
 and this tree carries the bit through get_unix_prot(), retro-applies it
