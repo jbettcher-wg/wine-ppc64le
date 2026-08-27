@@ -82,6 +82,7 @@ GUEST-REFUSE DllGetClassObject
 # imports them: __wine_com_dispatch is called by ntdll's COM trap dispatcher
 # on the NATIVE module, and the other two are the audit's redirect targets.
 EXCLUDE __wine_com_dispatch
+EXCLUDE __wine_com_slot_name
 EXCLUDE __wine_guest_DirectInput8Create
 EXCLUDE __wine_com_refuse
 

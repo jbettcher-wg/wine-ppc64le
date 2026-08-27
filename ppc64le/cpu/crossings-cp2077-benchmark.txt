@@ -1,0 +1,244 @@
+# Cyberpunk 2077 -benchmark, the flythrough only.
+#
+# [MEASURED] 2026-08-27 on op4k (POWER8, V620, performance governor), this
+# tree with WINE_PPC64LE_TRAP_STATS armed.  Run 3 of 3: 18.25 avg fps over
+# 1199 frames; the three armed runs were 18.47 / 18.74 / 18.25.
+#
+# Produced by subtracting two of the sink's periodic dumps with
+# ppc64le/cpu/xstat_window.py.  The window is the interval over which the
+# crossing rate held steady at ~3.5M/s, which is the flythrough; the process
+# lives ~168 s, so whole-life rates understate these by ~2.5x.
+#
+# HOW TO READ THE SYSCALL CLASS.  NtCallbackReturn is not an independent
+# crossing: it is how emu_trap_dispatch RETURNS, so its count is exactly
+# flat+com.  Subtract it to get real syscalls (36.0M here, 541k/s), and
+# note that a syscall row sitting at the same count as a flat row above it
+# is that export's own syscall -- QueryPerformanceCounter and PeekMessageW
+# each cost one full trap AND one full syscall per call.
+#
+# crossing frequency over a 66.57 s window (92.26 s -> 158.83 s of process life)
+# 235622244 crossings in 217 named rows
+# class syscall       135833179       2040456/s
+# class com            54907999        824816/s
+# class flat           44878640        674157/s
+# class event              1213            18/s
+# class callback           1213            18/s
+
+class             count      per-sec  name
+syscall        99787100      1498980  NtCallbackReturn
+flat           17084378       256638  KERNEL32.dll.QueryPerformanceCounter
+syscall        17084206       256635  NtQueryPerformanceCounter
+com            11717696       176021  ID3D12GraphicsCommandList::SetGraphicsRootDescriptorTable
+com            10938711       164319  ID3D12Device::CopyDescriptors
+syscall         6692031       100526  NtUserPeekMessage
+flat            6692031       100526  USER32.dll.PeekMessageW
+com             6346809        95340  ID3D12Device::CreateConstantBufferView
+com             6298735        94618  ID3D12Resource::GetGPUVirtualAddress
+com             5213637        78318  ID3D12GraphicsCommandList::DrawIndexedInstanced
+flat            4650707        69862  KERNEL32.dll.EnterCriticalSection
+flat            4650658        69861  KERNEL32.dll.LeaveCriticalSection
+com             4143356        62241  ID3D12GraphicsCommandList::IASetVertexBuffers
+com             3872111        58166  ID3D12GraphicsCommandList::IASetIndexBuffer
+syscall         2779163        41748  NtWaitForSingleObject
+flat            2773271        41659  KERNEL32.dll.WaitForSingleObject
+flat            2747527        41273  KERNEL32.dll.ReleaseSemaphore
+syscall         2747422        41271  NtReleaseSemaphore
+syscall         2646245        39751  NtWaitForAlertByThreadId
+syscall         2592961        38951  NtAlertThreadByThreadId
+flat            1243646        18682  KERNEL32.dll.GetCurrentThreadId
+com              814668        12238  ID3D12GraphicsCommandList::SetPipelineState
+com              743996        11176  ID3D12GraphicsCommandList::SetComputeRootDescriptorTable
+flat             623164         9361  KERNEL32.dll.AcquireSRWLockExclusive
+flat             623159         9361  KERNEL32.dll.ReleaseSRWLockExclusive
+flat             535240         8040  KERNEL32.dll.SetEvent
+syscall          535230         8040  NtSetEvent
+com              502399         7547  ID3D12GraphicsCommandList::ResourceBarrier
+flat             496512         7458  KERNEL32.dll.ResetEvent
+syscall          496500         7458  NtResetEvent
+com              478798         7192  ID3D12GraphicsCommandList::OMSetStencilRef
+com              347922         5226  ID3D12GraphicsCommandList2::WriteBufferImmediate
+flat             310755         4668  KERNEL32.dll.SwitchToThread
+syscall          310755         4668  NtYieldExecution
+flat             277166         4164  KERNEL32.dll.AcquireSRWLockShared
+flat             277166         4164  KERNEL32.dll.ReleaseSRWLockShared
+com              259968         3905  ID3D12DescriptorHeap::GetCPUDescriptorHandleForHeapStart
+com              250897         3769  ID3D12GraphicsCommandList::CopyBufferRegion
+com              249193         3743  ID3D12Fence::GetCompletedValue
+com              245259         3684  ID3D12GraphicsCommandList::OMSetRenderTargets
+flat             218343         3280  KERNEL32.dll.InterlockedPushEntrySList
+flat             217448         3266  KERNEL32.dll.HeapAlloc
+flat             217444         3266  KERNEL32.dll.HeapFree
+com              207274         3114  ID3D12GraphicsCommandList::ExecuteIndirect
+flat             202735         3045  KERNEL32.dll.InterlockedPopEntrySList
+com              184889         2777  ID3D12GraphicsCommandList::RSSetScissorRects
+com              180037         2704  ID3D12GraphicsCommandList::RSSetViewports
+flat             169734         2550  KERNEL32.dll.GetLastError
+flat             169594         2548  KERNEL32.dll.SetLastError
+flat             158702         2384  KERNEL32.dll.GetSystemTimePreciseAsFileTime
+com              143191         2151  ID3D12GraphicsCommandList::DrawInstanced
+com              138500         2081  ID3D12GraphicsCommandList5::RSSetShadingRate
+com              122185         1835  ID3D12GraphicsCommandList::Dispatch
+flat             116687         1753  kernelbase.dll.FlsGetValue
+com              112509         1690  ID3D12DescriptorHeap::GetGPUDescriptorHandleForHeapStart
+flat             105802         1589  KERNEL32.dll.TlsSetValue
+com               93345         1402  ID3D12GraphicsCommandList::DiscardResource
+com               79177         1189  ID3D12GraphicsCommandList::Close
+com               79096         1188  ID3D12CommandAllocator/ID3D12Object::SetName
+com               79096         1188  ID3D12CommandAllocator::Reset
+com               79096         1188  ID3D12GraphicsCommandList/ID3D12Object::SetName
+com               79096         1188  ID3D12GraphicsCommandList::Reset
+com               76497         1149  ID3D12GraphicsCommandList::ClearRenderTargetView
+com               63325          951  IDXGIAdapter3::QueryVideoMemoryInfo
+com               59401          892  ID3D12GraphicsCommandList5::RSSetShadingRateImage
+com               58551          880  ID3D12Resource/IUnknown::Release
+flat              52901          795  KERNEL32.dll.TlsGetValue
+flat              52900          795  KERNEL32.dll.SleepConditionVariableSRW
+flat              52900          795  KERNEL32.dll.GetQueuedCompletionStatus
+syscall           52900          795  NtRemoveIoCompletion
+com               50117          753  ID3D12GraphicsCommandList::IASetPrimitiveTopology
+com               47165          709  ID3D12GraphicsCommandList::SetComputeRootSignature
+com               47163          708  ID3D12GraphicsCommandList::SetDescriptorHeaps
+com               45110          678  ID3D12CommandQueue::Signal
+com               44421          667  ID3D12GraphicsCommandList::SetGraphicsRootSignature
+com               35359          531  ID3D12Resource/IUnknown::AddRef
+com               32980          495  ID3D12CommandQueue::Wait
+com               30292          455  ID3D12Device::CopyDescriptorsSimple
+com               29161          438  ID3D12GraphicsCommandList::CopyTextureRegion
+com               26684          401  ID3D12GraphicsCommandList::EndQuery
+flat              23322          350  ADVAPI32.dll.SystemFunction036
+com               20129          302  ID3D12CommandQueue/ID3D12Object::GetPrivateData
+com               20129          302  ID3D12CommandQueue::ExecuteCommandLists
+com               20129          302  ID3D12Fence::Signal
+flat              19916          299  KERNEL32.dll.QueryPerformanceFrequency
+com               19583          294  ID3D12Device::CreateShaderResourceView
+com               18184          273  ID3D12GraphicsCommandList::ClearUnorderedAccessViewUint
+syscall           17035          256  NtClose
+com               15075          226  ID3D12Resource::GetDesc
+com               14807          222  ID3D12Device::CreatePlacedResource
+flat              14002          210  KERNEL32.dll.GetTickCount
+com               12106          182  ID3D12Resource::Map
+com               12099          182  ID3D12Resource::Unmap
+syscall           12052          181  NtWaitForMultipleObjects
+flat              12052          181  KERNEL32.dll.WaitForMultipleObjectsEx
+com               11914          179  ID3D12RootSignature/IUnknown::Release
+com               11903          179  ID3D12RootSignature/IUnknown::AddRef
+flat              11149          167  KERNEL32.dll.Sleep
+syscall           11148          167  NtDelayExecution
+com               10788          162  ID3D12Device::GetCopyableFootprints
+flat               9754          147  KERNEL32.dll.InterlockedFlushSList
+com                9328          140  IAudioClient::GetCurrentPadding
+com                8719          131  ID3D12GraphicsCommandList::ClearDepthStencilView
+syscall            8026          121  NtOpenKeyEx
+flat               7766          117  KERNEL32.dll.InitializeSRWLock
+syscall            7487          112  NtQueryValueKey
+com                6917          104  ID3D12Resource::GetHeapProperties
+syscall            6128           92  NtDeviceIoControlFile
+syscall            6024           90  NtSetInformationFile
+flat               6024           90  KERNEL32.dll.SetFilePointerEx
+syscall            6023           90  NtReadFile
+flat               6023           90  KERNEL32.dll.ReadFile
+flat               5894           89  WS2_32.dll.select
+com                5727           86  ID3D12Resource/IUnknown::QueryInterface
+flat               5089           76  KERNEL32.dll.CloseHandle
+syscall            5088           76  NtCreateEvent
+flat               5088           76  KERNEL32.dll.CreateEventW
+com                5071           76  IAudioRenderClient::GetBuffer
+com                5071           76  IAudioRenderClient::ReleaseBuffer
+syscall            4710           71  NtCreateKey
+flat               4647           70  XINPUT9_1_0.dll.XInputGetState
+flat               4102           62  KERNEL32.dll.WakeConditionVariable
+com                3815           57  ID3D12Device::GetResourceAllocationInfo
+com                3749           56  ID3D12Device/IUnknown::Release
+com                3749           56  ID3D12Resource/ID3D12DeviceChild::GetDevice
+syscall            3316           50  NtSetValueKey
+syscall            3052           46  NtEnumerateKey
+syscall            2426           36  NtUserCallHwndParam
+syscall            2426           36  NtUserGetForegroundWindow
+flat               2426           36  USER32.dll.GetForegroundWindow
+com                2426           36  IDXGIOutput/IUnknown::Release
+com                2426           36  IDXGIAdapter2/IDXGIAdapter::EnumOutputs
+com                2426           36  IDXGIOutput::GetDesc
+syscall            2426           36  NtUserEnumDisplayDevices
+syscall            2426           36  NtUserEnumDisplaySettings
+flat               2426           36  USER32.dll.EnumDisplayDevicesW
+flat               2426           36  USER32.dll.EnumDisplaySettingsW
+com                2424           36  ID3D12GraphicsCommandList::CopyResource
+com                1935           29  ID3D12CommandQueue::GetDesc
+com                1586           24  ID3D12Device4::CreateCommittedResource1
+syscall            1379           21  NtUserTranslateMessage
+flat               1379           21  USER32.dll.DispatchMessageW
+flat               1379           21  USER32.dll.TranslateMessage
+syscall            1379           21  NtUserDispatchMessage
+flat               1291           19  KERNEL32.dll.DeleteCriticalSection
+flat               1263           19  KERNEL32.dll.SleepConditionVariableCS
+flat               1257           19  KERNEL32.dll.InitializeCriticalSection
+event              1213           18  nested guest run (call_guest_function)
+flat               1213           18  USER32.dll.GetWindowLongPtrW
+callback           1213           18  Cyberpunk2077.exe+0x7cb6bc
+syscall            1213           18  NtUserGetProcessDpiAwarenessContext
+com                1213           18  IDXGISwapChain4/IDXGISwapChain3::GetCurrentBackBufferIndex
+com                1213           18  IDXGISwapChain4/IDXGISwapChain::GetFullscreenState
+syscall            1213           18  NtUserInvalidateRect
+flat               1213           18  USER32.dll.InvalidateRect
+com                1213           18  ID3D12GraphicsCommandList::ResolveQueryData
+com                1213           18  IDXGISwapChain4/IDXGISwapChain::Present
+syscall            1213           18  NtUserValidateRect
+flat               1213           18  USER32.dll.ValidateRect
+syscall            1213           18  NtUserClipCursor
+flat               1213           18  USER32.dll.ClipCursor
+flat               1213           18  USER32.dll.ClientToScreen
+flat                792           12  SETUPAPI.dll.SetupDiGetDeviceInterfaceDetailW
+flat                604            9  ucrtbase.dll.strcmp
+com                 594            9  ID3D12PipelineLibrary::LoadGraphicsPipeline
+flat                528            8  SETUPAPI.dll.SetupDiEnumDeviceInterfaces
+com                 488            7  ID3D12PipelineState/IUnknown::Release
+syscall             423            6  NtAllocateVirtualMemory
+com                 384            6  ID3D12PipelineState/IUnknown::AddRef
+com                 336            5  ID3D12PipelineLibrary::StorePipeline
+flat                331            5  KERNEL32.dll.VirtualAlloc
+syscall             331            5  NtFreeVirtualMemory
+flat                304            5  KERNEL32.dll.VirtualFree
+com                 225            3  ID3D12GraphicsCommandList/IUnknown::QueryInterface
+syscall             194            3  NtAlertMultipleThreadByThreadId
+flat                183            3  KERNEL32.dll.WakeAllConditionVariable
+com                 156            2  ID3D12GraphicsCommandList2/IUnknown::Release
+syscall             155            2  NtQuerySystemTime
+flat                154            2  KERNEL32.dll.GetSystemTimeAsFileTime
+com                 139            2  ID3D12Device::CreateUnorderedAccessView
+flat                132            2  SETUPAPI.dll.SetupDiDestroyDeviceInfoList
+flat                132            2  SETUPAPI.dll.SetupDiGetClassDevsW
+flat                105            2  ucrtbase.dll.strncpy
+com                  81            1  ID3D12CommandAllocator/IUnknown::Release
+com                  81            1  ID3D12GraphicsCommandList/IUnknown::Release
+com                  81            1  ID3D12GraphicsCommandList4/IUnknown::Release
+com                  81            1  ID3D12GraphicsCommandList5/IUnknown::Release
+com                  75            1  ID3D12Device::CreateCommandAllocator
+com                  75            1  ID3D12Device::CreateCommandList
+com                  75            1  ID3D12GraphicsCommandList2/IUnknown::AddRef
+syscall              62            1  NtQuerySystemInformation
+syscall              52            1  NtOpenKey
+com                  48            1  ID3D12Device::CreateGraphicsPipelineState
+syscall              34            1  NtUserMsgWaitForMultipleObjectsEx
+com                  33            0  ID3D12Device/IUnknown::QueryInterface
+com                  33            0  ID3D12Device1/IUnknown::Release
+com                  33            0  ID3D12Device1::SetResidencyPriority
+flat                 31            0  ucrtbase.dll.div
+com                  26            0  ID3D12Device::CreateRenderTargetView
+flat                 13            0  ole32.dll.CoCreateInstance
+com                  13            0  INetworkListManager::GetConnectivity
+syscall               8            0  NtCreateFile
+flat                  7            0  KERNEL32.dll.CreateDirectoryW
+flat                  2            0  KERNEL32.dll.GetProcAddress
+flat                  2            0  KERNEL32.dll.MultiByteToWideChar
+syscall               2            0  NtQueryInformationFile
+flat                  2            0  ucrtbase.dll.strncmp
+syscall               2            0  NtWriteFile
+flat                  2            0  KERNEL32.dll.WriteFile
+flat                  2            0  ucrtbase.dll._dtest
+flat                  1            0  KERNEL32.dll.CreateFileW
+flat                  1            0  KERNEL32.dll.GetFileSizeEx
+flat                  1            0  KERNEL32.dll.GetLocalTime
+com                   1            0  ID3D12Heap/IUnknown::Release
+com                   1            0  ID3D12PipelineLibrary::GetSerializedSize
+com                   1            0  ID3D12PipelineLibrary::Serialize
+flat                  1            0  ucrtbase.dll._dsign

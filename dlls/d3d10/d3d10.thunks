@@ -78,6 +78,7 @@ GUEST-PASS D3D10GetPixelShaderProfile    ID3D10Device never dereferenced; return
 
 # Internal names, kept out of the guest export list; see dlls/d3d11/d3d11.thunks.
 EXCLUDE __wine_com_dispatch
+EXCLUDE __wine_com_slot_name
 EXCLUDE __wine_com_refuse
 EXCLUDE __wine_guest_D3D10CreateDevice
 EXCLUDE __wine_guest_D3D10CreateDeviceAndSwapChain

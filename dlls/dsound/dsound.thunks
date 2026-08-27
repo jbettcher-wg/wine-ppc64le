@@ -75,6 +75,7 @@ GUEST-REFUSE DllGetClassObject
 # the NATIVE module, __wine_com_refuse is what GUEST-REFUSE resolves to, and
 # the __wine_guest_* are the GUEST-IMPL targets named above.
 EXCLUDE __wine_com_dispatch
+EXCLUDE __wine_com_slot_name
 EXCLUDE __wine_com_refuse
 EXCLUDE __wine_guest_DirectSoundCreate
 EXCLUDE __wine_guest_DirectSoundCreate8

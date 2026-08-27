@@ -617,6 +617,14 @@ NTSTATUS WINAPI __wine_com_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
     return winecom_dispatch( iface, slot, ctx );
 }
 
+/* The crossing-frequency sink's name lookup; see winecom_slot_names.  Never on
+ * a dispatch path -- ntdll asks once per slot, when it interns the row. */
+BOOL WINAPI __wine_com_slot_name( UINT iface, UINT slot, const char **iface_name,
+                                  const char **slot_name )
+{
+    return winecom_slot_names( iface, slot, iface_name, slot_name );
+}
+
 HRESULT WINAPI __wine_com_refuse(void)
 {
     ERR( "xaudio2: refusing an interface-bearing flat export with no wrapper "

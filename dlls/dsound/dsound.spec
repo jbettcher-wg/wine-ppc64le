@@ -30,3 +30,9 @@
 @ stdcall -private __wine_guest_DirectSoundCaptureCreate(ptr ptr ptr)
 @ stdcall -private __wine_guest_DirectSoundCaptureCreate8(ptr ptr ptr)
 @ stdcall -private __wine_guest_DirectSoundFullDuplexCreate(ptr ptr ptr ptr long long ptr ptr ptr ptr)
+
+# Appended at the END so no `@` export above it is renumbered:
+# ordinals are assigned in file order and guests import by ordinal
+# (ppc64le/vkd3d/check-ordinal-imports.sh).  Asked of the NATIVE
+# module by ntdll when the crossing sink interns a COM slot row.
+@ stdcall -private __wine_com_slot_name(long long ptr ptr)

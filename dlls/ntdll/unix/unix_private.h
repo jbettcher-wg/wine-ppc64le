@@ -379,6 +379,10 @@ extern void signal_disable_syscall_dispatch(void);
 extern void signal_init_process( TEB *teb );
 extern void DECLSPEC_NORETURN signal_start_thread( PRTL_THREAD_START_ROUTINE entry, void *arg, TEB *teb );
 extern SYSTEM_SERVICE_TABLE KeServiceDescriptorTable[4];
+extern const char *ntdll_syscall_name( UINT idx, UINT num );
+/* the crossing-frequency sink; both -> off unless WINE_PPC64LE_TRAP_STATS */
+extern int emu_xstat_enabled(void);
+extern ULONG_PTR *emu_xstat_syscall_counters( ULONG limit );
 extern void __wine_syscall_dispatcher(void);
 extern void __wine_syscall_dispatcher_return(void);
 extern void __wine_unix_call_dispatcher(void);

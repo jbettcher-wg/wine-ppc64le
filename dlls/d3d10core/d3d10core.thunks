@@ -41,4 +41,5 @@ INCLUDE-DIR ../../ppc64le/dxvk
 
 # Internal names, kept out of the guest export list; see dlls/d3d11/d3d11.thunks.
 EXCLUDE __wine_com_dispatch
+EXCLUDE __wine_com_slot_name
 EXCLUDE __wine_guest_D3D10CoreCreateDevice

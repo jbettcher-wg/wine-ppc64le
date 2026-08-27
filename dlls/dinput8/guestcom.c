@@ -273,6 +273,14 @@ NTSTATUS WINAPI __wine_com_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
     return winecom_dispatch( iface, slot, ctx );
 }
 
+/* The crossing-frequency sink's name lookup; see winecom_slot_names.  Never on
+ * a dispatch path -- ntdll asks once per slot, when it interns the row. */
+BOOL WINAPI __wine_com_slot_name( UINT iface, UINT slot, const char **iface_name,
+                                  const char **slot_name )
+{
+    return winecom_slot_names( iface, slot, iface_name, slot_name );
+}
+
 /* The shared loud-refusal stub every GUEST-REFUSE export resolves to: a flat
  * export that vends or consumes interfaces and has no wrapper.  Returns
  * E_NOTIMPL, never a pass-through that would hand the guest a native vtable.

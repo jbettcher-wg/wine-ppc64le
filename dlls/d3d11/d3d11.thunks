@@ -74,8 +74,11 @@ INCLUDE-DIR ../../ppc64le/dxvk
 # imports them: __wine_com_dispatch is called by ntdll's trap dispatcher on
 # the NATIVE module, __wine_guest_* are the GUEST-IMPL targets (native
 # symbols, named above), and __wine_dxvk_* are the aliases dxgi.dll and
-# d3d10core.dll forward their own plain names to.
+# d3d10core.dll forward their own plain names to.  __wine_com_slot_name is the
+# same shape as __wine_com_dispatch: ntdll asks the NATIVE module for a slot's
+# name when the crossing-frequency sink interns its row.
 EXCLUDE __wine_com_dispatch
+EXCLUDE __wine_com_slot_name
 EXCLUDE __wine_guest_D3D11CreateDevice
 EXCLUDE __wine_guest_D3D11CreateDeviceAndSwapChain
 EXCLUDE __wine_guest_D3D11CoreCreateDevice

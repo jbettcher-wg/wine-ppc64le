@@ -1764,6 +1764,8 @@ static ULONG_PTR emu_LoadLibraryA( const ULONG_PTR *a, void *native )
 #define MAX_GL_NAMES_SAID 4096
 
 static BOOL emu_env_flag( const WCHAR *name );
+/* the crossing-frequency sink, defined below the callback pool it counts */
+static void xstat_event( ULONG_PTR ev, const char *name );
 
 static char *gl_names_said[MAX_GL_NAMES_SAID];
 static UINT gl_names_said_count;
@@ -1918,6 +1920,7 @@ static ULONG_PTR call_guest_function( void *entry, void *arg )
     NTSTATUS status;
 
     params.exception_dispatcher = emu_exception_dispatch;
+    xstat_event( XSTAT_EV_NESTED_RUN, "nested guest run (call_guest_function)" );
     guest_run_depth++;
     status = WINE_UNIX_CALL( unix_emu_run_entry, &params );
     guest_run_depth--;
@@ -4487,8 +4490,11 @@ void WINAPI emu_exception_dispatch( ULONG id, void *args, ULONG len )
     /* The fault path resumes FROM the context either way, so it has no use for
      * the distinction the raise path turns on. */
     BOOL ctx_rewritten;
-    NTSTATUS status = dispatch_guest_exception( exc->rec, exc->ctx, exc->stack_base,
-                                                exc->stack_limit, &ctx_rewritten );
+    NTSTATUS status;
+
+    xstat_event( XSTAT_EV_GUEST_FAULT, "guest exception dispatch" );
+    status = dispatch_guest_exception( exc->rec, exc->ctx, exc->stack_base,
+                                       exc->stack_limit, &ctx_rewritten );
 
     if (status != STATUS_SUCCESS)
     {
@@ -5142,6 +5148,212 @@ static ULONG_PTR emu_onexit( const ULONG_PTR *a, void *native )
 
 
 /***********************************************************************
+ *           crossing-frequency counters  (WINE_PPC64LE_TRAP_STATS=<path>)
+ *
+ * WINEEMUPROFILE answers "which cache slots are hot"; this answers "which
+ * NAMED call crosses the boundary most per second", which is the question a
+ * fast path is chosen against.  A sampling profiler cannot answer it at all:
+ * it attributes time to the callee and never counts the crossings that
+ * reached it.
+ *
+ * ONE RELAXED ADD ON THE COUNTING PATH, and nothing else.  Every identity is
+ * resolved to a row index once, on the path that was already resolving that
+ * site under the loader lock, and the index is then carried in the same
+ * structure the site's other loop-invariant answers are carried in -- the
+ * thunk RIP cache, for flat exports and COM slots.  The add is
+ * __ATOMIC_RELAXED, not InterlockedIncrement: a count must not lose
+ * increments across threads, but nothing downstream orders against it, and a
+ * full barrier per crossing would be a measurable share of the thing being
+ * measured.
+ *
+ * NO STRINGS ARE TOUCHED WHILE COUNTING.  Names are copied into the row once,
+ * when the row is interned, and the syscall class does not intern at all --
+ * it counts into the dispatcher's own CounterTable and is resolved to names
+ * by the unix side at dump time.
+ *
+ * OFF COSTS TWO PREDICTED BRANCHES: one on the probe flag, one on the control
+ * pointer.  Neither the rows nor the syscall counter arrays are allocated
+ * unless the environment names a file.
+ */
+static struct emu_xstat_ctl *xstat;      /* NULL unless armed */
+static int xstat_probed;
+static LONG xstat_lock;                  /* interning only; never counting */
+
+/* Crossings on THIS thread between automatic-dump checks.  Per-thread and
+ * plain, because a shared tick counter would be a contended cache line
+ * written by every crossing -- the exact cost this instrumentation must not
+ * add.  A power of two so the test is a mask. */
+static __thread UINT xstat_tick;
+#define XSTAT_TICK_MASK 0xfffff
+
+#define XSTAT_NO_ROW (~0u)
+
+void emu_xstat_dump(void)
+{
+    if (xstat) WINE_UNIX_CALL( unix_emu_xstat_dump, NULL );
+}
+
+static void xstat_probe(void)
+{
+    struct emu_xstat_init_params params = { NULL };
+
+    if (!WINE_UNIX_CALL( unix_emu_xstat_init, &params )) xstat = params.ctl;
+    xstat_probed = 1;
+}
+
+/* The pointer is what decides, not the flag: two threads crossing for the
+ * first time together both probe (the unix side's init is idempotent under a
+ * mutex), and a thread that sees the flag set before the pointer simply does
+ * not count for the microseconds until its cache line catches up.  Ordering
+ * that with a barrier would put one on every crossing to buy nothing. */
+static BOOL xstat_on(void)
+{
+    if (!xstat_probed) xstat_probe();
+    return xstat != NULL;
+}
+
+static UINT xstat_hash( UINT cls, ULONG_PTR key )
+{
+    ULONG64 h = (ULONG64)key + (ULONG64)cls * 0x9e3779b97f4a7c15ull;
+
+    h ^= h >> 30;
+    h *= 0xbf58476d1ce4e5b9ull;
+    h ^= h >> 27;
+    return (UINT)(h >> 32);
+}
+
+/* Lock-free: a row's key is published with a release store AFTER its class
+ * and name are written, so a nonzero key seen here means a complete row. */
+static UINT xstat_find( UINT cls, ULONG_PTR key )
+{
+    UINT mask = xstat->rows_max - 1;
+    UINT i = xstat_hash( cls, key ) & mask, n;
+
+    for (n = 0; n <= mask; n++, i = (i + 1) & mask)
+    {
+        const struct emu_xstat_row *r = &xstat->rows[i];
+        ULONG_PTR k = __atomic_load_n( &r->key, __ATOMIC_ACQUIRE );
+
+        if (!k) return XSTAT_NO_ROW;
+        if (k == key && r->cls == cls) return i;
+    }
+    return XSTAT_NO_ROW;
+}
+
+/* -> the row for (cls, key), interning it under `name` if it is new.  Insert
+ * takes a spin lock, which is legitimate here and nowhere else: it runs once
+ * per distinct call site, on a path that has already taken the loader lock or
+ * is about to start a nested emulator run. */
+static UINT xstat_intern( UINT cls, ULONG_PTR key, const char *name )
+{
+    UINT row, i, n, mask;
+
+    if ((row = xstat_find( cls, key )) != XSTAT_NO_ROW) return row;
+
+    while (InterlockedCompareExchange( &xstat_lock, 1, 0 )) YieldProcessor();
+    if ((row = xstat_find( cls, key )) == XSTAT_NO_ROW)
+    {
+        mask = xstat->rows_max - 1;
+        for (n = 0, i = xstat_hash( cls, key ) & mask; n <= mask; n++, i = (i + 1) & mask)
+        {
+            struct emu_xstat_row *r = &xstat->rows[i];
+
+            if (r->key) continue;
+            r->cls = cls;
+            if (name)
+            {
+                SIZE_T len = strlen( name );
+
+                if (len >= sizeof(r->name)) len = sizeof(r->name) - 1;
+                memcpy( r->name, name, len );
+                r->name[len] = 0;
+            }
+            __atomic_store_n( &r->key, key, __ATOMIC_RELEASE );
+            row = i;
+            break;
+        }
+    }
+    WriteRelease( (LONG volatile *)&xstat_lock, 0 );
+    return row;
+}
+
+/* The whole counting path.  Anything that is not this add belongs elsewhere. */
+static void xstat_hit( UINT row )
+{
+    if (row == XSTAT_NO_ROW) return;
+    __atomic_fetch_add( &xstat->rows[row].count, 1, __ATOMIC_RELAXED );
+}
+
+/* Dumped periodically as well as at shutdown, because the runs worth measuring
+ * are exactly the ones that do not shut down -- a game a timeout kills, or one
+ * that dies on its own error path.  SIGUSR2 asks for a dump at a chosen moment
+ * and is noticed here within a few thousand crossings.
+ *
+ * Called only from crossing paths that hold NO lock.  The resolve path holds
+ * the loader lock, and a dump formats and writes a file; a site resolves once,
+ * so leaving it out of the tick costs nothing measurable and keeps the
+ * process-wide lock off the write. */
+static void xstat_tick_check(void)
+{
+    if (++xstat_tick & 0xfff) return;
+    if (!(xstat_tick & XSTAT_TICK_MASK) || xstat->dump_req)
+    {
+        xstat->dump_req = 0;
+        emu_xstat_dump();
+    }
+}
+
+static void xstat_event( ULONG_PTR ev, const char *name )
+{
+    if (!xstat_on()) return;
+    xstat_hit( xstat_intern( EMU_XSTAT_EVENT, ev, name ) );
+}
+
+/* Just enough formatting to name a row, hand-rolled.  The PE side of ntdll
+ * has no snprintf it can call: printf.c defines the export under an internal
+ * name (NTDLL__snprintf), so a caller inside ntdll would not link.  A row is
+ * named once, when it is interned. */
+static SIZE_T xstat_put( char *buf, SIZE_T len, SIZE_T at, const char *s )
+{
+    while (s && *s && at + 1 < len) buf[at++] = *s++;
+    if (at < len) buf[at] = 0;
+    return at;
+}
+
+static SIZE_T xstat_put_w( char *buf, SIZE_T len, SIZE_T at, const WCHAR *s )
+{
+    while (s && *s && at + 1 < len) buf[at++] = (char)*s++;
+    if (at < len) buf[at] = 0;
+    return at;
+}
+
+static SIZE_T xstat_put_num( char *buf, SIZE_T len, SIZE_T at, ULONG64 v, UINT base )
+{
+    char tmp[24];
+    UINT n = 0;
+
+    do
+    {
+        UINT d = (UINT)(v % base);
+        tmp[n++] = d < 10 ? '0' + d : 'a' + d - 10;
+        v /= base;
+    } while (v && n < sizeof(tmp));
+    while (n && at + 1 < len) buf[at++] = tmp[--n];
+    if (at < len) buf[at] = 0;
+    return at;
+}
+
+/* module.Export, out of the guest module's own name table. */
+static void xstat_name_export( char *buf, SIZE_T len, const WCHAR *mod, const char *fn )
+{
+    SIZE_T at = xstat_put_w( buf, len, 0, mod );
+
+    at = xstat_put( buf, len, at, "." );
+    xstat_put( buf, len, at, fn );
+}
+
+
+/***********************************************************************
  *           guest callback trampolines
  *
  * The generalisation the atexit handlers dodged: an API whose callbacks must
@@ -5272,11 +5484,51 @@ static BOOL guest_cb_owns( const void *fn )
     return FALSE;
 }
 
+/* One row per guest callback TARGET, which is what the pool's own identity is
+ * keyed on too (one stub per target/width/arity).  Named by the guest module
+ * and offset rather than by the API that registered it: the registering export
+ * is already a row of its own in the flat class, and plumbing its name down
+ * through wrap_thunk_callback_args would put a string on a path that has none.
+ *
+ * A hash probe rather than a carried index, because the dispatchers receive the
+ * guest target and not the stub that holds it.  That probe is two loads in
+ * front of a nested emulator run, which is the cheapest thing on this path by
+ * three orders of magnitude. */
+static void xstat_count_callback( void *fn )
+{
+    UINT row;
+
+    if (!xstat_on()) return;
+    if ((row = xstat_find( EMU_XSTAT_CALLBACK, (ULONG_PTR)fn )) == XSTAT_NO_ROW)
+    {
+        LDR_DATA_TABLE_ENTRY *mod = NULL;
+        char name[EMU_XSTAT_NAME];
+        SIZE_T i = 0;
+
+        if (!LdrFindEntryForAddress( fn, &mod ) && mod)
+        {
+            i = xstat_put_w( name, sizeof(name), 0, mod->BaseDllName.Buffer );
+            i = xstat_put( name, sizeof(name), i, "+0x" );
+            xstat_put_num( name, sizeof(name), i,
+                           (ULONG64)((ULONG_PTR)fn - (ULONG_PTR)mod->DllBase), 16 );
+        }
+        else
+        {
+            i = xstat_put( name, sizeof(name), 0, "guest 0x" );
+            xstat_put_num( name, sizeof(name), i, (ULONG64)(ULONG_PTR)fn, 16 );
+        }
+        row = xstat_intern( EMU_XSTAT_CALLBACK, (ULONG_PTR)fn, name );
+    }
+    xstat_hit( row );
+    xstat_tick_check();
+}
+
 static ULONG_PTR guest_callback_run( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
                                      ULONG_PTR a3, void *fn, BOOL *ended )
 {
     ULONG_PTR ret;
 
+    xstat_count_callback( fn );
     TRACE( "calling guest callback %p (%p,%p,%p,%p)\n", fn,
            (void *)a0, (void *)a1, (void *)a2, (void *)a3 );
     ret = call_guest_function_args( fn, a0, a1, a2, a3 );
@@ -5328,6 +5580,7 @@ static ULONG_PTR guest_callback_run5( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
 {
     ULONG_PTR ret;
 
+    xstat_count_callback( fn );
     TRACE( "calling guest callback %p (%p,%p,%p,%p,%p)\n", fn,
            (void *)a0, (void *)a1, (void *)a2, (void *)a3, (void *)a4 );
     ret = call_guest_function_args5( fn, a0, a1, a2, a3, a4 );
@@ -5362,6 +5615,7 @@ static ULONG_PTR guest_callback_run6( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
 {
     ULONG_PTR ret;
 
+    xstat_count_callback( fn );
     TRACE( "calling guest callback %p (%p,%p,%p,%p,%p,%p)\n", fn,
            (void *)a0, (void *)a1, (void *)a2, (void *)a3, (void *)a4, (void *)a5 );
     ret = call_guest_function_args6( fn, a0, a1, a2, a3, a4, a5 );
@@ -5418,6 +5672,7 @@ static ULONG_PTR guest_callback_run7( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
 {
     ULONG_PTR ret;
 
+    xstat_count_callback( fn );
     TRACE( "calling guest callback %p (%p,%p,%p,%p,%p,%p,%p)\n", fn,
            (void *)a0, (void *)a1, (void *)a2, (void *)a3, (void *)a4,
            (void *)a5, (void *)a6 );
@@ -5455,6 +5710,7 @@ static ULONG_PTR guest_callback_run8( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
 {
     ULONG_PTR ret;
 
+    xstat_count_callback( fn );
     TRACE( "calling guest callback %p (%p,%p,%p,%p,%p,%p,%p,%p)\n", fn,
            (void *)a0, (void *)a1, (void *)a2, (void *)a3, (void *)a4,
            (void *)a5, (void *)a6, (void *)a7 );
@@ -5493,6 +5749,7 @@ static ULONG_PTR guest_callback_run9( ULONG_PTR a0, ULONG_PTR a1, ULONG_PTR a2,
 {
     ULONG_PTR ret;
 
+    xstat_count_callback( fn );
     TRACE( "calling guest callback %p (%p,%p,%p,%p,%p,%p,%p,%p,%p)\n", fn,
            (void *)a0, (void *)a1, (void *)a2, (void *)a3, (void *)a4,
            (void *)a5, (void *)a6, (void *)a7, (void *)a8 );
@@ -7278,6 +7535,51 @@ static BOOL find_guest_com_target( LDR_DATA_TABLE_ENTRY *mod, ULONG_PTR rip,
     return FALSE;
 }
 
+/* Interface::Method for a COM slot, asked of the module that owns the marshal
+ * table.  ntdll has no view of a winecom surface -- the runtime is a static
+ * library, one instance per linkee -- so the client exports the two names
+ * beside the dispatch entry ntdll already calls.  Caller holds the loader
+ * lock; this runs once per slot, when its row is interned. */
+static void xstat_name_com_slot( LDR_DATA_TABLE_ENTRY *mod, const struct com_thunk_hit *com,
+                                 char *buf, SIZE_T len )
+{
+    BOOL (WINAPI *slot_name)( UINT, UINT, const char **, const char ** );
+    const char *iname = NULL, *sname = NULL;
+    ANSI_STRING name;
+    HMODULE native;
+
+    RtlInitAnsiString( &name, "__wine_com_slot_name" );
+    if (!LdrGetDllHandle( NULL, 0, &mod->BaseDllName, &native ) &&
+        !LdrGetProcedureAddress( native, &name, 0, (void **)&slot_name ) &&
+        slot_name( com->iface, com->slot, &iname, &sname ) && iname && sname)
+    {
+        /* A generated slot name already carries the interface that DECLARED
+         * the method, which is not always the one the guest called through:
+         * IMalloc's Release is declared by IUnknown.  Print the declaring
+         * name once, and the calling interface only when it differs. */
+        SIZE_T ilen = strlen( iname );
+        SIZE_T at = 0;
+
+        if (!strncmp( sname, iname, ilen ) && !strncmp( sname + ilen, "::", 2 ))
+            xstat_put( buf, len, 0, sname );
+        else
+        {
+            at = xstat_put( buf, len, 0, iname );
+            at = xstat_put( buf, len, at, strstr( sname, "::" ) ? "/" : "::" );
+            xstat_put( buf, len, at, sname );
+        }
+    }
+    else
+    {
+        SIZE_T at = xstat_put_w( buf, len, 0, mod->BaseDllName.Buffer );
+
+        at = xstat_put( buf, len, at, " iface " );
+        at = xstat_put_num( buf, len, at, com->iface, 10 );
+        at = xstat_put( buf, len, at, " slot " );
+        xstat_put_num( buf, len, at, com->slot, 10 );
+    }
+}
+
 /* A direct-mapped cache of find_guest_thunk_target's answer, keyed by the
  * trapping RIP, AND READ WITHOUT THE LOADER LOCK.  Both halves of that
  * sentence are load-bearing, and the second one is the point.
@@ -7363,6 +7665,13 @@ struct thunk_rip_cache_entry
     thunk_override_func override;
     UINT cb_mask, cb_wide, cb_argc, fp, widths, signs;
     struct com_thunk_hit com;    /* com.dispatch NULL unless this RIP is a slot */
+    UINT stat_row;               /* WINE_PPC64LE_TRAP_STATS row, or XSTAT_NO_ROW.
+                                  * Here rather than in a table of its own for
+                                  * the reason the whole cache exists: resolving
+                                  * this site's identity is loop-invariant, and
+                                  * the counting path must not resolve anything.
+                                  * Cleared with the rest on unmap, so a row can
+                                  * outlive the entry but never mis-name it. */
 };
 
 static struct thunk_rip_cache_entry thunk_rip_cache[THUNK_RIP_CACHE_SIZE];
@@ -7464,6 +7773,7 @@ static BOOL thunk_rip_cache_get( ULONG_PTR rip, struct thunk_rip_cache_entry *ou
     out->com.dispatch = e->com.dispatch;
     out->com.iface    = e->com.iface;
     out->com.slot     = e->com.slot;
+    out->stat_row     = e->stat_row;
 
     __atomic_thread_fence( __ATOMIC_ACQUIRE );   /* payload loads, THEN the recheck */
     s2 = ReadNoFence( (LONG const volatile *)&e->seq );
@@ -7588,6 +7898,7 @@ static void thunk_rip_cache_put( ULONG_PTR rip, const struct thunk_rip_cache_ent
     e->com.dispatch = val->com.dispatch;
     e->com.iface    = val->com.iface;
     e->com.slot     = val->com.slot;
+    e->stat_row     = val->stat_row;
 
     WriteRelease( (LONG volatile *)&e->seq, s + 2 );   /* even: stable again */
 }
@@ -7638,11 +7949,13 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
     static int no_cache = -1;
     struct thunk_rip_cache_entry hit;
     LIST_ENTRY *mark, *entry;
+    UINT stat_row = XSTAT_NO_ROW;
     void *ret = NULL;
     ULONG_PTR magic;
 
     if (no_cache == -1) no_cache = emu_env_flag( L"WINEEMUNORIPCACHE" );
     if (thunk_rip_profile == -1) thunk_rip_profile = emu_env_flag( L"WINEEMUPROFILE" );
+    if (!xstat_probed) xstat_probe();
 
     /* Counted HERE rather than on the hit path, because a crossing that
      * misses is still a crossing -- and a call site that is only ever crossed
@@ -7684,6 +7997,15 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
         /* a COM entry carries a dispatch and a NULL proc; a flat one the
          * reverse, and must leave the caller's zeroed *com alone */
         if (com && hit.com.dispatch) *com = hit.com;
+        /* THE COUNTING PATH: one relaxed add against an index this site
+         * resolved once.  Everything that made the index -- the module walk,
+         * the name lookups, the string copy -- happened on the miss path
+         * below, and happens once per site for the life of the mapping. */
+        if (xstat)
+        {
+            xstat_hit( hit.stat_row );
+            xstat_tick_check();
+        }
         return hit.proc;
     }
 
@@ -7806,10 +8128,20 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
         }
 
         ret = proc;
+        if (xstat)
+        {
+            char name[EMU_XSTAT_NAME];
+
+            xstat_name_export( name, sizeof(name), mod->BaseDllName.Buffer,
+                               (const char *)(base + names[idx]) );
+            stat_row = xstat_intern( EMU_XSTAT_FLAT, rip, name );
+            xstat_hit( stat_row );
+        }
         if (!no_cache)
         {
             struct thunk_rip_cache_entry val = { 0 };
 
+            val.stat_row = stat_row;
             val.proc     = proc;
             val.sig      = *sig_out;
             val.override = *override;
@@ -7831,12 +8163,24 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
          * not the loader lock, which is what the crossing was actually
          * paying.  A Direct3D 12 or XAudio2 guest crosses through vtable
          * slots far more often than through flat imports. */
-        if (com && find_guest_com_target( mod, rip, com ) && !no_cache)
+        if (com && find_guest_com_target( mod, rip, com ))
         {
-            struct thunk_rip_cache_entry val = { 0 };
+            if (xstat)
+            {
+                char name[EMU_XSTAT_NAME];
 
-            val.com = *com;
-            thunk_rip_cache_put( rip, &val );
+                xstat_name_com_slot( mod, com, name, sizeof(name) );
+                stat_row = xstat_intern( EMU_XSTAT_COM, rip, name );
+                xstat_hit( stat_row );
+            }
+            if (!no_cache)
+            {
+                struct thunk_rip_cache_entry val = { 0 };
+
+                val.stat_row = stat_row;
+                val.com = *com;
+                thunk_rip_cache_put( rip, &val );
+            }
         }
         goto done;
     }
@@ -8242,6 +8586,7 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
     }
     else if (!proc && !override)
     {
+        xstat_event( XSTAT_EV_TRAP_UNHANDLED, "guest trap with no target" );
         ERR( "unhandled guest trap at %p\n", (void *)(ULONG_PTR)ctx->Rip );
         status = STATUS_ILLEGAL_INSTRUCTION;
     }

@@ -381,6 +381,25 @@ static HRESULT host_qi( void *host, const GUID *riid, void **out )
     return (HRESULT)wc_surface->invoke( host, 0 /* QueryInterface */, 3, args );
 }
 
+BOOL winecom_slot_names( UINT iface, UINT slot, const char **iface_name,
+                         const char **slot_name )
+{
+    const struct winecom_iface *itf;
+
+    if (!wc_surface || iface >= wc_surface->iface_count) return FALSE;
+    itf = &wc_surface->ifaces[iface];
+    if (slot >= itf->slot_count) return FALSE;
+    *iface_name = itf->name;
+    /* An identity row carries no slot table: IUnknown's three slots are served
+     * by name and the rest are refused, so name them the same way. */
+    if (!itf->slots)
+        *slot_name = slot == 0 ? "QueryInterface" : slot == 1 ? "AddRef"
+                   : slot == 2 ? "Release" : "<identity>";
+    else if (!itf->slots[slot].name) return FALSE;
+    else *slot_name = itf->slots[slot].name;
+    return TRUE;
+}
+
 /* ------------------------------------------------------- proxy operations */
 
 UINT winecom_iface_from_iid( const GUID *riid )

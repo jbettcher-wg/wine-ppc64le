@@ -274,13 +274,39 @@ and the COUNT of guest<->native crossings.  The levers, in order:
      either), and per-thread caching of the TLS/TEB pointers the
      dispatcher currently re-resolves every hop.  ~24% of the thread is
      sitting in this mechanical per-hop work.
-  2. **Delete the hottest crossings**: the tick/QPC/PeekMessage shape
-     says the game polls time and input at frame frequency through full
-     traps.  Windows serves GetTickCount/QPC from KUSER_SHARED_DATA in
-     user space with NO syscall; if the guest lane traps for these,
-     serving them guest-side from the shared page removes whole
-     crossing classes.  First step: count trap exits by slot name to
-     rank them (the profile shows cost, not frequency).
+  2. **Delete the hottest crossings** -- THE COUNT IS IN, and it names
+     them.  `WINE_PPC64LE_TRAP_STATS=<path>` counts every crossing per
+     call site (flat export, COM slot, syscall, guest callback);
+     `ppc64le/cpu/CROSSINGS.md` is the mechanism and
+     `ppc64le/cpu/crossings-cp2077-benchmark.txt` the table.
+     [MEASURED] 2026-08-27 over Cyberpunk's 66.6 s flythrough:
+     **235.6M crossings, 3.54M/s** at 18.25 fps -- **196,516 crossings
+     PER FRAME**, of which:
+
+     | crossing | /s | per frame |
+     |---|---:|---:|
+     | `QueryPerformanceCounter` (+ its own `NtQueryPerformanceCounter`) | 256,638 | 14,061 |
+     | `ID3D12GraphicsCommandList::SetGraphicsRootDescriptorTable` | 176,021 | 9,644 |
+     | `ID3D12Device::CopyDescriptors` | 164,319 | 9,003 |
+     | `PeekMessageW` (+ its own `NtUserPeekMessage`) | 100,526 | 5,508 |
+     | `ID3D12Device::CreateConstantBufferView` | 95,340 | 5,224 |
+     | `ID3D12Resource::GetGPUVirtualAddress` | 94,618 | 5,184 |
+     | `ID3D12GraphicsCommandList::DrawIndexedInstanced` | 78,318 | 4,291 |
+     | `EnterCriticalSection` / `LeaveCriticalSection` | 69,862 / 69,861 | 3,828 each |
+
+     So: **QPC and PeekMessage are confirmed, GetTickCount is dead** --
+     377/s over the whole process and ZERO in the flythrough, so the
+     `win32u get_tick_count` in the profile is inside PeekMessage, not a
+     crossing of its own.  Serving QPC guest-side from KUSER_SHARED_DATA
+     removes 34M crossings from this route (17M traps and 17M syscalls,
+     14% of everything); the uncontended critical-section pair is
+     another 9.3M for a call with no syscall behind it, and
+     `GetGPUVirtualAddress` is a getter on an object the guest already
+     holds.  **But the COM class is bigger than the flat class** (54.9M
+     vs 44.9M): the four d3d12 descriptor/draw rows above are 30M
+     crossings and no shared page can serve them -- they need batching
+     or a guest-side descriptor cache, which is a design, not a knob.
+     Guest CALLBACKS are a non-issue at ~18/s; do not spend time there.
   3. **Name the memcpy 6.7%**: game streaming vs marshal copies --
      annotate call sites before optimizing either.
 HWTSO/PROT_SAO is NO LONGER FEXInterpreter-only: fastppcx86 `d4168c1ec`

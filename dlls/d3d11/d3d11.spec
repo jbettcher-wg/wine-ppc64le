@@ -86,3 +86,9 @@
 @ stdcall __wine_dxvk_D3D10CoreRegisterLayers() D3D10CoreRegisterLayers
 @ stdcall __wine_dxvk_D3D10CreateDevice(ptr long ptr long long ptr) D3D10CreateDevice
 @ stdcall __wine_dxvk_D3D10CreateDeviceAndSwapChain(ptr long ptr long long ptr ptr ptr) D3D10CreateDeviceAndSwapChain
+
+# Appended at the END so no `@` export above it is renumbered:
+# ordinals are assigned in file order and guests import by ordinal
+# (ppc64le/vkd3d/check-ordinal-imports.sh).  Asked of the NATIVE
+# module by ntdll when the crossing sink interns a COM slot row.
+@ stdcall __wine_com_slot_name(long long ptr ptr)

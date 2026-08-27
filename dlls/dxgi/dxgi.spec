@@ -26,3 +26,9 @@
 @ stdcall __wine_guest_CreateDXGIFactory2(long ptr ptr) d3d11.__wine_guest_CreateDXGIFactory2
 @ stdcall __wine_guest_DXGIGetDebugInterface1(long ptr ptr) d3d11.__wine_guest_DXGIGetDebugInterface1
 @ stdcall __wine_guest_DXGID3D10CreateDevice(ptr ptr ptr long ptr long ptr) d3d11.__wine_guest_DXGID3D10CreateDevice
+
+# Appended at the END so no `@` export above it is renumbered:
+# ordinals are assigned in file order and guests import by ordinal
+# (ppc64le/vkd3d/check-ordinal-imports.sh).  Asked of the NATIVE
+# module by ntdll when the crossing sink interns a COM slot row.
+@ stdcall __wine_com_slot_name(long long ptr ptr) d3d11.__wine_com_slot_name

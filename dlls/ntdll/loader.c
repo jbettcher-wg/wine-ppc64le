@@ -4260,6 +4260,7 @@ void WINAPI LdrShutdownProcess(void)
      * offset, and process_detach() below unmaps the modules those names come
      * from. */
     dump_guest_thunk_profile();
+    emu_xstat_dump();
 #endif
     process_detach();
 }

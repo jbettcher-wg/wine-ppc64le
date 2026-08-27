@@ -417,6 +417,14 @@ extern BOOL winecom_attach( const struct winecom_surface *surface );
  * ntdll: STATUS_SUCCESS means fully served including ctx->Rax. */
 extern NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx );
 
+/* -> TRUE with *iface_name/*slot_name pointing at this surface's own table
+ * strings (module lifetime, never copied).  The crossing-frequency sink in
+ * ntdll asks through the client's __wine_com_slot_name export, because ntdll
+ * has no view of a surface -- this runtime is a static library with one
+ * instance per linkee.  A refused or identity row still has a name. */
+extern BOOL winecom_slot_names( UINT iface, UINT slot, const char **iface_name,
+                                const char **slot_name );
+
 /* Intern a host interface pointer as a guest-callable proxy.  CONSUMES one
  * host reference; the returned proxy carries one guest reference.  NULL in,
  * NULL out.  Under WINEEMUNOCOMWRAP=1 (the negative control) the host

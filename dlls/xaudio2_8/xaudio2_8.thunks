@@ -75,6 +75,7 @@ EXCLUDE __wine_guest_CreateAudioVolumeMeter
 EXCLUDE __wine_guest_CreateFX
 
 EXCLUDE __wine_com_dispatch
+EXCLUDE __wine_com_slot_name
 EXCLUDE __wine_com_refuse
 EXCLUDE __wine_guest_XAudio2Create
 EXCLUDE __wine_guest_XAudio2CreateWithVersionInfo

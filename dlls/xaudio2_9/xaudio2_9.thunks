@@ -85,6 +85,7 @@ EXCLUDE __wine_guest_CreateFX
 # thunk path has carried since cd4ea32c93d.
 
 EXCLUDE __wine_com_dispatch
+EXCLUDE __wine_com_slot_name
 EXCLUDE __wine_com_refuse
 EXCLUDE __wine_guest_XAudio2Create
 EXCLUDE __wine_guest_XAudio2CreateWithVersionInfo

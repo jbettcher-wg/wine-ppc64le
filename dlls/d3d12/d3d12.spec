@@ -16,3 +16,9 @@
 # proxy over to this lane -- winecom instances are per-linkee and cannot read
 # each other's interning.  Wine-private; see main.c.
 @ stdcall __wine_d3d12_create_swapchain_for_hwnd(ptr ptr ptr ptr ptr ptr)
+
+# Appended at the END so no `@` export above it is renumbered:
+# ordinals are assigned in file order and guests import by ordinal
+# (ppc64le/vkd3d/check-ordinal-imports.sh).  Asked of the NATIVE
+# module by ntdll when the crossing sink interns a COM slot row.
+@ stdcall __wine_com_slot_name(long long ptr ptr)

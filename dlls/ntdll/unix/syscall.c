@@ -264,10 +264,24 @@ void ntdll_add_syscall_debug_info( UINT idx, const char **names, const char **us
     usercall_names = user_names;
 }
 
+/* -> the name of syscall (idx, num), or NULL.  The crossing-frequency sink
+ * resolves numbers to names here, at dump time, so that nothing on the
+ * dispatcher's path ever touches a string. */
+const char *ntdll_syscall_name( UINT idx, UINT num )
+{
+    if (idx >= ARRAY_SIZE(syscall_names) || !syscall_names[idx]) return NULL;
+    if (num >= KeServiceDescriptorTable[idx].ServiceLimit) return NULL;
+    return syscall_names[idx][num];
+}
+
 BOOLEAN KeAddSystemServiceTable( ULONG_PTR *funcs, ULONG_PTR *counters, ULONG limit,
                                  BYTE *arguments, ULONG index )
 {
     if (index >= ARRAY_SIZE(KeServiceDescriptorTable)) return FALSE;
+    /* A table registered after the sink armed still gets counted: win32u's
+     * arrives later than a guest's first crossing, and it is the half of the
+     * syscall surface a windowed title spends its crossings on. */
+    if (!counters) counters = emu_xstat_syscall_counters( limit );
     KeServiceDescriptorTable[index].ServiceTable  = funcs;
     KeServiceDescriptorTable[index].CounterTable  = counters;
     KeServiceDescriptorTable[index].ServiceLimit  = limit;

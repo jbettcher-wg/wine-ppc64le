@@ -22,6 +22,7 @@
 #define __NTDLL_UNIXLIB_H
 
 #include "wine/unixlib.h"
+#include "emu_xstat.h"
 
 struct _DISPATCHER_CONTEXT;
 
@@ -228,6 +229,8 @@ enum ntdll_unix_funcs
     unix_emu32_thread,
     unix_emu32_run,
     unix_emu32_invalidate,
+    unix_emu_xstat_init,
+    unix_emu_xstat_dump,
 };
 
 extern unixlib_handle_t __wine_unixlib_handle;

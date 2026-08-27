@@ -186,6 +186,14 @@ NTSTATUS WINAPI __wine_com_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
     return winecom_dispatch( iface, slot, ctx );
 }
 
+/* The crossing-frequency sink's name lookup; see winecom_slot_names.  Never
+ * on a dispatch path -- ntdll asks once per slot, when it interns the row. */
+BOOL WINAPI __wine_com_slot_name( UINT iface, UINT slot, const char **iface_name,
+                                  const char **slot_name )
+{
+    return winecom_slot_names( iface, slot, iface_name, slot_name );
+}
+
 /* ----------------------------------------------------- hand-written slots */
 
 /* ID3D12GraphicsCommandList::ResourceBarrier( UINT n, const
@@ -1262,6 +1270,11 @@ ULONG_PTR WINAPI D3D12GetInterface( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3 )
 ULONG_PTR WINAPI __wine_com_dispatch( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3 )
 {
     __wine_spec_unimplemented_stub( "d3d12.dll", "__wine_com_dispatch" );
+}
+
+ULONG_PTR WINAPI __wine_com_slot_name( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4 )
+{
+    __wine_spec_unimplemented_stub( "d3d12.dll", "__wine_com_slot_name" );
 }
 
 ULONG_PTR WINAPI __wine_d3d12_create_swapchain_for_hwnd( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3,

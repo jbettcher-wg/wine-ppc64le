@@ -37,6 +37,7 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 #include <dlfcn.h>
 #ifdef HAVE_PWD_H
@@ -2477,6 +2478,228 @@ static NTSTATUS unixcall_emu32_invalidate( void *args )
 }
 
 
+/***********************************************************************
+ *           the crossing-frequency sink (WINE_PPC64LE_TRAP_STATS)
+ *
+ * Counts, never times: a sampling profiler answers "where did the time go
+ * inside the callee" and can never answer "how many times was the boundary
+ * crossed to get there", which is the number a fast path is chosen against.
+ *
+ * Everything here is off unless WINE_PPC64LE_TRAP_STATS names a file.  The
+ * table is allocated once, addressed by both sides of ntdll directly, and
+ * only ever formatted here, because only this side has stdio and the path.
+ */
+
+static struct emu_xstat_ctl xstat_ctl;
+static int xstat_armed = -1;          /* -1 = the environment is unread */
+static struct timespec xstat_t0;
+static pthread_mutex_t xstat_dump_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static void xstat_sigusr2( int sig )
+{
+    xstat_ctl.dump_req = 1;
+}
+
+/* Every registered syscall table gets a counter array, and the dispatcher's
+ * increment is gated on that pointer being non-NULL -- so the OFF cost in
+ * __wine_syscall_dispatcher is one load, one compare and one not-taken
+ * branch, and no table ever half-counts.  Called both from here (for the
+ * tables that exist when the sink arms) and from KeAddSystemServiceTable (for
+ * win32u's, which registers later than a guest's first crossing). */
+ULONG_PTR *emu_xstat_syscall_counters( ULONG limit )
+{
+    if (!emu_xstat_enabled()) return NULL;
+    return calloc( limit, sizeof(ULONG_PTR) );
+}
+
+int emu_xstat_enabled(void)
+{
+    if (xstat_armed == -1) xstat_armed = getenv( "WINE_PPC64LE_TRAP_STATS" ) != NULL;
+    return xstat_armed;
+}
+
+static void xstat_attach_syscall_counters(void)
+{
+    UINT i;
+
+    for (i = 0; i < ARRAY_SIZE(KeServiceDescriptorTable); i++)
+    {
+        SYSTEM_SERVICE_TABLE *t = &KeServiceDescriptorTable[i];
+
+        if (!t->ServiceTable || !t->ServiceLimit || t->CounterTable) continue;
+        t->CounterTable = calloc( t->ServiceLimit, sizeof(ULONG_PTR) );
+    }
+}
+
+/***********************************************************************
+ *           unixcall_emu_xstat_init
+ */
+static NTSTATUS unixcall_emu_xstat_init( void *args )
+{
+    struct emu_xstat_init_params *params = args;
+
+    params->ctl = NULL;
+    if (!emu_xstat_enabled()) return STATUS_SUCCESS;
+    /* The PE side probes lazily on its first crossing, so several guest
+     * threads can arrive here together on a process that starts them at once. */
+    pthread_mutex_lock( &xstat_dump_mutex );
+    if (!xstat_ctl.rows)
+    {
+        struct sigaction act;
+
+        if (!(xstat_ctl.rows = calloc( EMU_XSTAT_ROWS, sizeof(*xstat_ctl.rows) )))
+        {
+            pthread_mutex_unlock( &xstat_dump_mutex );
+            return STATUS_SUCCESS;                 /* off rather than fatal */
+        }
+        xstat_ctl.rows_max = EMU_XSTAT_ROWS;
+        clock_gettime( CLOCK_MONOTONIC, &xstat_t0 );
+        xstat_attach_syscall_counters();
+
+        /* SIGUSR2 is free in this port -- SIGQUIT and SIGUSR1 are the only two
+         * this side installs -- and the handler only raises a flag the next
+         * crossing reads, so a dump can be asked for at a chosen moment of a
+         * benchmark without stopping it. */
+        memset( &act, 0, sizeof(act) );
+        act.sa_handler = xstat_sigusr2;
+        sigemptyset( &act.sa_mask );
+        act.sa_flags = SA_RESTART;
+        sigaction( SIGUSR2, &act, NULL );
+    }
+    pthread_mutex_unlock( &xstat_dump_mutex );
+    params->ctl = &xstat_ctl;
+    return STATUS_SUCCESS;
+}
+
+static int xstat_cmp( const void *a, const void *b )
+{
+    const struct emu_xstat_row *ra = a, *rb = b;
+
+    if (ra->count != rb->count) return ra->count < rb->count ? 1 : -1;
+    return strcmp( ra->name, rb->name );
+}
+
+static const char *xstat_class_name( UINT cls )
+{
+    switch (cls)
+    {
+    case EMU_XSTAT_FLAT:     return "flat";
+    case EMU_XSTAT_COM:      return "com";
+    case EMU_XSTAT_SYSCALL:  return "syscall";
+    case EMU_XSTAT_CALLBACK: return "callback";
+    default:                 return "event";
+    }
+}
+
+/***********************************************************************
+ *           unixcall_emu_xstat_dump
+ *
+ * Rewritten in full each time through a temporary and a rename, so a reader
+ * (or a run killed mid-write) never sees a half-printed table.
+ */
+static NTSTATUS unixcall_emu_xstat_dump( void *args )
+{
+    ULONG64 class_total[EMU_XSTAT_CLASSES] = { 0 }, total = 0;
+    struct emu_xstat_row *snap;
+    const char *path;
+    struct timespec now;
+    char tmp[PATH_MAX], final[PATH_MAX];
+    double secs;
+    UINT i, j, n = 0, syscalls = 0;
+    FILE *f;
+
+    if (!xstat_ctl.rows) return STATUS_SUCCESS;
+    if (!(path = getenv( "WINE_PPC64LE_TRAP_STATS" ))) return STATUS_SUCCESS;
+    /* One writer at a time, and a second one simply skips: two threads
+     * reaching their periodic dump together would otherwise interleave into
+     * one temporary file and rename the mixture into place. */
+    if (pthread_mutex_trylock( &xstat_dump_mutex )) return STATUS_SUCCESS;
+
+    clock_gettime( CLOCK_MONOTONIC, &now );
+    secs = (now.tv_sec - xstat_t0.tv_sec) + (now.tv_nsec - xstat_t0.tv_nsec) / 1e9;
+    if (secs <= 0.0) secs = 1e-9;
+
+    /* Syscalls are counted in the dispatcher's own CounterTable rather than in
+     * a row, because the dispatcher is assembly and the table pointer it
+     * already loads costs it nothing extra.  They join the table here. */
+    for (i = 0; i < ARRAY_SIZE(KeServiceDescriptorTable); i++)
+        if (KeServiceDescriptorTable[i].CounterTable) syscalls += KeServiceDescriptorTable[i].ServiceLimit;
+
+    if (!(snap = calloc( xstat_ctl.rows_max + syscalls, sizeof(*snap) )))
+    {
+        pthread_mutex_unlock( &xstat_dump_mutex );
+        return STATUS_NO_MEMORY;
+    }
+
+    for (i = 0; i < xstat_ctl.rows_max; i++)
+    {
+        const struct emu_xstat_row *r = &xstat_ctl.rows[i];
+        ULONG64 c = __atomic_load_n( &r->count, __ATOMIC_RELAXED );
+
+        if (!r->key || !c) continue;
+        snap[n] = *r;
+        snap[n].count = c;
+        n++;
+    }
+    for (i = 0; i < ARRAY_SIZE(KeServiceDescriptorTable); i++)
+    {
+        const SYSTEM_SERVICE_TABLE *t = &KeServiceDescriptorTable[i];
+
+        if (!t->CounterTable) continue;
+        for (j = 0; j < t->ServiceLimit; j++)
+        {
+            ULONG_PTR c = __atomic_load_n( &t->CounterTable[j], __ATOMIC_RELAXED );
+            const char *name = ntdll_syscall_name( i, j );
+
+            if (!c) continue;
+            snap[n].count = c;
+            snap[n].cls   = EMU_XSTAT_SYSCALL;
+            if (name) snprintf( snap[n].name, sizeof(snap[n].name), "%s", name );
+            else snprintf( snap[n].name, sizeof(snap[n].name), "syscall %04x", (i << 12) | j );
+            n++;
+        }
+    }
+
+    for (i = 0; i < n; i++)
+    {
+        total += snap[i].count;
+        if (snap[i].cls < EMU_XSTAT_CLASSES) class_total[snap[i].cls] += snap[i].count;
+    }
+    qsort( snap, n, sizeof(*snap), xstat_cmp );
+
+    /* ONE FILE PER PROCESS, always.  A game launch is a whole Wine session --
+     * wineboot, services.exe, explorer.exe, the game -- and every one of them
+     * crosses the boundary and dumps here.  Sharing the path made the LAST
+     * process to exit the only one measured, which is never the game
+     * ([MEASURED]: a complete Cyberpunk benchmark left a 1474-crossing file
+     * written by a service).  The reader picks the biggest. */
+    snprintf( final, sizeof(final), "%s.%u", path, (UINT)getpid() );
+    snprintf( tmp, sizeof(tmp), "%s.tmp", final );
+    if (!(f = fopen( tmp, "w" )))
+    {
+        free( snap );
+        pthread_mutex_unlock( &xstat_dump_mutex );
+        return STATUS_SUCCESS;
+    }
+    fprintf( f, "# guest/native crossing frequency, pid %u, %.2f s of process life\n",
+             (UINT)getpid(), secs );
+    fprintf( f, "# %llu crossings counted in %u named rows\n",
+             (unsigned long long)total, n );
+    for (i = 0; i < EMU_XSTAT_CLASSES; i++)
+        fprintf( f, "# class %-8s %14llu  %12.0f/s\n", xstat_class_name( i ),
+                 (unsigned long long)class_total[i], class_total[i] / secs );
+    fprintf( f, "\n%-8s %14s %12s  %s\n", "class", "count", "per-sec", "name" );
+    for (i = 0; i < n; i++)
+        fprintf( f, "%-8s %14llu %12.0f  %s\n", xstat_class_name( snap[i].cls ),
+                 (unsigned long long)snap[i].count, snap[i].count / secs, snap[i].name );
+    fclose( f );
+    rename( tmp, final );
+    free( snap );
+    pthread_mutex_unlock( &xstat_dump_mutex );
+    return STATUS_SUCCESS;
+}
+
+
 static const unixlib_entry_t unix_call_funcs[] =
 {
     load_so_dll,
@@ -2494,6 +2717,8 @@ static const unixlib_entry_t unix_call_funcs[] =
     unixcall_emu32_thread,
     unixcall_emu32_run,
     unixcall_emu32_invalidate,
+    unixcall_emu_xstat_init,
+    unixcall_emu_xstat_dump,
 };
 
 
@@ -2523,6 +2748,9 @@ const unixlib_entry_t unix_call_wow64_funcs[] =
     wow64_emu_run_entry,   /* unix_emu32_thread */
     wow64_emu_run_entry,   /* unix_emu32_run */
     wow64_emu_run_entry,   /* unix_emu32_invalidate */
+    wow64_emu_run_entry,   /* unix_emu_xstat_init: the sink counts native-lane
+                              crossings, which a wow64 caller does not make */
+    wow64_emu_run_entry,   /* unix_emu_xstat_dump */
 };
 
 #endif  /* _WIN64 */

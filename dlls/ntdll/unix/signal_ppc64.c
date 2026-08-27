@@ -2346,6 +2346,24 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "4:\tmr 12, 20\n\t"
                    "mtctr 12\n\t"
                    "std 2, 24(1)\n\t"
+                   /* WINE_PPC64LE_TRAP_STATS: count this crossing.  r14 still
+                    * holds the table and r16 the entry's byte offset, both
+                    * computed for the lookup above, so with the sink off this
+                    * whole counter is a load, a compare and a branch that is
+                    * never taken -- CounterTable is a field Wine has always
+                    * had and always left NULL.  ldarx/stdcx. with no
+                    * barrier either side is the relaxed atomic add: the count
+                    * must not lose increments across threads, and nothing
+                    * downstream orders against it.  r21/r22 are dead here and
+                    * are already saved in the frame. */
+                   "ld 21, 8(14)\n\t"               /* table->CounterTable */
+                   "cmpdi 21, 0\n\t"
+                   "beq 0f\n"
+                   "1:\tldarx 22, 21, 16\n\t"
+                   "addi 22, 22, 1\n\t"
+                   "stdcx. 22, 21, 16\n\t"
+                   "bne- 1b\n"
+                   "0:\t"
                    "lwz 11, 0x380(30)\n\t"          /* thread_data->syscall_trace */
                    "cmpwi 11, 0\n\t"
                    "bne " __ASM_LOCAL_LABEL("trace_syscall") "\n\t"

@@ -44,3 +44,9 @@
 @ stdcall __wine_guest_MFCreateVideoMediaType(ptr ptr) mfplat.__wine_guest_MFCreateVideoMediaType
 @ stdcall __wine_guest_MFCreateVideoMediaTypeFromSubtype(ptr ptr) mfplat.__wine_guest_MFCreateVideoMediaTypeFromSubtype
 @ stdcall __wine_guest_MFCreateDXSurfaceBuffer(ptr ptr long ptr) mfplat.__wine_guest_MFCreateDXSurfaceBuffer
+
+# Appended at the END so no `@` export above it is renumbered:
+# ordinals are assigned in file order and guests import by ordinal
+# (ppc64le/vkd3d/check-ordinal-imports.sh).  Asked of the NATIVE
+# module by ntdll when the crossing sink interns a COM slot row.
+@ stdcall __wine_com_slot_name(long long ptr ptr) mfplat.__wine_com_slot_name
