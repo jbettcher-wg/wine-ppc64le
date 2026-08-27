@@ -84,6 +84,17 @@ last match will sample the wrong one — this produced "zero SAO pages" from a
 working build and an hour of kernel-side theorising.  Pick the pid whose
 `/proc/N/smaps` actually shows what you are looking for.
 
+**A Wine session outlives `flock`, and keeps the lock.**  Two agents share this
+box through `flock /tmp/op4k-bench.lock <command>`, and a command that starts
+Wine leaves `services.exe`, `winedevice.exe`, `rpcss.exe` and friends behind
+when its wineserver goes -- orphans that INHERITED the lock's file descriptor.
+The lock is held by whoever holds an fd on it, so the next `flock` blocks
+behind processes whose command finished an hour ago, on an idle machine.
+[MEASURED] 2026-08-27: 30 minutes of a gate sweep waiting on six of its own
+predecessor's leftovers.  `fuser -v /tmp/op4k-bench.lock` names them, and
+`ppc64le/reap-orphans.sh` clears them; run it after any sweep or benchmark
+batch, not only when the load average complains.
+
 **Screenshots on this box** need the Wayland compositor, not X: the rootless
 Xwayland root window is black to `import` and `ffmpeg -f x11grab`.  What works:
 

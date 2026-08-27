@@ -1028,6 +1028,21 @@ RAW_BODY_EXPORTS = {
 }
 
 
+# Guest fast paths: an independent copy of the generator's FAST_PATH tables
+# and of the struct emu_qpc_guest offsets in include/wine/emu_qpc.h.  Three
+# spellings of one layout is one too many, and this is the copy that turns a
+# divergence into a red check instead of a guest reading a garbage clock.
+RESERVED_EXPORTS  = ('__wine_thunk_info', '__wine_com_thunk_info',
+                     '__wine_thunk_qpc')
+FAST_PATH_MODULES = ('kernel32.dll', 'kernelbase.dll')
+FAST_PATH_EXPORTS = ('QueryPerformanceCounter', 'QueryPerformanceFrequency')
+QPC_BLOCK_EXPORT  = '__wine_thunk_qpc'
+QPC_ENABLED       = 24
+QPC_BLOCK_SIZE    = 48
+QPC_MAGIC         = 0x5150433150504336          # "QPC1PPC6"
+FAST_BODY_MAX     = 96                          # bytes to look in for the fallback
+
+
 def expect_stub(mode, imm, name=None):
     if name in RAW_BODY_EXPORTS:
         body = RAW_BODY_EXPORTS[name]
@@ -1202,8 +1217,33 @@ def main():
     # An omission is reported and counted, and is a FAIL only under
     # --require-complete; see the WineSpecList docstring for why this file
     # does not re-derive the refusal decision itself.
-    img_names = [n for n, rva in sorted(exp.items(), key=lambda kv: kv[1])
-                 if n not in ('__wine_thunk_info', '__wine_com_thunk_info')]
+    # A FAST-PATH EXPORT'S DIRECTORY RVA IS NOT ITS PLACE IN THE ARRAY.  It
+    # points at the fast body, which lives past the end of the stub array, so
+    # sorting the export directory by RVA would move those two names to the end
+    # and slip every index-based check below by one apiece.  Its real place is
+    # the slot its fallback jumps to, and that jump is in the body: take the
+    # first E9 whose target is 16-byte aligned and BELOW the body, which is the
+    # stub array by construction.  Everything else sorts by its own RVA exactly
+    # as before.
+    def order_rva( n, rva ):
+        if (spec_dll or '').lower() not in FAST_PATH_MODULES: return rva
+        if n not in FAST_PATH_EXPORTS: return rva
+        try:
+            body = pe.read(rva, FAST_BODY_MAX)
+        except Fail:
+            return rva
+        for off in range(0, FAST_BODY_MAX - 5):
+            if body[off] != 0xe9:
+                continue
+            tgt = rva + off + 5 + struct.unpack('<i', body[off + 1:off + 5])[0]
+            if tgt % STRIDE == 0 and tgt < rva:
+                return tgt
+        return rva
+
+    img_names = [n for n, _ in sorted(((n, order_rva(n, rva))
+                                       for n, rva in exp.items()),
+                                      key=lambda kv: kv[1])
+                 if n not in RESERVED_EXPORTS]
     pos_of = {e['name']: i for i, e in enumerate(listed)}
     invented = [n for n in img_names if n not in pos_of]
     r.check(not invented, '5b every exported name is in the export list',
@@ -1315,10 +1355,90 @@ def main():
                 ','.join(walked) if walked != spec_names else '%d names' % count)
         r.check(all(n in exp for n in walked),
                 '8g every names_rva[] name is in the export directory')
+        # A fast-path export's NAME points at its fast body, not at its slot.
+        # The slot is still there and still holds the trap (checks 7, 12b,
+        # 12c); what moved is only where the export directory sends a caller.
+        fastnames = [n for n in walked
+                     if args.body == 'trap'
+                     and (spec_dll or '').lower() in FAST_PATH_MODULES
+                     and n in FAST_PATH_EXPORTS]
         bad = ['%s: 0x%x != 0x%x' % (n, exp.get(n, 0), stubs_rva + i * STRIDE)
-               for i, n in enumerate(walked) if exp.get(n) != stubs_rva + i * STRIDE]
-        r.check(not bad, '8h export RVA == stubs_rva + index*16 for every name',
-                '; '.join(bad) if bad else 'all %d ok' % count)
+               for i, n in enumerate(walked)
+               if n not in fastnames and exp.get(n) != stubs_rva + i * STRIDE]
+        r.check(not bad, '8h export RVA == stubs_rva + index*16 for every name'
+                + (' (fast paths excepted)' if fastnames else ''),
+                '; '.join(bad) if bad else 'all %d ok' % (count - len(fastnames)))
+
+        if fastnames:
+            qpc_rva = exp.get(QPC_BLOCK_EXPORT, 0)
+            s = pe.section_of(qpc_rva) if qpc_rva else None
+            r.check(s is not None and bool(s['flags'] & IMAGE_SCN_MEM_WRITE),
+                    '8p %s is exported and writable' % QPC_BLOCK_EXPORT,
+                    ('%s flags=0x%08x' % (s['name'], s['flags'])) if s
+                    else 'no such export')
+            if qpc_rva and s:
+                try:
+                    blk = pe.read(qpc_rva, QPC_BLOCK_SIZE)
+                except Fail as e:
+                    blk = None
+                    r.check(False, '8p2 the QPC block is readable', str(e))
+                if blk:
+                    magic = struct.unpack('<Q', blk[:8])[0]
+                    r.check(magic == QPC_MAGIC,
+                            '8p3 the QPC block carries the magic the host checks',
+                            '0x%016x, want 0x%016x' % (magic, QPC_MAGIC))
+                    # Linked DISARMED.  A block that shipped armed would have
+                    # a guest reading an all-zero multiplier as a clock.
+                    r.check(blk[QPC_ENABLED] == 0,
+                            '8p4 the QPC block ships disarmed',
+                            'enabled=%d' % blk[QPC_ENABLED])
+
+            stub_of = {n: stubs_rva + i * STRIDE for i, n in enumerate(walked)}
+            bad, seen = [], []
+            for n in fastnames:
+                rva = exp.get(n, 0)
+                sec = pe.section_of(rva)
+                if not rva or sec is None or sec['name'] != '.thunk':
+                    bad.append('%s: not in .thunk' % n)
+                    continue
+                if rva < stubs_rva + count * STRIDE:
+                    bad.append('%s: 0x%x is inside the stub array' % (n, rva))
+                    continue
+                try:
+                    body = pe.read(rva, FAST_BODY_MAX)
+                except Fail as e:
+                    bad.append('%s: %s' % (n, e))
+                    continue
+                # cmpb $1, disp32(%rip) -- the arming test, and its operand
+                # must be the block's enabled byte and nothing else.
+                if body[0:2] != b'\x80\x3d' or body[6] != 1:
+                    bad.append('%s: does not begin with cmpb $1, disp32(%%rip)' % n)
+                    continue
+                disp = struct.unpack('<i', body[2:6])[0]
+                if rva + 7 + disp != qpc_rva + QPC_ENABLED:
+                    bad.append('%s: tests 0x%x, not %s+%d'
+                               % (n, rva + 7 + disp, QPC_BLOCK_EXPORT, QPC_ENABLED))
+                    continue
+                # and somewhere in it a direct jump back to ITS OWN trap stub,
+                # which is what makes the fallback a fallback.
+                want, found = stub_of[n], False
+                for off in range(7, FAST_BODY_MAX - 5):
+                    if body[off] != 0xe9:
+                        continue
+                    rel = struct.unpack('<i', body[off + 1:off + 5])[0]
+                    if rva + off + 5 + rel == want:
+                        found = True
+                        break
+                if not found:
+                    bad.append('%s: no jmp back to its stub at 0x%x' % (n, want))
+                    continue
+                seen.append('%s@0x%x' % (n, rva))
+            r.check(not bad,
+                    '8q every fast body tests the block and falls back to its own stub',
+                    '; '.join(bad) if bad else ', '.join(seen))
+        elif QPC_BLOCK_EXPORT in exp:
+            r.check(False, '8p this module exports %s but has no fast path'
+                    % QPC_BLOCK_EXPORT, 'stale block')
 
     # -- impl_names_rva[] (version 4).  Walked and validated as bytes here;
     # cross-checked against the descriptors and against Wine's headers at 11h.
@@ -1370,9 +1490,13 @@ def main():
             bad.append('%s@0x%x: got %s want %s' % (n, rva, g.hex(), w.hex()))
     r.check(not bad, '7  every stub body matches --body=%s exactly' % args.body,
             '; '.join(bad) if bad else '%d stubs verified' % count)
-    r.check(all(exp[spec_names[i]] + STRIDE == exp[spec_names[i + 1]]
+    # Slot RVAs, not directory RVAs: a fast-path export's name points at its
+    # fast body (see order_rva above), while its SLOT is still exactly where
+    # the stride says it is, and the stride is what this check is about.
+    slot_rva = {n: order_rva(n, exp[n]) for n in spec_names if n in exp}
+    r.check(all(slot_rva[spec_names[i]] + STRIDE == slot_rva[spec_names[i + 1]]
                 for i in range(len(spec_names) - 1)
-                if spec_names[i] in exp and spec_names[i + 1] in exp),
+                if spec_names[i] in slot_rva and spec_names[i + 1] in slot_rva),
             '6f stubs are contiguous at 16-byte stride')
 
     # -- 12. published trap site

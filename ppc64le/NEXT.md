@@ -307,6 +307,35 @@ and the COUNT of guest<->native crossings.  The levers, in order:
      crossings and no shared page can serve them -- they need batching
      or a guest-side descriptor cache, which is a design, not a knob.
      Guest CALLBACKS are a non-issue at ~18/s; do not spend time there.
+
+     **QPC IS DONE (2026-08-27).**  The guest's kernel32 answers
+     `QueryPerformanceCounter` and `QueryPerformanceFrequency` in its
+     own x86-64 code -- `rdtsc`, one 64x64 multiply, a shift and an add
+     -- with no trap and no syscall, the way Windows answers them from
+     the TSC.  Measured A/B, one binary and one env var
+     (`WINE_PPC64LE_NO_QPC_BYPASS=1`) apart, in
+     `ppc64le/cpu/crossings-cp2077-qpc.txt`: all three rows leave the
+     flythrough window ENTIRELY (198,735/s and 198,735/s become
+     absent), and total crossings fall from **187,633 to 152,718 per
+     frame**.  avg fps 14.999 -> 15.312 on the same armed runs.
+
+     What made it correct rather than merely fast is that the guest and
+     the native `NtQueryPerformanceCounter` compute the SAME
+     expression from the SAME timebase, so an interleaved sequence of
+     the two is monotone by algebra rather than by luck --
+     `include/wine/emu_qpc.h` has the derivation, the measured
+     emulator TSC scale, and the 39.6 ppm the timebase drifts from
+     CLOCK_BOOTTIME (which is why the two places in Wine that convert
+     QPC into the wineserver's clock now say `server_monotonic_time()`).
+     `ppc64le/cpu/check-qpc-fastpath.sh` is the gate; its negative
+     control breaks the seeding two ways and both go red.
+
+     `tools/spec2thunk`'s `FAST_PATH_EXPORTS` is now a mechanism, not a
+     one-off: an export can carry real guest code beside the stub array
+     while its stub, the stride and the trap offset stay exactly what
+     the dispatcher expects.  The next candidate is NOT PeekMessage
+     (real queue semantics) and NOT GetTickCount (dead).  It is the COM
+     class, which is now the largest by far and wants batching.
   3. **Name the memcpy 6.7%**: game streaming vs marshal copies --
      annotate call sites before optimizing either.
 HWTSO/PROT_SAO is NO LONGER FEXInterpreter-only: fastppcx86 `d4168c1ec`

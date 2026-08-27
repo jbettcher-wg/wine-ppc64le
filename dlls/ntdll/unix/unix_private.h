@@ -349,6 +349,12 @@ extern NTSTATUS virtual_alloc_thread_stack( INITIAL_TEB *stack, ULONG_PTR limit_
                                             SIZE_T reserve_size, SIZE_T commit_size, BOOL guard_page );
 extern void virtual_map_user_shared_data(void);
 extern void virtual_init_user_shared_data(void);
+/* the wineserver's clock, in NT ticks.  NOT NtQueryPerformanceCounter -- see
+ * the comment on the definition in unix/sync.c. */
+extern ULONGLONG server_monotonic_time(void);
+/* seeds the QPC parameters in the KUSER_SHARED_DATA page tail; see
+ * include/wine/emu_qpc.h.  A no-op off ppc64le. */
+extern void init_qpc_session_data( void *usd_page );
 extern NTSTATUS virtual_handle_fault( struct thread_data *data, EXCEPTION_RECORD *rec, void *stack );
 extern unsigned int virtual_locked_server_call( void *req_ptr );
 extern ssize_t virtual_locked_read( int fd, void *addr, size_t size );

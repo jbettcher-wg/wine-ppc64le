@@ -70,6 +70,7 @@
 #include "ddk/wdm.h"
 #include "wine/server.h"
 #include "wine/debug.h"
+#include "wine/emu_qpc.h"
 #include "unix_private.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(sync);
@@ -106,6 +107,151 @@ static inline ULONGLONG monotonic_counter(void)
     gettimeofday( &now, 0 );
     return ticks_from_time_t( now.tv_sec ) + now.tv_usec * 10 - server_start_time;
 }
+
+
+/***********************************************************************
+ *           server_monotonic_time
+ *
+ * The wineserver's clock, in NT ticks -- the domain a negative `when` in the
+ * server protocol is absolute in (server/thread.c: `-wait->when <=
+ * monotonic_time`).  It used to be spelled NtQueryPerformanceCounter at the
+ * two places that convert between the two domains, because on every
+ * architecture QPC WAS this clock.
+ *
+ * On ppc64le it no longer is: QPC answers from the POWER timebase so the guest
+ * can read it without a syscall (see below), and the timebase is not
+ * NTP-disciplined while CLOCK_BOOTTIME is.  [MEASURED] 2026-08-27 on op4k, over
+ * a 60 s interval: the two differ by -39.6 ppm, which is 2.4 ms a minute and
+ * 144 ms an hour.  Used for a DELTA that is nothing -- 40 µs on a one-second
+ * timer, which is why the threadpool's rel_now arithmetic is untouched -- but
+ * used to convert a relative timeout into an absolute one in the server's
+ * domain it is an error that grows for as long as the session lives, and it
+ * would have made every wait in an eight-hour session a second too long.
+ *
+ * Windows has exactly the same split (QPC comes off the TSC and is not slewed;
+ * the interrupt time is), so the fix is not to re-slew QPC.  It is to stop
+ * using QPC where the server's clock was what was meant.
+ */
+ULONGLONG server_monotonic_time(void)
+{
+    return monotonic_counter();
+}
+
+
+/***********************************************************************
+ *           the ppc64le lane's timebase-derived QPC
+ *
+ * See include/wine/emu_qpc.h for why QPC moves off CLOCK_BOOTTIME and onto
+ * the POWER timebase: it is the only clock a guest can read without leaving
+ * user space, and the native and guest answers have to be the SAME clock, not
+ * two clocks that agree for a while.
+ *
+ * qpc_session is this process's read-only view of the session block the first
+ * process seeded.  It is resolved once, on the first call, because the
+ * KUSER_SHARED_DATA mapping is not in place when this file's statics are
+ * initialised.  Nothing rewrites the block, so no lock and no re-read.
+ */
+#ifdef __powerpc64__
+
+static const struct emu_qpc_session *qpc_session;
+
+/* Only the POSITIVE answer is cached.  The block is seeded from
+ * start_wineboot(), which is not the first thing a session's first process
+ * does, so an early call here can legitimately see an unseeded page -- and
+ * caching THAT would leave one process on CLOCK_BOOTTIME for its whole life
+ * while its guest read the timebase, which is the exact disagreement this
+ * design exists to prevent.  The retry costs a load and a compare on a path
+ * the fast path has already emptied. */
+static BOOL qpc_bypass_active(void)
+{
+    const struct emu_qpc_session *s = qpc_session;
+
+    if (s) return TRUE;
+    s = (const struct emu_qpc_session *)((const char *)user_shared_data + EMU_QPC_SESSION_OFFSET);
+    if (!emu_qpc_session_ok( s )) return FALSE;
+    qpc_session = s;
+    return TRUE;
+}
+
+/* Seed the session block.  Called once per session, from
+ * virtual_init_user_shared_data(), through the writable mapping. */
+void init_qpc_session_data( void *usd_page )
+{
+    struct emu_qpc_session *s = (struct emu_qpc_session *)((char *)usd_page + EMU_QPC_SESSION_OFFSET);
+    ULONG64 tb_freq, mul, raw;
+    const char *off;
+    FILE *f;
+
+    memset( s, 0, sizeof(*s) );
+
+    if ((off = getenv( "WINE_PPC64LE_NO_QPC_BYPASS" )) && off[0] == '1')
+    {
+        ERR( "QPC timebase bypass disabled by WINE_PPC64LE_NO_QPC_BYPASS\n" );
+        return;
+    }
+
+    /* The kernel publishes the timebase frequency in /proc/cpuinfo as
+     * "timebase".  glibc's __ppc_get_timebase_freq() reads the device tree
+     * through the same value; reading it here keeps this file free of a
+     * <sys/platform/ppc.h> dependency that the PE side could not share. */
+    tb_freq = 0;
+    if ((f = fopen( "/proc/cpuinfo", "r" )))
+    {
+        char line[256];
+        while (fgets( line, sizeof(line), f ))
+        {
+            unsigned long long v;
+            if (sscanf( line, "timebase : %llu", &v ) == 1 ||
+                sscanf( line, "timebase: %llu", &v ) == 1)
+            {
+                tb_freq = v;
+                break;
+            }
+        }
+        fclose( f );
+    }
+    if (!tb_freq)
+    {
+        ERR( "no timebase frequency in /proc/cpuinfo; QPC stays on CLOCK_BOOTTIME\n" );
+        return;
+    }
+
+    /* multiplier = floor(2^64 * 10^7 / tb_freq), computed without a 128-bit
+     * divide: 2^64 / tb_freq * 10^7 would lose the fraction, so scale the
+     * numerator instead.  At 512 MHz this is exactly 5 * 2^56. */
+    mul = (ULONG64)(((unsigned __int128)TICKSPERSEC_QPC << 64) / tb_freq);
+    if (!mul)
+    {
+        ERR( "timebase frequency %llu is too high to convert; QPC stays on CLOCK_BOOTTIME\n",
+             (unsigned long long)tb_freq );
+        return;
+    }
+
+    /* Line the new clock up with the old one, so QPC keeps tracking
+     * CLOCK_BOOTTIME and the wineserver's relative-timeout conversion in
+     * server_wait() still means what it meant. */
+    raw = emu_qpc_mulhi( emu_qpc_timebase(), mul );
+
+    s->multiplier = mul;
+    s->bias       = monotonic_counter() - raw;
+    s->tb_freq    = tb_freq;
+    s->qpc_freq   = TICKSPERSEC_QPC;
+    /* QpcFrequency is truthful whether or not anything reads it.  Windows'
+     * QpcBypassEnabled stays 0 on purpose -- see emu_qpc.h. */
+    ((KUSER_SHARED_DATA *)usd_page)->QpcFrequency = TICKSPERSEC_QPC;
+    __atomic_store_n( &s->magic, EMU_QPC_MAGIC, __ATOMIC_RELEASE );
+
+    TRACE( "QPC on the timebase: freq %llu Hz, multiplier %llu, bias %lld\n",
+           (unsigned long long)tb_freq, (unsigned long long)mul, (long long)s->bias );
+}
+
+#else   /* __powerpc64__ */
+
+void init_qpc_session_data( void *usd_page )
+{
+}
+
+#endif  /* __powerpc64__ */
 
 #ifdef __linux__
 
@@ -2279,7 +2425,9 @@ NTSTATUS WINAPI NtQueryTimer( HANDLE handle, TIMER_INFORMATION_CLASS class,
         if (basic_info->RemainingTime.QuadPart > 0) NtQuerySystemTime( &now );
         else
         {
-            NtQueryPerformanceCounter( &now, NULL );
+            /* a negative `when` is absolute in the SERVER's clock, not in
+             * QPC's -- see server_monotonic_time() above */
+            now.QuadPart = server_monotonic_time();
             basic_info->RemainingTime.QuadPart = -basic_info->RemainingTime.QuadPart;
         }
 
@@ -2470,7 +2618,15 @@ NTSTATUS WINAPI NtDelayExecution( BOOLEAN alertable, const LARGE_INTEGER *timeou
  */
 NTSTATUS WINAPI NtQueryPerformanceCounter( LARGE_INTEGER *counter, LARGE_INTEGER *frequency )
 {
+#ifdef __powerpc64__
+    /* The guest's fast path answers from the same expression with the same
+     * parameters; see include/wine/emu_qpc.h.  The fallback is the clock this
+     * always used, so a session whose block never got seeded is unchanged. */
+    if (qpc_bypass_active()) counter->QuadPart = emu_qpc_native( qpc_session );
+    else counter->QuadPart = monotonic_counter();
+#else
     counter->QuadPart = monotonic_counter();
+#endif
     if (frequency) frequency->QuadPart = TICKSPERSEC;
     return STATUS_SUCCESS;
 }

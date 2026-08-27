@@ -1,0 +1,162 @@
+# Cyberpunk 2077 -benchmark, the flythrough only: the QPC fast path A/B.
+#
+# [MEASURED] 2026-08-27 on op4k (POWER8, V620).  ONE BINARY, TWO RUNS,
+# back to back inside one hold of /tmp/op4k-bench.lock, differing only by
+#
+#     WINE_PPC64LE_NO_QPC_BYPASS=1
+#
+# which stops virtual_init_user_shared_data() seeding the session's QPC
+# parameters, so NtQueryPerformanceCounter falls back to CLOCK_BOOTTIME and no
+# guest module ever arms its fast-path block.  That is exactly the behaviour
+# this tree had before the change, produced by the tree that has it -- a
+# cleaner control than an older build, which would differ in other ways too.
+#
+# The machine was left AS FOUND rather than tuned, because another agent was
+# verifying on the same GPU: ondemand governor, SMT4, unbound.  That is why the
+# absolute rates here are lower than crossings-cp2077-benchmark.txt's, which
+# ran at performance/SMT2 and 18.25 fps.  Both legs below saw the same machine,
+# which is what makes them comparable to each other.
+#
+# WINE_PPC64LE_TRAP_STATS was armed for both legs (it costs 6.2% of frame rate;
+# never compare an armed run against an unarmed one).  Windows are two of the
+# sink's periodic dumps subtracted with ppc64le/cpu/xstat_window.py.
+#
+#   leg      averageFps   frames   window
+#   before   14.999       1064     64.98 s (109.13 -> 174.11 s of process life)
+#   after    15.312       1077     67.62 s (108.70 -> 176.32 s of process life)
+#
+# THE CLAIM, per second and per frame:
+#
+#   row                                     before/s   after/s   before/frame  after/frame
+#   KERNEL32.dll.QueryPerformanceCounter      198,735         0         13,250        0
+#   NtQueryPerformanceCounter                 198,735         0         13,250        0
+#   KERNEL32.dll.QueryPerformanceFrequency        238         0             16        0
+#
+# Not "collapsed to noise": ABSENT.  The rows do not appear in the after
+# window at all, because a call that takes the fast path is not a crossing and
+# has nothing to count.  (Whole-process, outside the window, the before-arming
+# calls are still there -- one per guest module, which is what arms it.)
+#
+# Every QPC call also cost one NtCallbackReturn, the trap-return mechanism, so
+# the real per-call saving is three crossings:
+#
+#   all classes                             2,814,312  2,338,414    187,633   152,718
+#
+# 34,915 fewer crossings per frame against 39,750 that QPC's three rows were
+# worth.  The 4,835 difference is not the fast path leaking: PeekMessageW rose
+# from 6,069 to 7,883 per frame between the two runs, which is the game pacing
+# its message pump against a frame rate that moved.  The control that says the
+# two runs are otherwise the same run is the COM class, which is
+# 38,788 crossings per frame before and 38,910 after -- 0.3% apart.
+#
+# FRAME TIMES, from the benchmark's own frames.csv, for the timing-bug question
+# that matters more than the count:
+#
+#   leg      mean     median   p1       p99      max      stdev
+#   before   66.66ms  62.95ms  45.71ms  110.91ms 181.41ms 15.52ms
+#   after    65.30ms  61.63ms  44.44ms  103.39ms 158.79ms 15.02ms
+#
+# Same shape, slightly better everywhere, no new spikes.  A clock that had
+# gone wrong would show here first.
+
+===== before: WINE_PPC64LE_NO_QPC_BYPASS=1, 14.999 avg fps =====
+
+# crossing frequency over a 64.98 s window (109.13 s -> 174.11 s of process life)
+# 182873955 crossings in 348 named rows
+# class syscall       105264078       1619946/s
+# class flat           39801152        612514/s
+# class com            37804640        581789/s
+# class event              2464            38/s
+# class callback           1621            25/s
+
+class             count      per-sec  name
+syscall        77606544      1194314  NtCallbackReturn
+flat           12913811       198735  KERNEL32.dll.QueryPerformanceCounter
+syscall        12913811       198735  NtQueryPerformanceCounter
+com             7893745       121480  ID3D12GraphicsCommandList::SetGraphicsRootDescriptorTable
+com             7398988       113866  ID3D12Device::CopyDescriptors
+syscall         5915085        91029  NtUserPeekMessage
+flat            5915084        91029  USER32.dll.PeekMessageW
+flat            4937250        75981  KERNEL32.dll.LeaveCriticalSection
+flat            4937223        75981  KERNEL32.dll.EnterCriticalSection
+com             4305387        66257  ID3D12Device::CreateConstantBufferView
+com             4276996        65820  ID3D12Resource::GetGPUVirtualAddress
+com             3800139        58482  ID3D12GraphicsCommandList::DrawIndexedInstanced
+com             2890636        44485  ID3D12GraphicsCommandList::IASetVertexBuffers
+com             2715325        41787  ID3D12GraphicsCommandList::IASetIndexBuffer
+syscall         2151429        33109  NtWaitForSingleObject
+flat            2146176        33028  KERNEL32.dll.WaitForSingleObject
+flat            2121445        32648  KERNEL32.dll.ReleaseSemaphore
+syscall         2121444        32648  NtReleaseSemaphore
+flat            1908407        29369  KERNEL32.dll.GetCurrentThreadId
+syscall         1578091        24286  NtWaitForAlertByThreadId
+syscall         1521360        23413  NtAlertThreadByThreadId
+flat             561494         8641  KERNEL32.dll.ReleaseSRWLockExclusive
+flat             561486         8641  KERNEL32.dll.AcquireSRWLockExclusive
+flat             544446         8379  KERNEL32.dll.SetEvent
+syscall          544445         8379  NtSetEvent
+com              536154         8251  ID3D12GraphicsCommandList::SetPipelineState
+com              520920         8017  ID3D12GraphicsCommandList::SetComputeRootDescriptorTable
+flat             511808         7876  KERNEL32.dll.ResetEvent
+syscall          511805         7876  NtResetEvent
+flat             403359         6207  KERNEL32.dll.AcquireSRWLockShared
+
+# the rest of the time rows in this leg, for the record:
+flat             161122         2480  KERNEL32.dll.GetSystemTimePreciseAsFileTime
+flat              15446          238  KERNEL32.dll.QueryPerformanceFrequency
+flat               4559           70  KERNEL32.dll.GetTickCount
+flat                135            2  KERNEL32.dll.GetSystemTimeAsFileTime
+
+===== after: the fast path armed, 15.312 avg fps =====
+
+# crossing frequency over a 67.62 s window (108.70 s -> 176.32 s of process life)
+# 158123595 crossings in 345 named rows
+# class syscall        87757321       1297801/s
+# class com            40286399        595776/s
+# class flat           30075678        444775/s
+# class event              2520            37/s
+# class callback           1677            25/s
+
+class             count      per-sec  name
+syscall        70362612      1040559  NtCallbackReturn
+com             8446816       124916  ID3D12GraphicsCommandList::SetGraphicsRootDescriptorTable
+flat            8162255       120708  USER32.dll.PeekMessageW
+syscall         8162219       120707  NtUserPeekMessage
+com             7917591       117089  ID3D12Device::CopyDescriptors
+flat            5172116        76488  KERNEL32.dll.LeaveCriticalSection
+flat            5172081        76487  KERNEL32.dll.EnterCriticalSection
+com             4600170        68030  ID3D12Device::CreateConstantBufferView
+com             4569578        67577  ID3D12Resource::GetGPUVirtualAddress
+com             4009651        59297  ID3D12GraphicsCommandList::DrawIndexedInstanced
+com             3071870        45428  ID3D12GraphicsCommandList::IASetVertexBuffers
+com             2886020        42680  ID3D12GraphicsCommandList::IASetIndexBuffer
+syscall         2257048        33378  NtWaitForSingleObject
+flat            2251608        33298  KERNEL32.dll.WaitForSingleObject
+flat            2226907        32933  KERNEL32.dll.ReleaseSemaphore
+syscall         2226866        32932  NtReleaseSemaphore
+flat            1954882        28910  KERNEL32.dll.GetCurrentThreadId
+syscall         1638102        24225  NtWaitForAlertByThreadId
+syscall         1578911        23350  NtAlertThreadByThreadId
+flat             588385         8701  KERNEL32.dll.ReleaseSRWLockExclusive
+flat             588377         8701  KERNEL32.dll.AcquireSRWLockExclusive
+com              577986         8548  ID3D12GraphicsCommandList::SetPipelineState
+syscall          561369         8302  NtSetEvent
+flat             561369         8302  KERNEL32.dll.SetEvent
+com              556718         8233  ID3D12GraphicsCommandList::SetComputeRootDescriptorTable
+flat             526612         7788  KERNEL32.dll.ResetEvent
+syscall          526612         7788  NtResetEvent
+flat             412379         6098  KERNEL32.dll.AcquireSRWLockShared
+flat             412379         6098  KERNEL32.dll.ReleaseSRWLockShared
+com              369537         5465  ID3D12GraphicsCommandList::ResourceBarrier
+
+# and the time rows.  QueryPerformanceCounter, NtQueryPerformanceCounter and
+# QueryPerformanceFrequency are not here because they did not happen.
+flat             168283         2489  KERNEL32.dll.GetSystemTimePreciseAsFileTime
+flat               6381           94  KERNEL32.dll.GetTickCount
+flat                138            2  KERNEL32.dll.GetSystemTimeAsFileTime
+
+# GetSystemTimePreciseAsFileTime is what is left of the time class and it is
+# 2,489/s -- 1.25% of what QPC was, and 163 per frame.  It is NOT served here.
+# It reads the REALTIME clock, which NTP steps and slews, so serving it from
+# the timebase needs a published realtime epoch that can move under a reader,
+# and that is a second correctness argument for a 1% win.  Named, not done.

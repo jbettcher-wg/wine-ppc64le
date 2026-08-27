@@ -1488,7 +1488,15 @@ struct object *create_user_data_mapping( struct object *root, struct unicode_str
 {
     void *ptr;
     struct mapping *mapping;
-    struct mapping_init_data data = { .size = sizeof(KUSER_SHARED_DATA), .flags = SEC_COMMIT,
+    /* A FULL PAGE, not sizeof(KUSER_SHARED_DATA).  Windows' user shared data
+     * IS one page, every client already maps it a page at a time
+     * (virtual_map_user_shared_data), and the ppc64le native lane puts its
+     * QPC-bypass parameters in the tail past the Windows structure -- see
+     * include/wine/emu_qpc.h.  Sizing the section at 0x738 left those bytes
+     * inside the mapping's last partial page, which works by accident of how
+     * Linux handles a shared mapping past EOF and is not something to build a
+     * clock on. */
+    struct mapping_init_data data = { .size = 0x1000, .flags = SEC_COMMIT,
                                       .file_access = FILE_READ_DATA | FILE_WRITE_DATA };
     struct object_params params = { .ops = &mapping_ops, .root = root, .name = name,
                                     .attr = attr, .sd = sd, .init_data = &data };

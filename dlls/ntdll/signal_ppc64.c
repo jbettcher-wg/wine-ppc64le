@@ -37,6 +37,7 @@
 #include "ntdll_misc.h"
 #include "unwind.h"
 #include "wine/debug.h"
+#include "wine/emu_qpc.h"
 #include "ntsyscalls.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(seh);
@@ -7935,6 +7936,117 @@ void flush_guest_thunk_cache(void)
 }
 
 /***********************************************************************
+ *           qpc_arm_module
+ *
+ * Fill in and switch on a guest module's QPC fast-path block, once.
+ *
+ * A fast-path stub is linked DISARMED, so the first QueryPerformanceCounter a
+ * guest makes goes down the stub's slow leg: it stores its own RDTSC reading
+ * into the block and falls through to the trap it always took.  That reading
+ * is the whole point.  It is a guest-visible counter value a few microseconds
+ * old, and the guest counter is the host timebase shifted left by the
+ * emulator's TSC scale with the same zero ([MEASURED] -- see
+ * include/wine/emu_qpc.h), so one native mftb() here NAMES that scale by
+ * matching `sample >> s` against it.  No question is asked of the emulator, no
+ * guest code is run from the host, and a counter that does not look like the
+ * timebase at any scale leaves the block off, which costs the trap and nothing
+ * else.
+ *
+ * Called from the module walk below, which runs once per new call site under
+ * the loader lock.  The first QPC call IS such a site, so the block is armed
+ * by the time the second one runs; nothing later depends on another miss
+ * happening.
+ */
+#define QPC_PROBED_MAX 32
+static const void *qpc_probed[QPC_PROBED_MAX];
+static UINT qpc_probed_count;
+
+static void qpc_arm_module( LDR_DATA_TABLE_ENTRY *mod )
+{
+    const struct emu_qpc_session *sess;
+    struct emu_qpc_guest *g;
+    ANSI_STRING name;
+    ULONG64 tb, sample;
+    UINT s, i;
+
+    for (i = 0; i < qpc_probed_count; i++)
+        if (qpc_probed[i] == mod->DllBase) return;
+
+    RtlInitAnsiString( &name, "__wine_thunk_qpc" );
+    if (LdrGetProcedureAddress( mod->DllBase, &name, 0, (void **)&g )) goto done;
+    if (g->magic != EMU_QPC_MAGIC)
+    {
+        ERR( "%s exports __wine_thunk_qpc with magic %I64x, not %I64x\n",
+             debugstr_w(mod->BaseDllName.Buffer), g->magic, (ULONG64)EMU_QPC_MAGIC );
+        goto done;
+    }
+    if (g->enabled) goto done;
+    /* No stub has run yet.  NOT recorded as probed: the sample appears on the
+     * first fast-path call, and that call's own miss is what arms this. */
+    if (!(sample = g->tsc_sample)) return;
+
+    if (emu_env_flag( L"WINE_PPC64LE_NO_QPC_BYPASS" ))
+    {
+        ERR( "guest QPC fast path disabled by WINE_PPC64LE_NO_QPC_BYPASS\n" );
+        goto done;
+    }
+
+    sess = (const struct emu_qpc_session *)((const char *)user_shared_data + EMU_QPC_SESSION_OFFSET);
+    if (!emu_qpc_session_ok( sess ))
+    {
+        ERR( "the session's QPC parameters were never seeded; fast path stays off\n" );
+        goto done;
+    }
+
+    /* Two seconds either way.  Adjacent candidate scales are a factor of two
+     * apart -- half the machine's uptime in timebase ticks, hundreds of
+     * billions -- so this window cannot pick the wrong one; it is wide only so
+     * that a first trap which had to LdrLoadDll a native counterpart still
+     * matches. */
+    tb = emu_qpc_timebase();
+    for (s = 0; s <= EMU_QPC_MAX_SHIFT; s++)
+    {
+        ULONG64 guess = sample >> s;
+        ULONG64 d = guess > tb ? guess - tb : tb - guess;
+        if (d < sess->tb_freq * 2) break;
+    }
+    if (s > EMU_QPC_MAX_SHIFT)
+    {
+        ERR( "guest RDTSC %I64u is not the timebase (%I64u) at any scale; "
+             "QPC fast path stays off\n", sample, tb );
+        goto done;
+    }
+
+    g->multiplier = sess->multiplier;
+    g->bias       = sess->bias;
+    g->frequency  = sess->qpc_freq;
+    g->shift      = (UCHAR)s;
+
+    /* The negative controls the gate drives.  Each breaks the SEEDING, which
+     * is the part a wrong answer would come from, and leaves the mechanism
+     * itself intact -- so ppc64le/cpu/check-qpc-fastpath.sh is falsifying the
+     * thing it claims to check and not re-stating it. */
+    if (emu_env_flag( L"WINE_PPC64LE_QPC_SABOTAGE_SHIFT" ))
+    {
+        ERR( "SABOTAGE: seeding the guest QPC shift as %u instead of %u\n", s + 1, s );
+        g->shift = (UCHAR)(s + 1);
+    }
+    if (emu_env_flag( L"WINE_PPC64LE_QPC_SABOTAGE_BIAS" ))
+    {
+        ERR( "SABOTAGE: seeding the guest QPC bias 100 ms off\n" );
+        g->bias = sess->bias + 1000000;
+    }
+
+    TRACE( "%s: guest QPC armed, tsc scale %u, multiplier %I64u, bias %I64d\n",
+           debugstr_w(mod->BaseDllName.Buffer), s, g->multiplier, g->bias );
+    __atomic_store_n( &g->enabled, 1, __ATOMIC_RELEASE );
+
+done:
+    if (qpc_probed_count < QPC_PROBED_MAX) qpc_probed[qpc_probed_count++] = mod->DllBase;
+}
+
+
+/***********************************************************************
  *           find_guest_thunk_target
  *
  * Resolve a trapping guest address to the native function it stands for, or
@@ -8045,6 +8157,10 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
                  debugstr_w(mod->BaseDllName.Buffer), info->version, THUNK_INFO_VERSION );
             goto done;
         }
+
+        /* Once per module, and only from a module that really is a thunk
+         * module: see qpc_arm_module above. */
+        qpc_arm_module( mod );
 
         /* The stub rescues the guest's first argument before trapping, so the
          * trap is at a fixed offset inside the stub rather than at its start;

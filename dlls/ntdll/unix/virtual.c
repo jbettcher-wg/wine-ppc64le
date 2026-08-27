@@ -4572,8 +4572,11 @@ void virtual_init_user_shared_data(void)
         ERR( "failed to open the USD section: %08x\n", status );
         exit(1);
     }
+    /* A PAGE, not sizeof(*data): the tail past the Windows structure carries
+     * the native lane's QPC parameters (include/wine/emu_qpc.h) and this is
+     * the one place in the session that writes them. */
     if ((res = server_get_unix_fd( section, 0, &fd, &needs_close, NULL, NULL )) ||
-        (data = mmap( NULL, sizeof(*data), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 )) == MAP_FAILED)
+        (data = mmap( NULL, page_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 )) == MAP_FAILED)
     {
         ERR( "failed to remap the process USD: %d\n", res );
         exit(1);
@@ -4605,7 +4608,8 @@ void virtual_init_user_shared_data(void)
     }
 
     init_shared_data_cpuinfo( data );
-    munmap( data, sizeof(*data) );
+    init_qpc_session_data( data );
+    munmap( data, page_size );
 }
 
 

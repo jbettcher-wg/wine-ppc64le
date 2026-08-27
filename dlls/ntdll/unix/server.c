@@ -799,13 +799,11 @@ unsigned int server_wait( const union select_op *select_op, data_size_t size, UI
     unsigned int ret;
     struct user_apc apc;
 
-    if (abs_timeout < 0)
-    {
-        LARGE_INTEGER now;
-
-        NtQueryPerformanceCounter( &now, NULL );
-        abs_timeout -= now.QuadPart;
-    }
+    /* A negative timeout the server receives is an absolute time in the
+     * SERVER's clock, so that is the clock this converts with.  It used to say
+     * NtQueryPerformanceCounter, which is the same clock everywhere except the
+     * ppc64le lane; see server_monotonic_time() in unix/sync.c. */
+    if (abs_timeout < 0) abs_timeout -= server_monotonic_time();
 
     ret = server_select( select_op, size, flags, abs_timeout, NULL, &apc );
     if (ret == STATUS_USER_APC) return invoke_user_apc( NULL, &apc, ret );

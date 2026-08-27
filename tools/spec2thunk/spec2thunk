@@ -180,6 +180,14 @@ from wine_sig import Refused
 
 STRIDE = 16
 INFO_VERSION = 7
+
+# Exports this generator makes up, past the end of the module's ordinal space.
+# A .thunks or .spec file that names one of them is refused, because the two
+# would then be the same name meaning two things.  spec2thunk-check knows the
+# same list and excludes it from the "every exported name is in the list"
+# checks.
+RESERVED_EXPORTS = ('__wine_thunk_info', '__wine_com_thunk_info',
+                    '__wine_thunk_qpc')
 BUILTIN_SIG = b"Wine builtin DLL\x00"   # 17 bytes, must sit at file offset 0x40
 SIG_OFF = 0x40
 
@@ -463,7 +471,7 @@ def parse_spec(path):
     names = [e['name'] for e in exports]
     if len(set(names)) != len(names):
         sys.exit("%s: duplicate export names" % path)
-    for reserved in ('__wine_thunk_info', '__wine_com_thunk_info'):
+    for reserved in RESERVED_EXPORTS:
         if reserved in names:
             sys.exit("%s: %s is reserved" % (path, reserved))
     return dll, exports, from_spec, excludes, extra
@@ -1692,6 +1700,117 @@ RAW_BODY_EXPORTS = {
 }
 
 
+# --------------------------------------------------------------------------
+# GUEST FAST PATHS
+# --------------------------------------------------------------------------
+# A trap stub is 16 bytes and cannot be anything else: the dispatcher recovers
+# an export's index from `(trapping RIP - stubs_rva - trap_off) / stride`, so
+# the array's geometry is ABI.  A fast path needs forty-odd bytes and a
+# fallback, so it does not live in the slot.  It lives BESIDE the array, and
+# the module's export table points the name at it:
+#
+#   .thunk    [ stub 0 ][ stub 1 ] ... [ stub N-1 ]   <- untouched, still ABI
+#             [ fast body for export k ]              <- appended, any length
+#                 ...
+#             fallback: jmp wine_thunk_stub_k         <- the trap, at its own
+#                                                        slot, at trap_off
+#   .def      QueryPerformanceCounter = wine_thunk_fast_k
+#
+# So a call that cannot take the fast path arrives at the trap instruction it
+# always did, at the RIP the dispatcher expects, with RCX -- MS-x64 argument 0
+# -- still intact, because a fast body must not touch RCX before it commits.
+# Everything that resolves a stub by index, GetProcAddress included (the host
+# hands back the export table's address, which is now the fast body), keeps
+# working; nothing in the host reads a stub address to identify an export.
+#
+# WHY THIS IS WORTH A MECHANISM.  [MEASURED] 2026-08-27, Cyberpunk 2077's
+# -benchmark flythrough: KERNEL32.QueryPerformanceCounter alone was 256,638
+# crossings a second, 14,061 a frame, each one a trap AND the syscall the
+# native side then made -- the hottest named crossing in the port by a factor
+# of 1.5 over the next one.  Windows serves it from user space and so does
+# this.  See include/wine/emu_qpc.h for the clock and why it is the same clock
+# the native side answers with.
+#
+# x86-64 ONLY.  The 32-bit lane's stub is a bare `int 0x80` with every
+# argument on the stack, and no title reaches it yet (NEXT.md item 2); an
+# unproven second copy of this would be a liability, not a feature.
+FAST_PATH_MODULES = ('kernel32.dll', 'kernelbase.dll')
+
+FAST_PATH_EXPORTS = {
+    'QueryPerformanceCounter':   'qpc',
+    'QueryPerformanceFrequency': 'qpf',
+}
+
+# Field offsets inside struct emu_qpc_guest.  THE SAME NUMBERS AS
+# include/wine/emu_qpc.h -- that header's C_ASSERTs and this table are two
+# spellings of one layout, and spec2thunk-check carries a third.
+QPC_MULTIPLIER  = 8
+QPC_BIAS        = 16
+QPC_ENABLED     = 24
+QPC_SHIFT       = 25
+QPC_FREQUENCY   = 32
+QPC_TSC_SAMPLE  = 40
+QPC_BLOCK_SIZE  = 48
+QPC_MAGIC       = 0x5150433150504336   # "QPC1PPC6"
+
+
+def fast_path_kind(dll, name, mode, machine):
+    """Which fast body this export gets, or None."""
+    if machine != 'x86_64' or mode != 'trap':
+        return None
+    if dll.lower() not in FAST_PATH_MODULES:
+        return None
+    return FAST_PATH_EXPORTS.get(name)
+
+
+def emit_fast_body(a, kind, idx):
+    """The guest x86-64 for one fast-path export, plus its fallback."""
+    q = 'wine_thunk_qpc'
+    a('\t.globl\twine_thunk_fast_%d' % idx)
+    a('wine_thunk_fast_%d:' % idx)
+    if kind == 'qpc':
+        # BOOL QueryPerformanceCounter( LARGE_INTEGER *counter )   rcx = counter
+        #
+        # The disarmed leg reads RDTSC anyway and leaves it in tsc_sample: that
+        # is how the host learns the emulator's TSC scale, from a guest-visible
+        # counter reading it cannot take itself (emu_qpc.h).  The ARMED leg
+        # never writes it -- a store there would be one cache line fifteen game
+        # threads contend for a quarter of a million times a second.
+        a('\tcmpb\t$1, %s+%d(%%rip)' % (q, QPC_ENABLED))
+        a('\tjne\t.Lwine_thunk_slow_%d' % idx)
+        a('\tmovq\t%rcx, %r10')
+        a('\trdtsc')
+        a('\tshlq\t$32, %rdx')
+        a('\torq\t%rdx, %rax')
+        a('\tmulq\t%s+%d(%%rip)' % (q, QPC_MULTIPLIER))
+        a('\tmovb\t%s+%d(%%rip), %%cl' % (q, QPC_SHIFT))
+        a('\tshrq\t%cl, %rdx')
+        a('\taddq\t%s+%d(%%rip), %%rdx' % (q, QPC_BIAS))
+        a('\tmovq\t%rdx, (%r10)')
+        a('\tmovl\t$1, %eax')
+        a('\tretq')
+        a('.Lwine_thunk_slow_%d:' % idx)
+        a('\trdtsc')
+        a('\tshlq\t$32, %rdx')
+        a('\torq\t%rdx, %rax')
+        a('\tmovq\t%%rax, %s+%d(%%rip)' % (q, QPC_TSC_SAMPLE))
+        a('\tjmp\twine_thunk_stub_%d' % idx)
+    elif kind == 'qpf':
+        # BOOL QueryPerformanceFrequency( LARGE_INTEGER *frequency )
+        # Free, once the block exists: 299 crossings/s in the same measurement.
+        a('\tcmpb\t$1, %s+%d(%%rip)' % (q, QPC_ENABLED))
+        a('\tjne\t.Lwine_thunk_slow_%d' % idx)
+        a('\tmovq\t%s+%d(%%rip), %%rax' % (q, QPC_FREQUENCY))
+        a('\tmovq\t%rax, (%rcx)')
+        a('\tmovl\t$1, %eax')
+        a('\tretq')
+        a('.Lwine_thunk_slow_%d:' % idx)
+        a('\tjmp\twine_thunk_stub_%d' % idx)
+    else:
+        raise ValueError(kind)
+    a('')
+
+
 def stub_bytes(mode, imm, raw_body=None, machine='x86_64'):
     """Exactly STRIDE bytes of guest machine code for one stub slot."""
     if raw_body is not None:
@@ -1747,6 +1866,18 @@ def emit_asm(dll, exports, mode, com_ifaces=None, machine='x86_64'):
         a('\t.byte\t' + ','.join('0x%02X' % c for c in b))
     a('wine_thunk_stubs_end:')
     a('')
+
+    # The fast bodies sit past the end of the stub array, in the same
+    # executable section.  Nothing indexes them; the export table names them.
+    fast = [(i, fast_path_kind(dll, e['name'], mode, machine))
+            for i, e in enumerate(exports)]
+    fast = [(i, k) for i, k in fast if k]
+    if fast:
+        a('\t# --- guest fast paths (see FAST_PATH_EXPORTS) ---')
+        a('\t.balign\t16')
+        for i, k in fast:
+            a('\t# %s' % exports[i]['name'])
+            emit_fast_body(a, k, i)
     a('\t.section\t.rdata,"dr"')
     a('\t.balign\t8')
     a('\t.globl\twine_thunk_info')
@@ -1834,6 +1965,27 @@ def emit_asm(dll, exports, mode, com_ifaces=None, machine='x86_64'):
             a('wine_thunk_impl_%d:' % i)
             a('\t.asciz\t"%s"' % e['impl'])
     a('')
+    if fast:
+        # WRITABLE, and per module and per process by construction: the
+        # multiplier the guest needs depends on the emulator's TSC scale, which
+        # is this process's bridge configuration, not the machine's.  Linked
+        # with enabled = 0, so an image loaded by a host that does not arm it
+        # takes the trap on every call -- the behaviour it had before.
+        a('\t.section\t.data,"dw"')
+        a('\t.balign\t64')
+        a('\t.globl\twine_thunk_qpc')
+        a('wine_thunk_qpc:')
+        a('\t.quad\t0x%016X\t# magic' % QPC_MAGIC)
+        a('\t.quad\t0\t\t\t# multiplier')
+        a('\t.quad\t0\t\t\t# bias')
+        a('\t.byte\t0\t\t\t# enabled')
+        a('\t.byte\t0\t\t\t# shift')
+        a('\t.byte\t0,0,0,0,0,0\t\t# pad')
+        a('\t.quad\t0\t\t\t# frequency')
+        a('\t.quad\t0\t\t\t# tsc_sample')
+        a('\t.section\t.rdata,"dr"')
+        a('')
+
     if com_ifaces:
         emit_com_asm(a, com_ifaces, machine)
     a('\t# One absolute pointer so the linker is forced to emit a base')
@@ -1853,7 +2005,8 @@ def emit_asm(dll, exports, mode, com_ifaces=None, machine='x86_64'):
     return decorate(  '\n'.join(out) + '\n', machine)
 
 
-def emit_def(dll, exports, have_com=False, ord_limit=0, machine='x86_64'):
+def emit_def(dll, exports, have_com=False, ord_limit=0, machine='x86_64',
+             mode='trap'):
     """The .def the thunk PE is linked from.
 
     Each export carries the ordinal assign_ordinals() gave it, because a guest
@@ -1870,18 +2023,31 @@ def emit_def(dll, exports, have_com=False, ord_limit=0, machine='x86_64'):
     # this side stays as written.
     sym = lambda n: n
     out = ['LIBRARY %s' % dll, 'EXPORTS']
+    have_fast = False
     for i, e in enumerate(exports):
+        # A fast-path export's NAME resolves to the fast body; its stub slot
+        # stays exactly where it was, and the fast body's fallback jumps to it.
+        if fast_path_kind(dll, e['name'], mode, machine):
+            target, have_fast = 'wine_thunk_fast_%d' % i, True
+        else:
+            target = 'wine_thunk_stub_%d' % i
         out.append('    %s = %s%s'
-                   % (e['name'], sym('wine_thunk_stub_%d' % i),
+                   % (e['name'], sym(target),
                       ' @%d' % e['ordinal'] if e.get('ordinal') else ''))
     info_ord = ord_limit + 1 if ord_limit else 0
     out.append('    __wine_thunk_info = %s%s DATA'
                % (sym('wine_thunk_info'),
                   ' @%d' % info_ord if info_ord else ''))
+    nxt = info_ord + 1
     if have_com:
         out.append('    __wine_com_thunk_info = %s%s DATA'
                    % (sym('wine_com_thunk_info'),
-                      ' @%d' % (info_ord + 1) if info_ord else ''))
+                      ' @%d' % nxt if info_ord else ''))
+        nxt += 1
+    if have_fast:
+        out.append('    __wine_thunk_qpc = %s%s DATA'
+                   % (sym('wine_thunk_qpc'),
+                      ' @%d' % nxt if info_ord else ''))
     return '\n'.join(out) + '\n'
 
 
@@ -2050,7 +2216,7 @@ def main():
     if len(set(names)) != len(names):
         dup = sorted({n for n in names if names.count(n) > 1})
         sys.exit('duplicate export names: %s' % ', '.join(dup))
-    for reserved in ('__wine_thunk_info', '__wine_com_thunk_info'):
+    for reserved in RESERVED_EXPORTS:
         if reserved in names:
             sys.exit('%s is reserved' % reserved)
 
@@ -2236,7 +2402,8 @@ def main():
         f.write(emit_asm(dll, exports, args.body, com_ifaces, args.machine))
     with open(dpath, 'w') as f:
         f.write(emit_def(dll, exports, have_com=bool(com_ifaces),
-                         ord_limit=ord_limit, machine=args.machine))
+                         ord_limit=ord_limit, machine=args.machine,
+                         mode=args.body))
 
     mach = MACHINES[args.machine]
     run([args.clang, '-target', mach['clang_target'], '-c', spath, '-o', opath],

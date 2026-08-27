@@ -113,7 +113,7 @@ Over the 66.6 s flythrough at 18.25 fps: **235.6M crossings, 3.54M/s**, in
 
 * **QPC is the single hottest named crossing** — 14,061 calls per frame, each
   a full trap plus a full syscall.  Windows serves it from
-  KUSER_SHARED_DATA in user space.
+  KUSER_SHARED_DATA in user space.  **This row is now gone**; see below.
 * **PeekMessage is second among flat exports**, 5,508 per frame, likewise a
   trap plus a syscall.
 * **GetTickCount is NOT hot**: 377/s over the whole process, 0 in the
@@ -124,3 +124,41 @@ Over the 66.6 s flythrough at 18.25 fps: **235.6M crossings, 3.54M/s**, in
   of it (`Cyberpunk2077.exe+0x7cb6bc`, a window procedure).
 * **The COM class is 55M crossings, 825k/s** — larger than the flat class, and
   the top four rows are d3d12 descriptor and draw-state calls.
+
+## What was done about the top row (2026-08-27)
+
+QPC is gone.  `KERNEL32.QueryPerformanceCounter`, `NtQueryPerformanceCounter`
+and `QueryPerformanceFrequency` do not appear in the flythrough window at all
+any more, because a guest calling them no longer crosses anything: the export
+in the guest's kernel32 is real x86-64 that reads the POWER timebase with
+`rdtsc` and returns.  `ppc64le/cpu/crossings-cp2077-qpc.txt` is the A/B, one
+binary and one env var apart.
+
+| | before | after |
+|---|---:|---:|
+| `KERNEL32.dll.QueryPerformanceCounter` | 198,735/s | — |
+| `NtQueryPerformanceCounter` | 198,735/s | — |
+| all crossings, per frame | 187,633 | 152,718 |
+
+The mechanism is three pieces and each is documented where it lives:
+
+* `include/wine/emu_qpc.h` — the clock.  Why the timebase, why the guest and
+  native answers are the same expression rather than two clocks that agree,
+  what the emulator's TSC scale is and how the host measures it without asking
+  the emulator, and the 39.6 ppm the timebase drifts from CLOCK_BOOTTIME
+  (which is why `server_monotonic_time()` now exists).
+* `tools/spec2thunk` — `FAST_PATH_EXPORTS`, the mechanism for giving one
+  export real guest code beside its stub array while the stub, the stride and
+  the trap offset stay exactly what the dispatcher expects.
+* `dlls/ntdll/signal_ppc64.c` — `qpc_arm_module`, which fills the guest's
+  block on the first call.
+
+`ppc64le/cpu/check-qpc-fastpath.sh` is the gate, and its negative control
+breaks the seeding two different ways.
+
+**What this does not touch.**  `PeekMessageW` is now the hottest flat row at
+120,708/s and it is not shared-page servable — it has real message-queue
+semantics.  `GetSystemTimePreciseAsFileTime` is 2,489/s and reads the realtime
+clock, which NTP can step; the timebase cannot serve it without a published
+realtime epoch that moves under a reader.  The COM class did not move and is
+now the largest by far; those rows want a batching design, not a fast path.
