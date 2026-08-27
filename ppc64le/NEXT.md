@@ -130,12 +130,23 @@ what is actually seen:
   already hands out a TAGGED eventfd (vkd3d-patches/0001); the lift is the
   relay a guest can `WaitForSingleObject` on -- an NT semaphore the unix side
   releases when the eventfd pays out.  The game runs without it today.
-* **DXR honestly**: the `D3D12_STATE_OBJECT_DESC` walker
-  (ID3D12Device5::CreateStateObject and Device7::AddToStateObject), so nodxr
-  can come back out of the appconfig on hardware that can afford it.
-* **PipelineLibrary Load pair**: LoadGraphicsPipeline/LoadComputePipeline
-  refuse (desc structs carry the root signature); the game falls back to
-  fresh PSO creation every boot, which costs load time, not correctness.
+* **DXR walker and PipelineLibrary loads -- DONE (2026-08-26, 477b103fb76).**
+  Nine of the thirteen refused slots became hand walkers and the named holes
+  dropped to four: the pipeline-library load trio (Cyberpunk hit the first
+  pair on EVERY boot; its pipeline cache can load now instead of rebuilding
+  each PSO), the two remaining float-by-value frames (OMSetDepthBounds,
+  RSSetDepthBias -- hand_clear_dsv's XMM lift, two new typed shapes),
+  BeginRenderPass and the enhanced Barrier, and the
+  `D3D12_STATE_OBJECT_DESC` walker for CreateStateObject/AddToStateObject
+  with association-pointer remap.  `nodxr` CAN come out of the appconfig
+  now, but whether the V620 should be offered RT is a performance decision,
+  not a marshalling one -- unmeasured, and the flag stays until it is.  The
+  four rows still refused are three structural classes, each named in the
+  table: DRED's native-owned breadcrumb list, WorkGraphProperties' 16-byte
+  by-value aggregate, RegisterDestructionCallback's guest function pointer.
+  None of the nine new walkers has been driven by a real title yet; the
+  next Cyberpunk boot is the live test (watch load time, and `grep -a
+  refus` should lose the PipelineLibrary lines).
 * The 15-ish `err:combase:__wine_com_refuse` flat-export refusals at boot and
   the unknown syscom IID {77aa99a0-1bd6-484f-8bc7-2c654c9a9b6f} -- survived,
   unidentified; name them with a +thunk trace when they matter.
@@ -219,10 +230,25 @@ FEX_* knobs reach the native lane since fastppcx86 `54df357cb` (the
 bridge environment layer), and FEX_HWTSO works for real since
 `d4168c1ec` + this tree's PROT_SAO wiring (see the commit).
 
-What remains: the GameThread itself.  Next instrument is a perf profile
-of that one tid mid-benchmark (`FEX_GLOBALJITNAMING=1` writes
-/tmp/perf-<pid>.map, and the bridge honors it now) to split its 92%
-between JIT'd guest code, bridge helpers, and TSO barrier overhead.
+**The passthrough is verified; the PARITY is not there (found
+2026-08-26).**  The emulated stack launches every game through
+`~/fex-scripts/launchers.bak/fexplay-wtsmc`, which exports the tuned
+set: HWTSO, LOCKONLYTSO, the whole SMC suite (SMCCHECKS=mtrack, cheap
+tier, lazy inval, soft invalidate, store backpatch/emulation, mprotect
+defer, semantic patch), FUTEXMITIGATE, SCHEDPASSTHROUGH.  The native
+lane's `appconfig/*.env` files set NONE of them, and the 2026-08-19
+Cyberpunk log confirms only X87REDUCEDPRECISION=1 reached the run -- so
+the native lane's JIT emits full TSO barriers and strict SMC checks
+against an emulated lane running years of tuning.  Comparing the lanes
+before fixing that measures config, not architecture.  First lever:
+mirror the fexplay-wtsmc knob set into the native lane's env (per-title
+.env or a steamtool/proton default), re-run the `-benchmark` A/B --
+parked until the user calls for it.
+
+What remains after parity: the GameThread itself.  Next instrument is a
+perf profile of that one tid mid-benchmark (`FEX_GLOBALJITNAMING=1`
+writes /tmp/perf-<pid>.map, and the bridge honors it now) to split its
+92% between JIT'd guest code, bridge helpers, and TSO barrier overhead.
 HWTSO/PROT_SAO is NO LONGER FEXInterpreter-only: fastppcx86 `d4168c1ec`
 re-hosts the probe and the refusal/revocation closure in the bridge,
 and this tree carries the bit through get_unix_prot(), retro-applies it
