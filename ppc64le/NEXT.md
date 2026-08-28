@@ -370,10 +370,48 @@ and the COUNT of guest<->native crossings.  The levers, in order:
      GameThread time.  Whether that headroom turns into fps at SMT2 or
      under the performance governor is unmeasured.
 
-     The remaining unbatched hot rows are the DEVICE-side descriptor pair
-     (CopyDescriptors 176k/s + CreateConstantBufferView 99k/s -- now rows
-     one and two of the COM class), ResourceBarrier (9.5k/s, struct
-     arrays), and PeekMessageW.
+     The remaining unbatched hot rows are CopyDescriptors itself (176k/s,
+     trapping BY DESIGN -- its trap is the device journal's ordering
+     point), ResourceBarrier (9.5k/s, struct arrays), and PeekMessageW
+     (a leg of its own is in flight).
+
+     **The device journal is BUILT but OPT-IN (2026-08-27 night,
+     WINEEMUCOMDEVJOURNAL=1 to enable), because a hang it causes is
+     UNATTRIBUTED.**  Built to the settled design below --
+     CreateConstantBufferView records guest-side into per-thread rings
+     (TEB SystemReserved1[0], RDTSC stamps, k-way merge at every COM
+     dispatch, dirty-byte idle check) -- and hardened three times over by
+     what one night of Cyberpunk legs found: a consistent-cut timestamp
+     bounds the merge (the sequential ring-snapshot walk is not a cut),
+     the ring header carries a magic the snippet verifies (SystemReserved1
+     is reserved from Wine, not from the app), and the drain holds
+     structurally-implausible records instead of replaying them.  Gate
+     ppc64le/winecom/check-dev-journal.sh: 62/62 cross-thread replays in
+     issued order, sabotage red, kill switch clean.
+
+     What keeps it off: with the journal on, Cyberpunk raises ONE amdgpu
+     gfx_0.0.0 ring timeout per benchmark leg (~3 min in, no VM fault, the
+     game limps at 13-14 fps of reset wreckage afterwards; one run
+     escalated to a MODE1 reset crashloop that took the compositor and a
+     reboot with it).  Journal OFF is clean -- 24.42 fps, the best this
+     title has measured.  Everything the replay stream could confess has
+     been ruled out ON DATA: a fully-traced leg (2.08M replays) shows
+     zero same-handle inversions, zero corrupt records, every replay
+     before its consuming dispatch -- and still hangs.  FEX_HWTSO=1 does
+     not change the verdict.  The one configuration that runs the full
+     flythrough clean is the WINEEMUCOMDEVDOUBLE=1 diagnostic: records
+     taken AND the call served live at record time -- so the poison is
+     specifically "creates reach vkd3d only at the drain", through a
+     consumer the trap set does not cover.  Suspects still standing:
+     dev_cs convoy starving a thread the GPU waits on through a
+     GPU-side wait packet, or a descriptor consumer inside vkd3d/dxgi
+     that crosses on a path winecom never sees.  Two false leads worth
+     not re-walking: the 58k "torn records" a plausibility check once
+     flagged were LEGAL NULL CBVs ({0,0} range inits -- Cyberpunk writes
+     tens of thousands), and run-native (unlike steamtool/proton) never
+     arms FEX_HWTSO, which is a real gap on the bench path but not this
+     bug.  The paragraph below is the design as built; the correctness
+     comments live above wc_dev_drain in libs/winecom/winecom.c.
 
      **The device-pair DESIGN is settled (2026-08-27 evening), unbuilt.**
      Device methods are free-threaded, so the command-list journal's

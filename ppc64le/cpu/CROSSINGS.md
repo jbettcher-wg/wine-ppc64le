@@ -190,7 +190,23 @@ materialised vtable slots (the COM lane's runtime analog of
   by, so the journal buys worker CPU and total crossings, not frame time on
   this title as configured.
 
-The still-unbatched hot rows are the DEVICE-side pair — `CopyDescriptors`
-(176k/s) + `CreateConstantBufferView` (99k/s), which are free-threaded and
-want a descriptor-shadow design — `ResourceBarrier` (9.5k/s, struct arrays),
-and `PeekMessageW`.
+* **The device journal** (OPT-IN: `WINEEMUCOMDEVJOURNAL=1` enables it,
+  and NEXT.md item 6 records the unattributed GPU hang that keeps it off
+  by default; `WINEEMUNOCOMDEVJOURNAL=1` kills it when enabled, sabotage
+  `WINEEMUCOMDEVSABOTAGE=1` records without ever replaying): the free-
+  threaded device side's answer to the same problem.
+  `ID3D12Device::CreateConstantBufferView` records into PER-THREAD rings
+  anchored at the guest TEB's `SystemReserved1[0]`; every record carries an
+  RDTSC stamp (the timebase, core-synchronized by the QPC work's proof) and
+  the drain k-way-merges all rings by stamp at the next real COM dispatch —
+  which `CopyDescriptors` and every other consumer still is, so
+  create-then-copy stays ordered across threads.  A guest-set dirty byte
+  makes the per-dispatch check one load.  The correctness argument, wall by
+  wall, is the comment above `wc_dev_drain` in winecom.c; the gate is
+  `ppc64le/winecom/check-dev-journal.sh` (two threads under a strict event
+  baton, replay transcript must equal issued order).
+
+The still-unbatched hot rows are `CopyDescriptors` itself (176k/s — it stays
+trapping BY DESIGN: its trap is the device journal's ordering point, so
+batching it needs a further design), `ResourceBarrier` (9.5k/s, struct
+arrays), and `PeekMessageW`.

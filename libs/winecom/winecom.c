@@ -62,6 +62,7 @@
 #include "wine/winecom.h"
 
 #include "winecom_private.h"
+#include "wine/emu_qpc.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(winecom);
 
@@ -787,6 +788,595 @@ static void install_journal( void )
 static void install_journal( void ) { }
 #endif  /* _WIN64 */
 
+/***********************************************************************
+ *           the device journal -- the descriptor shadow's write half
+ *
+ * [MEASURED, crossings table] with the command-list journal in, the top of
+ * the COM class is the DEVICE-side descriptor pair: CopyDescriptors at
+ * 164k/s and CreateConstantBufferView at 95k/s.  Device methods are
+ * free-threaded, so the list journal's one-recorder-per-object rule does
+ * not hold and a per-proxy ring would race.  What holds instead:
+ *
+ *   RINGS    one ring per RECORDING THREAD, anchored at the guest TEB's
+ *            SystemReserved1[0] (+0x190, unused by Wine's 64-bit side,
+ *            C_ASSERT-pinned below).  A thread's first TRAPPED call on a
+ *            curated slot arms its ring; while the anchor is NULL the
+ *            snippet falls back to the trap.  Rings are never freed: a
+ *            thread that exits leaks its 32K ring, bounded by thread
+ *            count, and that is a accepted cost of keeping the guest
+ *            side lock-free.
+ *   ORDER    every record carries an RDTSC stamp -- under the bridge,
+ *            rdtsc reads the POWER timebase, which the QPC fast path
+ *            proved core-synchronized -- and the drain k-way-merges all
+ *            rings by stamp.  An APP-ORDERED pair of creates spans a call
+ *            return plus the app's own synchronization, so both records
+ *            are ring-visible with ordered stamps before the later call
+ *            is even issued; merge order equals issued order.  Two
+ *            unordered creates may replay either way, exactly as D3D12
+ *            allows.
+ *   CONSUME  CopyDescriptors -- and every other descriptor consumer --
+ *            still traps, and winecom_dispatch drains ALL device rings
+ *            before serving anything (wc_dev_drain; the guest-set dirty
+ *            byte makes the idle check one load).  Create-then-copy is
+ *            therefore ordered no matter which threads did which.
+ *   RECLAIM  headers carry pos (guest-written) and cons (native-written).
+ *            Any thread's drain advances cons; only a drain running ON
+ *            the ring's owner thread resets both to zero, because only
+ *            then is the ring's writer provably idle (it is here, inside
+ *            its own trap).  Ring-full falls back to the slot's own trap
+ *            stub, whose dispatch drains first -- the slow path is the
+ *            old path.
+ *   ARGS     the 16-byte D3D12_CONSTANT_BUFFER_VIEW_DESC is copied INTO
+ *            the record (its pointer kept only for its NULLness); the
+ *            by-value descriptor handle rides in the record; the proxy
+ *            pointer is re-validated through proxy_from_pointer at
+ *            replay, so a corrupted ring drops loudly instead of
+ *            dispatching through garbage.
+ *
+ * WINEEMUNOCOMDEVJOURNAL=1 is the kill switch: no snippets, every call
+ * traps, the crossing counter shows the row again.  WINEEMUCOMDEVSABOTAGE=1
+ * disarms the DRAIN while leaving the recording live -- creates are
+ * recorded and never replayed -- which is the gate's negative control:
+ * the replay transcript disappears and dependent state goes stale.
+ */
+
+#define DEV_RING_DATA   0x40      /* header size; data starts here (guest ABI) */
+#define DEV_RING_SIZE   0x8000    /* 32K of records a thread, ~585 records */
+#define DEV_REC_BYTES   56
+#define DEV_SHAPE_CBV   8         /* outside enum journal_shape on purpose: a
+                                     device record leaking into a per-proxy
+                                     ring must fail its size check there */
+
+/* The snippet trusts nothing: SystemReserved1 is reserved from WINE, not
+ * from the app, and a guest that stashes its own value in slot [0] would
+ * otherwise hand the recorder a wild "ring" whose cap check garbage can
+ * pass -- 56-byte records sprayed into app memory, GPU-visible heaps
+ * included, with no CPU-side fault to show for it.  The magic is checked
+ * before anything else is believed; a foreign value falls back to the trap
+ * forever, which is the old world. */
+#define DEV_RING_MAGIC  0x4e524a5645444657ull   /* "WFDEVJRN" */
+
+struct dev_ring
+{
+    UINT64 pos;               /* 0x00: bytes appended, guest-written (guest ABI) */
+    UINT64 cap;               /* 0x08: data bytes available        (guest ABI) */
+    UINT64 magic;             /* 0x10: DEV_RING_MAGIC              (guest ABI) */
+    UINT64 cons;              /* bytes replayed, native-written */
+    UINT   owner_tid;
+    UINT   bad_cons;          /* ~0u, or the cons offset that failed validation */
+    struct dev_ring *next;    /* the drain-all registry, dev_cs-guarded */
+    UINT64 snap;              /* this drain's pos snapshot */
+    UINT64 bad_since;         /* raw timebase when bad_cons first failed */
+};
+#ifdef _WIN64
+C_ASSERT( sizeof(struct dev_ring) <= DEV_RING_DATA );
+C_ASSERT( offsetof(struct dev_ring, pos) == 0x00 );
+C_ASSERT( offsetof(struct dev_ring, cap) == 0x08 );
+C_ASSERT( offsetof(struct dev_ring, magic) == 0x10 );
+C_ASSERT( offsetof(TEB, SystemReserved1) == 0x190 );  /* the snippet's gs:[0x190] */
+#endif
+
+static struct dev_ring *dev_rings;
+static volatile BYTE dev_dirty;         /* guest-written; address baked into snippets */
+static unsigned char *dev_slot_map;     /* per (iface,slot): curated for the device journal */
+static BOOL dev_journal_on;
+static BOOL dev_sabotage;
+static BOOL dev_double;
+static UCHAR dev_stamp_shift;           /* rdtsc == mftb << shift; from __wine_thunk_qpc */
+static int dev_stamp_known = -1;        /* -1 unread, 0 block not armed yet, 1 known */
+
+#ifndef __powerpc64__
+/* the device journal only installs on the ppc64 host build; on any other
+ * lane dev_dirty stays 0 and the drain returns before the cut is taken */
+#define emu_qpc_timebase() 0
+#endif
+
+static CRITICAL_SECTION dev_cs;
+static CRITICAL_SECTION_DEBUG dev_cs_debug =
+{
+    0, 0, &dev_cs,
+    { &dev_cs_debug.ProcessLocksList, &dev_cs_debug.ProcessLocksList },
+      0, 0, { (DWORD_PTR)(__FILE__ ": winecom dev_cs") }
+};
+static CRITICAL_SECTION dev_cs = { &dev_cs_debug, -1, 0, 0, 0, 0 };
+
+static struct com_proxy *proxy_from_pointer( void *ptr );
+
+/* The drain's consistent cut needs the stamps' unit: rdtsc is the timebase
+ * shifted by the emulator's TSC scale, and the armed qpc block in guest
+ * kernel32 is where that scale lives (the COM thunk modules carry no
+ * fast-path exports and no block of their own).  The block arms on the
+ * guest's first QPC call, which can postdate COM init, so this is asked
+ * again on every arming attempt until it answers -- and no ring ever
+ * exists before the stamps have a native unit. */
+static BOOL dev_stamp_ready( void )
+{
+#ifdef _WIN64
+    static const WCHAR k32W[] = { 'k','e','r','n','e','l','3','2','.','d','l','l',0 };
+    const WCHAR *names = k32W;
+    const struct emu_qpc_guest *qpc;
+    ANSI_STRING qpc_name;
+    void *qpc_ptr;
+    HMODULE k32;
+
+    if (dev_stamp_known > 0) return TRUE;
+    if (!(k32 = find_guest_module( &names, 1 ))) return FALSE;
+    RtlInitAnsiString( &qpc_name, "__wine_thunk_qpc" );
+    if (LdrGetProcedureAddress( k32, &qpc_name, 0, &qpc_ptr ) ||
+        !(qpc = qpc_ptr) || qpc->magic != EMU_QPC_MAGIC || !qpc->enabled ||
+        qpc->shift > EMU_QPC_MAX_SHIFT)
+    {
+        if (dev_stamp_known < 0)
+            WARN( "guest kernel32's qpc block is not armed yet; device rings "
+                  "wait for the first guest QPC call\n" );
+        dev_stamp_known = 0;
+        return FALSE;
+    }
+    dev_stamp_shift = qpc->shift;
+    dev_stamp_known = 1;
+    TRACE( "devjournal: stamp unit is mftb << %u\n", dev_stamp_shift );
+    return TRUE;
+#else
+    return FALSE;
+#endif
+}
+
+/* Arm the calling thread's ring: allocate, register, hang it on the TEB.
+ * Runs inside the thread's own trap on a curated slot, so the thread's
+ * guest half is idle and the plain anchor store is safe. */
+static void wc_dev_arm( void )
+{
+    struct dev_ring *r;
+    SIZE_T size = DEV_RING_DATA + DEV_RING_SIZE;
+    void *mem = NULL;
+
+    if (!dev_journal_on) return;
+    if ((r = NtCurrentTeb()->SystemReserved1[0]))
+    {
+        /* nonzero already: ours (armed), or the APP's own value -- say so
+         * once, because that is a thread the fast path can never serve */
+        if (r->magic != DEV_RING_MAGIC)
+        {
+            static LONG reported;
+            if (InterlockedIncrement( &reported ) <= 8)
+                ERR( "thread %04lx TEB SystemReserved1[0] holds a foreign "
+                     "value %p; its creates stay trapping\n",
+                     HandleToULong( NtCurrentTeb()->ClientId.UniqueThread ),
+                     (void *)r );
+        }
+        return;
+    }
+    if (!dev_stamp_ready()) return;
+    if (NtAllocateVirtualMemory( NtCurrentProcess(), &mem, 0, &size,
+                                 MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE ))
+        return;   /* every call keeps trapping, which is the old world */
+    r = mem;
+    r->pos = 0;
+    r->cap = DEV_RING_SIZE;
+    r->magic = DEV_RING_MAGIC;
+    r->cons = 0;
+    r->owner_tid = HandleToULong( NtCurrentTeb()->ClientId.UniqueThread );
+    r->bad_cons = ~0u;
+    r->bad_since = 0;
+    RtlEnterCriticalSection( &dev_cs );
+    r->next = dev_rings;
+    dev_rings = r;
+    RtlLeaveCriticalSection( &dev_cs );
+    NtCurrentTeb()->SystemReserved1[0] = r;
+    TRACE( "devjournal: ring %p armed for thread %04x\n", r, r->owner_tid );
+}
+
+/* Replay every device-ring record, all rings merged by stamp, then let the
+ * calling thread reclaim its own ring.  Serialized by dev_cs: concurrent
+ * dispatches must not replay a record twice, and a dispatch about to serve
+ * a dependent call must WAIT for a drain in flight, not skip it. */
+static void wc_dev_drain( void )
+{
+    struct dev_ring *r;
+    UINT64 curtid, cut;
+
+    static BOOL dev_draining;   /* same-thread re-entry fuse: dev_cs is
+                                   recursive, and a replay's classifier can
+                                   reach wc_forward_host, which drains too --
+                                   a nested merge would advance cons and
+                                   retake snapshots under the outer one */
+
+    if (!dev_dirty) return;
+    if (dev_sabotage) return;   /* the gate's negative control */
+    RtlEnterCriticalSection( &dev_cs );
+    if (dev_draining)
+    {
+        RtlLeaveCriticalSection( &dev_cs );
+        return;
+    }
+    dev_draining = TRUE;
+    /* clear-then-read, with a FULL BARRIER between: the clear must be
+     * globally visible before the pos loads below execute.  A plain store
+     * can sit in this core's store buffer past those loads (POWER reorders
+     * store->load freely), and that interleave STRANDS a record: our pos
+     * load misses the guest's new record, the guest's dirty=1 lands, and
+     * our delayed clear then overwrites it -- record invisible, flag zero.
+     * The next create re-arms the flag, so the strand is usually microseconds;
+     * but the LAST create before an ExecuteCommandLists has no successor,
+     * the execute's own drain sees a clear flag and skips, and the GPU
+     * consumes a stale descriptor.  [MEASURED 2026-08-27: exactly that --
+     * one amdgpu gfx-ring timeout per Cyberpunk benchmark leg, no VM
+     * fault, gone with the journal off; the seq_cst exchange closes it.] */
+    __atomic_exchange_n( &dev_dirty, 0, __ATOMIC_SEQ_CST );
+    /* THE CONSISTENT CUT.  The snapshot loop below walks the rings one at a
+     * time while producers keep publishing, so ring A's snapshot can predate
+     * a record whose app-ordered SUCCESSOR lands in later-walked ring B's --
+     * merge that snapshot alone and the successor replays THIS drain, the
+     * predecessor the NEXT: an ordered same-slot pair applied backwards.
+     * [MEASURED 2026-08-27, +winecom leg: 1,680 stamp inversions in 2.08M
+     * replays, one amdgpu gfx-ring timeout per benchmark leg from the stale
+     * descriptors.]  So the merge stops at a timestamp taken HERE, before
+     * any snapshot: a record stamped before the cut was CREATED before it,
+     * and if its publication raced a snapshot its ordered successors cannot
+     * exist yet (its own call has not returned), while everything a
+     * CONSUMER is owed was published before the consumer even trapped --
+     * stamped before the cut by construction.  Records past the cut keep
+     * the flag set and replay next drain.  Native mftb and the snippets'
+     * rdtsc share a zero: rdtsc == mftb << shift (wine/emu_qpc.h). */
+    cut = emu_qpc_timebase() << dev_stamp_shift;
+    for (r = dev_rings; r; r = r->next)
+    {
+        r->snap = __atomic_load_n( &r->pos, __ATOMIC_ACQUIRE );
+        if (r->snap > r->cap || r->snap % DEV_REC_BYTES)
+        {
+            ERR( "devjournal: ring %p pos %I64u is corrupt (cap %I64u); "
+                 "skipping its records\n", r, r->snap, r->cap );
+            r->snap = r->cons;
+        }
+    }
+    for (;;)
+    {
+        struct dev_ring *best = NULL;
+        UINT64 best_stamp = 0;
+        const BYTE *rec;
+        UINT key, sizesh, iface, slot;
+        const struct winecom_iface *itf;
+        const struct winecom_slot *sl;
+        struct com_proxy *p;
+        UINT64 rawargs[16] = { 0 }, rax;
+        NTSTATUS status;
+
+        for (r = dev_rings; r; r = r->next)
+        {
+            UINT64 stamp;
+            if (r->cons >= r->snap) continue;
+            stamp = *(const UINT64 *)((const BYTE *)r + DEV_RING_DATA + r->cons + 8);
+            if (!best || stamp < best_stamp) { best = r; best_stamp = stamp; }
+        }
+        if (!best) break;
+        if (best_stamp >= cut)
+        {
+            /* every remaining head is younger than the cut (per-ring order
+             * is per-thread order); they are the next drain's records */
+            dev_dirty = 1;
+            break;
+        }
+
+        rec = (const BYTE *)best + DEV_RING_DATA + best->cons;
+        key = *(const UINT *)rec;
+        sizesh = *(const UINT *)(rec + 4);
+        iface = key >> 16;
+        slot = key & 0xffff;
+
+        /* VALIDATION-GATED ADVANCE.  [MEASURED 2026-08-27, the double-apply
+         * leg: 58,583 of ~2M records read with garbage fields] a cross-thread
+         * drain can read a record whose pos-publish is visible but whose
+         * BYTES are not yet -- the guest's stores reach this native reader
+         * unordered.  A record that fails ANY check is therefore HELD, not
+         * dropped and never replayed: its bytes land within microseconds and
+         * the next drain takes it.  Correct because an app-ORDERED create
+         * sits behind the app's own synchronization, whose barriers flush
+         * the record before the ordered consumer can trap -- only RACING
+         * records are ever held, and holding a racing create is within
+         * D3D12's contract.  A record still failing after a full
+         * millisecond of timebase is not a torn record but a corrupt one,
+         * and the ring drops loudly. */
+        p = NULL;
+        if (sizesh != (DEV_REC_BYTES | (DEV_SHAPE_CBV << 24)) ||
+            iface >= wc_surface->iface_count ||
+            slot >= wc_surface->ifaces[iface].slot_count ||
+            !dev_slot_map[iface_slot_base[iface] + slot] ||
+            !(p = proxy_from_pointer( *(void **)(rec + 16) )))
+            /* STRUCTURE only: header word, curated slot, interned proxy.
+             * The desc CONTENT is passed through exactly as the live path
+             * would pass the app's own pointer -- the first cut here
+             * second-guessed it and held {0,0}, which is the perfectly
+             * legal NULL CBV Cyberpunk writes 58k of per run */
+        {
+            UINT64 now = emu_qpc_timebase();
+            if (best->bad_cons != (UINT)best->cons)
+            {
+                best->bad_cons = (UINT)best->cons;
+                best->bad_since = now;
+            }
+            else if (now - best->bad_since > 512000)   /* ~1ms at 512 MHz */
+            {
+                ERR( "devjournal: record at cons %I64u in ring %p is corrupt, "
+                     "not torn (key %08x size/shape %08x, %s); dropping the "
+                     "rest of the ring\n", best->cons, best, key, sizesh,
+                     p ? "fields implausible" : "no proxy" );
+                best->bad_cons = ~0u;
+                best->cons = best->snap;
+                continue;
+            }
+            best->snap = best->cons;   /* hold this ring for this drain */
+            continue;
+        }
+        if (best->bad_cons == (UINT)best->cons) best->bad_cons = ~0u;
+        itf = &wc_surface->ifaces[iface];
+        sl = &itf->slots[slot];
+
+        rawargs[1] = *(const UINT64 *)(rec + 24) ? (UINT64)(ULONG_PTR)(rec + 40) : 0;
+        rawargs[2] = *(const UINT64 *)(rec + 32);
+        TRACE( "devjournal: replay %s proxy %p va %I64x size %u handle %I64x stamp %I64u\n",
+               sl->name, p, *(const UINT64 *)(rec + 40), *(const UINT *)(rec + 48),
+               *(const UINT64 *)(rec + 32), best_stamp );
+        status = invoke_marshalled( itf, sl, p, iface, slot, rawargs, &rax );
+        if (status)
+            ERR( "devjournal: replay of %s failed, status %08x; continuing\n",
+                 sl->name, (UINT)status );
+        best->cons += DEV_REC_BYTES;
+    }
+    curtid = HandleToULong( NtCurrentTeb()->ClientId.UniqueThread );
+    for (r = dev_rings; r; r = r->next)
+    {
+        UINT64 pos = __atomic_load_n( &r->pos, __ATOMIC_RELAXED );
+        if (r->owner_tid == curtid && r->cons == pos)
+        {
+            /* the writer is this thread and it is here, not appending */
+            __atomic_store_n( &r->pos, 0, __ATOMIC_RELEASE );
+            r->cons = 0;
+        }
+        /* a record published after our snapshot leaves cons behind pos:
+         * re-arm the flag ourselves so the next dispatch drains it even if
+         * that record was the last of its burst -- the belt to the
+         * barrier's braces */
+        else if (r->cons < pos) dev_dirty = 1;
+    }
+    dev_draining = FALSE;
+    RtlLeaveCriticalSection( &dev_cs );
+}
+
+#ifdef _WIN64
+/***********************************************************************
+ *           install_dev_journal
+ *
+ * Emit the per-thread recording snippets for the curated device slots and
+ * point their vtable entries at them.  Byte encodings llvm-mc-verified
+ * (the source .s is in the commit message's session); the shape:
+ *
+ *     mov  r10, gs:[0x190]        ; the thread's ring; NULL -> fallback
+ *     test r10, r10 ; jz fb
+ *     movabs rax, MAGIC ; cmp [r10+0x10], rax ; jne fb   ; not OUR ring
+ *     mov  r11, [r10]             ; pos
+ *     lea  rax, [r11+56] ; cmp rax, [r10+8] ; ja fb
+ *     mov  r9, rdx                ; pDesc, out of rdtsc's way
+ *     rdtsc ; shl rdx,32 ; or rax,rdx
+ *     lea  r11, [r10+r11+0x40]    ; the record
+ *     mov  dword [r11], KEY ; mov dword [r11+4], 56|8<<24
+ *     mov  [r11+8], rax           ; stamp
+ *     mov  [r11+16], rcx          ; proxy
+ *     mov  [r11+24], r9 ; mov [r11+32], r8
+ *     test r9, r9 ; jz over the 16-byte desc copy
+ *     lea  rdx, [r11-8] ; sub rdx, r10 ; mov [r10], rdx   ; publish pos
+ *     movabs r10, &dev_dirty ; mov byte [r10], 1 ; ret
+ * fb: jmp [rip+0] ; .quad trap_stub
+ *
+ * The fallback fires before anything but rax/r10/r11 is touched, so the
+ * trap stub sees the call exactly as issued.
+ */
+static const struct { const char *name; UINT argc; } dev_slot_defs[] =
+{
+    { "ID3D12Device::CreateConstantBufferView", 3 },
+};
+
+static void install_dev_journal( void )
+{
+    static const BYTE dv_pre1[] = { 0x65, 0x4c, 0x8b, 0x14, 0x25,       /* mov r10,gs:[0x190] */
+                                    0x90, 0x01, 0x00, 0x00,
+                                    0x4d, 0x85, 0xd2 };                 /* test r10,r10 */
+    static const BYTE dv_pre2[] = { 0x4d, 0x8b, 0x1a,                   /* mov r11,[r10] */
+                                    0x49, 0x8d, 0x43, 0x38,             /* lea rax,[r11+56] */
+                                    0x49, 0x3b, 0x42, 0x08 };           /* cmp rax,[r10+8] */
+    static const BYTE dv_body1[] = { 0x49, 0x89, 0xd1,                  /* mov r9,rdx */
+                                     0x0f, 0x31,                        /* rdtsc */
+                                     0x48, 0xc1, 0xe2, 0x20,            /* shl rdx,32 */
+                                     0x48, 0x09, 0xd0,                  /* or rax,rdx */
+                                     0x4f, 0x8d, 0x5c, 0x1a, 0x40 };    /* lea r11,[r10+r11+0x40] */
+    static const BYTE dv_body2[] = { 0x49, 0x89, 0x43, 0x08,            /* mov [r11+8],rax */
+                                     0x49, 0x89, 0x4b, 0x10,            /* mov [r11+16],rcx */
+                                     0x4d, 0x89, 0x4b, 0x18,            /* mov [r11+24],r9 */
+                                     0x4d, 0x89, 0x43, 0x20,            /* mov [r11+32],r8 */
+                                     0x4d, 0x85, 0xc9,                  /* test r9,r9 */
+                                     0x74, 0x0f,                        /* jz +15 (over the copy) */
+                                     0x49, 0x8b, 0x01,                  /* mov rax,[r9] */
+                                     0x49, 0x89, 0x43, 0x28,            /* mov [r11+40],rax */
+                                     0x49, 0x8b, 0x41, 0x08,            /* mov rax,[r9+8] */
+                                     0x49, 0x89, 0x43, 0x30,            /* mov [r11+48],rax */
+                                     0x49, 0x8d, 0x53, 0xf8,            /* lea rdx,[r11-8] */
+                                     0x4c, 0x29, 0xd2,                  /* sub rdx,r10 */
+                                     0x49, 0x89, 0x12 };                /* mov [r10],rdx */
+    static const BYTE dv_epi[] = { 0x41, 0xc6, 0x02, 0x01,              /* mov byte [r10],1 */
+                                   0xc3 };                              /* ret */
+    static const BYTE fb[]  = { 0xff, 0x25, 0x00, 0x00, 0x00, 0x00 };   /* jmp [rip+0] */
+
+    static const UINT snippet_stride = 160;   /* the body is ~131 */
+    unsigned char *block, *code;
+    SIZE_T size;
+    UINT i, n, j, k, count = 0;
+    BYTE tmp[16];
+
+    if (!(dev_slot_map = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap,
+                                          HEAP_ZERO_MEMORY, total_slots )))
+        return;
+
+    for (i = 0; i < wc_surface->iface_count; i++)
+    {
+        const struct winecom_iface *itf = &wc_surface->ifaces[i];
+        if (!itf->slots) continue;
+        for (n = 0; n < itf->slot_count; n++)
+            for (j = 0; j < ARRAYSIZE(dev_slot_defs); j++)
+                if (itf->slots[n].name && !strcmp( itf->slots[n].name, dev_slot_defs[j].name ))
+                    count++;
+    }
+    if (!count) return;
+    /* OPT-IN, not opt-out [2026-08-27]: correct at its gate and under a
+     * fully-traced Cyberpunk leg (2.08M replays, zero same-handle
+     * inversions, zero corruption, every replay before its consumer), the
+     * journal still coincides with amdgpu gfx-ring timeouts the moment
+     * creates are applied ONLY at the drain -- the double-apply diagnostic
+     * (records + live application) runs the full flythrough clean, and
+     * FEX_HWTSO=1 does not change the verdict.  Whatever the GPU is
+     * consuming stale is not visible in the replay stream, so until that
+     * is named the journal stays off unless asked for.  The investigation
+     * is written up in NEXT.md item 6. */
+    if (!com_env_flag( L"WINEEMUCOMDEVJOURNAL" ))
+        return;
+    ERR( "WINEEMUCOMDEVJOURNAL=1 -- the device journal is ON (opt-in, "
+         "%u slots); see NEXT.md item 6 for why it is not the default\n", count );
+    if (com_env_flag( L"WINEEMUNOCOMDEVJOURNAL" ))
+    {
+        ERR( "WINEEMUNOCOMDEVJOURNAL=1 -- %u device-journal slots stay trapping "
+             "on every call\n", count );
+        return;
+    }
+    dev_sabotage = com_env_flag( L"WINEEMUCOMDEVSABOTAGE" );
+    if (dev_sabotage)
+        ERR( "WINEEMUCOMDEVSABOTAGE=1 -- device rings record and NEVER replay; "
+             "descriptor state WILL go stale\n" );
+    dev_double = com_env_flag( L"WINEEMUCOMDEVDOUBLE" );
+    if (dev_double)
+        ERR( "WINEEMUCOMDEVDOUBLE=1 -- snippets record AND fall through to the "
+             "trap: every create applies live and again at the drain "
+             "(idempotent).  A diagnostic split, not a mode to play under\n" );
+
+    block = NULL;
+    size = count * snippet_stride;
+    if (NtAllocateVirtualMemory( NtCurrentProcess(), (void **)&block, 0, &size,
+                                 MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE ))
+    {
+        ERR( "no memory for %u device-journal snippets; slots stay trapping\n", count );
+        return;
+    }
+
+    code = block;
+    for (i = 0; i < wc_surface->iface_count; i++)
+    {
+        const struct winecom_iface *itf = &wc_surface->ifaces[i];
+        if (!itf->slots) continue;
+        for (n = 0; n < itf->slot_count; n++)
+        {
+            const struct winecom_slot *sl = &itf->slots[n];
+            struct snippet_buf b = { code };
+            UINT64 *vslot;
+            UINT argc = 0;
+
+            for (j = 0; j < ARRAYSIZE(dev_slot_defs); j++)
+                if (sl->name && !strcmp( sl->name, dev_slot_defs[j].name ))
+                { argc = dev_slot_defs[j].argc; break; }
+            if (!argc) continue;
+
+            /* fail closed to trapping if the table row stopped matching the
+             * curated shape -- a drifted roster must never produce a wrong
+             * record */
+            if (sl->refuse || (sl->flags & WINECOM_F_HAND) ||
+                !(sl->flags & WINECOM_F_RET_VOID) || sl->argc != argc)
+            {
+                ERR( "device-journal slot %s does not match its curated shape "
+                     "(argc %u, flags %x); it stays trapping\n",
+                     sl->name, sl->argc, sl->flags );
+                continue;
+            }
+
+            vslot = &guest_vtbl_block[iface_slot_base[i] + n];
+
+            sb_emit( &b, dv_pre1, sizeof(dv_pre1) );
+            sb_emit_jcc_fb( &b, 0x74 );                   /* jz fb */
+            tmp[0] = 0x48; tmp[1] = 0xb8;                 /* movabs rax,MAGIC */
+            *(UINT64 *)(tmp + 2) = DEV_RING_MAGIC;
+            sb_emit( &b, tmp, 10 );
+            tmp[0] = 0x49; tmp[1] = 0x39; tmp[2] = 0x42; tmp[3] = 0x10;
+            sb_emit( &b, tmp, 4 );                        /* cmp [r10+0x10],rax */
+            sb_emit_jcc_fb( &b, 0x75 );                   /* jne fb: not a ring */
+            sb_emit( &b, dv_pre2, sizeof(dv_pre2) );
+            sb_emit_jcc_fb( &b, 0x77 );                   /* ja fb */
+            sb_emit( &b, dv_body1, sizeof(dv_body1) );
+            tmp[0] = 0x41; tmp[1] = 0xc7; tmp[2] = 0x03;  /* mov dword [r11],key */
+            *(UINT *)(tmp + 3) = (i << 16) | n;
+            sb_emit( &b, tmp, 7 );
+            tmp[0] = 0x41; tmp[1] = 0xc7; tmp[2] = 0x43; tmp[3] = 0x04;
+            *(UINT *)(tmp + 4) = DEV_REC_BYTES | (DEV_SHAPE_CBV << 24);
+            sb_emit( &b, tmp, 8 );                        /* mov dword [r11+4],rec|shape */
+            sb_emit( &b, dv_body2, sizeof(dv_body2) );
+            tmp[0] = 0x49; tmp[1] = 0xba;                 /* movabs r10,&dev_dirty */
+            *(UINT64 *)(tmp + 2) = (UINT64)(ULONG_PTR)&dev_dirty;
+            sb_emit( &b, tmp, 10 );
+            if (!dev_double) sb_emit( &b, dv_epi, sizeof(dv_epi) );
+            else
+            {
+                sb_emit( &b, dv_epi, sizeof(dv_epi) - 1 );  /* the dirty store, no ret */
+                b.fixups[b.nfix++] = b.p + 1;               /* jmp fb: the record was
+                                                               taken, now the trap
+                                                               serves the call live */
+                tmp[0] = 0xeb; tmp[1] = 0;
+                sb_emit( &b, tmp, 2 );
+            }
+
+            for (k = 0; k < b.nfix; k++)
+            {
+                LONG_PTR d = b.p - (b.fixups[k] + 1);
+                if (d > 127)   /* the earliest jump is ~122 from the fallback:
+                                  refuse loudly if this body ever outgrows rel8 */
+                {
+                    ERR( "device-journal snippet for %s outgrew rel8 (%ld); "
+                         "it stays trapping\n", sl->name, (long)d );
+                    break;
+                }
+                *b.fixups[k] = (BYTE)d;
+            }
+            if (k < b.nfix) continue;
+            sb_emit( &b, fb, sizeof(fb) );
+            memcpy( b.p, vslot, sizeof(UINT64) );         /* the trap stub */
+            b.p += 8;
+
+            TRACE( "devjournal: %s slot %u recorded guest-side from %p "
+                   "(fallback stub %p)\n", sl->name, n, code, *(void **)vslot );
+            *vslot = (UINT64)(ULONG_PTR)code;
+            dev_slot_map[iface_slot_base[i] + n] = 1;
+            code += snippet_stride;
+        }
+    }
+    dev_journal_on = TRUE;
+}
+#else
+static void install_dev_journal( void ) { }
+#endif  /* _WIN64 */
+
 /* Build the guest vtables from a guest module's published stub arrays. */
 static BOOL com_runtime_init_once( void )
 {
@@ -852,6 +1442,7 @@ static BOOL com_runtime_init_once( void )
            wc_surface->name, total_slots, i, guest );
     install_const_getters();
     install_journal();
+    install_dev_journal();
     if (nowrap)
         ERR( "%s: WINEEMUNOCOMWRAP=1 -- interface pointers will cross RAW; "
              "expect guest calls into native vtables\n", wc_surface->name );
@@ -1112,6 +1703,7 @@ BOOL wc_forward_host( void *ptr, void **host_out )
      * must be current before the callee sees it.  D3D12's Close-before-
      * execute rule means this normally finds an empty ring -- Close trapped
      * and drained -- so this is the belt to that braces. */
+    wc_dev_drain();
     wc_journal_drain( p );
     *host_out = p->host;
     return TRUE;
@@ -1569,7 +2161,10 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
     /* Everything the guest journaled on this object happened BEFORE the call
      * that is trapping now: replay it first, whatever this call is -- a
      * non-journaled method, a journaled one whose ring filled, Close, or
-     * Release.  This is what makes the recorded order the issued order. */
+     * Release.  This is what makes the recorded order the issued order.
+     * Device rings first: a replayed list command may depend on a
+     * descriptor create recorded on another thread. */
+    wc_dev_drain();
     wc_journal_drain( proxy );
 
     /* IUnknown's three slots head every vtable and are served from the proxy
@@ -1602,6 +2197,11 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
     }
 
     TRACE( "%s (iface %u slot %u argc %u)\n", sl->name, iface, slot, sl->argc );
+
+    /* a device-journaled slot trapping means the caller has no ring yet
+     * (or its ring is full): arm this thread so the NEXT call records */
+    if (dev_journal_on && dev_slot_map[iface_slot_base[iface] + slot])
+        wc_dev_arm();
 
     if (sl->flags & WINECOM_F_HAND)
     {
