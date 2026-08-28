@@ -1734,11 +1734,22 @@ RAW_BODY_EXPORTS = {
 # x86-64 ONLY.  The 32-bit lane's stub is a bare `int 0x80` with every
 # argument on the stack, and no title reaches it yet (NEXT.md item 2); an
 # unproven second copy of this would be a liability, not a feature.
-FAST_PATH_MODULES = ('kernel32.dll', 'kernelbase.dll')
+FAST_PATH_MODULES = ('kernel32.dll', 'kernelbase.dll', 'ntdll.dll')
 
 FAST_PATH_EXPORTS = {
-    'QueryPerformanceCounter':   'qpc',
-    'QueryPerformanceFrequency': 'qpf',
+    'QueryPerformanceCounter':    'qpc',
+    'QueryPerformanceFrequency':  'qpf',
+    'GetCurrentThreadId':         'tid',
+    # The critical-section pair carries BOTH spellings: kernel32's .spec says
+    # EnterCriticalSection forwards to NTDLL.RtlEnterCriticalSection, but
+    # FROM-SPEC auto gives the kernel32 THUNK its own trap stub under the
+    # kernel32 name (the crossing table names the row KERNEL32.dll.Enter-
+    # CriticalSection, which is how this was noticed), so each module's
+    # export gets its own fast body over the same algorithm.
+    'RtlEnterCriticalSection':    'ecs',
+    'RtlLeaveCriticalSection':    'lcs',
+    'EnterCriticalSection':       'ecs',
+    'LeaveCriticalSection':       'lcs',
 }
 
 # Field offsets inside struct emu_qpc_guest.  THE SAME NUMBERS AS
@@ -1748,6 +1759,8 @@ QPC_MULTIPLIER  = 8
 QPC_BIAS        = 16
 QPC_ENABLED     = 24
 QPC_SHIFT       = 25
+QPC_CS_DISABLE  = 26
+QPC_CS_SABOTAGE = 27
 QPC_FREQUENCY   = 32
 QPC_TSC_SAMPLE  = 40
 QPC_BLOCK_SIZE  = 48
@@ -1794,6 +1807,110 @@ def emit_fast_body(a, kind, idx):
         a('\tshlq\t$32, %rdx')
         a('\torq\t%rdx, %rax')
         a('\tmovq\t%%rax, %s+%d(%%rip)' % (q, QPC_TSC_SAMPLE))
+        a('\tjmp\twine_thunk_stub_%d' % idx)
+    elif kind == 'tid':
+        # DWORD GetCurrentThreadId( void )
+        #
+        # TEB->ClientId.UniqueThread, which is what Windows' own kernel32
+        # export reads and what guest code reads INLINE all over every real
+        # binary (gs:[0x48]) -- so unlike QPC there is no host-seeded
+        # parameter here, nothing to arm and nothing whose seeding a
+        # sabotage lever could break: the value is right whenever guest
+        # code can run at all, because the run entry installed this
+        # thread's TEB as the GS base before the first instruction.
+        # [MEASURED] 2026-08-27, Cyberpunk flythrough: 21,588 crossings/s.
+        # The fallback jmp is unreachable; it stays because the checker
+        # maps a fast body to its slot through it (spec2thunk-check,
+        # order_rva).
+        a('\tmovl\t%gs:0x48, %eax')
+        a('\tretq')
+        a('.Lwine_thunk_slow_%d:' % idx)
+        a('\tjmp\twine_thunk_stub_%d' % idx)
+    elif kind == 'ecs':
+        # RtlEnterCriticalSection( RTL_CRITICAL_SECTION *crit )   rcx = crit
+        # (kernel32.EnterCriticalSection is a spec forward to this export)
+        #
+        # [MEASURED] 2026-08-27, Cyberpunk flythrough: 79,926/s, and every
+        # uncontended one has NO syscall behind it -- the native side does one
+        # interlocked op and returns.  The trap was the whole cost.
+        #
+        # THE ALGORITHM IS WINE'S OWN TryEnter, byte for byte in behaviour --
+        # it must be, because native RtlEnterCriticalSection runs against the
+        # SAME struct from Wine-internal callers, and two lock algorithms on
+        # one lock word is a corruption generator:
+        #   uncontended:  LockCount -1 -> 0 by cmpxchg, then OwningThread and
+        #                 RecursionCount, exactly TryEnter's first arm;
+        #   recursion:    owner == tid: interlocked-increment LockCount, then
+        #                 RecursionCount++, exactly TryEnter's second arm;
+        #   contended:    fall to the trap; the native side spins and waits
+        #                 with the semaphore machinery this body cannot have.
+        # LOCK CMPXCHG is a full barrier on x86 and stays one under FEX
+        # (TSO/HWTSO), so the field stores order exactly as native ones do.
+        #
+        # RTL_CRITICAL_SECTION x64: LockCount +8, RecursionCount +0xC,
+        # OwningThread +0x10.  The tid compares as the full HANDLE: the store
+        # zero-extends (ULongToHandle) so the compare must too.
+        #
+        # cs_disable is the kill switch, cs_sabotage the gate's deliberate
+        # wrongness (skip the owner store); both are host-written bytes in
+        # the qpc block -- see wine/emu_qpc.h.
+        a('\tcmpb\t$0, %s+%d(%%rip)' % (q, QPC_CS_DISABLE))
+        a('\tjne\t.Lwine_thunk_slow_%d' % idx)
+        a('\tmovl\t$-1, %eax')
+        a('\txorl\t%edx, %edx')
+        a('\tlock cmpxchgl\t%edx, 8(%rcx)')
+        a('\tjne\t.Lwine_thunk_ecs_rec_%d' % idx)
+        a('\tmovl\t%gs:0x48, %eax')
+        a('\tcmpb\t$0, %s+%d(%%rip)' % (q, QPC_CS_SABOTAGE))
+        a('\tjne\t.Lwine_thunk_ecs_sab_%d' % idx)
+        a('\tmovq\t%rax, 0x10(%rcx)')
+        a('.Lwine_thunk_ecs_sab_%d:' % idx)
+        a('\tmovl\t$1, 0xC(%rcx)')
+        a('\tretq')
+        a('.Lwine_thunk_ecs_rec_%d:' % idx)
+        a('\tmovq\t0x10(%rcx), %rdx')
+        a('\tmovl\t%gs:0x48, %r8d')
+        a('\tcmpq\t%r8, %rdx')
+        a('\tjne\t.Lwine_thunk_slow_%d' % idx)
+        a('\tlock addl\t$1, 8(%rcx)')
+        a('\taddl\t$1, 0xC(%rcx)')
+        a('\tretq')
+        a('.Lwine_thunk_slow_%d:' % idx)
+        a('\tjmp\twine_thunk_stub_%d' % idx)
+    elif kind == 'lcs':
+        # RtlLeaveCriticalSection( RTL_CRITICAL_SECTION *crit )   rcx = crit
+        # (kernel32.LeaveCriticalSection forwards here, like the enter half)
+        #
+        # [MEASURED] the other 79,926/s.  Only the clean, non-recursive,
+        # no-waiter release is fast; everything else is the trap:
+        #   RecursionCount != 1        recursion exit -> native;
+        #   cmpxchg LockCount 0 -> -1  fails when a waiter has incremented ->
+        #                              RESTORE owner and recursion, then trap,
+        #                              and the native Leave redoes the release
+        #                              properly, wake included.
+        # The order is the correctness: owner and recursion are cleared
+        # BEFORE the lock word is released (native Leave's own order), and
+        # the release is a cmpxchg rather than a decrement precisely so a
+        # failed release leaves the lock word HELD and the restore window
+        # races nobody -- only the owner writes these fields while the word
+        # is held, and we are the owner.  The transient owner=0-while-held
+        # state is one native Leave itself passes through.
+        a('\tcmpb\t$0, %s+%d(%%rip)' % (q, QPC_CS_DISABLE))
+        a('\tjne\t.Lwine_thunk_slow_%d' % idx)
+        a('\tcmpl\t$1, 0xC(%rcx)')
+        a('\tjne\t.Lwine_thunk_slow_%d' % idx)
+        a('\tmovl\t$0, 0xC(%rcx)')
+        a('\tmovq\t$0, 0x10(%rcx)')
+        a('\txorl\t%eax, %eax')
+        a('\tmovl\t$-1, %edx')
+        a('\tlock cmpxchgl\t%edx, 8(%rcx)')
+        a('\tjne\t.Lwine_thunk_lcs_undo_%d' % idx)
+        a('\tretq')
+        a('.Lwine_thunk_lcs_undo_%d:' % idx)
+        a('\tmovl\t%gs:0x48, %eax')
+        a('\tmovq\t%rax, 0x10(%rcx)')
+        a('\tmovl\t$1, 0xC(%rcx)')
+        a('.Lwine_thunk_slow_%d:' % idx)
         a('\tjmp\twine_thunk_stub_%d' % idx)
     elif kind == 'qpf':
         # BOOL QueryPerformanceFrequency( LARGE_INTEGER *frequency )

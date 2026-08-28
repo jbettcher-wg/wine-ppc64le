@@ -372,8 +372,27 @@ and the COUNT of guest<->native crossings.  The levers, in order:
 
      The remaining unbatched hot rows are the DEVICE-side descriptor pair
      (CopyDescriptors 176k/s + CreateConstantBufferView 99k/s -- now rows
-     one and two of the COM class), which want a descriptor-shadow design,
-     ResourceBarrier (9.5k/s, struct arrays), and PeekMessageW.
+     one and two of the COM class), ResourceBarrier (9.5k/s, struct
+     arrays), and PeekMessageW.
+
+     **The device-pair DESIGN is settled (2026-08-27 evening), unbuilt.**
+     Device methods are free-threaded, so the command-list journal's
+     single-recorder assumption does not hold, and the hazard is app-
+     synchronized cross-thread ordering (T1 CreateCBV slot A, sync, T2
+     reads/copies A).  The design that survives it: journal ONLY
+     CreateConstantBufferView, per-THREAD rings anchored at the guest
+     TEB's SystemReserved1[0] (win64 +0x190, unused by Wine's 64-bit
+     side), records carrying an RDTSC stamp -- the timebase, which the
+     QPC work PROVED core-synchronized -- and the drain k-way-merges all
+     rings by stamp.  App-sync spans a call return, so any ordered pair
+     has both records ring-visible before the later one exists; merge
+     order equals real order.  CopyDescriptors stays trapping and every
+     dispatch drains all device rings first (a guest-set dirty byte makes
+     that check O(1)), which is exactly what makes create-then-copy
+     ordered.  Ring headers carry pos/cons; cross-thread drains advance
+     cons, only the owner thread's own drain reclaims to zero, ring-full
+     falls back to the trap.  Rings leak on thread exit (bounded by
+     thread count; note it in the code).
   3. **Name the memcpy 6.7%**: game streaming vs marshal copies --
      annotate call sites before optimizing either.
 HWTSO/PROT_SAO is NO LONGER FEXInterpreter-only: fastppcx86 `d4168c1ec`

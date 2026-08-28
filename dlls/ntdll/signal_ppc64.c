@@ -8026,6 +8026,25 @@ static void qpc_arm_module( LDR_DATA_TABLE_ENTRY *mod )
              debugstr_w(mod->BaseDllName.Buffer), g->magic, (ULONG64)EMU_QPC_MAGIC );
         goto done;
     }
+    /* The critical-section levers ride in this block but are NOT part of the
+     * clock's arming dance: the CS fast bodies are live at byte value 0 (they
+     * have no host-seeded parameter -- see wine/emu_qpc.h), so all the host
+     * ever writes here is a deliberate 1.  Written before every early return
+     * below so the levers work even when the clock never arms; idempotent, so
+     * running again for an already-probed module costs two compares. */
+    if (emu_env_flag( L"WINE_PPC64LE_NO_CS_BYPASS" ) && !g->cs_disable)
+    {
+        ERR( "guest critical-section fast path disabled by WINE_PPC64LE_NO_CS_BYPASS\n" );
+        g->cs_disable = 1;
+    }
+    if (emu_env_flag( L"WINE_PPC64LE_CS_SABOTAGE_OWNER" ) && !g->cs_sabotage)
+    {
+        ERR( "SABOTAGE: the guest's fast EnterCriticalSection will not record "
+             "an owner; recursive and native enters on the owning thread will "
+             "deadlock, which is what the gate's negative control requires\n" );
+        g->cs_sabotage = 1;
+    }
+
     if (g->enabled) goto done;
     /* No stub has run yet.  NOT recorded as probed: the sample appears on the
      * first fast-path call, and that call's own miss is what arms this. */

@@ -153,7 +153,23 @@ struct emu_qpc_guest
     ULONG64 bias;        /* +16 the session bias, verbatim */
     UCHAR   enabled;     /* +24 the arming flag; the stubs' only branch */
     UCHAR   shift;       /* +25 the emulator's TSC scale */
-    UCHAR   pad[6];      /* +26 */
+    /* The critical-section fast bodies (spec2thunk kinds 'ecs'/'lcs') branch
+     * on these two.  They live here because this is the one guest-visible,
+     * host-writable block a thunk module already exports; they have nothing
+     * to do with the clock.  Both default 0 = fast path LIVE, which is safe
+     * before any host ever writes them: unlike QPC there is no host-seeded
+     * parameter in the CS algorithm, only the levers.
+     *   cs_disable      WINE_PPC64LE_NO_CS_BYPASS=1: every call takes the
+     *                   slot's own trap, the pre-fast-path world.
+     *   cs_sabotage     WINE_PPC64LE_CS_SABOTAGE_OWNER=1: the fast ENTER
+     *                   skips its OwningThread store, so the next recursive
+     *                   or native enter on the owning thread sees an owner
+     *                   of 0 and waits on a lock its own thread holds --
+     *                   the deadlock ppc64le/cpu/check-cs-fastpath.sh's
+     *                   negative control requires. */
+    UCHAR   cs_disable;  /* +26 */
+    UCHAR   cs_sabotage; /* +27 */
+    UCHAR   pad[4];      /* +28 */
     ULONG64 frequency;   /* +32 QueryPerformanceFrequency's answer */
     ULONG64 tsc_sample;  /* +40 written only while disarmed */
 };
@@ -163,6 +179,8 @@ C_ASSERT( FIELD_OFFSET(struct emu_qpc_guest, multiplier) == 8 );
 C_ASSERT( FIELD_OFFSET(struct emu_qpc_guest, bias)       == 16 );
 C_ASSERT( FIELD_OFFSET(struct emu_qpc_guest, enabled)    == 24 );
 C_ASSERT( FIELD_OFFSET(struct emu_qpc_guest, shift)      == 25 );
+C_ASSERT( FIELD_OFFSET(struct emu_qpc_guest, cs_disable)  == 26 );
+C_ASSERT( FIELD_OFFSET(struct emu_qpc_guest, cs_sabotage) == 27 );
 C_ASSERT( FIELD_OFFSET(struct emu_qpc_guest, frequency)  == 32 );
 C_ASSERT( FIELD_OFFSET(struct emu_qpc_guest, tsc_sample) == 40 );
 
@@ -170,6 +188,8 @@ C_ASSERT( FIELD_OFFSET(struct emu_qpc_guest, tsc_sample) == 40 );
 #define EMU_QPC_GUEST_BIAS         16
 #define EMU_QPC_GUEST_ENABLED      24
 #define EMU_QPC_GUEST_SHIFT        25
+#define EMU_QPC_GUEST_CS_DISABLE   26
+#define EMU_QPC_GUEST_CS_SABOTAGE  27
 #define EMU_QPC_GUEST_FREQUENCY    32
 #define EMU_QPC_GUEST_TSC_SAMPLE   40
 

@@ -123,6 +123,25 @@ the launcher and let the game exit.
 
 ## Reading a failure
 
+**A "frozen" game may be a CRASHED game whose crash path wedged.**  [MEASURED]
+2026-08-27, Cyberpunk under a benchmark batch: the game raised its own fatal
+(`RaiseException(c000001d)` -- REDengine's fatal idiom; the "exception
+address" is the RETURN ADDRESS of that call, a `ret` after a `call` in the
+image, not a faulting instruction) ~36 s into STARTUP, the unhandled-guest
+re-raise engaged the native crash machinery, and that wedged on the process
+heap critical section ("blocked by <tid>" retry spam every 60 s) -- a
+15-minute "freeze" that was really a crash plus a stuck reporter.  Read the
+log's `raise_pending_guest_exception` line and the RtlpWaitForCriticalSection
+spam before theorising about hangs.  Also: `ps -eo comm` truncates
+`Cyberpunk2077.exe` to `Cyberpunk2077.e`, and a `grep -iE "Cyberpunk"` over
+`comm` output can STILL miss it depending on the field order -- confirm a
+game's death with `ps --ppid <proton>` and `args`, not comm greps.  The one
+occurrence sits at 1 fatal in 11 otherwise-clean runs of the same build; the
+CS-fast-path bisection (6 legs) and soak (6 legs) both came back clean, and
+the other open suspect is fex's documented lazy-SMC cross-thread hole
+(fex-src a072a9122, "narrowed but does not close"), whose window every thunk
+relayout reshuffles.
+
 `refuse_once` prints **once per slot**, so one line in a log can mean a call
 made sixty times a second.  When a title renders wrong, `grep -a refus` the
 run log before suspecting anything deeper — the Cyberpunk "memory corruption"
