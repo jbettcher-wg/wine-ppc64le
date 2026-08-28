@@ -1734,7 +1734,7 @@ RAW_BODY_EXPORTS = {
 # x86-64 ONLY.  The 32-bit lane's stub is a bare `int 0x80` with every
 # argument on the stack, and no title reaches it yet (NEXT.md item 2); an
 # unproven second copy of this would be a liability, not a feature.
-FAST_PATH_MODULES = ('kernel32.dll', 'kernelbase.dll', 'ntdll.dll')
+FAST_PATH_MODULES = ('kernel32.dll', 'kernelbase.dll', 'ntdll.dll', 'user32.dll')
 
 FAST_PATH_EXPORTS = {
     'QueryPerformanceCounter':    'qpc',
@@ -1750,6 +1750,7 @@ FAST_PATH_EXPORTS = {
     'RtlLeaveCriticalSection':    'lcs',
     'EnterCriticalSection':       'ecs',
     'LeaveCriticalSection':       'lcs',
+    'PeekMessageW':               'peek',
 }
 
 # Field offsets inside struct emu_qpc_guest.  THE SAME NUMBERS AS
@@ -1912,6 +1913,114 @@ def emit_fast_body(a, kind, idx):
         a('\tmovl\t$1, 0xC(%rcx)')
         a('.Lwine_thunk_slow_%d:' % idx)
         a('\tjmp\twine_thunk_stub_%d' % idx)
+    elif kind == 'peek':
+        # BOOL PeekMessageW( MSG *msg_out, HWND hwnd, UINT first, UINT last,
+        #                    UINT flags )
+        #   rcx = msg_out (NEVER touched: the fallback stub needs it intact),
+        #   rdx = hwnd, r8d = first, r9d = last, flags at 0x28(%rsp).
+        #
+        # [MEASURED] 2026-08-27, Cyberpunk flythrough: 100,526/s, each one a
+        # full trap AND a full syscall (NtUserPeekMessage) -- the top flat row
+        # once QPC fell.  Almost all of them are the render loop's empty poll:
+        # PeekMessageW(&msg, 0, 0, 0, PM_REMOVE) with nothing pending.
+        #
+        # THE EMPTY ANSWER IS A SHARED-MEMORY READ.  Wine's own empty path
+        # (dlls/win32u/message.c, check_queue_bits) proves emptiness from the
+        # thread's server-maintained queue_shm -- wake/changed masks and bits
+        # behind a seqlock -- and returns 0 without any server request.  This
+        # body performs THE SAME test against THE SAME shared object, whose
+        # address the native side seeded into TEB SystemReserved1[1]
+        # (gs:0x198, low bit = the gate's sabotage tag) the first time this
+        # thread's real peek looked the queue up (get_shared_queue,
+        # dlls/win32u/winstation.c).  Unseeded, every call is the trap it
+        # always was.  Only the exact common shape is served: null hwnd,
+        # first == last == 0, no PM_QS_* word in flags; QS_SENDMESSAGE is in
+        # the tested mask, so a pending sent message always forces the trap.
+        #
+        # WHAT AN EMPTY NATIVE PEEK DOES THAT THIS BODY DOES NOT, and why
+        # each is safe (the analysis behind the design -- keep it current):
+        #   check_for_driver_events   the X11 input pump, natively throttled
+        #                             to 8 kHz.  Starving it forever would
+        #                             kill input, so this body FORCES a real
+        #                             peek whenever the KUSER_SHARED_DATA
+        #                             tick (0x7ffe0320, wineserver updates it
+        #                             every ~16ms) moves, and at latest every
+        #                             256 fast answers (a per-thread budget in
+        #                             gs:0x1a4, last-tick in gs:0x1a0) --
+        #                             the pump runs at poll rate or ~16ms,
+        #                             whichever the app's rate gives.
+        #   flush_window_surfaces     GDI surface blit; runs on every forced
+        #                             real peek, which is the same class of
+        #                             throttling the driver check gets.
+        #   NtYieldExecution          Wine's own kindness to busy loops, not
+        #                             a Windows PeekMessage contract; a loop
+        #                             waiting on another thread's post still
+        #                             traps the moment the bits show it.
+        #   access_time hung-queue    natively, skip only if the server was
+        #                             spoken to <3s ago; the forced real peek
+        #                             above refreshes it far faster than
+        #                             that, so the guard cannot be what
+        #                             stands between the app and the server.
+        #
+        # The seqlock is read exactly as the native reader does: even seq,
+        # fields, seq unchanged -- anything else is the trap.  x86 load
+        # ordering (TSO, which the emulator preserves) is the fence.
+        #
+        # queue_shm layout (include/wine/server_protocol.h, shared_object_t):
+        #   +0 seq, +8 id, +16 access_time, +24 wake_mask, +28 wake_bits,
+        #   +32 changed_mask, +36 changed_bits.
+        # Tested constants for the null-filter shape, from include/winuser.h:
+        #   wake  0x1cff = QS_ALLINPUT
+        #   clear 0x1dbf = QS_INPUT|QS_POSTMESSAGE|QS_ALLPOSTMESSAGE|
+        #                  QS_TIMER|QS_PAINT|QS_HOTKEY
+        # and both masks must be 0, or the thread's last wait left a state
+        # only the server path may touch.
+        #
+        # The fallback jmp sits FIRST so it lands inside the 96 bytes
+        # spec2thunk-check scans for it (order_rva / 8q).
+        a('\tmovq\t%gs:0x198, %r10')
+        a('\ttestq\t%r10, %r10')
+        a('\tjnz\t.Lwine_thunk_peek_on_%d' % idx)
+        a('.Lwine_thunk_slow_%d:' % idx)
+        a('\tjmp\twine_thunk_stub_%d' % idx)
+        a('.Lwine_thunk_peek_on_%d:' % idx)
+        a('\ttestq\t%rdx, %rdx')
+        a('\tjnz\t.Lwine_thunk_slow_%d' % idx)
+        a('\tmovl\t%r8d, %eax')
+        a('\torl\t%r9d, %eax')
+        a('\tjnz\t.Lwine_thunk_slow_%d' % idx)
+        a('\tmovl\t0x28(%rsp), %eax')
+        a('\tshrl\t$16, %eax')
+        a('\tjnz\t.Lwine_thunk_slow_%d' % idx)
+        a('\tbtrq\t$0, %r10')
+        a('\tjc\t.Lwine_thunk_peek_empty_%d' % idx)
+        a('\tmovl\t0x7ffe0320, %eax')
+        a('\tcmpl\t%gs:0x1a0, %eax')
+        a('\tjne\t.Lwine_thunk_peek_force_%d' % idx)
+        a('\tdecl\t%gs:0x1a4')
+        a('\tjns\t.Lwine_thunk_peek_bits_%d' % idx)
+        a('.Lwine_thunk_peek_force_%d:' % idx)
+        a('\tmovl\t%eax, %gs:0x1a0')
+        a('\tmovl\t$255, %gs:0x1a4')
+        a('\tjmp\t.Lwine_thunk_slow_%d' % idx)
+        a('.Lwine_thunk_peek_bits_%d:' % idx)
+        a('\tmovq\t(%r10), %r11')
+        a('\ttestb\t$1, %r11b')
+        a('\tjnz\t.Lwine_thunk_slow_%d' % idx)
+        a('\tmovl\t24(%r10), %eax')
+        a('\torl\t32(%r10), %eax')
+        a('\tjnz\t.Lwine_thunk_slow_%d' % idx)
+        a('\tmovl\t28(%r10), %eax')
+        a('\ttestl\t$0x1cff, %eax')
+        a('\tjnz\t.Lwine_thunk_slow_%d' % idx)
+        a('\tmovl\t36(%r10), %eax')
+        a('\ttestl\t$0x1dbf, %eax')
+        a('\tjnz\t.Lwine_thunk_slow_%d' % idx)
+        a('\tcmpq\t(%r10), %r11')
+        a('\tjne\t.Lwine_thunk_slow_%d' % idx)
+        a('.Lwine_thunk_peek_empty_%d:' % idx)
+        a('\txorl\t%eax, %eax')
+        a('\tretq')
     elif kind == 'qpf':
         # BOOL QueryPerformanceFrequency( LARGE_INTEGER *frequency )
         # Free, once the block exists: 299 crossings/s in the same measurement.

@@ -25,6 +25,7 @@
 #include <assert.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 #include <pthread.h>
 
@@ -233,6 +234,51 @@ NTSTATUS get_shared_desktop( struct object_lock *lock, const desktop_shm_t **des
     return STATUS_SUCCESS;
 }
 
+#ifdef __powerpc64__
+/* The guest PeekMessageW fast body (tools/spec2thunk, kind 'peek') answers
+ * the empty null-filter poll from this thread's queue_shm without crossing,
+ * by running check_queue_bits' own test against the same shared object.  It
+ * finds the object through TEB SystemReserved1[1], which nothing on the
+ * 64-bit side uses (the array is krnl386/16-bit territory); [0] belongs to
+ * the descriptor-shadow work, [2] is the fast body's own per-thread tick +
+ * trap budget.  Seeded here because this lookup is the one place the
+ * object's address is born, on the owning thread, before any answer the
+ * fast path could give -- an unseeded slot means every call still traps.
+ *
+ * WINE_PPC64LE_NO_PEEK_BYPASS=1 never seeds: the kill switch.
+ * WINE_PPC64LE_PEEK_SABOTAGE=1 seeds the address tagged with bit 0: the
+ * fast body then answers EVERY common-shape poll empty without looking at
+ * the bits, so a posted message is never seen -- the starvation
+ * ppc64le/cpu/check-peek-fastpath.sh's negative control requires. */
+static void seed_guest_peek_queue( const shared_object_t *object )
+{
+    static int mode = -1;
+
+    if (mode < 0)
+    {
+        const char *env;
+        if ((env = getenv( "WINE_PPC64LE_NO_PEEK_BYPASS" )) && env[0] == '1')
+        {
+            ERR( "guest PeekMessageW fast path disabled by WINE_PPC64LE_NO_PEEK_BYPASS\n" );
+            mode = 0;
+        }
+        else if ((env = getenv( "WINE_PPC64LE_PEEK_SABOTAGE" )) && env[0] == '1')
+        {
+            ERR( "SABOTAGE: the guest PeekMessageW fast path will answer every "
+                 "null-filter poll empty without reading the queue bits; posted "
+                 "messages will starve, which is what the gate's negative "
+                 "control requires\n" );
+            mode = 2;
+        }
+        else mode = 1;
+    }
+    if (!mode) return;
+    NtCurrentTeb()->SystemReserved1[1] = (void *)((UINT_PTR)object | (mode == 2));
+}
+#else
+static void seed_guest_peek_queue( const shared_object_t *object ) { }
+#endif
+
 NTSTATUS get_shared_queue( struct object_lock *lock, const queue_shm_t **queue_shm )
 {
     struct session_thread_data *data = get_session_thread_data();
@@ -253,6 +299,7 @@ NTSTATUS get_shared_queue( struct object_lock *lock, const queue_shm_t **queue_s
 
         data->shared_queue = find_shared_session_object( locator.id, locator.offset );
         if (!(object = data->shared_queue)) return STATUS_INVALID_HANDLE;
+        seed_guest_peek_queue( object );
     }
 
     if (!lock->id || !shared_object_release_seqlock( object, lock->seq ))

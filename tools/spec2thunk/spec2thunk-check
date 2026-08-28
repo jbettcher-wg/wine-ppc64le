@@ -1034,11 +1034,11 @@ RAW_BODY_EXPORTS = {
 # divergence into a red check instead of a guest reading a garbage clock.
 RESERVED_EXPORTS  = ('__wine_thunk_info', '__wine_com_thunk_info',
                      '__wine_thunk_qpc')
-FAST_PATH_MODULES = ('kernel32.dll', 'kernelbase.dll', 'ntdll.dll')
+FAST_PATH_MODULES = ('kernel32.dll', 'kernelbase.dll', 'ntdll.dll', 'user32.dll')
 FAST_PATH_EXPORTS = ('QueryPerformanceCounter', 'QueryPerformanceFrequency',
                      'GetCurrentThreadId', 'RtlEnterCriticalSection',
                      'RtlLeaveCriticalSection', 'EnterCriticalSection',
-                     'LeaveCriticalSection')
+                     'LeaveCriticalSection', 'PeekMessageW')
 QPC_BLOCK_EXPORT  = '__wine_thunk_qpc'
 QPC_ENABLED       = 24
 QPC_BLOCK_SIZE    = 48
