@@ -59,6 +59,7 @@
 #include "winbase.h"
 #include "winternl.h"
 #include "wine/debug.h"
+#include "wine/exception.h"
 #include "wine/winecom.h"
 
 #include "winecom_private.h"
@@ -157,6 +158,239 @@ struct com_iface_entry
     UINT stubs_rva;
 };
 
+/* ------------------------------------------------------- the 32-bit guest
+ *
+ * ONE RUNTIME, KEYED BY GUEST MACHINE AT ATTACH.  A process has exactly one
+ * guest machine for its whole life -- an i386 guest is a WoW64 process, an
+ * x86-64 guest is not -- so the "one proxy runtime parameterised by width or
+ * a second instantiation" question (i386-lane-design.md, the crux) resolves
+ * to a per-process constant, not a per-object one.  What changes under
+ * `guest32`:
+ *
+ *   THE PROXY OBJECT.  `struct com_proxy` is unchanged.  Its first member is
+ *   still the 8-byte guest_vtbl field -- but the proxy is allocated BELOW
+ *   4 GiB and the vtable it points at is below 4 GiB, so on this
+ *   little-endian host the guest's 4-byte load at offset 0 reads exactly the
+ *   low half of the same bytes the native side reads as 8: one struct, two
+ *   correct views.  The layout pins (cached_qword at 0x20...) are 64-bit
+ *   guest ABI and the fast paths that rely on them do not install here.
+ *
+ *   THE VTABLE.  A 32-bit vtable is an array of 4-BYTE slot entries, so the
+ *   i386 module's stub addresses are materialised into a separate UINT
+ *   block (below 4 GiB, since the proxies' 4-byte vtable pointers must reach
+ *   it) rather than the UINT64 block the 64-bit lane builds.
+ *
+ *   THE MODULE.  The guest thunk module lives in the 32-BIT loader list (the
+ *   i386 loader is the guest's own ntdll32; these modules never appear in
+ *   the 64-bit PEB), and its exports are parsed straight out of the PE32
+ *   export directory -- LdrGetProcedureAddress only serves the 64-bit list.
+ *
+ *   DISPATCH.  Arguments arrive in 4-byte stdcall stack slots and the CALLEE
+ *   pops them, so serving a call requires the marshal table's I386_GEOM
+ *   geometry -- see winecom_dispatch32 at the bottom of this file.  Rows
+ *   without it are refused; rows without even the pop arithmetic fault.
+ */
+static BOOL guest32;
+
+/* Guest-legal allocations: the proxies and the 32-bit vtable block must be
+ * addressable by 4-byte guest pointers.  A trivial carve-out allocator over
+ * NtAllocateVirtualMemory's zero_bits form, plus a free list for the one
+ * fixed size that ever comes back (a proxy).  wc_cs guards both. */
+static void *low_chunk;
+static SIZE_T low_used, low_cap;
+static void *low_free_proxies;   /* singly linked through the first word */
+
+static void *wc_alloc_low( SIZE_T size )
+{
+    void *ret;
+
+    size = (size + 15) & ~(SIZE_T)15;
+    if (!low_chunk || low_used + size > low_cap)
+    {
+        SIZE_T cap = size > 0x10000 ? (size + 0xffff) & ~(SIZE_T)0xffff : 0x10000;
+        void *mem = NULL;
+
+        if (NtAllocateVirtualMemory( NtCurrentProcess(), &mem, 0x7fffffff, &cap,
+                                     MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE ))
+            return NULL;
+        low_chunk = mem;    /* a part-used old chunk leaks its tail: bounded
+                               by chunk count, and proxies recycle below */
+        low_used = 0;
+        low_cap = cap;
+    }
+    ret = (char *)low_chunk + low_used;
+    low_used += size;
+    return ret;
+}
+
+static struct com_proxy *wc_proxy_alloc(void)   /* wc_cs held */
+{
+    struct com_proxy *p;
+
+    if (!guest32)
+        return RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, sizeof(*p) );
+    if ((p = low_free_proxies))
+    {
+        low_free_proxies = *(void **)p;
+        return p;
+    }
+    return wc_alloc_low( sizeof(*p) );
+}
+
+static void wc_proxy_free( struct com_proxy *p )
+{
+    if (!guest32)
+    {
+        RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, p );
+        return;
+    }
+    RtlEnterCriticalSection( &wc_cs );
+    *(void **)p = low_free_proxies;
+    low_free_proxies = p;
+    RtlLeaveCriticalSection( &wc_cs );
+}
+
+/* The 32-bit guest vtables, when guest32: vtbl32s[i] points into vtbl32_block,
+ * whose entries are the i386 stub addresses as 4-byte words. */
+static UINT **vtbl32s;
+static UINT *vtbl32_block;
+
+/* hand32_map[iface_slot_base[i] + n]: index into wc_surface->hand32, or 0xff */
+static unsigned char *hand32_map;
+
+/* refuse32/no-geometry log-once flags share refuse_logged */
+
+/* Export lookup on a mapped PE32 image the 64-bit loader has never seen.
+ * The export directory is machine-independent; forwarders are not followed
+ * (every name asked for is a data table the module defines itself). */
+static void *find_export32( ULONG_PTR base, const char *name )
+{
+    const IMAGE_EXPORT_DIRECTORY *exp;
+    const UINT *names, *funcs;
+    const USHORT *ords;
+    ULONG size;
+    UINT i;
+
+    exp = RtlImageDirectoryEntryToData( (HMODULE)base, TRUE,
+                                        IMAGE_DIRECTORY_ENTRY_EXPORT, &size );
+    if (!exp || !exp->NumberOfNames) return NULL;
+    names = (const UINT *)(base + exp->AddressOfNames);
+    ords  = (const USHORT *)(base + exp->AddressOfNameOrdinals);
+    funcs = (const UINT *)(base + exp->AddressOfFunctions);
+    for (i = 0; i < exp->NumberOfNames; i++)
+        if (!strcmp( (const char *)(base + names[i]), name ))
+        {
+            if (ords[i] >= exp->NumberOfFunctions) return NULL;
+            return (void *)(base + funcs[ords[i]]);
+        }
+    return NULL;
+}
+
+struct wc_ldr_entry32
+{
+    LIST_ENTRY32     InLoadOrderLinks;
+    LIST_ENTRY32     InMemoryOrderLinks;
+    LIST_ENTRY32     InInitializationOrderLinks;
+    ULONG            DllBase;
+    ULONG            EntryPoint;
+    ULONG            SizeOfImage;
+    UNICODE_STRING32 FullDllName;
+    UNICODE_STRING32 BaseDllName;
+};
+
+/* The 32-bit loader list walk: same question as find_guest_module below,
+ * asked of the guest ntdll32's own PEB.  The list is guarded by the GUEST
+ * loader's own lock, which no native thread can take, so a guest thread
+ * splicing it mid-walk can hand this walk a wild link -- the walk runs
+ * under __TRY and retries, the same protection ntdll's own 32-bit resolver
+ * carries (see find_guest_thunk_target32's banner and the measured Dex
+ * hang that motivated it). */
+static HMODULE find_guest_module32_walk( const WCHAR *const *names, UINT count )
+{
+    PEB_LDR_DATA32 *ldr;
+    LIST_ENTRY32 *mark;
+    TEB32 *teb32;
+    PEB32 *peb32;
+    HMODULE ret = NULL;
+    ULONG e32;
+    UINT i;
+
+    if (!NtCurrentTeb()->WowTebOffset) return NULL;
+    teb32 = (TEB32 *)((char *)NtCurrentTeb() + NtCurrentTeb()->WowTebOffset);
+    if (!(peb32 = (PEB32 *)(ULONG_PTR)teb32->Peb) ||
+        !(ldr = (PEB_LDR_DATA32 *)(ULONG_PTR)peb32->LdrData))
+        return NULL;
+
+    mark = &ldr->InMemoryOrderModuleList;
+    for (e32 = mark->Flink; e32 != (ULONG)(ULONG_PTR)mark && !ret;
+         e32 = ((LIST_ENTRY32 *)(ULONG_PTR)e32)->Flink)
+    {
+        struct wc_ldr_entry32 *mod = CONTAINING_RECORD( (LIST_ENTRY32 *)(ULONG_PTR)e32,
+                                                        struct wc_ldr_entry32,
+                                                        InMemoryOrderLinks );
+        const IMAGE_NT_HEADERS *nt = RtlImageNtHeader( (HMODULE)(ULONG_PTR)mod->DllBase );
+        UNICODE_STRING want, have;
+
+        if (!nt || nt->FileHeader.Machine != IMAGE_FILE_MACHINE_I386) continue;
+        have.Buffer = (WCHAR *)(ULONG_PTR)mod->BaseDllName.Buffer;
+        have.Length = mod->BaseDllName.Length;
+        have.MaximumLength = mod->BaseDllName.MaximumLength;
+        for (i = 0; i < count; i++)
+        {
+            RtlInitUnicodeString( &want, names[i] );
+            if (RtlEqualUnicodeString( &want, &have, TRUE ))
+            {
+                /* An application can ship its OWN d3d11.dll beside the .exe
+                 * (Dex does), and it loads under the same base name as this
+                 * port's thunk module.  A namesake that publishes no
+                 * __wine_com_thunk_info is such a copy, not a drifted
+                 * roster: skip it and keep walking, so the port's own
+                 * module -- which the guest also loaded, from the system
+                 * directory -- is the one materialised from. */
+                if (!find_export32( mod->DllBase, "__wine_com_thunk_info" ))
+                {
+                    TRACE( "skipping %s at %p: no __wine_com_thunk_info "
+                           "(an application's own copy)\n",
+                           debugstr_wn( have.Buffer, have.Length / sizeof(WCHAR) ),
+                           (void *)(ULONG_PTR)mod->DllBase );
+                    continue;
+                }
+                ret = (HMODULE)(ULONG_PTR)mod->DllBase;
+                break;
+            }
+        }
+    }
+    return ret;
+}
+
+static HMODULE find_guest_module32( const WCHAR *const *names, UINT count )
+{
+    HMODULE ret = NULL;
+    ULONG_PTR magic;
+    UINT attempt;
+    BOOL torn;
+
+    for (attempt = 0; attempt < 16; attempt++)
+    {
+        torn = FALSE;
+        LdrLockLoaderLock( 0, NULL, &magic );
+        __TRY
+        {
+            ret = find_guest_module32_walk( names, count );
+        }
+        __EXCEPT_ALL
+        {
+            torn = TRUE;
+        }
+        __ENDTRY
+        LdrUnlockLoaderLock( 0, magic );
+        if (!torn) return ret;
+        NtYieldExecution();
+    }
+    ERR( "the 32-bit loader-list walk kept faulting; reporting no module\n" );
+    return NULL;
+}
+
 /* a "1" in the process environment; PE-side, so no getenv here */
 static BOOL com_env_flag( const WCHAR *name )
 {
@@ -171,7 +405,7 @@ static BOOL com_env_flag( const WCHAR *name )
            value.Length && buf[0] == '1';
 }
 
-static HMODULE find_guest_module( const WCHAR *const *names, UINT count )
+static HMODULE find_guest_module( const WCHAR *const *names, UINT count, BOOL require_com_table )
 {
     LIST_ENTRY *mark, *entry;
     HMODULE ret = NULL;
@@ -193,6 +427,14 @@ static HMODULE find_guest_module( const WCHAR *const *names, UINT count )
             RtlInitUnicodeString( &want, names[i] );
             if (RtlEqualUnicodeString( &want, &mod->BaseDllName, TRUE ))
             {
+                /* same shadowing rule as the 32-bit walk: an application's
+                 * own copy of a thunk module publishes no com table and is
+                 * not a candidate.  The QPC arm path looks kernel32 up
+                 * through here too and legitimately lacks the table, so the
+                 * requirement is the caller's choice. */
+                if (require_com_table &&
+                    !find_export32( (ULONG_PTR)mod->DllBase, "__wine_com_thunk_info" ))
+                    continue;
                 ret = mod->DllBase;
                 break;
             }
@@ -215,8 +457,13 @@ static BOOL com_check_module( HMODULE guest, const struct com_thunk_info **info_
     void *ptr;
     UINT i;
 
-    RtlInitAnsiString( &name, "__wine_com_thunk_info" );
-    if (LdrGetProcedureAddress( guest, &name, 0, &ptr ))
+    if (guest32) ptr = find_export32( base, "__wine_com_thunk_info" );
+    else
+    {
+        RtlInitAnsiString( &name, "__wine_com_thunk_info" );
+        if (LdrGetProcedureAddress( guest, &name, 0, &ptr )) ptr = NULL;
+    }
+    if (!ptr)
     {
         ERR( "%s: guest module %p exports no __wine_com_thunk_info\n",
              wc_surface->name, guest );
@@ -313,6 +560,11 @@ static void install_const_getters( void )
     unsigned char *block, *code;
     SIZE_T size;
     UINT i, n, count = 0;
+
+    /* the snippets are x86-64 encodings and the cached_qword offset is the
+     * 64-bit guest ABI; an i386 guest keeps trapping, which is that lane's
+     * baseline for everything */
+    if (guest32) return;
 
     for (i = 0; i < wc_surface->iface_count; i++)
     {
@@ -640,6 +892,7 @@ static void install_journal( void )
     SIZE_T size;
     UINT i, n, j, k, count = 0;
 
+    if (guest32) return;   /* x86-64 snippet encodings; see install_const_getters */
     if (!(iface_journaled = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap,
                                              HEAP_ZERO_MEMORY, wc_surface->iface_count )))
         return;
@@ -920,7 +1173,7 @@ static BOOL dev_stamp_ready( void )
     HMODULE k32;
 
     if (dev_stamp_known > 0) return TRUE;
-    if (!(k32 = find_guest_module( &names, 1 ))) return FALSE;
+    if (!(k32 = find_guest_module( &names, 1, FALSE ))) return FALSE;
     RtlInitAnsiString( &qpc_name, "__wine_thunk_qpc" );
     if (LdrGetProcedureAddress( k32, &qpc_name, 0, &qpc_ptr ) ||
         !(qpc = qpc_ptr) || qpc->magic != EMU_QPC_MAGIC || !qpc->enabled ||
@@ -1231,6 +1484,7 @@ static void install_dev_journal( void )
     UINT i, n, j, k, count = 0;
     BYTE tmp[16];
 
+    if (guest32) return;   /* x86-64 snippet encodings; see install_const_getters */
     if (!(dev_slot_map = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap,
                                           HEAP_ZERO_MEMORY, total_slots )))
         return;
@@ -1388,8 +1642,17 @@ static BOOL com_runtime_init_once( void )
 
     nowrap = com_env_flag( L"WINEEMUNOCOMWRAP" );
 
-    if (!(guest = find_guest_module( wc_surface->guest_modules,
-                                     wc_surface->module_count )))
+    /* The guest machine is a property of the process, settled before any
+     * guest code could trap: an i386 guest is a WoW64 process. */
+    guest32 = NtCurrentTeb()->WowTebOffset != 0;
+    if (guest32)
+        TRACE( "%s: attaching for an i386 guest (WoW64 process)\n",
+               wc_surface->name );
+
+    guest = guest32
+        ? find_guest_module32( wc_surface->guest_modules, wc_surface->module_count )
+        : find_guest_module( wc_surface->guest_modules, wc_surface->module_count, TRUE );
+    if (!guest)
     {
         ERR( "%s: no guest thunk module in this process; COM dispatch "
              "cannot work\n", wc_surface->name );
@@ -1398,7 +1661,9 @@ static BOOL com_runtime_init_once( void )
     /* validate every loaded candidate, materialise from the first */
     for (i = 0; i < wc_surface->module_count; i++)
     {
-        HMODULE mod = find_guest_module( &wc_surface->guest_modules[i], 1 );
+        HMODULE mod = guest32
+            ? find_guest_module32( &wc_surface->guest_modules[i], 1 )
+            : find_guest_module( &wc_surface->guest_modules[i], 1, TRUE );
         if (mod && !com_check_module( mod, NULL )) return FALSE;
     }
     if (!com_check_module( guest, &info )) return FALSE;
@@ -1419,6 +1684,22 @@ static BOOL com_runtime_init_once( void )
     refuse_logged = (unsigned char *)(guest_vtbl_block + total_slots);
     memset( refuse_logged, 0, total_slots );
 
+    if (guest32)
+    {
+        /* The 32-bit vtable block: 4-byte slot entries, below 4 GiB because
+         * the proxies' 4-byte vtable pointers must reach it.  vtbl32s and
+         * hand32_map ride the ordinary heap; only what the GUEST addresses
+         * needs to be low. */
+        RtlEnterCriticalSection( &wc_cs );
+        vtbl32_block = wc_alloc_low( total_slots * sizeof(UINT) );
+        RtlLeaveCriticalSection( &wc_cs );
+        vtbl32s = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0,
+                                   wc_surface->iface_count * sizeof(*vtbl32s) );
+        hand32_map = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, total_slots );
+        if (!vtbl32_block || !vtbl32s || !hand32_map) return FALSE;
+        memset( hand32_map, 0xff, total_slots );
+    }
+
     off = 0;
     for (i = 0; i < wc_surface->iface_count; i++)
     {
@@ -1426,6 +1707,28 @@ static BOOL com_runtime_init_once( void )
         guest_vtbls[i] = guest_vtbl_block + off;
         for (n = 0; n < entries[i].slot_count; n++)
             guest_vtbl_block[off + n] = base + entries[i].stubs_rva + n * (UINT64)info->stride;
+        if (guest32)
+        {
+            vtbl32s[i] = vtbl32_block + off;
+            for (n = 0; n < entries[i].slot_count; n++)
+                vtbl32_block[off + n] = (UINT)guest_vtbl_block[off + n];
+            /* match this interface's rows against the surface's 32-bit hand
+             * walkers, by slot name -- once, here, never on a dispatch */
+            if (wc_surface->hand32 && wc_surface->ifaces[i].slots)
+                for (n = 0; n < entries[i].slot_count; n++)
+                {
+                    const char *sname = wc_surface->ifaces[i].slots[n].name;
+                    UINT h;
+
+                    if (!sname) continue;
+                    for (h = 0; h < wc_surface->hand32_count; h++)
+                        if (!strcmp( sname, wc_surface->hand32[h].slot_name ))
+                        {
+                            hand32_map[off + n] = (unsigned char)h;
+                            break;
+                        }
+                }
+        }
         off += entries[i].slot_count;
     }
     /* The stub arrays are contiguous per interface but not necessarily as a
@@ -1570,6 +1873,24 @@ void *winecom_wrap( void *host, UINT iface )
 
     if (!host) return NULL;
 
+    /* The concrete-type upgrade: a caller may legally static_cast a returned
+     * base interface to the derived type it knows the object to be, and the
+     * proxy's vtable must be long enough for that call to land on a real
+     * stub.  Asked BEFORE interning, so one host object interns under its
+     * concrete type however it is reached. */
+    if (wc_surface->wrap_concrete)
+    {
+        UINT up = wc_surface->wrap_concrete( host, iface );
+        if (up < wc_surface->iface_count && up != iface)
+        {
+            TRACE( "wrapping %s host %p as its concrete %s\n",
+                   wc_surface->ifaces[iface].name, host,
+                   wc_surface->ifaces[up].name );
+            iface = up;
+            bucket = (UINT)(((ULONG_PTR)host >> 4) % INTERN_BUCKETS);
+        }
+    }
+
     /* THE ROUND TRIP.  `host` may be one of the REVERSE proxies -- a native
      * vtable this runtime built around an object the guest implemented -- on
      * its way back to the guest that wrote it.  Wrapping one would give the
@@ -1606,14 +1927,18 @@ void *winecom_wrap( void *host, UINT iface )
         host_release_iface( host, iface );
         return p;
     }
-    if (!(p = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, sizeof(*p) )))
+    if (!(p = wc_proxy_alloc()))
     {
         RtlLeaveCriticalSection( &wc_cs );
         ERR( "out of memory interning %s %p\n", wc_surface->ifaces[iface].name, host );
         host_release_iface( host, iface );
         return NULL;
     }
-    p->guest_vtbl = guest_vtbls[iface];
+    /* For an i386 guest the vtable pointer is the 4-byte-slot block and the
+     * proxy itself sits below 4 GiB (wc_proxy_alloc): on this little-endian
+     * host the guest's 4-byte load at offset 0 then reads exactly the low
+     * half of the same field the native side reads as 8 bytes. */
+    p->guest_vtbl = guest32 ? (const void *)vtbl32s[iface] : (const void *)guest_vtbls[iface];
     p->host = host;
     p->refs = 1;
     p->iface = iface;
@@ -1651,17 +1976,32 @@ static struct com_proxy *proxy_from_pointer( void *ptr )
 {
     struct com_proxy *cand = ptr;
     ULONG_PTR vtbl;
+    BOOL in_block;
     UINT i;
 
     if (!ptr) return NULL;
-    vtbl = (ULONG_PTR)cand->guest_vtbl;
-    if ((ULONG_PTR)(guest_vtbl_block) <= vtbl &&
-        vtbl < (ULONG_PTR)(guest_vtbl_block + total_slots))
+    /* A 32-bit guest object's vtable pointer is 4 bytes, so only 4 bytes of
+     * a foreign candidate may be read -- 8 could touch the next field, or
+     * for a 4-byte object the next page. */
+    if (guest32)
+    {
+        vtbl = *(const UINT *)cand;
+        in_block = (ULONG_PTR)vtbl32_block <= vtbl &&
+                   vtbl < (ULONG_PTR)(vtbl32_block + total_slots);
+    }
+    else
+    {
+        vtbl = (ULONG_PTR)cand->guest_vtbl;
+        in_block = (ULONG_PTR)guest_vtbl_block <= vtbl &&
+                   vtbl < (ULONG_PTR)(guest_vtbl_block + total_slots);
+    }
+    if (in_block)
     {
         /* points into the materialised block: confirm it is an interface
          * base, then confirm the pointer is interned */
         for (i = 0; i < wc_surface->iface_count; i++)
-            if ((const void *)guest_vtbls[i] == cand->guest_vtbl)
+            if (guest32 ? (ULONG_PTR)vtbl32s[i] == vtbl
+                        : (const void *)guest_vtbls[i] == cand->guest_vtbl)
             {
                 UINT bucket = (UINT)(((ULONG_PTR)cand->host >> 4) % INTERN_BUCKETS);
                 struct com_proxy *p;
@@ -1760,7 +2100,7 @@ static ULONG proxy_release( struct com_proxy *p )
             NtFreeVirtualMemory( NtCurrentProcess(), &mem, &ring, MEM_RELEASE );
         }
         host_release_iface( host, iface );
-        RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, p );
+        wc_proxy_free( p );
     }
     return refs;
 }
@@ -1890,6 +2230,17 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
     const UINT64 *arr_borrowed = NULL;
     UINT n_arr_borrowed = 0;
     BOOL have_ppv = FALSE;
+    /* guest32 out-parameter staging: a 32-bit guest's interface-out cell is
+     * FOUR bytes, and both the unixlib below and winecom_wrap write eight --
+     * so every such parameter is redirected to a native-width local here and
+     * narrowed back to the guest's cell after the wrap.  arr_out_buf serves
+     * the out-ARRAY class the same way (64 elements covers every out-array
+     * this surface has -- OMGet* family, 8-ish; a larger one refuses). */
+    void *ppv_local = NULL;
+    void *out_static_local[8];
+    void *arr_out_buf[64];
+    UINT arr_out_used = 0;
+    UINT arr_out_base[8];
 
     args[0] = (UINT64)(ULONG_PTR)proxy->host;
     for (i = 1; i < sl->argc; i++)
@@ -1963,7 +2314,14 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
         case WINECOM_CA_IFACE_OUT_STATIC:
             args[i] = raw;
             if (raw && n_out_static < ARRAYSIZE(out_static_idx))
+            {
+                if (guest32)
+                {
+                    out_static_local[n_out_static] = NULL;
+                    args[i] = (UINT64)(ULONG_PTR)&out_static_local[n_out_static];
+                }
                 out_static_idx[n_out_static++] = i;
+            }
             break;
         case WINECOM_CA_IFACE_ARR_OUT_STATIC:
             /* The array itself is the caller's buffer, so it crosses as an
@@ -1984,10 +2342,36 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
                 return STATUS_SUCCESS;
             }
             if (raw && n_out_arr < ARRAYSIZE(out_arr_idx))
+            {
+                if (guest32)
+                {
+                    UINT cnt = (UINT)rawargs[sl->caux[i - 1] + 1];
+
+                    if (arr_out_used + cnt > ARRAYSIZE(arr_out_buf))
+                    {
+                        refuse_once( iface, slot, sl->name,
+                                     "interface out-array larger than the "
+                                     "32-bit lane's staging buffer" );
+                        if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
+                        release_borrows( args, borrowed, n_borrowed );
+                        *rax_out = (UINT)E_NOTIMPL;
+                        return STATUS_SUCCESS;
+                    }
+                    memset( &arr_out_buf[arr_out_used], 0, cnt * sizeof(void *) );
+                    arr_out_base[n_out_arr] = arr_out_used;
+                    args[i] = (UINT64)(ULONG_PTR)&arr_out_buf[arr_out_used];
+                    arr_out_used += cnt;
+                }
                 out_arr_idx[n_out_arr++] = i;
+            }
             break;
         case WINECOM_CA_PPV_OUT:
             args[i] = raw;
+            if (guest32 && raw)
+            {
+                ppv_local = NULL;
+                args[i] = (UINT64)(ULONG_PTR)&ppv_local;
+            }
             have_ppv = TRUE;
             ppv_idx = i;
             riid_idx = sl->aux + 1;
@@ -2011,6 +2395,7 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
         {
             UINT count = (UINT)rawargs[sl->aux2 + 1];
             void *const *src = (void *const *)(ULONG_PTR)raw;
+            const UINT *src32 = (const UINT *)(ULONG_PTR)raw;
             UINT64 *dst;
 
             if (!src || !count)
@@ -2034,7 +2419,8 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
                  * an array has one position for many objects -- so the element
                  * proxies are given back by their own loop after the call. */
                 void *host;
-                if (!winecom_to_native( src[n],
+                void *elem = guest32 ? (void *)(ULONG_PTR)src32[n] : src[n];
+                if (!winecom_to_native( elem,
                                         (sl->xaux && (sl->xmask & (1u << (i - 1))))
                                             ? sl->xaux[i - 1] : ~0u, &host ))
                 {
@@ -2114,6 +2500,31 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
 
         for (k = 0; k < count; k++)
             if (out[k]) out[k] = winecom_wrap( out[k], sl->xaux[idx - 1] );
+    }
+
+    /* The other half of the guest32 staging above: everything the callee
+     * wrote -- now wrapped -- is narrowed into the guest's own 4-byte cells.
+     * On failure a cell gets NULL, never whatever host pointer the local may
+     * hold: a raw host pointer in a guest cell is the defect this runtime
+     * exists to prevent. */
+    if (guest32)
+    {
+        if (have_ppv && rawargs[ppv_idx])
+            *(UINT *)(ULONG_PTR)rawargs[ppv_idx] =
+                SUCCEEDED((HRESULT)ret) ? (UINT)(ULONG_PTR)ppv_local : 0;
+        for (n = 0; n < n_out_static; n++)
+            *(UINT *)(ULONG_PTR)rawargs[out_static_idx[n]] =
+                SUCCEEDED((HRESULT)ret) ? (UINT)(ULONG_PTR)out_static_local[n] : 0;
+        for (n = 0; n < n_out_arr; n++)
+        {
+            UINT idx = out_arr_idx[n];
+            UINT count = (UINT)rawargs[sl->caux[idx - 1] + 1];
+            UINT *gout = (UINT *)(ULONG_PTR)rawargs[idx];
+            UINT k;
+
+            for (k = 0; k < count; k++)
+                gout[k] = (UINT)(ULONG_PTR)arr_out_buf[arr_out_base[n] + k];
+        }
     }
 
     if (sl->flags & WINECOM_F_RET_VIA_ARG)
@@ -2218,4 +2629,300 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
         if (st == STATUS_SUCCESS) ctx->Rax = rax;
         return st;
     }
+}
+
+/* ------------------------------------------------------ the 32-bit dispatch */
+
+BOOL winecom_guest32(void)
+{
+    /* a property of the PROCESS, not of the attach: client code narrows its
+     * guest-cell writes by this answer on paths that run before -- or
+     * without -- a successful attach (a refusal stub still NULLs its out
+     * parameters), so it must not read attach state */
+    return NtCurrentTeb()->WowTebOffset != 0;
+}
+
+void winecom_store_guest_ptr( void *cell, void *value )
+{
+    if (winecom_guest32()) *(UINT *)cell = (UINT)(ULONG_PTR)value;
+    else *(void **)cell = value;
+}
+
+/***********************************************************************
+ *           winecom_dispatch32
+ *
+ * The i386 twin of winecom_dispatch, over a stdcall frame instead of MS-x64
+ * registers: [Esp] the return address, [Esp+4] `this`, parameters in 4-byte
+ * slots from [Esp+8], 8-byte parameters (qwordmask) in two consecutive
+ * slots, and the CALLEE pops -- which is why the contract with ntdll differs
+ * from the 64-bit one: this side performs the whole epilogue (Eax, Edx for
+ * an EDX:EAX return, Eip from the popped return address, Esp past the
+ * frame), because the pop arithmetic is per-slot knowledge only the marshal
+ * table has.  Rows are served only under BOTH version stamps:
+ * WINECOM_F_I386_GEOM (the frame is decodable and poppable) and
+ * WINECOM_F_I386_STRUCTS_OK (every pointer parameter's pointee was audited
+ * against the i386 layouts, divergent ones described in reps[]).  A row
+ * with geometry but without a serve path pops correctly and answers
+ * E_NOTIMPL; a row without geometry cannot even do that and the trap
+ * faults, loudly.
+ */
+static void pop_frame32( I386_CONTEXT *ctx, UINT bytes )
+{
+    const ULONG *esp = (const ULONG *)(ULONG_PTR)ctx->Esp;
+
+    ctx->Eip = esp[0];
+    ctx->Esp += 4 + bytes;
+}
+
+NTSTATUS winecom_dispatch32( UINT iface, UINT slot, I386_CONTEXT *ctx )
+{
+    const struct winecom_iface *itf;
+    const struct winecom_slot *sl;
+    const ULONG *esp;
+    struct com_proxy *proxy;
+    UINT pop_bytes, i, cur;
+    UINT64 rawargs[16] = { 0 }, rax = 0;
+    NTSTATUS st;
+
+    /* rep staging: native temporaries for divergent-layout struct params */
+    struct
+    {
+        const struct winecom_rep *rep;
+        void *guest;
+        void *native;
+        UINT count;
+        BOOL heap;
+    } fixes[8];
+    UINT n_fixes = 0;
+    char repbuf[1024];
+    UINT rep_used = 0;
+
+    if (!com_ready()) return STATUS_DLL_INIT_FAILED;
+    if (!guest32)
+    {
+        ERR( "%s: 32-bit dispatch in a 64-bit-guest process\n", wc_surface->name );
+        return STATUS_INVALID_PARAMETER;
+    }
+    if (iface >= wc_surface->iface_count) return STATUS_INVALID_PARAMETER;
+    itf = &wc_surface->ifaces[iface];
+    if (slot >= itf->slot_count) return STATUS_INVALID_PARAMETER;
+
+    esp = (const ULONG *)(ULONG_PTR)ctx->Esp;
+    proxy = (struct com_proxy *)(ULONG_PTR)esp[1];
+
+    /* IUnknown's three slots head every vtable; their frames are fixed by
+     * IUnknown itself (QI: riid + ppv = two slots; AddRef/Release: none). */
+    if (slot < 3)
+    {
+        if (itf->flags & WINECOM_IF_LOCAL)
+        {
+            ERR( "%s is [local]; its slot %u is a real method the client must "
+                 "claim before dispatch\n", itf->name, slot );
+            return STATUS_ILLEGAL_INSTRUCTION;
+        }
+        if (!proxy)
+        {
+            ERR( "%s slot %u called with NULL this\n", itf->name, slot );
+            ctx->Eax = (UINT)E_INVALIDARG;
+            pop_frame32( ctx, slot == 0 ? 12 : 4 );
+            return STATUS_SUCCESS;
+        }
+        switch (slot)
+        {
+        case 0:
+        {
+            void *local = NULL;
+            HRESULT hr = proxy_qi( proxy, (const GUID *)(ULONG_PTR)esp[2], &local );
+
+            if (FAILED(hr))
+                WARN( "QI failed %08x: caller %08x this %08x riid %08x ppv %08x\n",
+                      (UINT)hr, esp[0], esp[1], esp[2], esp[3] );
+            if (esp[3]) *(UINT *)(ULONG_PTR)esp[3] = (UINT)(ULONG_PTR)local;
+            ctx->Eax = (UINT)hr;
+            pop_frame32( ctx, 12 );
+            return STATUS_SUCCESS;
+        }
+        case 1:
+            ctx->Eax = proxy_addref( proxy );
+            pop_frame32( ctx, 4 );
+            return STATUS_SUCCESS;
+        case 2:
+            ctx->Eax = proxy_release( proxy );
+            pop_frame32( ctx, 4 );
+            return STATUS_SUCCESS;
+        }
+    }
+
+    sl = itf->slots ? &itf->slots[slot] : NULL;
+    if (!sl)
+    {
+        /* an identity row past IUnknown: no slot table, no frame knowledge,
+         * no honest pop -- the fault names the slot */
+        ERR( "%s slot %u has no marshal row; cannot even pop its frame\n",
+             itf->name, slot );
+        return STATUS_ILLEGAL_INSTRUCTION;
+    }
+    if (!(sl->flags & WINECOM_F_I386_GEOM))
+    {
+        refuse_once( iface, slot, sl->name,
+                     "no i386 frame geometry (x87 return, or a table "
+                     "predating the i386 oracle); the frame cannot be popped" );
+        return STATUS_ILLEGAL_INSTRUCTION;
+    }
+    pop_bytes = 4 * sl->argc + 4 * (UINT)__builtin_popcount( sl->qwordmask );
+
+    if (!proxy)
+    {
+        ERR( "%s slot %u called with NULL this\n", itf->name, slot );
+        ctx->Eax = (UINT)E_INVALIDARG;
+        pop_frame32( ctx, pop_bytes );
+        return STATUS_SUCCESS;
+    }
+    if (proxy->iface != iface)
+        WARN( "proxy %p says iface %u (%s), stub says %u (%s)\n", proxy,
+              proxy->iface, wc_surface->ifaces[proxy->iface].name, iface, itf->name );
+
+    TRACE( "%s (iface %u slot %u argc %u) [i386]\n", sl->name, iface, slot, sl->argc );
+
+    /* a 32-bit hand walker, matched by name at attach, serves the row before
+     * any other disposition -- including a 64-bit refusal, which is about
+     * the OTHER lane's marshalling */
+    if (hand32_map && hand32_map[iface_slot_base[iface] + slot] != 0xff)
+    {
+        UINT64 r = wc_surface->hand32[hand32_map[iface_slot_base[iface] + slot]]
+                       .fn( proxy->host, slot, ctx );
+
+        ctx->Eax = (UINT)r;
+        if (sl->flags & WINECOM_F_RET_QWORD) ctx->Edx = (UINT)(r >> 32);
+        pop_frame32( ctx, pop_bytes );
+        return STATUS_SUCCESS;
+    }
+
+    if (sl->refuse)
+    {
+        refuse_once( iface, slot, sl->name, sl->refuse );
+        ctx->Eax = (UINT)E_NOTIMPL;
+        pop_frame32( ctx, pop_bytes );
+        return STATUS_SUCCESS;
+    }
+    if (sl->refuse32)
+    {
+        refuse_once( iface, slot, sl->name, sl->refuse32 );
+        ctx->Eax = (UINT)E_NOTIMPL;
+        pop_frame32( ctx, pop_bytes );
+        return STATUS_SUCCESS;
+    }
+    if (sl->flags & WINECOM_F_HAND)
+    {
+        refuse_once( iface, slot, sl->name,
+                     "hand-written on the 64-bit lane with no 32-bit walker yet" );
+        ctx->Eax = (UINT)E_NOTIMPL;
+        pop_frame32( ctx, pop_bytes );
+        return STATUS_SUCCESS;
+    }
+    if (!(sl->flags & WINECOM_F_I386_STRUCTS_OK))
+    {
+        refuse_once( iface, slot, sl->name,
+                     "pointer parameters not audited against i386 layouts; "
+                     "refusing rather than passing a divergent struct raw" );
+        ctx->Eax = (UINT)E_NOTIMPL;
+        pop_frame32( ctx, pop_bytes );
+        return STATUS_SUCCESS;
+    }
+
+    /* the frame: rawargs[i] is parameter i exactly as the 64-bit lane's
+     * winecom_read_arg would have produced it */
+    for (i = 1, cur = 2; i < sl->argc && i < 16; i++)
+    {
+        if (sl->qwordmask & (1u << (i - 1)))
+        {
+            rawargs[i] = esp[cur] | ((UINT64)esp[cur + 1] << 32);
+            cur += 2;
+        }
+        else rawargs[i] = esp[cur++];
+    }
+
+    /* divergent-layout struct parameters: repack into native temporaries
+     * (and back, for the out direction) around the one real call.  More
+     * reps than fixes[] can hold would mean silently passing the surplus
+     * through raw -- refuse instead; no generated row comes close. */
+    if (sl->rep_count > ARRAYSIZE(fixes))
+    {
+        refuse_once( iface, slot, sl->name,
+                     "more repacked parameters than the dispatcher stages" );
+        ctx->Eax = (UINT)E_NOTIMPL;
+        pop_frame32( ctx, pop_bytes );
+        return STATUS_SUCCESS;
+    }
+    for (i = 0; i < sl->rep_count && n_fixes < ARRAYSIZE(fixes); i++)
+    {
+        const struct winecom_rep *r = &sl->reps[i];
+        UINT64 raw = rawargs[r->param + 1];
+        UINT count, bytes;
+        BOOL heap = FALSE;
+        void *buf;
+
+        if (!raw) continue;
+        count = r->count_param == 0xff ? 1 : (UINT)rawargs[r->count_param + 1];
+        if (!count) continue;
+        bytes = (r->size64 * count + 15) & ~15u;
+        if (rep_used + bytes <= sizeof(repbuf))
+        {
+            buf = repbuf + rep_used;
+            rep_used += bytes;
+        }
+        else if ((heap = TRUE, !(buf = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, bytes ))))
+        {
+            while (n_fixes--)
+                if (fixes[n_fixes].heap)
+                    RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, fixes[n_fixes].native );
+            ctx->Eax = (UINT)E_OUTOFMEMORY;
+            pop_frame32( ctx, pop_bytes );
+            return STATUS_SUCCESS;
+        }
+        fixes[n_fixes].rep = r;
+        fixes[n_fixes].guest = (void *)(ULONG_PTR)raw;
+        fixes[n_fixes].native = buf;
+        fixes[n_fixes].count = count;
+        fixes[n_fixes].heap = heap;
+        n_fixes++;
+        if (r->dir & 1)
+        {
+            UINT k;
+            for (k = 0; k < count; k++)
+                r->to_native( (char *)buf + (SIZE_T)k * r->size64,
+                              (const char *)(ULONG_PTR)raw + (SIZE_T)k * r->size32 );
+        }
+        else memset( buf, 0, r->size64 * (SIZE_T)count );
+        rawargs[r->param + 1] = (UINT64)(ULONG_PTR)buf;
+    }
+
+    st = invoke_marshalled( itf, sl, proxy, iface, slot, rawargs, &rax );
+
+    for (i = 0; i < n_fixes; i++)
+    {
+        if (st == STATUS_SUCCESS && (fixes[i].rep->dir & 2))
+        {
+            UINT k;
+            for (k = 0; k < fixes[i].count; k++)
+                fixes[i].rep->to_guest(
+                    (char *)fixes[i].guest + (SIZE_T)k * fixes[i].rep->size32,
+                    (const char *)fixes[i].native + (SIZE_T)k * fixes[i].rep->size64 );
+        }
+        if (fixes[i].heap)
+            RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, fixes[i].native );
+    }
+
+    if (st != STATUS_SUCCESS) return st;
+    /* an sret row answers the CALLER'S buffer pointer in EAX; if that
+     * parameter was repacked, rax holds the native temporary -- hand back
+     * the guest's own pointer, which the copy-back above just filled */
+    if ((sl->flags & WINECOM_F_RET_VIA_ARG))
+        for (i = 0; i < n_fixes; i++)
+            if ((UINT64)(ULONG_PTR)fixes[i].native == rax)
+                rax = (UINT64)(ULONG_PTR)fixes[i].guest;
+    ctx->Eax = (UINT)rax;
+    if (sl->flags & WINECOM_F_RET_QWORD) ctx->Edx = (UINT)(rax >> 32);
+    pop_frame32( ctx, pop_bytes );
+    return STATUS_SUCCESS;
 }

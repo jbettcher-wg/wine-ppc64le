@@ -122,6 +122,20 @@
                                    not something any code currently does.  Do
                                    not mistake this paragraph for a check
                                    that exists. */
+#define WINECOM_F_I386_STRUCTS_OK 128 /* Every POINTER parameter of this slot
+                                   was audited against the i386 layout roster:
+                                   each one's pointee either lays out
+                                   identically on both guests, or is described
+                                   by a `reps` entry the 32-bit dispatcher
+                                   applies, or the row is refused/hand-written
+                                   anyway.  Same reading rule as I386_GEOM:
+                                   absence means "the generator never looked"
+                                   -- a table predating the audit -- and a
+                                   32-bit lane must refuse the row, never pass
+                                   a divergent struct through raw.  A 4-byte-
+                                   aligned i386 struct read at 8-byte offsets
+                                   is this codebase's most expensive bug
+                                   class: plausible values, wrong fields. */
 #define WINECOM_F_CONST_QWORD 64 /* The slot is a NULLARY getter (argc == 1,
                                    `this` only) returning an 8-byte scalar
                                    that is IMMUTABLE for the object's lifetime
@@ -356,6 +370,36 @@ struct winecom_slot
                                    so a 32-bit reader sees "no geometry", not
                                    "all narrow" -- that pairing is what makes
                                    this append safe. */
+    const struct winecom_rep *reps; /* i386 struct repacks for this slot's
+                                   divergent-layout pointer parameters, or
+                                   NULL.  Meaningful only with
+                                   WINECOM_F_I386_STRUCTS_OK, whose banner
+                                   has the reading rule.  Appended last. */
+    unsigned char rep_count;
+    const char *refuse32;       /* non-NULL: the 32-bit lane refuses this row
+                                   with this reason (log once, E_NOTIMPL,
+                                   frame still popped by geometry) even though
+                                   the 64-bit lane serves it -- a divergent
+                                   struct array whose element count is not
+                                   mechanical, until a hand32 serves it. */
+};
+
+/* One divergent-layout struct parameter of a slot, for the 32-bit lane: the
+ * guest's 4-byte-aligned bytes are repacked element by element into a native
+ * temporary before the call (dir & 1) and back after it (dir & 2), through
+ * the functions gen_repack32.py generated from clang's own record layouts of
+ * BOTH targets.  `count_param` is the by-value parameter (counting after
+ * `this`, like every mask in winecom_slot) holding the element count, or
+ * 0xff for a scalar. */
+struct winecom_rep
+{
+    unsigned char param;        /* parameter index counting after `this` */
+    unsigned char count_param;  /* 0xff = scalar */
+    unsigned char dir;          /* 1 = in, 2 = out, 3 = both */
+    unsigned short size64;      /* native element size */
+    unsigned short size32;      /* i386 guest element size */
+    void (*to_native)( void *dst, const void *src32 );
+    void (*to_guest)( void *dst32, const void *src );
 };
 
 /* winecom_iface flags */
@@ -392,6 +436,22 @@ typedef UINT64 (*winecom_invoke_fn)( void *host, UINT slot, UINT argc,
  * for the same reason. */
 typedef UINT64 (*winecom_hand_fn)( void *host, UINT slot, AMD64_CONTEXT *ctx );
 
+/* A hand-written slot for the 32-BIT lane: reads its own arguments out of
+ * the guest's stdcall frame (ctx->Esp: [0] return address, [1] `this`, [2]
+ * the first parameter slot...).  Returns what EAX must carry; the DISPATCHER
+ * performs the stdcall pop from the row's I386_GEOM geometry, so the walker
+ * must leave Esp/Eip alone.  A row can have a 32-bit walker whether its
+ * 64-bit side is hand-written, marshalled, or refused -- matching is by the
+ * row's own slot NAME at attach, so the two lanes stay independently
+ * honest. */
+typedef UINT64 (*winecom_hand32_fn)( void *host, UINT slot, I386_CONTEXT *ctx );
+
+struct winecom_hand32
+{
+    const char *slot_name;      /* == winecom_slot::name of the row served */
+    winecom_hand32_fn fn;
+};
+
 /* winecom_surface flags */
 #define WINECOM_SF_REVERSE 1  /* This surface's native side may be handed
                                  REVERSE PROXIES -- native vtable objects whose
@@ -419,6 +479,28 @@ struct winecom_surface
     UINT flags;                          /* WINECOM_SF_*; appended last, so a
                                             client that predates it keeps
                                             exactly the behaviour it had */
+    const struct winecom_hand32 *hand32; /* 32-bit hand walkers, matched to
+                                            rows by slot name at attach; NULL
+                                            for a surface with no 32-bit
+                                            lane.  Appended last, same rule. */
+    UINT hand32_count;
+    UINT (*wrap_concrete)( void *host, UINT iface ); /* COM lets a caller
+                                            static_cast a returned BASE
+                                            interface to the concrete type it
+                                            knows it created -- Unity casts
+                                            ID3D11View::GetResource's result
+                                            to ID3D11Texture2D and calls
+                                            GetDesc -- but a proxy's vtable
+                                            is only as long as the DECLARED
+                                            interface, so the call runs off
+                                            the stub array [MEASURED
+                                            2026-08-28, the Dex canary].  A
+                                            surface that knows how to ask the
+                                            host for the concrete type (D3D11
+                                            has GetType) supplies this hook;
+                                            winecom_wrap consults it before
+                                            interning.  NULL = wrap as
+                                            declared.  Appended last. */
 };
 
 /* Bind this linkee's runtime instance to `surface` and materialise the
@@ -449,6 +531,25 @@ extern void CDECL __wine_emu_materialize_ctx( AMD64_CONTEXT *ctx );
  * this after its own lazy initialisation.  Contract as established with
  * ntdll: STATUS_SUCCESS means fully served including ctx->Rax. */
 extern NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx );
+
+/* The 32-BIT dispatch loop, for a runtime attached in a WoW64 process (the
+ * guest machine is a property of the process, detected at attach).  Contract
+ * with ntdll's emu32_dispatch_thunk: STATUS_SUCCESS means FULLY served --
+ * Eax (and Edx for an EDX:EAX return) written, the return address popped
+ * into Eip, and the stdcall frame popped off Esp, because on i386 the pop is
+ * per-slot knowledge (the marshal table's I386_GEOM rows) that only this
+ * side has.  Any other status: the trap was not served and ntdll raises. */
+extern NTSTATUS winecom_dispatch32( UINT iface, UINT slot, I386_CONTEXT *ctx );
+
+/* TRUE when this runtime serves an i386 guest (a WoW64 process).  Client
+ * code that writes a pointer-sized value through a guest-supplied cell must
+ * ask, and write 4 bytes when it answers TRUE -- an 8-byte store into a
+ * 32-bit guest's void** cell clobbers whatever the guest keeps next to it. */
+extern BOOL winecom_guest32(void);
+
+/* Store an interface pointer (or any pointer-sized value) through a
+ * guest-owned cell at the guest's own width. */
+extern void winecom_store_guest_ptr( void *cell, void *value );
 
 /* -> TRUE with *iface_name/*slot_name pointing at this surface's own table
  * strings (module lifetime, never copied).  The crossing-frequency sink in
