@@ -78,6 +78,15 @@ SIGNED_PTR_TYPES = frozenset((
     'LONG_PTR', 'INT_PTR', 'SSIZE_T', 'ptrdiff_t', 'intptr_t',
 ))
 
+# Pointer-width INTEGER types: 4 guest bytes hold a VALUE, not an address.
+# Narrowing one on the way OUT is what 32-bit Windows itself does -- with a
+# CLAMP, not a truncation: DXGI_ADAPTER_DESC's DedicatedVideoMemory on a
+# WoW64 process saturates at 4 GiB rather than reporting memory mod 2^32,
+# and a truncated size is the wrong-number class this tree refuses to ship.
+UNSIGNED_PTR_TYPES = frozenset((
+    'SIZE_T', 'ULONG_PTR', 'UINT_PTR', 'uintptr_t', 'DWORD_PTR',
+))
+
 LAYOUT_RE = re.compile(r'^\s*\*\*\* Dumping AST Record Layout')
 # Depth matters.  clang dumps a nested record's fields INSIDE its parent's
 # listing, indented one level further; a pattern that ignores the indent
@@ -181,6 +190,10 @@ def main():
     ap.add_argument('--wine-include', required=True,
                     help='the build tree include dir (widl-generated headers)')
     ap.add_argument('--out', required=True)
+    ap.add_argument('--json', help='also write the audited layout roster '
+                    '(every aggregate measured, divergent or not, with both '
+                    'sizes) for gen_winecom.py to key its per-slot i386 '
+                    'struct audit on')
     ap.add_argument('--guest64', default='x86_64-windows-gnu')
     ap.add_argument('--guest32', default='i386-windows-gnu')
     args = ap.parse_args()
@@ -229,29 +242,39 @@ def main():
         a64 = dump_layouts(tu, args.guest64, includes, defines)
         a32 = dump_layouts(tu, args.guest32, includes, defines)
 
-        # Only aggregates whose LAYOUT differs need a repack at all.
-        divergent = []
-        for n in names:
-            x, y = a64.get(n), a32.get(n)
-            if not x or not y:
-                continue
-            if (x.size, x.align) != (y.size, y.align) or \
-               [f[0] for f in x.fields] != [f[0] for f in y.fields]:
-                divergent.append(n)
-
-        pairs = [(n, f[2]) for n in divergent for f in a64[n].fields]
+        # Every measured aggregate's field widths, on both targets.  The
+        # sizes are needed for MORE than the repack bodies: the divergence
+        # test itself must see them, because a pointer member can land at
+        # the SAME offset in a struct of the SAME size ({void *p; UINT64 b}
+        # is 16 bytes with b at 8 on both guests) while the pointer itself
+        # is 4 guest bytes -- the native read of 8 picks up padding.  The
+        # first version of this test compared only sizes, aligns and
+        # offsets, and would have passed that struct through raw.
+        measured = [n for n in names if a64.get(n) and a32.get(n)
+                    and [f[2] for f in a64[n].fields] ==
+                        [f[2] for f in a32[n].fields]]
+        pairs = [(n, f[2]) for n in measured for f in a64[n].fields]
         if not pairs:
-            print('gen_repack32: no divergent aggregates; nothing to emit')
+            print('gen_repack32: no measurable aggregates; nothing to emit')
         s64 = field_sizes(pairs, args.guest64, includes, defines, td,
                           includes_h)
         s32 = field_sizes(pairs, args.guest32, includes, defines, td,
                           includes_h)
 
     idx, sizes = 0, {}
-    for n in divergent:
+    for n in measured:
         for f in a64[n].fields:
             sizes[(n, f[2])] = (s64[idx], s32[idx])
             idx += 1
+
+    divergent = []
+    for n in measured:
+        x, y = a64[n], a32[n]
+        if (x.size, x.align) != (y.size, y.align) or \
+           [f[0] for f in x.fields] != [f[0] for f in y.fields] or \
+           any(sizes[(n, f[2])][0] != sizes[(n, f[2])][1]
+               for f in x.fields):
+            divergent.append(n)
 
     refused = []
     out = [HEADER]
@@ -260,22 +283,22 @@ def main():
     # consumer reproduce the exact set (dxgidebug.h's queue filters are not
     # reachable from dxgi1_6.h, and a caller that guesses gets an unknown
     # type name for a struct it never mentions).
-    out.append('#define WIN32_LEAN_AND_MEAN')
-    out.append('#define COBJMACROS')
-    out.append('#include <windows.h>')
-    for h in includes_out:
-        out.append('#include <%s>' % h)
-    out.append('')
+    # NO type names anywhere in the output: every body is offset-based byte
+    # copying, so the untyped void* signatures free the consumer from
+    # reproducing the exact DXVK header set this was generated against --
+    # which is what lets dlls/d3d11/main.c, which deliberately includes no
+    # D3D headers at all, include this file and hand the functions to
+    # libs/winecom's rep tables.
     # Forward declarations for all of them, so a struct that embeds another
     # divergent struct can call its repack whatever order they are emitted
     # in.  Ordering by nesting depth would work too and is one subtle bug
     # away from an implicit declaration; this cannot be got wrong.
     out.append('/* forward declarations: nested aggregates repack recursively */')
     for n in divergent:
-        out.append('static inline void wine_repack32_%s( %s *dst, const void *src32 );'
-                   % (n, n))
-        out.append('static inline void wine_repack64_%s( void *dst32, const %s *src );'
-                   % (n, n))
+        out.append('static inline void wine_repack32_%s( void *dst, const void *src32 );'
+                   % n)
+        out.append('static inline void wine_repack64_%s( void *dst32, const void *src );'
+                   % n)
     out.append('')
     for n in divergent:
         body_up, body_dn = [], []
@@ -286,10 +309,10 @@ def main():
             if base in divergent and not arr:
                 # a nested aggregate that diverges in its own right: recurse,
                 # never memcpy -- its fields have moved too.
-                body_up.append('    wine_repack32_%s( (%s *)((char *)dst + %d), (const char *)src32 + %d );'
-                               % (base, base, o64, o32))
-                body_dn.append('    wine_repack64_%s( (char *)dst32 + %d, (const %s *)((const char *)src + %d) );'
-                               % (base, o32, base, o64))
+                body_up.append('    wine_repack32_%s( (char *)dst + %d, (const char *)src32 + %d );'
+                               % (base, o64, o32))
+                body_dn.append('    wine_repack64_%s( (char *)dst32 + %d, (const char *)src + %d );'
+                               % (base, o32, o64))
             elif w64 == w32:
                 body_up.append('    memcpy( (char *)dst + %d, (const char *)src32 + %d, %d );'
                                % (o64, o32, w64))
@@ -298,14 +321,30 @@ def main():
             elif w32 == 4 and w64 == 8:
                 base = ty.split()[0]
                 signed = base in SIGNED_PTR_TYPES
-                ld = ('(ULONG64)(LONG64)*(const INT32 *)' if signed
-                      else '(ULONG64)*(const UINT32 *)')
+                value_kind = signed or base in UNSIGNED_PTR_TYPES
+                ld = ('(unsigned long long)(long long)*(const int *)' if signed
+                      else '(unsigned long long)*(const unsigned int *)')
                 body_up.append(
-                    '    *(ULONG64 *)((char *)dst + %d) = %s((const char *)src32 + %d);'
+                    '    *(unsigned long long *)((char *)dst + %d) = %s((const char *)src32 + %d);'
                     % (o64, ld, o32))
-                body_dn.append(
-                    '    *(UINT32 *)((char *)dst32 + %d) = (UINT32)*(const ULONG64 *)((const char *)src + %d);'
-                    % (o32, o64))
+                if value_kind and not signed:
+                    # a pointer-width COUNT going down to 4 bytes SATURATES,
+                    # exactly as WoW64's own adapter-memory fields do
+                    body_dn.append(
+                        '    { unsigned long long v = *(const unsigned long long *)((const char *)src + %d);'
+                        ' *(unsigned int *)((char *)dst32 + %d) ='
+                        ' v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }'
+                        % (o64, o32))
+                elif signed:
+                    body_dn.append(
+                        '    { long long v = *(const long long *)((const char *)src + %d);'
+                        ' *(int *)((char *)dst32 + %d) ='
+                        ' v > 0x7fffffff ? 0x7fffffff : v < (-0x7fffffff - 1) ? (-0x7fffffff - 1) : (int)v; }'
+                        % (o64, o32))
+                else:
+                    body_dn.append(
+                        '    *(unsigned int *)((char *)dst32 + %d) = (unsigned int)*(const unsigned long long *)((const char *)src + %d);'
+                        % (o32, o64))
             else:
                 refused.append('%s.%s (%s: %d bytes on the 64-bit guest, %d on '
                                'the 32-bit one -- not a pointer widening)'
@@ -313,12 +352,12 @@ def main():
         out.append('/* %s: %d bytes / align %d on a 64-bit guest, %d / %d on i386 */'
                    % (n, a64[n].size, a64[n].align, a32[n].size, a32[n].align))
         out.append('#define WINE_REPACK32_SIZE_%s %d' % (n, a32[n].size))
-        out.append('static inline void wine_repack32_%s( %s *dst, const void *src32 )\n{'
-                   % (n, n))
+        out.append('static inline void wine_repack32_%s( void *dst, const void *src32 )\n{'
+                   % n)
         out.extend(body_up)
         out.append('}')
-        out.append('static inline void wine_repack64_%s( void *dst32, const %s *src )\n{'
-                   % (n, n))
+        out.append('static inline void wine_repack64_%s( void *dst32, const void *src )\n{'
+                   % n)
         out.extend(body_dn)
         out.append('}\n')
 
@@ -329,6 +368,36 @@ def main():
 
     with open(args.out, 'w') as fh:
         fh.write('\n'.join(out) + '\n')
+    if args.json:
+        import json as _json
+        # A widened field is a 4-byte guest cell that native code reads or
+        # writes as 8.  Widening IN (guest -> native) is always safe.  The
+        # OUT direction truncates, which is safe only for the window-station
+        # handle family -- Wine keeps those below 4 GiB by design -- and a
+        # SILENT truncation of a real pointer (Map's pData) is this
+        # codebase's most expensive bug class, so any other widened field
+        # marks the type out_unsafe and the consumer must refuse the out
+        # direction rather than repack it.
+        handle_ok = re.compile(r'^H[A-Z]{2,}$')
+        def out_unsafe(n):
+            for o64, ty, fname, arr in a64[n].fields:
+                w64, w32 = sizes[(n, fname)]
+                if w64 == 8 and w32 == 4:
+                    base = (ty or '').split('[')[0].strip()
+                    last = base.split()[-1] if base.split() else ''
+                    if last in SIGNED_PTR_TYPES or last in UNSIGNED_PTR_TYPES:
+                        continue     # a value, clamped by the repack, not an address
+                    if '*' in base or not handle_ok.match(last):
+                        return True
+            return False
+        roster = dict(
+            divergent={n: dict(size64=a64[n].size, size32=a32[n].size,
+                               out_unsafe=out_unsafe(n))
+                       for n in divergent},
+            identical=sorted(n for n in measured if n not in divergent))
+        with open(args.json, 'w') as fh:
+            _json.dump(roster, fh, indent=1, sort_keys=True)
+            fh.write('\n')
     print('gen_repack32: %d of %d aggregates diverge and were repacked -> %s'
           % (len(divergent), len(names), args.out))
     return 0

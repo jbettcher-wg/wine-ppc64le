@@ -19,565 +19,167 @@
 
 #include <string.h>
 
-#define WIN32_LEAN_AND_MEAN
-#define COBJMACROS
-#include <windows.h>
-#include <d3d11_4.h>
-#include <d3d11on12.h>
-#include <dxgi1_6.h>
-#include <d3d11.h>
-#include <d3d11_1.h>
-#include <d3d11_2.h>
-#include <d3d11_3.h>
-#include <d3d11sdklayers.h>
-#include <d3d11shader.h>
-#include <dxgi.h>
-#include <dxgi1_2.h>
-#include <dxgi1_3.h>
-#include <dxgi1_4.h>
-#include <dxgi1_5.h>
-#include <dxgicommon.h>
-#include <dxgidebug.h>
-#include <dxgiformat.h>
-#include <dxgitype.h>
-
 /* forward declarations: nested aggregates repack recursively */
-static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT( D3D11_AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT( void *dst32, const D3D11_AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_CRYPTO_SESSION_INPUT( D3D11_AUTHENTICATED_CONFIGURE_CRYPTO_SESSION_INPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_CRYPTO_SESSION_INPUT( void *dst32, const D3D11_AUTHENTICATED_CONFIGURE_CRYPTO_SESSION_INPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_INITIALIZE_INPUT( D3D11_AUTHENTICATED_CONFIGURE_INITIALIZE_INPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_INITIALIZE_INPUT( void *dst32, const D3D11_AUTHENTICATED_CONFIGURE_INITIALIZE_INPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_INPUT( D3D11_AUTHENTICATED_CONFIGURE_INPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_INPUT( void *dst32, const D3D11_AUTHENTICATED_CONFIGURE_INPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_OUTPUT( D3D11_AUTHENTICATED_CONFIGURE_OUTPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_CONFIGURE_OUTPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_PROTECTION_INPUT( D3D11_AUTHENTICATED_CONFIGURE_PROTECTION_INPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_PROTECTION_INPUT( void *dst32, const D3D11_AUTHENTICATED_CONFIGURE_PROTECTION_INPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_SHARED_RESOURCE_INPUT( D3D11_AUTHENTICATED_CONFIGURE_SHARED_RESOURCE_INPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_SHARED_RESOURCE_INPUT( void *dst32, const D3D11_AUTHENTICATED_CONFIGURE_SHARED_RESOURCE_INPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_COUNT_OUTPUT( D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_COUNT_OUTPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_COUNT_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_COUNT_OUTPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_INPUT( D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_INPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_INPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_INPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_OUTPUT( D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_OUTPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_OUTPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT( D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_INPUT( D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_INPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_INPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_INPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_OUTPUT( D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_OUTPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_OUTPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_CURRENT_ACCESSIBILITY_ENCRYPTION_OUTPUT( D3D11_AUTHENTICATED_QUERY_CURRENT_ACCESSIBILITY_ENCRYPTION_OUTPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_CURRENT_ACCESSIBILITY_ENCRYPTION_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_CURRENT_ACCESSIBILITY_ENCRYPTION_OUTPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_DEVICE_HANDLE_OUTPUT( D3D11_AUTHENTICATED_QUERY_DEVICE_HANDLE_OUTPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_DEVICE_HANDLE_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_DEVICE_HANDLE_OUTPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_INPUT( D3D11_AUTHENTICATED_QUERY_INPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_INPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_INPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( D3D11_AUTHENTICATED_QUERY_OUTPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_OUTPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_INPUT( D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_INPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_INPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_INPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_OUTPUT( D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_OUTPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_OUTPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_INPUT( D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_INPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_INPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_INPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_OUTPUT( D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_OUTPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_OUTPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_PROTECTION_OUTPUT( D3D11_AUTHENTICATED_QUERY_PROTECTION_OUTPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_PROTECTION_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_PROTECTION_OUTPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_COUNT_OUTPUT( D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_COUNT_OUTPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_COUNT_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_COUNT_OUTPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_INPUT( D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_INPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_INPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_INPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_OUTPUT( D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_OUTPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_OUTPUT *src );
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_UNRESTRICTED_PROTECTED_SHARED_RESOURCE_COUNT_OUTPUT( D3D11_AUTHENTICATED_QUERY_UNRESTRICTED_PROTECTED_SHARED_RESOURCE_COUNT_OUTPUT *dst, const void *src32 );
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_UNRESTRICTED_PROTECTED_SHARED_RESOURCE_COUNT_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_UNRESTRICTED_PROTECTED_SHARED_RESOURCE_COUNT_OUTPUT *src );
-static inline void wine_repack32_D3D11_INFO_QUEUE_FILTER( D3D11_INFO_QUEUE_FILTER *dst, const void *src32 );
-static inline void wine_repack64_D3D11_INFO_QUEUE_FILTER( void *dst32, const D3D11_INFO_QUEUE_FILTER *src );
-static inline void wine_repack32_D3D11_INFO_QUEUE_FILTER_DESC( D3D11_INFO_QUEUE_FILTER_DESC *dst, const void *src32 );
-static inline void wine_repack64_D3D11_INFO_QUEUE_FILTER_DESC( void *dst32, const D3D11_INFO_QUEUE_FILTER_DESC *src );
-static inline void wine_repack32_D3D11_INPUT_ELEMENT_DESC( D3D11_INPUT_ELEMENT_DESC *dst, const void *src32 );
-static inline void wine_repack64_D3D11_INPUT_ELEMENT_DESC( void *dst32, const D3D11_INPUT_ELEMENT_DESC *src );
-static inline void wine_repack32_D3D11_KEY_EXCHANGE_HW_PROTECTION_DATA( D3D11_KEY_EXCHANGE_HW_PROTECTION_DATA *dst, const void *src32 );
-static inline void wine_repack64_D3D11_KEY_EXCHANGE_HW_PROTECTION_DATA( void *dst32, const D3D11_KEY_EXCHANGE_HW_PROTECTION_DATA *src );
-static inline void wine_repack32_D3D11_MAPPED_SUBRESOURCE( D3D11_MAPPED_SUBRESOURCE *dst, const void *src32 );
-static inline void wine_repack64_D3D11_MAPPED_SUBRESOURCE( void *dst32, const D3D11_MAPPED_SUBRESOURCE *src );
-static inline void wine_repack32_D3D11_MESSAGE( D3D11_MESSAGE *dst, const void *src32 );
-static inline void wine_repack64_D3D11_MESSAGE( void *dst32, const D3D11_MESSAGE *src );
-static inline void wine_repack32_D3D11_SO_DECLARATION_ENTRY( D3D11_SO_DECLARATION_ENTRY *dst, const void *src32 );
-static inline void wine_repack64_D3D11_SO_DECLARATION_ENTRY( void *dst32, const D3D11_SO_DECLARATION_ENTRY *src );
-static inline void wine_repack32_D3D11_SUBRESOURCE_DATA( D3D11_SUBRESOURCE_DATA *dst, const void *src32 );
-static inline void wine_repack64_D3D11_SUBRESOURCE_DATA( void *dst32, const D3D11_SUBRESOURCE_DATA *src );
-static inline void wine_repack32_D3D11_VIDEO_DECODER_BEGIN_FRAME_CRYPTO_SESSION( D3D11_VIDEO_DECODER_BEGIN_FRAME_CRYPTO_SESSION *dst, const void *src32 );
-static inline void wine_repack64_D3D11_VIDEO_DECODER_BEGIN_FRAME_CRYPTO_SESSION( void *dst32, const D3D11_VIDEO_DECODER_BEGIN_FRAME_CRYPTO_SESSION *src );
-static inline void wine_repack32_D3D11_VIDEO_DECODER_BUFFER_DESC( D3D11_VIDEO_DECODER_BUFFER_DESC *dst, const void *src32 );
-static inline void wine_repack64_D3D11_VIDEO_DECODER_BUFFER_DESC( void *dst32, const D3D11_VIDEO_DECODER_BUFFER_DESC *src );
-static inline void wine_repack32_D3D11_VIDEO_DECODER_BUFFER_DESC1( D3D11_VIDEO_DECODER_BUFFER_DESC1 *dst, const void *src32 );
-static inline void wine_repack64_D3D11_VIDEO_DECODER_BUFFER_DESC1( void *dst32, const D3D11_VIDEO_DECODER_BUFFER_DESC1 *src );
-static inline void wine_repack32_D3D11_VIDEO_DECODER_EXTENSION( D3D11_VIDEO_DECODER_EXTENSION *dst, const void *src32 );
-static inline void wine_repack64_D3D11_VIDEO_DECODER_EXTENSION( void *dst32, const D3D11_VIDEO_DECODER_EXTENSION *src );
-static inline void wine_repack32_D3D11_VIDEO_PROCESSOR_STREAM( D3D11_VIDEO_PROCESSOR_STREAM *dst, const void *src32 );
-static inline void wine_repack64_D3D11_VIDEO_PROCESSOR_STREAM( void *dst32, const D3D11_VIDEO_PROCESSOR_STREAM *src );
-static inline void wine_repack32_DXGI_ADAPTER_DESC( DXGI_ADAPTER_DESC *dst, const void *src32 );
-static inline void wine_repack64_DXGI_ADAPTER_DESC( void *dst32, const DXGI_ADAPTER_DESC *src );
-static inline void wine_repack32_DXGI_ADAPTER_DESC1( DXGI_ADAPTER_DESC1 *dst, const void *src32 );
-static inline void wine_repack64_DXGI_ADAPTER_DESC1( void *dst32, const DXGI_ADAPTER_DESC1 *src );
-static inline void wine_repack32_DXGI_ADAPTER_DESC2( DXGI_ADAPTER_DESC2 *dst, const void *src32 );
-static inline void wine_repack64_DXGI_ADAPTER_DESC2( void *dst32, const DXGI_ADAPTER_DESC2 *src );
-static inline void wine_repack32_DXGI_ADAPTER_DESC3( DXGI_ADAPTER_DESC3 *dst, const void *src32 );
-static inline void wine_repack64_DXGI_ADAPTER_DESC3( void *dst32, const DXGI_ADAPTER_DESC3 *src );
-static inline void wine_repack32_DXGI_INFO_QUEUE_FILTER( DXGI_INFO_QUEUE_FILTER *dst, const void *src32 );
-static inline void wine_repack64_DXGI_INFO_QUEUE_FILTER( void *dst32, const DXGI_INFO_QUEUE_FILTER *src );
-static inline void wine_repack32_DXGI_INFO_QUEUE_FILTER_DESC( DXGI_INFO_QUEUE_FILTER_DESC *dst, const void *src32 );
-static inline void wine_repack64_DXGI_INFO_QUEUE_FILTER_DESC( void *dst32, const DXGI_INFO_QUEUE_FILTER_DESC *src );
-static inline void wine_repack32_DXGI_INFO_QUEUE_MESSAGE( DXGI_INFO_QUEUE_MESSAGE *dst, const void *src32 );
-static inline void wine_repack64_DXGI_INFO_QUEUE_MESSAGE( void *dst32, const DXGI_INFO_QUEUE_MESSAGE *src );
-static inline void wine_repack32_DXGI_MAPPED_RECT( DXGI_MAPPED_RECT *dst, const void *src32 );
-static inline void wine_repack64_DXGI_MAPPED_RECT( void *dst32, const DXGI_MAPPED_RECT *src );
-static inline void wine_repack32_DXGI_OUTPUT_DESC( DXGI_OUTPUT_DESC *dst, const void *src32 );
-static inline void wine_repack64_DXGI_OUTPUT_DESC( void *dst32, const DXGI_OUTPUT_DESC *src );
-static inline void wine_repack32_DXGI_OUTPUT_DESC1( DXGI_OUTPUT_DESC1 *dst, const void *src32 );
-static inline void wine_repack64_DXGI_OUTPUT_DESC1( void *dst32, const DXGI_OUTPUT_DESC1 *src );
-static inline void wine_repack32_DXGI_PRESENT_PARAMETERS( DXGI_PRESENT_PARAMETERS *dst, const void *src32 );
-static inline void wine_repack64_DXGI_PRESENT_PARAMETERS( void *dst32, const DXGI_PRESENT_PARAMETERS *src );
-static inline void wine_repack32_DXGI_SHARED_RESOURCE( DXGI_SHARED_RESOURCE *dst, const void *src32 );
-static inline void wine_repack64_DXGI_SHARED_RESOURCE( void *dst32, const DXGI_SHARED_RESOURCE *src );
-static inline void wine_repack32_DXGI_SWAP_CHAIN_DESC( DXGI_SWAP_CHAIN_DESC *dst, const void *src32 );
-static inline void wine_repack64_DXGI_SWAP_CHAIN_DESC( void *dst32, const DXGI_SWAP_CHAIN_DESC *src );
+static inline void wine_repack32_D3D10_INFO_QUEUE_FILTER( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_INFO_QUEUE_FILTER( void *dst32, const void *src );
+static inline void wine_repack32_D3D10_INFO_QUEUE_FILTER_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_INFO_QUEUE_FILTER_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D10_INPUT_ELEMENT_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_INPUT_ELEMENT_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D10_MAPPED_TEXTURE2D( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_MAPPED_TEXTURE2D( void *dst32, const void *src );
+static inline void wine_repack32_D3D10_MAPPED_TEXTURE3D( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_MAPPED_TEXTURE3D( void *dst32, const void *src );
+static inline void wine_repack32_D3D10_MESSAGE( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_MESSAGE( void *dst32, const void *src );
+static inline void wine_repack32_D3D10_SO_DECLARATION_ENTRY( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_SO_DECLARATION_ENTRY( void *dst32, const void *src );
+static inline void wine_repack32_D3D10_SUBRESOURCE_DATA( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_SUBRESOURCE_DATA( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_CRYPTO_SESSION_INPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_CRYPTO_SESSION_INPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_INITIALIZE_INPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_INITIALIZE_INPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_INPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_INPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_OUTPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_OUTPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_PROTECTION_INPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_PROTECTION_INPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_SHARED_RESOURCE_INPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_SHARED_RESOURCE_INPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_COUNT_OUTPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_COUNT_OUTPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_INPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_INPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_OUTPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_OUTPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_INPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_INPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_OUTPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_OUTPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_CURRENT_ACCESSIBILITY_ENCRYPTION_OUTPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_CURRENT_ACCESSIBILITY_ENCRYPTION_OUTPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_DEVICE_HANDLE_OUTPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_DEVICE_HANDLE_OUTPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_INPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_INPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_INPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_INPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_OUTPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_OUTPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_INPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_INPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_OUTPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_OUTPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_PROTECTION_OUTPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_PROTECTION_OUTPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_COUNT_OUTPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_COUNT_OUTPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_INPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_INPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_OUTPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_OUTPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_UNRESTRICTED_PROTECTED_SHARED_RESOURCE_COUNT_OUTPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_UNRESTRICTED_PROTECTED_SHARED_RESOURCE_COUNT_OUTPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_INFO_QUEUE_FILTER( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_INFO_QUEUE_FILTER( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_INFO_QUEUE_FILTER_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_INFO_QUEUE_FILTER_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_INPUT_ELEMENT_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_INPUT_ELEMENT_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_KEY_EXCHANGE_HW_PROTECTION_DATA( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_KEY_EXCHANGE_HW_PROTECTION_DATA( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_MAPPED_SUBRESOURCE( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_MAPPED_SUBRESOURCE( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_MESSAGE( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_MESSAGE( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_SO_DECLARATION_ENTRY( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_SO_DECLARATION_ENTRY( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_SUBRESOURCE_DATA( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_SUBRESOURCE_DATA( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_VIDEO_DECODER_BEGIN_FRAME_CRYPTO_SESSION( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_VIDEO_DECODER_BEGIN_FRAME_CRYPTO_SESSION( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_VIDEO_DECODER_BUFFER_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_VIDEO_DECODER_BUFFER_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_VIDEO_DECODER_BUFFER_DESC1( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_VIDEO_DECODER_BUFFER_DESC1( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_VIDEO_DECODER_EXTENSION( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_VIDEO_DECODER_EXTENSION( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_VIDEO_PROCESSOR_STREAM( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_VIDEO_PROCESSOR_STREAM( void *dst32, const void *src );
+static inline void wine_repack32_DXGI_ADAPTER_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_DXGI_ADAPTER_DESC( void *dst32, const void *src );
+static inline void wine_repack32_DXGI_ADAPTER_DESC1( void *dst, const void *src32 );
+static inline void wine_repack64_DXGI_ADAPTER_DESC1( void *dst32, const void *src );
+static inline void wine_repack32_DXGI_ADAPTER_DESC2( void *dst, const void *src32 );
+static inline void wine_repack64_DXGI_ADAPTER_DESC2( void *dst32, const void *src );
+static inline void wine_repack32_DXGI_ADAPTER_DESC3( void *dst, const void *src32 );
+static inline void wine_repack64_DXGI_ADAPTER_DESC3( void *dst32, const void *src );
+static inline void wine_repack32_DXGI_INFO_QUEUE_FILTER( void *dst, const void *src32 );
+static inline void wine_repack64_DXGI_INFO_QUEUE_FILTER( void *dst32, const void *src );
+static inline void wine_repack32_DXGI_INFO_QUEUE_FILTER_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_DXGI_INFO_QUEUE_FILTER_DESC( void *dst32, const void *src );
+static inline void wine_repack32_DXGI_INFO_QUEUE_MESSAGE( void *dst, const void *src32 );
+static inline void wine_repack64_DXGI_INFO_QUEUE_MESSAGE( void *dst32, const void *src );
+static inline void wine_repack32_DXGI_MAPPED_RECT( void *dst, const void *src32 );
+static inline void wine_repack64_DXGI_MAPPED_RECT( void *dst32, const void *src );
+static inline void wine_repack32_DXGI_OUTPUT_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_DXGI_OUTPUT_DESC( void *dst32, const void *src );
+static inline void wine_repack32_DXGI_OUTPUT_DESC1( void *dst, const void *src32 );
+static inline void wine_repack64_DXGI_OUTPUT_DESC1( void *dst32, const void *src );
+static inline void wine_repack32_DXGI_PRESENT_PARAMETERS( void *dst, const void *src32 );
+static inline void wine_repack64_DXGI_PRESENT_PARAMETERS( void *dst32, const void *src );
+static inline void wine_repack32_DXGI_SHARED_RESOURCE( void *dst, const void *src32 );
+static inline void wine_repack64_DXGI_SHARED_RESOURCE( void *dst32, const void *src );
+static inline void wine_repack32_DXGI_SWAP_CHAIN_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_DXGI_SWAP_CHAIN_DESC( void *dst32, const void *src );
 
-/* D3D11_AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT: 64 bytes / align 8 on a 64-bit guest, 56 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT 56
-static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT( D3D11_AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT *dst, const void *src32 )
+/* D3D10_INFO_QUEUE_FILTER: 96 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_INFO_QUEUE_FILTER 48
+static inline void wine_repack32_D3D10_INFO_QUEUE_FILTER( void *dst, const void *src32 )
 {
-    wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (D3D11_AUTHENTICATED_CONFIGURE_INPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    memcpy( (char *)dst + 48, (const char *)src32 + 40, 16 );
+    wine_repack32_D3D10_INFO_QUEUE_FILTER_DESC( (char *)dst + 0, (const char *)src32 + 0 );
+    wine_repack32_D3D10_INFO_QUEUE_FILTER_DESC( (char *)dst + 48, (const char *)src32 + 24 );
 }
-static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT( void *dst32, const D3D11_AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT *src )
+static inline void wine_repack64_D3D10_INFO_QUEUE_FILTER( void *dst32, const void *src )
 {
-    wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_CONFIGURE_INPUT *)((const char *)src + 0) );
-    memcpy( (char *)dst32 + 40, (const char *)src + 48, 16 );
-}
-
-/* D3D11_AUTHENTICATED_CONFIGURE_CRYPTO_SESSION_INPUT: 72 bytes / align 8 on a 64-bit guest, 52 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_CONFIGURE_CRYPTO_SESSION_INPUT 52
-static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_CRYPTO_SESSION_INPUT( D3D11_AUTHENTICATED_CONFIGURE_CRYPTO_SESSION_INPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (D3D11_AUTHENTICATED_CONFIGURE_INPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    *(ULONG64 *)((char *)dst + 48) = (ULONG64)*(const UINT32 *)((const char *)src32 + 40);
-    *(ULONG64 *)((char *)dst + 56) = (ULONG64)*(const UINT32 *)((const char *)src32 + 44);
-    *(ULONG64 *)((char *)dst + 64) = (ULONG64)*(const UINT32 *)((const char *)src32 + 48);
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_CRYPTO_SESSION_INPUT( void *dst32, const D3D11_AUTHENTICATED_CONFIGURE_CRYPTO_SESSION_INPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_CONFIGURE_INPUT *)((const char *)src + 0) );
-    *(UINT32 *)((char *)dst32 + 40) = (UINT32)*(const ULONG64 *)((const char *)src + 48);
-    *(UINT32 *)((char *)dst32 + 44) = (UINT32)*(const ULONG64 *)((const char *)src + 56);
-    *(UINT32 *)((char *)dst32 + 48) = (UINT32)*(const ULONG64 *)((const char *)src + 64);
-}
-
-/* D3D11_AUTHENTICATED_CONFIGURE_INITIALIZE_INPUT: 56 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_CONFIGURE_INITIALIZE_INPUT 48
-static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_INITIALIZE_INPUT( D3D11_AUTHENTICATED_CONFIGURE_INITIALIZE_INPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (D3D11_AUTHENTICATED_CONFIGURE_INPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    memcpy( (char *)dst + 48, (const char *)src32 + 40, 4 );
-    memcpy( (char *)dst + 52, (const char *)src32 + 44, 4 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_INITIALIZE_INPUT( void *dst32, const D3D11_AUTHENTICATED_CONFIGURE_INITIALIZE_INPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_CONFIGURE_INPUT *)((const char *)src + 0) );
-    memcpy( (char *)dst32 + 40, (const char *)src + 48, 4 );
-    memcpy( (char *)dst32 + 44, (const char *)src + 52, 4 );
+    wine_repack64_D3D10_INFO_QUEUE_FILTER_DESC( (char *)dst32 + 0, (const char *)src + 0 );
+    wine_repack64_D3D10_INFO_QUEUE_FILTER_DESC( (char *)dst32 + 24, (const char *)src + 48 );
 }
 
-/* D3D11_AUTHENTICATED_CONFIGURE_INPUT: 48 bytes / align 8 on a 64-bit guest, 40 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_CONFIGURE_INPUT 40
-static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_INPUT( D3D11_AUTHENTICATED_CONFIGURE_INPUT *dst, const void *src32 )
-{
-    memcpy( (char *)dst + 0, (const char *)src32 + 0, 16 );
-    memcpy( (char *)dst + 16, (const char *)src32 + 16, 16 );
-    *(ULONG64 *)((char *)dst + 32) = (ULONG64)*(const UINT32 *)((const char *)src32 + 32);
-    memcpy( (char *)dst + 40, (const char *)src32 + 36, 4 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_INPUT( void *dst32, const D3D11_AUTHENTICATED_CONFIGURE_INPUT *src )
-{
-    memcpy( (char *)dst32 + 0, (const char *)src + 0, 16 );
-    memcpy( (char *)dst32 + 16, (const char *)src + 16, 16 );
-    *(UINT32 *)((char *)dst32 + 32) = (UINT32)*(const ULONG64 *)((const char *)src + 32);
-    memcpy( (char *)dst32 + 36, (const char *)src + 40, 4 );
-}
-
-/* D3D11_AUTHENTICATED_CONFIGURE_OUTPUT: 48 bytes / align 8 on a 64-bit guest, 44 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_CONFIGURE_OUTPUT 44
-static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_OUTPUT( D3D11_AUTHENTICATED_CONFIGURE_OUTPUT *dst, const void *src32 )
-{
-    memcpy( (char *)dst + 0, (const char *)src32 + 0, 16 );
-    memcpy( (char *)dst + 16, (const char *)src32 + 16, 16 );
-    *(ULONG64 *)((char *)dst + 32) = (ULONG64)*(const UINT32 *)((const char *)src32 + 32);
-    memcpy( (char *)dst + 40, (const char *)src32 + 36, 4 );
-    memcpy( (char *)dst + 44, (const char *)src32 + 40, 4 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_CONFIGURE_OUTPUT *src )
-{
-    memcpy( (char *)dst32 + 0, (const char *)src + 0, 16 );
-    memcpy( (char *)dst32 + 16, (const char *)src + 16, 16 );
-    *(UINT32 *)((char *)dst32 + 32) = (UINT32)*(const ULONG64 *)((const char *)src + 32);
-    memcpy( (char *)dst32 + 36, (const char *)src + 40, 4 );
-    memcpy( (char *)dst32 + 40, (const char *)src + 44, 4 );
-}
-
-/* D3D11_AUTHENTICATED_CONFIGURE_PROTECTION_INPUT: 56 bytes / align 8 on a 64-bit guest, 44 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_CONFIGURE_PROTECTION_INPUT 44
-static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_PROTECTION_INPUT( D3D11_AUTHENTICATED_CONFIGURE_PROTECTION_INPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (D3D11_AUTHENTICATED_CONFIGURE_INPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    memcpy( (char *)dst + 48, (const char *)src32 + 40, 4 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_PROTECTION_INPUT( void *dst32, const D3D11_AUTHENTICATED_CONFIGURE_PROTECTION_INPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_CONFIGURE_INPUT *)((const char *)src + 0) );
-    memcpy( (char *)dst32 + 40, (const char *)src + 48, 4 );
-}
-
-/* D3D11_AUTHENTICATED_CONFIGURE_SHARED_RESOURCE_INPUT: 72 bytes / align 8 on a 64-bit guest, 52 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_CONFIGURE_SHARED_RESOURCE_INPUT 52
-static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_SHARED_RESOURCE_INPUT( D3D11_AUTHENTICATED_CONFIGURE_SHARED_RESOURCE_INPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (D3D11_AUTHENTICATED_CONFIGURE_INPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    memcpy( (char *)dst + 48, (const char *)src32 + 40, 4 );
-    *(ULONG64 *)((char *)dst + 56) = (ULONG64)*(const UINT32 *)((const char *)src32 + 44);
-    memcpy( (char *)dst + 64, (const char *)src32 + 48, 4 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_SHARED_RESOURCE_INPUT( void *dst32, const D3D11_AUTHENTICATED_CONFIGURE_SHARED_RESOURCE_INPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_CONFIGURE_INPUT *)((const char *)src + 0) );
-    memcpy( (char *)dst32 + 40, (const char *)src + 48, 4 );
-    *(UINT32 *)((char *)dst32 + 44) = (UINT32)*(const ULONG64 *)((const char *)src + 56);
-    memcpy( (char *)dst32 + 48, (const char *)src + 64, 4 );
-}
-
-/* D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_COUNT_OUTPUT: 56 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_COUNT_OUTPUT 48
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_COUNT_OUTPUT( D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_COUNT_OUTPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (D3D11_AUTHENTICATED_QUERY_OUTPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    memcpy( (char *)dst + 48, (const char *)src32 + 44, 4 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_COUNT_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_COUNT_OUTPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_QUERY_OUTPUT *)((const char *)src + 0) );
-    memcpy( (char *)dst32 + 44, (const char *)src + 48, 4 );
-}
-
-/* D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_INPUT: 40 bytes / align 8 on a 64-bit guest, 28 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_INPUT 28
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_INPUT( D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_INPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_QUERY_INPUT( (D3D11_AUTHENTICATED_QUERY_INPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    memcpy( (char *)dst + 32, (const char *)src32 + 24, 4 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_INPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_INPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_QUERY_INPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_QUERY_INPUT *)((const char *)src + 0) );
-    memcpy( (char *)dst32 + 24, (const char *)src + 32, 4 );
-}
-
-/* D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_OUTPUT: 72 bytes / align 8 on a 64-bit guest, 64 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_OUTPUT 64
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_OUTPUT( D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_OUTPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (D3D11_AUTHENTICATED_QUERY_OUTPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    memcpy( (char *)dst + 48, (const char *)src32 + 44, 4 );
-    memcpy( (char *)dst + 52, (const char *)src32 + 48, 16 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_OUTPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_QUERY_OUTPUT *)((const char *)src + 0) );
-    memcpy( (char *)dst32 + 44, (const char *)src + 48, 4 );
-    memcpy( (char *)dst32 + 48, (const char *)src + 52, 16 );
-}
-
-/* D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT: 56 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT 48
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT( D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (D3D11_AUTHENTICATED_QUERY_OUTPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    memcpy( (char *)dst + 48, (const char *)src32 + 44, 4 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_QUERY_OUTPUT *)((const char *)src + 0) );
-    memcpy( (char *)dst32 + 44, (const char *)src + 48, 4 );
-}
-
-/* D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_INPUT: 40 bytes / align 8 on a 64-bit guest, 28 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_INPUT 28
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_INPUT( D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_INPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_QUERY_INPUT( (D3D11_AUTHENTICATED_QUERY_INPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    *(ULONG64 *)((char *)dst + 32) = (ULONG64)*(const UINT32 *)((const char *)src32 + 24);
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_INPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_INPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_QUERY_INPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_QUERY_INPUT *)((const char *)src + 0) );
-    *(UINT32 *)((char *)dst32 + 24) = (UINT32)*(const ULONG64 *)((const char *)src + 32);
-}
-
-/* D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_OUTPUT: 72 bytes / align 8 on a 64-bit guest, 56 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_OUTPUT 56
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_OUTPUT( D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_OUTPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (D3D11_AUTHENTICATED_QUERY_OUTPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    *(ULONG64 *)((char *)dst + 48) = (ULONG64)*(const UINT32 *)((const char *)src32 + 44);
-    *(ULONG64 *)((char *)dst + 56) = (ULONG64)*(const UINT32 *)((const char *)src32 + 48);
-    *(ULONG64 *)((char *)dst + 64) = (ULONG64)*(const UINT32 *)((const char *)src32 + 52);
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_OUTPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_QUERY_OUTPUT *)((const char *)src + 0) );
-    *(UINT32 *)((char *)dst32 + 44) = (UINT32)*(const ULONG64 *)((const char *)src + 48);
-    *(UINT32 *)((char *)dst32 + 48) = (UINT32)*(const ULONG64 *)((const char *)src + 56);
-    *(UINT32 *)((char *)dst32 + 52) = (UINT32)*(const ULONG64 *)((const char *)src + 64);
-}
-
-/* D3D11_AUTHENTICATED_QUERY_CURRENT_ACCESSIBILITY_ENCRYPTION_OUTPUT: 64 bytes / align 8 on a 64-bit guest, 60 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_CURRENT_ACCESSIBILITY_ENCRYPTION_OUTPUT 60
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_CURRENT_ACCESSIBILITY_ENCRYPTION_OUTPUT( D3D11_AUTHENTICATED_QUERY_CURRENT_ACCESSIBILITY_ENCRYPTION_OUTPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (D3D11_AUTHENTICATED_QUERY_OUTPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    memcpy( (char *)dst + 48, (const char *)src32 + 44, 16 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_CURRENT_ACCESSIBILITY_ENCRYPTION_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_CURRENT_ACCESSIBILITY_ENCRYPTION_OUTPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_QUERY_OUTPUT *)((const char *)src + 0) );
-    memcpy( (char *)dst32 + 44, (const char *)src + 48, 16 );
-}
-
-/* D3D11_AUTHENTICATED_QUERY_DEVICE_HANDLE_OUTPUT: 56 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_DEVICE_HANDLE_OUTPUT 48
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_DEVICE_HANDLE_OUTPUT( D3D11_AUTHENTICATED_QUERY_DEVICE_HANDLE_OUTPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (D3D11_AUTHENTICATED_QUERY_OUTPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    *(ULONG64 *)((char *)dst + 48) = (ULONG64)*(const UINT32 *)((const char *)src32 + 44);
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_DEVICE_HANDLE_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_DEVICE_HANDLE_OUTPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_QUERY_OUTPUT *)((const char *)src + 0) );
-    *(UINT32 *)((char *)dst32 + 44) = (UINT32)*(const ULONG64 *)((const char *)src + 48);
-}
-
-/* D3D11_AUTHENTICATED_QUERY_INPUT: 32 bytes / align 8 on a 64-bit guest, 24 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_INPUT 24
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_INPUT( D3D11_AUTHENTICATED_QUERY_INPUT *dst, const void *src32 )
-{
-    memcpy( (char *)dst + 0, (const char *)src32 + 0, 16 );
-    *(ULONG64 *)((char *)dst + 16) = (ULONG64)*(const UINT32 *)((const char *)src32 + 16);
-    memcpy( (char *)dst + 24, (const char *)src32 + 20, 4 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_INPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_INPUT *src )
-{
-    memcpy( (char *)dst32 + 0, (const char *)src + 0, 16 );
-    *(UINT32 *)((char *)dst32 + 16) = (UINT32)*(const ULONG64 *)((const char *)src + 16);
-    memcpy( (char *)dst32 + 20, (const char *)src + 24, 4 );
-}
-
-/* D3D11_AUTHENTICATED_QUERY_OUTPUT: 48 bytes / align 8 on a 64-bit guest, 44 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_OUTPUT 44
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( D3D11_AUTHENTICATED_QUERY_OUTPUT *dst, const void *src32 )
-{
-    memcpy( (char *)dst + 0, (const char *)src32 + 0, 16 );
-    memcpy( (char *)dst + 16, (const char *)src32 + 16, 16 );
-    *(ULONG64 *)((char *)dst + 32) = (ULONG64)*(const UINT32 *)((const char *)src32 + 32);
-    memcpy( (char *)dst + 40, (const char *)src32 + 36, 4 );
-    memcpy( (char *)dst + 44, (const char *)src32 + 40, 4 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_OUTPUT *src )
-{
-    memcpy( (char *)dst32 + 0, (const char *)src + 0, 16 );
-    memcpy( (char *)dst32 + 16, (const char *)src + 16, 16 );
-    *(UINT32 *)((char *)dst32 + 32) = (UINT32)*(const ULONG64 *)((const char *)src + 32);
-    memcpy( (char *)dst32 + 36, (const char *)src + 40, 4 );
-    memcpy( (char *)dst32 + 40, (const char *)src + 44, 4 );
-}
-
-/* D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_INPUT: 48 bytes / align 8 on a 64-bit guest, 32 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_INPUT 32
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_INPUT( D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_INPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_QUERY_INPUT( (D3D11_AUTHENTICATED_QUERY_INPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    *(ULONG64 *)((char *)dst + 32) = (ULONG64)*(const UINT32 *)((const char *)src32 + 24);
-    *(ULONG64 *)((char *)dst + 40) = (ULONG64)*(const UINT32 *)((const char *)src32 + 28);
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_INPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_INPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_QUERY_INPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_QUERY_INPUT *)((const char *)src + 0) );
-    *(UINT32 *)((char *)dst32 + 24) = (UINT32)*(const ULONG64 *)((const char *)src + 32);
-    *(UINT32 *)((char *)dst32 + 28) = (UINT32)*(const ULONG64 *)((const char *)src + 40);
-}
-
-/* D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_OUTPUT: 72 bytes / align 8 on a 64-bit guest, 56 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_OUTPUT 56
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_OUTPUT( D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_OUTPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (D3D11_AUTHENTICATED_QUERY_OUTPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    *(ULONG64 *)((char *)dst + 48) = (ULONG64)*(const UINT32 *)((const char *)src32 + 44);
-    *(ULONG64 *)((char *)dst + 56) = (ULONG64)*(const UINT32 *)((const char *)src32 + 48);
-    memcpy( (char *)dst + 64, (const char *)src32 + 52, 4 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_OUTPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_QUERY_OUTPUT *)((const char *)src + 0) );
-    *(UINT32 *)((char *)dst32 + 44) = (UINT32)*(const ULONG64 *)((const char *)src + 48);
-    *(UINT32 *)((char *)dst32 + 48) = (UINT32)*(const ULONG64 *)((const char *)src + 56);
-    memcpy( (char *)dst32 + 52, (const char *)src + 64, 4 );
-}
-
-/* D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_INPUT: 56 bytes / align 8 on a 64-bit guest, 36 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_INPUT 36
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_INPUT( D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_INPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_QUERY_INPUT( (D3D11_AUTHENTICATED_QUERY_INPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    *(ULONG64 *)((char *)dst + 32) = (ULONG64)*(const UINT32 *)((const char *)src32 + 24);
-    *(ULONG64 *)((char *)dst + 40) = (ULONG64)*(const UINT32 *)((const char *)src32 + 28);
-    memcpy( (char *)dst + 48, (const char *)src32 + 32, 4 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_INPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_INPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_QUERY_INPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_QUERY_INPUT *)((const char *)src + 0) );
-    *(UINT32 *)((char *)dst32 + 24) = (UINT32)*(const ULONG64 *)((const char *)src + 32);
-    *(UINT32 *)((char *)dst32 + 28) = (UINT32)*(const ULONG64 *)((const char *)src + 40);
-    memcpy( (char *)dst32 + 32, (const char *)src + 48, 4 );
-}
-
-/* D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_OUTPUT: 80 bytes / align 8 on a 64-bit guest, 64 / 8 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_OUTPUT 64
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_OUTPUT( D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_OUTPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (D3D11_AUTHENTICATED_QUERY_OUTPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    *(ULONG64 *)((char *)dst + 48) = (ULONG64)*(const UINT32 *)((const char *)src32 + 44);
-    *(ULONG64 *)((char *)dst + 56) = (ULONG64)*(const UINT32 *)((const char *)src32 + 48);
-    memcpy( (char *)dst + 64, (const char *)src32 + 52, 4 );
-    memcpy( (char *)dst + 72, (const char *)src32 + 56, 8 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_OUTPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_QUERY_OUTPUT *)((const char *)src + 0) );
-    *(UINT32 *)((char *)dst32 + 44) = (UINT32)*(const ULONG64 *)((const char *)src + 48);
-    *(UINT32 *)((char *)dst32 + 48) = (UINT32)*(const ULONG64 *)((const char *)src + 56);
-    memcpy( (char *)dst32 + 52, (const char *)src + 64, 4 );
-    memcpy( (char *)dst32 + 56, (const char *)src + 72, 8 );
-}
-
-/* D3D11_AUTHENTICATED_QUERY_PROTECTION_OUTPUT: 56 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_PROTECTION_OUTPUT 48
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_PROTECTION_OUTPUT( D3D11_AUTHENTICATED_QUERY_PROTECTION_OUTPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (D3D11_AUTHENTICATED_QUERY_OUTPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    memcpy( (char *)dst + 48, (const char *)src32 + 44, 4 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_PROTECTION_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_PROTECTION_OUTPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_QUERY_OUTPUT *)((const char *)src + 0) );
-    memcpy( (char *)dst32 + 44, (const char *)src + 48, 4 );
-}
-
-/* D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_COUNT_OUTPUT: 56 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_COUNT_OUTPUT 48
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_COUNT_OUTPUT( D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_COUNT_OUTPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (D3D11_AUTHENTICATED_QUERY_OUTPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    memcpy( (char *)dst + 48, (const char *)src32 + 44, 4 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_COUNT_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_COUNT_OUTPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_QUERY_OUTPUT *)((const char *)src + 0) );
-    memcpy( (char *)dst32 + 44, (const char *)src + 48, 4 );
-}
-
-/* D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_INPUT: 40 bytes / align 8 on a 64-bit guest, 28 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_INPUT 28
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_INPUT( D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_INPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_QUERY_INPUT( (D3D11_AUTHENTICATED_QUERY_INPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    memcpy( (char *)dst + 32, (const char *)src32 + 24, 4 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_INPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_INPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_QUERY_INPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_QUERY_INPUT *)((const char *)src + 0) );
-    memcpy( (char *)dst32 + 24, (const char *)src + 32, 4 );
-}
-
-/* D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_OUTPUT: 64 bytes / align 8 on a 64-bit guest, 56 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_OUTPUT 56
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_OUTPUT( D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_OUTPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (D3D11_AUTHENTICATED_QUERY_OUTPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    memcpy( (char *)dst + 48, (const char *)src32 + 44, 4 );
-    memcpy( (char *)dst + 52, (const char *)src32 + 48, 4 );
-    *(ULONG64 *)((char *)dst + 56) = (ULONG64)*(const UINT32 *)((const char *)src32 + 52);
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_OUTPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_QUERY_OUTPUT *)((const char *)src + 0) );
-    memcpy( (char *)dst32 + 44, (const char *)src + 48, 4 );
-    memcpy( (char *)dst32 + 48, (const char *)src + 52, 4 );
-    *(UINT32 *)((char *)dst32 + 52) = (UINT32)*(const ULONG64 *)((const char *)src + 56);
-}
-
-/* D3D11_AUTHENTICATED_QUERY_UNRESTRICTED_PROTECTED_SHARED_RESOURCE_COUNT_OUTPUT: 56 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_UNRESTRICTED_PROTECTED_SHARED_RESOURCE_COUNT_OUTPUT 48
-static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_UNRESTRICTED_PROTECTED_SHARED_RESOURCE_COUNT_OUTPUT( D3D11_AUTHENTICATED_QUERY_UNRESTRICTED_PROTECTED_SHARED_RESOURCE_COUNT_OUTPUT *dst, const void *src32 )
-{
-    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (D3D11_AUTHENTICATED_QUERY_OUTPUT *)((char *)dst + 0), (const char *)src32 + 0 );
-    memcpy( (char *)dst + 48, (const char *)src32 + 44, 4 );
-}
-static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_UNRESTRICTED_PROTECTED_SHARED_RESOURCE_COUNT_OUTPUT( void *dst32, const D3D11_AUTHENTICATED_QUERY_UNRESTRICTED_PROTECTED_SHARED_RESOURCE_COUNT_OUTPUT *src )
-{
-    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const D3D11_AUTHENTICATED_QUERY_OUTPUT *)((const char *)src + 0) );
-    memcpy( (char *)dst32 + 44, (const char *)src + 48, 4 );
-}
-
-/* D3D11_INFO_QUEUE_FILTER: 96 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_INFO_QUEUE_FILTER 48
-static inline void wine_repack32_D3D11_INFO_QUEUE_FILTER( D3D11_INFO_QUEUE_FILTER *dst, const void *src32 )
-{
-    wine_repack32_D3D11_INFO_QUEUE_FILTER_DESC( (D3D11_INFO_QUEUE_FILTER_DESC *)((char *)dst + 0), (const char *)src32 + 0 );
-    wine_repack32_D3D11_INFO_QUEUE_FILTER_DESC( (D3D11_INFO_QUEUE_FILTER_DESC *)((char *)dst + 48), (const char *)src32 + 24 );
-}
-static inline void wine_repack64_D3D11_INFO_QUEUE_FILTER( void *dst32, const D3D11_INFO_QUEUE_FILTER *src )
-{
-    wine_repack64_D3D11_INFO_QUEUE_FILTER_DESC( (char *)dst32 + 0, (const D3D11_INFO_QUEUE_FILTER_DESC *)((const char *)src + 0) );
-    wine_repack64_D3D11_INFO_QUEUE_FILTER_DESC( (char *)dst32 + 24, (const D3D11_INFO_QUEUE_FILTER_DESC *)((const char *)src + 48) );
-}
-
-/* D3D11_INFO_QUEUE_FILTER_DESC: 48 bytes / align 8 on a 64-bit guest, 24 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_INFO_QUEUE_FILTER_DESC 24
-static inline void wine_repack32_D3D11_INFO_QUEUE_FILTER_DESC( D3D11_INFO_QUEUE_FILTER_DESC *dst, const void *src32 )
+/* D3D10_INFO_QUEUE_FILTER_DESC: 48 bytes / align 8 on a 64-bit guest, 24 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_INFO_QUEUE_FILTER_DESC 24
+static inline void wine_repack32_D3D10_INFO_QUEUE_FILTER_DESC( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 4 );
-    *(ULONG64 *)((char *)dst + 8) = (ULONG64)*(const UINT32 *)((const char *)src32 + 4);
+    *(unsigned long long *)((char *)dst + 8) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 4);
     memcpy( (char *)dst + 16, (const char *)src32 + 8, 4 );
-    *(ULONG64 *)((char *)dst + 24) = (ULONG64)*(const UINT32 *)((const char *)src32 + 12);
+    *(unsigned long long *)((char *)dst + 24) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 12);
     memcpy( (char *)dst + 32, (const char *)src32 + 16, 4 );
-    *(ULONG64 *)((char *)dst + 40) = (ULONG64)*(const UINT32 *)((const char *)src32 + 20);
+    *(unsigned long long *)((char *)dst + 40) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 20);
 }
-static inline void wine_repack64_D3D11_INFO_QUEUE_FILTER_DESC( void *dst32, const D3D11_INFO_QUEUE_FILTER_DESC *src )
+static inline void wine_repack64_D3D10_INFO_QUEUE_FILTER_DESC( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 4 );
-    *(UINT32 *)((char *)dst32 + 4) = (UINT32)*(const ULONG64 *)((const char *)src + 8);
+    *(unsigned int *)((char *)dst32 + 4) = (unsigned int)*(const unsigned long long *)((const char *)src + 8);
     memcpy( (char *)dst32 + 8, (const char *)src + 16, 4 );
-    *(UINT32 *)((char *)dst32 + 12) = (UINT32)*(const ULONG64 *)((const char *)src + 24);
+    *(unsigned int *)((char *)dst32 + 12) = (unsigned int)*(const unsigned long long *)((const char *)src + 24);
     memcpy( (char *)dst32 + 16, (const char *)src + 32, 4 );
-    *(UINT32 *)((char *)dst32 + 20) = (UINT32)*(const ULONG64 *)((const char *)src + 40);
+    *(unsigned int *)((char *)dst32 + 20) = (unsigned int)*(const unsigned long long *)((const char *)src + 40);
 }
 
-/* D3D11_INPUT_ELEMENT_DESC: 32 bytes / align 8 on a 64-bit guest, 28 / 4 on i386 */
-#define WINE_REPACK32_SIZE_D3D11_INPUT_ELEMENT_DESC 28
-static inline void wine_repack32_D3D11_INPUT_ELEMENT_DESC( D3D11_INPUT_ELEMENT_DESC *dst, const void *src32 )
+/* D3D10_INPUT_ELEMENT_DESC: 32 bytes / align 8 on a 64-bit guest, 28 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_INPUT_ELEMENT_DESC 28
+static inline void wine_repack32_D3D10_INPUT_ELEMENT_DESC( void *dst, const void *src32 )
 {
-    *(ULONG64 *)((char *)dst + 0) = (ULONG64)*(const UINT32 *)((const char *)src32 + 0);
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
     memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
     memcpy( (char *)dst + 12, (const char *)src32 + 8, 4 );
     memcpy( (char *)dst + 16, (const char *)src32 + 12, 4 );
@@ -585,9 +187,539 @@ static inline void wine_repack32_D3D11_INPUT_ELEMENT_DESC( D3D11_INPUT_ELEMENT_D
     memcpy( (char *)dst + 24, (const char *)src32 + 20, 4 );
     memcpy( (char *)dst + 28, (const char *)src32 + 24, 4 );
 }
-static inline void wine_repack64_D3D11_INPUT_ELEMENT_DESC( void *dst32, const D3D11_INPUT_ELEMENT_DESC *src )
+static inline void wine_repack64_D3D10_INPUT_ELEMENT_DESC( void *dst32, const void *src )
 {
-    *(UINT32 *)((char *)dst32 + 0) = (UINT32)*(const ULONG64 *)((const char *)src + 0);
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
+    memcpy( (char *)dst32 + 8, (const char *)src + 12, 4 );
+    memcpy( (char *)dst32 + 12, (const char *)src + 16, 4 );
+    memcpy( (char *)dst32 + 16, (const char *)src + 20, 4 );
+    memcpy( (char *)dst32 + 20, (const char *)src + 24, 4 );
+    memcpy( (char *)dst32 + 24, (const char *)src + 28, 4 );
+}
+
+/* D3D10_MAPPED_TEXTURE2D: 16 bytes / align 8 on a 64-bit guest, 8 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_MAPPED_TEXTURE2D 8
+static inline void wine_repack32_D3D10_MAPPED_TEXTURE2D( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
+}
+static inline void wine_repack64_D3D10_MAPPED_TEXTURE2D( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
+}
+
+/* D3D10_MAPPED_TEXTURE3D: 16 bytes / align 8 on a 64-bit guest, 12 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_MAPPED_TEXTURE3D 12
+static inline void wine_repack32_D3D10_MAPPED_TEXTURE3D( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
+    memcpy( (char *)dst + 12, (const char *)src32 + 8, 4 );
+}
+static inline void wine_repack64_D3D10_MAPPED_TEXTURE3D( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
+    memcpy( (char *)dst32 + 8, (const char *)src + 12, 4 );
+}
+
+/* D3D10_MESSAGE: 32 bytes / align 8 on a 64-bit guest, 20 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_MESSAGE 20
+static inline void wine_repack32_D3D10_MESSAGE( void *dst, const void *src32 )
+{
+    memcpy( (char *)dst + 0, (const char *)src32 + 0, 4 );
+    memcpy( (char *)dst + 4, (const char *)src32 + 4, 4 );
+    memcpy( (char *)dst + 8, (const char *)src32 + 8, 4 );
+    *(unsigned long long *)((char *)dst + 16) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 12);
+    *(unsigned long long *)((char *)dst + 24) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 16);
+}
+static inline void wine_repack64_D3D10_MESSAGE( void *dst32, const void *src )
+{
+    memcpy( (char *)dst32 + 0, (const char *)src + 0, 4 );
+    memcpy( (char *)dst32 + 4, (const char *)src + 4, 4 );
+    memcpy( (char *)dst32 + 8, (const char *)src + 8, 4 );
+    *(unsigned int *)((char *)dst32 + 12) = (unsigned int)*(const unsigned long long *)((const char *)src + 16);
+    { unsigned long long v = *(const unsigned long long *)((const char *)src + 24); *(unsigned int *)((char *)dst32 + 16) = v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }
+}
+
+/* D3D10_SO_DECLARATION_ENTRY: 16 bytes / align 8 on a 64-bit guest, 12 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_SO_DECLARATION_ENTRY 12
+static inline void wine_repack32_D3D10_SO_DECLARATION_ENTRY( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
+    memcpy( (char *)dst + 12, (const char *)src32 + 8, 1 );
+    memcpy( (char *)dst + 13, (const char *)src32 + 9, 1 );
+    memcpy( (char *)dst + 14, (const char *)src32 + 10, 1 );
+}
+static inline void wine_repack64_D3D10_SO_DECLARATION_ENTRY( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
+    memcpy( (char *)dst32 + 8, (const char *)src + 12, 1 );
+    memcpy( (char *)dst32 + 9, (const char *)src + 13, 1 );
+    memcpy( (char *)dst32 + 10, (const char *)src + 14, 1 );
+}
+
+/* D3D10_SUBRESOURCE_DATA: 16 bytes / align 8 on a 64-bit guest, 12 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_SUBRESOURCE_DATA 12
+static inline void wine_repack32_D3D10_SUBRESOURCE_DATA( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
+    memcpy( (char *)dst + 12, (const char *)src32 + 8, 4 );
+}
+static inline void wine_repack64_D3D10_SUBRESOURCE_DATA( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
+    memcpy( (char *)dst32 + 8, (const char *)src + 12, 4 );
+}
+
+/* D3D11_AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT: 64 bytes / align 8 on a 64-bit guest, 56 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT 56
+static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    memcpy( (char *)dst + 48, (const char *)src32 + 40, 16 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    memcpy( (char *)dst32 + 40, (const char *)src + 48, 16 );
+}
+
+/* D3D11_AUTHENTICATED_CONFIGURE_CRYPTO_SESSION_INPUT: 72 bytes / align 8 on a 64-bit guest, 52 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_CONFIGURE_CRYPTO_SESSION_INPUT 52
+static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_CRYPTO_SESSION_INPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    *(unsigned long long *)((char *)dst + 48) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 40);
+    *(unsigned long long *)((char *)dst + 56) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 44);
+    *(unsigned long long *)((char *)dst + 64) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 48);
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_CRYPTO_SESSION_INPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    *(unsigned int *)((char *)dst32 + 40) = (unsigned int)*(const unsigned long long *)((const char *)src + 48);
+    *(unsigned int *)((char *)dst32 + 44) = (unsigned int)*(const unsigned long long *)((const char *)src + 56);
+    *(unsigned int *)((char *)dst32 + 48) = (unsigned int)*(const unsigned long long *)((const char *)src + 64);
+}
+
+/* D3D11_AUTHENTICATED_CONFIGURE_INITIALIZE_INPUT: 56 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_CONFIGURE_INITIALIZE_INPUT 48
+static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_INITIALIZE_INPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    memcpy( (char *)dst + 48, (const char *)src32 + 40, 4 );
+    memcpy( (char *)dst + 52, (const char *)src32 + 44, 4 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_INITIALIZE_INPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    memcpy( (char *)dst32 + 40, (const char *)src + 48, 4 );
+    memcpy( (char *)dst32 + 44, (const char *)src + 52, 4 );
+}
+
+/* D3D11_AUTHENTICATED_CONFIGURE_INPUT: 48 bytes / align 8 on a 64-bit guest, 40 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_CONFIGURE_INPUT 40
+static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_INPUT( void *dst, const void *src32 )
+{
+    memcpy( (char *)dst + 0, (const char *)src32 + 0, 16 );
+    memcpy( (char *)dst + 16, (const char *)src32 + 16, 16 );
+    *(unsigned long long *)((char *)dst + 32) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 32);
+    memcpy( (char *)dst + 40, (const char *)src32 + 36, 4 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_INPUT( void *dst32, const void *src )
+{
+    memcpy( (char *)dst32 + 0, (const char *)src + 0, 16 );
+    memcpy( (char *)dst32 + 16, (const char *)src + 16, 16 );
+    *(unsigned int *)((char *)dst32 + 32) = (unsigned int)*(const unsigned long long *)((const char *)src + 32);
+    memcpy( (char *)dst32 + 36, (const char *)src + 40, 4 );
+}
+
+/* D3D11_AUTHENTICATED_CONFIGURE_OUTPUT: 48 bytes / align 8 on a 64-bit guest, 44 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_CONFIGURE_OUTPUT 44
+static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_OUTPUT( void *dst, const void *src32 )
+{
+    memcpy( (char *)dst + 0, (const char *)src32 + 0, 16 );
+    memcpy( (char *)dst + 16, (const char *)src32 + 16, 16 );
+    *(unsigned long long *)((char *)dst + 32) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 32);
+    memcpy( (char *)dst + 40, (const char *)src32 + 36, 4 );
+    memcpy( (char *)dst + 44, (const char *)src32 + 40, 4 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_OUTPUT( void *dst32, const void *src )
+{
+    memcpy( (char *)dst32 + 0, (const char *)src + 0, 16 );
+    memcpy( (char *)dst32 + 16, (const char *)src + 16, 16 );
+    *(unsigned int *)((char *)dst32 + 32) = (unsigned int)*(const unsigned long long *)((const char *)src + 32);
+    memcpy( (char *)dst32 + 36, (const char *)src + 40, 4 );
+    memcpy( (char *)dst32 + 40, (const char *)src + 44, 4 );
+}
+
+/* D3D11_AUTHENTICATED_CONFIGURE_PROTECTION_INPUT: 56 bytes / align 8 on a 64-bit guest, 44 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_CONFIGURE_PROTECTION_INPUT 44
+static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_PROTECTION_INPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    memcpy( (char *)dst + 48, (const char *)src32 + 40, 4 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_PROTECTION_INPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    memcpy( (char *)dst32 + 40, (const char *)src + 48, 4 );
+}
+
+/* D3D11_AUTHENTICATED_CONFIGURE_SHARED_RESOURCE_INPUT: 72 bytes / align 8 on a 64-bit guest, 52 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_CONFIGURE_SHARED_RESOURCE_INPUT 52
+static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_SHARED_RESOURCE_INPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    memcpy( (char *)dst + 48, (const char *)src32 + 40, 4 );
+    *(unsigned long long *)((char *)dst + 56) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 44);
+    memcpy( (char *)dst + 64, (const char *)src32 + 48, 4 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_SHARED_RESOURCE_INPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_INPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    memcpy( (char *)dst32 + 40, (const char *)src + 48, 4 );
+    *(unsigned int *)((char *)dst32 + 44) = (unsigned int)*(const unsigned long long *)((const char *)src + 56);
+    memcpy( (char *)dst32 + 48, (const char *)src + 64, 4 );
+}
+
+/* D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_COUNT_OUTPUT: 56 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_COUNT_OUTPUT 48
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_COUNT_OUTPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    memcpy( (char *)dst + 48, (const char *)src32 + 44, 4 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_COUNT_OUTPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    memcpy( (char *)dst32 + 44, (const char *)src + 48, 4 );
+}
+
+/* D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_INPUT: 40 bytes / align 8 on a 64-bit guest, 28 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_INPUT 28
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_INPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_QUERY_INPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    memcpy( (char *)dst + 32, (const char *)src32 + 24, 4 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_INPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_QUERY_INPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    memcpy( (char *)dst32 + 24, (const char *)src + 32, 4 );
+}
+
+/* D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_OUTPUT: 72 bytes / align 8 on a 64-bit guest, 64 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_OUTPUT 64
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_OUTPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    memcpy( (char *)dst + 48, (const char *)src32 + 44, 4 );
+    memcpy( (char *)dst + 52, (const char *)src32 + 48, 16 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_OUTPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    memcpy( (char *)dst32 + 44, (const char *)src + 48, 4 );
+    memcpy( (char *)dst32 + 48, (const char *)src + 52, 16 );
+}
+
+/* D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT: 56 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT 48
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    memcpy( (char *)dst + 48, (const char *)src32 + 44, 4 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    memcpy( (char *)dst32 + 44, (const char *)src + 48, 4 );
+}
+
+/* D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_INPUT: 40 bytes / align 8 on a 64-bit guest, 28 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_INPUT 28
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_INPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_QUERY_INPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    *(unsigned long long *)((char *)dst + 32) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 24);
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_INPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_QUERY_INPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    *(unsigned int *)((char *)dst32 + 24) = (unsigned int)*(const unsigned long long *)((const char *)src + 32);
+}
+
+/* D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_OUTPUT: 72 bytes / align 8 on a 64-bit guest, 56 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_OUTPUT 56
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_OUTPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    *(unsigned long long *)((char *)dst + 48) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 44);
+    *(unsigned long long *)((char *)dst + 56) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 48);
+    *(unsigned long long *)((char *)dst + 64) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 52);
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_OUTPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    *(unsigned int *)((char *)dst32 + 44) = (unsigned int)*(const unsigned long long *)((const char *)src + 48);
+    *(unsigned int *)((char *)dst32 + 48) = (unsigned int)*(const unsigned long long *)((const char *)src + 56);
+    *(unsigned int *)((char *)dst32 + 52) = (unsigned int)*(const unsigned long long *)((const char *)src + 64);
+}
+
+/* D3D11_AUTHENTICATED_QUERY_CURRENT_ACCESSIBILITY_ENCRYPTION_OUTPUT: 64 bytes / align 8 on a 64-bit guest, 60 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_CURRENT_ACCESSIBILITY_ENCRYPTION_OUTPUT 60
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_CURRENT_ACCESSIBILITY_ENCRYPTION_OUTPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    memcpy( (char *)dst + 48, (const char *)src32 + 44, 16 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_CURRENT_ACCESSIBILITY_ENCRYPTION_OUTPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    memcpy( (char *)dst32 + 44, (const char *)src + 48, 16 );
+}
+
+/* D3D11_AUTHENTICATED_QUERY_DEVICE_HANDLE_OUTPUT: 56 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_DEVICE_HANDLE_OUTPUT 48
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_DEVICE_HANDLE_OUTPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    *(unsigned long long *)((char *)dst + 48) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 44);
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_DEVICE_HANDLE_OUTPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    *(unsigned int *)((char *)dst32 + 44) = (unsigned int)*(const unsigned long long *)((const char *)src + 48);
+}
+
+/* D3D11_AUTHENTICATED_QUERY_INPUT: 32 bytes / align 8 on a 64-bit guest, 24 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_INPUT 24
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_INPUT( void *dst, const void *src32 )
+{
+    memcpy( (char *)dst + 0, (const char *)src32 + 0, 16 );
+    *(unsigned long long *)((char *)dst + 16) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 16);
+    memcpy( (char *)dst + 24, (const char *)src32 + 20, 4 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_INPUT( void *dst32, const void *src )
+{
+    memcpy( (char *)dst32 + 0, (const char *)src + 0, 16 );
+    *(unsigned int *)((char *)dst32 + 16) = (unsigned int)*(const unsigned long long *)((const char *)src + 16);
+    memcpy( (char *)dst32 + 20, (const char *)src + 24, 4 );
+}
+
+/* D3D11_AUTHENTICATED_QUERY_OUTPUT: 48 bytes / align 8 on a 64-bit guest, 44 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_OUTPUT 44
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( void *dst, const void *src32 )
+{
+    memcpy( (char *)dst + 0, (const char *)src32 + 0, 16 );
+    memcpy( (char *)dst + 16, (const char *)src32 + 16, 16 );
+    *(unsigned long long *)((char *)dst + 32) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 32);
+    memcpy( (char *)dst + 40, (const char *)src32 + 36, 4 );
+    memcpy( (char *)dst + 44, (const char *)src32 + 40, 4 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( void *dst32, const void *src )
+{
+    memcpy( (char *)dst32 + 0, (const char *)src + 0, 16 );
+    memcpy( (char *)dst32 + 16, (const char *)src + 16, 16 );
+    *(unsigned int *)((char *)dst32 + 32) = (unsigned int)*(const unsigned long long *)((const char *)src + 32);
+    memcpy( (char *)dst32 + 36, (const char *)src + 40, 4 );
+    memcpy( (char *)dst32 + 40, (const char *)src + 44, 4 );
+}
+
+/* D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_INPUT: 48 bytes / align 8 on a 64-bit guest, 32 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_INPUT 32
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_INPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_QUERY_INPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    *(unsigned long long *)((char *)dst + 32) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 24);
+    *(unsigned long long *)((char *)dst + 40) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 28);
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_INPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_QUERY_INPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    *(unsigned int *)((char *)dst32 + 24) = (unsigned int)*(const unsigned long long *)((const char *)src + 32);
+    *(unsigned int *)((char *)dst32 + 28) = (unsigned int)*(const unsigned long long *)((const char *)src + 40);
+}
+
+/* D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_OUTPUT: 72 bytes / align 8 on a 64-bit guest, 56 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_OUTPUT 56
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_OUTPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    *(unsigned long long *)((char *)dst + 48) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 44);
+    *(unsigned long long *)((char *)dst + 56) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 48);
+    memcpy( (char *)dst + 64, (const char *)src32 + 52, 4 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_COUNT_OUTPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    *(unsigned int *)((char *)dst32 + 44) = (unsigned int)*(const unsigned long long *)((const char *)src + 48);
+    *(unsigned int *)((char *)dst32 + 48) = (unsigned int)*(const unsigned long long *)((const char *)src + 56);
+    memcpy( (char *)dst32 + 52, (const char *)src + 64, 4 );
+}
+
+/* D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_INPUT: 56 bytes / align 8 on a 64-bit guest, 36 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_INPUT 36
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_INPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_QUERY_INPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    *(unsigned long long *)((char *)dst + 32) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 24);
+    *(unsigned long long *)((char *)dst + 40) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 28);
+    memcpy( (char *)dst + 48, (const char *)src32 + 32, 4 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_INPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_QUERY_INPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    *(unsigned int *)((char *)dst32 + 24) = (unsigned int)*(const unsigned long long *)((const char *)src + 32);
+    *(unsigned int *)((char *)dst32 + 28) = (unsigned int)*(const unsigned long long *)((const char *)src + 40);
+    memcpy( (char *)dst32 + 32, (const char *)src + 48, 4 );
+}
+
+/* D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_OUTPUT: 80 bytes / align 8 on a 64-bit guest, 64 / 8 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_OUTPUT 64
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_OUTPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    *(unsigned long long *)((char *)dst + 48) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 44);
+    *(unsigned long long *)((char *)dst + 56) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 48);
+    memcpy( (char *)dst + 64, (const char *)src32 + 52, 4 );
+    memcpy( (char *)dst + 72, (const char *)src32 + 56, 8 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT_ID_OUTPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    *(unsigned int *)((char *)dst32 + 44) = (unsigned int)*(const unsigned long long *)((const char *)src + 48);
+    *(unsigned int *)((char *)dst32 + 48) = (unsigned int)*(const unsigned long long *)((const char *)src + 56);
+    memcpy( (char *)dst32 + 52, (const char *)src + 64, 4 );
+    memcpy( (char *)dst32 + 56, (const char *)src + 72, 8 );
+}
+
+/* D3D11_AUTHENTICATED_QUERY_PROTECTION_OUTPUT: 56 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_PROTECTION_OUTPUT 48
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_PROTECTION_OUTPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    memcpy( (char *)dst + 48, (const char *)src32 + 44, 4 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_PROTECTION_OUTPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    memcpy( (char *)dst32 + 44, (const char *)src + 48, 4 );
+}
+
+/* D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_COUNT_OUTPUT: 56 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_COUNT_OUTPUT 48
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_COUNT_OUTPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    memcpy( (char *)dst + 48, (const char *)src32 + 44, 4 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_COUNT_OUTPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    memcpy( (char *)dst32 + 44, (const char *)src + 48, 4 );
+}
+
+/* D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_INPUT: 40 bytes / align 8 on a 64-bit guest, 28 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_INPUT 28
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_INPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_QUERY_INPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    memcpy( (char *)dst + 32, (const char *)src32 + 24, 4 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_INPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_QUERY_INPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    memcpy( (char *)dst32 + 24, (const char *)src + 32, 4 );
+}
+
+/* D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_OUTPUT: 64 bytes / align 8 on a 64-bit guest, 56 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_OUTPUT 56
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_OUTPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    memcpy( (char *)dst + 48, (const char *)src32 + 44, 4 );
+    memcpy( (char *)dst + 52, (const char *)src32 + 48, 4 );
+    *(unsigned long long *)((char *)dst + 56) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 52);
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_RESTRICTED_SHARED_RESOURCE_PROCESS_OUTPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    memcpy( (char *)dst32 + 44, (const char *)src + 48, 4 );
+    memcpy( (char *)dst32 + 48, (const char *)src + 52, 4 );
+    *(unsigned int *)((char *)dst32 + 52) = (unsigned int)*(const unsigned long long *)((const char *)src + 56);
+}
+
+/* D3D11_AUTHENTICATED_QUERY_UNRESTRICTED_PROTECTED_SHARED_RESOURCE_COUNT_OUTPUT: 56 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_UNRESTRICTED_PROTECTED_SHARED_RESOURCE_COUNT_OUTPUT 48
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_UNRESTRICTED_PROTECTED_SHARED_RESOURCE_COUNT_OUTPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    memcpy( (char *)dst + 48, (const char *)src32 + 44, 4 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_UNRESTRICTED_PROTECTED_SHARED_RESOURCE_COUNT_OUTPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    memcpy( (char *)dst32 + 44, (const char *)src + 48, 4 );
+}
+
+/* D3D11_INFO_QUEUE_FILTER: 96 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_INFO_QUEUE_FILTER 48
+static inline void wine_repack32_D3D11_INFO_QUEUE_FILTER( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_INFO_QUEUE_FILTER_DESC( (char *)dst + 0, (const char *)src32 + 0 );
+    wine_repack32_D3D11_INFO_QUEUE_FILTER_DESC( (char *)dst + 48, (const char *)src32 + 24 );
+}
+static inline void wine_repack64_D3D11_INFO_QUEUE_FILTER( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_INFO_QUEUE_FILTER_DESC( (char *)dst32 + 0, (const char *)src + 0 );
+    wine_repack64_D3D11_INFO_QUEUE_FILTER_DESC( (char *)dst32 + 24, (const char *)src + 48 );
+}
+
+/* D3D11_INFO_QUEUE_FILTER_DESC: 48 bytes / align 8 on a 64-bit guest, 24 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_INFO_QUEUE_FILTER_DESC 24
+static inline void wine_repack32_D3D11_INFO_QUEUE_FILTER_DESC( void *dst, const void *src32 )
+{
+    memcpy( (char *)dst + 0, (const char *)src32 + 0, 4 );
+    *(unsigned long long *)((char *)dst + 8) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 4);
+    memcpy( (char *)dst + 16, (const char *)src32 + 8, 4 );
+    *(unsigned long long *)((char *)dst + 24) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 12);
+    memcpy( (char *)dst + 32, (const char *)src32 + 16, 4 );
+    *(unsigned long long *)((char *)dst + 40) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 20);
+}
+static inline void wine_repack64_D3D11_INFO_QUEUE_FILTER_DESC( void *dst32, const void *src )
+{
+    memcpy( (char *)dst32 + 0, (const char *)src + 0, 4 );
+    *(unsigned int *)((char *)dst32 + 4) = (unsigned int)*(const unsigned long long *)((const char *)src + 8);
+    memcpy( (char *)dst32 + 8, (const char *)src + 16, 4 );
+    *(unsigned int *)((char *)dst32 + 12) = (unsigned int)*(const unsigned long long *)((const char *)src + 24);
+    memcpy( (char *)dst32 + 16, (const char *)src + 32, 4 );
+    *(unsigned int *)((char *)dst32 + 20) = (unsigned int)*(const unsigned long long *)((const char *)src + 40);
+}
+
+/* D3D11_INPUT_ELEMENT_DESC: 32 bytes / align 8 on a 64-bit guest, 28 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_INPUT_ELEMENT_DESC 28
+static inline void wine_repack32_D3D11_INPUT_ELEMENT_DESC( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
+    memcpy( (char *)dst + 12, (const char *)src32 + 8, 4 );
+    memcpy( (char *)dst + 16, (const char *)src32 + 12, 4 );
+    memcpy( (char *)dst + 20, (const char *)src32 + 16, 4 );
+    memcpy( (char *)dst + 24, (const char *)src32 + 20, 4 );
+    memcpy( (char *)dst + 28, (const char *)src32 + 24, 4 );
+}
+static inline void wine_repack64_D3D11_INPUT_ELEMENT_DESC( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
     memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
     memcpy( (char *)dst32 + 8, (const char *)src + 12, 4 );
     memcpy( (char *)dst32 + 12, (const char *)src + 16, 4 );
@@ -598,70 +730,70 @@ static inline void wine_repack64_D3D11_INPUT_ELEMENT_DESC( void *dst32, const D3
 
 /* D3D11_KEY_EXCHANGE_HW_PROTECTION_DATA: 32 bytes / align 8 on a 64-bit guest, 16 / 4 on i386 */
 #define WINE_REPACK32_SIZE_D3D11_KEY_EXCHANGE_HW_PROTECTION_DATA 16
-static inline void wine_repack32_D3D11_KEY_EXCHANGE_HW_PROTECTION_DATA( D3D11_KEY_EXCHANGE_HW_PROTECTION_DATA *dst, const void *src32 )
+static inline void wine_repack32_D3D11_KEY_EXCHANGE_HW_PROTECTION_DATA( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 4 );
-    *(ULONG64 *)((char *)dst + 8) = (ULONG64)*(const UINT32 *)((const char *)src32 + 4);
-    *(ULONG64 *)((char *)dst + 16) = (ULONG64)*(const UINT32 *)((const char *)src32 + 8);
+    *(unsigned long long *)((char *)dst + 8) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 4);
+    *(unsigned long long *)((char *)dst + 16) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 8);
     memcpy( (char *)dst + 24, (const char *)src32 + 12, 4 );
 }
-static inline void wine_repack64_D3D11_KEY_EXCHANGE_HW_PROTECTION_DATA( void *dst32, const D3D11_KEY_EXCHANGE_HW_PROTECTION_DATA *src )
+static inline void wine_repack64_D3D11_KEY_EXCHANGE_HW_PROTECTION_DATA( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 4 );
-    *(UINT32 *)((char *)dst32 + 4) = (UINT32)*(const ULONG64 *)((const char *)src + 8);
-    *(UINT32 *)((char *)dst32 + 8) = (UINT32)*(const ULONG64 *)((const char *)src + 16);
+    *(unsigned int *)((char *)dst32 + 4) = (unsigned int)*(const unsigned long long *)((const char *)src + 8);
+    *(unsigned int *)((char *)dst32 + 8) = (unsigned int)*(const unsigned long long *)((const char *)src + 16);
     memcpy( (char *)dst32 + 12, (const char *)src + 24, 4 );
 }
 
 /* D3D11_MAPPED_SUBRESOURCE: 16 bytes / align 8 on a 64-bit guest, 12 / 4 on i386 */
 #define WINE_REPACK32_SIZE_D3D11_MAPPED_SUBRESOURCE 12
-static inline void wine_repack32_D3D11_MAPPED_SUBRESOURCE( D3D11_MAPPED_SUBRESOURCE *dst, const void *src32 )
+static inline void wine_repack32_D3D11_MAPPED_SUBRESOURCE( void *dst, const void *src32 )
 {
-    *(ULONG64 *)((char *)dst + 0) = (ULONG64)*(const UINT32 *)((const char *)src32 + 0);
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
     memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
     memcpy( (char *)dst + 12, (const char *)src32 + 8, 4 );
 }
-static inline void wine_repack64_D3D11_MAPPED_SUBRESOURCE( void *dst32, const D3D11_MAPPED_SUBRESOURCE *src )
+static inline void wine_repack64_D3D11_MAPPED_SUBRESOURCE( void *dst32, const void *src )
 {
-    *(UINT32 *)((char *)dst32 + 0) = (UINT32)*(const ULONG64 *)((const char *)src + 0);
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
     memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
     memcpy( (char *)dst32 + 8, (const char *)src + 12, 4 );
 }
 
 /* D3D11_MESSAGE: 32 bytes / align 8 on a 64-bit guest, 20 / 4 on i386 */
 #define WINE_REPACK32_SIZE_D3D11_MESSAGE 20
-static inline void wine_repack32_D3D11_MESSAGE( D3D11_MESSAGE *dst, const void *src32 )
+static inline void wine_repack32_D3D11_MESSAGE( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 4 );
     memcpy( (char *)dst + 4, (const char *)src32 + 4, 4 );
     memcpy( (char *)dst + 8, (const char *)src32 + 8, 4 );
-    *(ULONG64 *)((char *)dst + 16) = (ULONG64)*(const UINT32 *)((const char *)src32 + 12);
-    *(ULONG64 *)((char *)dst + 24) = (ULONG64)*(const UINT32 *)((const char *)src32 + 16);
+    *(unsigned long long *)((char *)dst + 16) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 12);
+    *(unsigned long long *)((char *)dst + 24) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 16);
 }
-static inline void wine_repack64_D3D11_MESSAGE( void *dst32, const D3D11_MESSAGE *src )
+static inline void wine_repack64_D3D11_MESSAGE( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 4 );
     memcpy( (char *)dst32 + 4, (const char *)src + 4, 4 );
     memcpy( (char *)dst32 + 8, (const char *)src + 8, 4 );
-    *(UINT32 *)((char *)dst32 + 12) = (UINT32)*(const ULONG64 *)((const char *)src + 16);
-    *(UINT32 *)((char *)dst32 + 16) = (UINT32)*(const ULONG64 *)((const char *)src + 24);
+    *(unsigned int *)((char *)dst32 + 12) = (unsigned int)*(const unsigned long long *)((const char *)src + 16);
+    { unsigned long long v = *(const unsigned long long *)((const char *)src + 24); *(unsigned int *)((char *)dst32 + 16) = v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }
 }
 
 /* D3D11_SO_DECLARATION_ENTRY: 24 bytes / align 8 on a 64-bit guest, 16 / 4 on i386 */
 #define WINE_REPACK32_SIZE_D3D11_SO_DECLARATION_ENTRY 16
-static inline void wine_repack32_D3D11_SO_DECLARATION_ENTRY( D3D11_SO_DECLARATION_ENTRY *dst, const void *src32 )
+static inline void wine_repack32_D3D11_SO_DECLARATION_ENTRY( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 4 );
-    *(ULONG64 *)((char *)dst + 8) = (ULONG64)*(const UINT32 *)((const char *)src32 + 4);
+    *(unsigned long long *)((char *)dst + 8) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 4);
     memcpy( (char *)dst + 16, (const char *)src32 + 8, 4 );
     memcpy( (char *)dst + 20, (const char *)src32 + 12, 1 );
     memcpy( (char *)dst + 21, (const char *)src32 + 13, 1 );
     memcpy( (char *)dst + 22, (const char *)src32 + 14, 1 );
 }
-static inline void wine_repack64_D3D11_SO_DECLARATION_ENTRY( void *dst32, const D3D11_SO_DECLARATION_ENTRY *src )
+static inline void wine_repack64_D3D11_SO_DECLARATION_ENTRY( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 4 );
-    *(UINT32 *)((char *)dst32 + 4) = (UINT32)*(const ULONG64 *)((const char *)src + 8);
+    *(unsigned int *)((char *)dst32 + 4) = (unsigned int)*(const unsigned long long *)((const char *)src + 8);
     memcpy( (char *)dst32 + 8, (const char *)src + 16, 4 );
     memcpy( (char *)dst32 + 12, (const char *)src + 20, 1 );
     memcpy( (char *)dst32 + 13, (const char *)src + 21, 1 );
@@ -670,43 +802,43 @@ static inline void wine_repack64_D3D11_SO_DECLARATION_ENTRY( void *dst32, const 
 
 /* D3D11_SUBRESOURCE_DATA: 16 bytes / align 8 on a 64-bit guest, 12 / 4 on i386 */
 #define WINE_REPACK32_SIZE_D3D11_SUBRESOURCE_DATA 12
-static inline void wine_repack32_D3D11_SUBRESOURCE_DATA( D3D11_SUBRESOURCE_DATA *dst, const void *src32 )
+static inline void wine_repack32_D3D11_SUBRESOURCE_DATA( void *dst, const void *src32 )
 {
-    *(ULONG64 *)((char *)dst + 0) = (ULONG64)*(const UINT32 *)((const char *)src32 + 0);
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
     memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
     memcpy( (char *)dst + 12, (const char *)src32 + 8, 4 );
 }
-static inline void wine_repack64_D3D11_SUBRESOURCE_DATA( void *dst32, const D3D11_SUBRESOURCE_DATA *src )
+static inline void wine_repack64_D3D11_SUBRESOURCE_DATA( void *dst32, const void *src )
 {
-    *(UINT32 *)((char *)dst32 + 0) = (UINT32)*(const ULONG64 *)((const char *)src + 0);
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
     memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
     memcpy( (char *)dst32 + 8, (const char *)src + 12, 4 );
 }
 
 /* D3D11_VIDEO_DECODER_BEGIN_FRAME_CRYPTO_SESSION: 48 bytes / align 8 on a 64-bit guest, 24 / 4 on i386 */
 #define WINE_REPACK32_SIZE_D3D11_VIDEO_DECODER_BEGIN_FRAME_CRYPTO_SESSION 24
-static inline void wine_repack32_D3D11_VIDEO_DECODER_BEGIN_FRAME_CRYPTO_SESSION( D3D11_VIDEO_DECODER_BEGIN_FRAME_CRYPTO_SESSION *dst, const void *src32 )
+static inline void wine_repack32_D3D11_VIDEO_DECODER_BEGIN_FRAME_CRYPTO_SESSION( void *dst, const void *src32 )
 {
-    *(ULONG64 *)((char *)dst + 0) = (ULONG64)*(const UINT32 *)((const char *)src32 + 0);
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
     memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
-    *(ULONG64 *)((char *)dst + 16) = (ULONG64)*(const UINT32 *)((const char *)src32 + 8);
-    *(ULONG64 *)((char *)dst + 24) = (ULONG64)*(const UINT32 *)((const char *)src32 + 12);
+    *(unsigned long long *)((char *)dst + 16) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 8);
+    *(unsigned long long *)((char *)dst + 24) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 12);
     memcpy( (char *)dst + 32, (const char *)src32 + 16, 4 );
-    *(ULONG64 *)((char *)dst + 40) = (ULONG64)*(const UINT32 *)((const char *)src32 + 20);
+    *(unsigned long long *)((char *)dst + 40) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 20);
 }
-static inline void wine_repack64_D3D11_VIDEO_DECODER_BEGIN_FRAME_CRYPTO_SESSION( void *dst32, const D3D11_VIDEO_DECODER_BEGIN_FRAME_CRYPTO_SESSION *src )
+static inline void wine_repack64_D3D11_VIDEO_DECODER_BEGIN_FRAME_CRYPTO_SESSION( void *dst32, const void *src )
 {
-    *(UINT32 *)((char *)dst32 + 0) = (UINT32)*(const ULONG64 *)((const char *)src + 0);
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
     memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
-    *(UINT32 *)((char *)dst32 + 8) = (UINT32)*(const ULONG64 *)((const char *)src + 16);
-    *(UINT32 *)((char *)dst32 + 12) = (UINT32)*(const ULONG64 *)((const char *)src + 24);
+    *(unsigned int *)((char *)dst32 + 8) = (unsigned int)*(const unsigned long long *)((const char *)src + 16);
+    *(unsigned int *)((char *)dst32 + 12) = (unsigned int)*(const unsigned long long *)((const char *)src + 24);
     memcpy( (char *)dst32 + 16, (const char *)src + 32, 4 );
-    *(UINT32 *)((char *)dst32 + 20) = (UINT32)*(const ULONG64 *)((const char *)src + 40);
+    *(unsigned int *)((char *)dst32 + 20) = (unsigned int)*(const unsigned long long *)((const char *)src + 40);
 }
 
 /* D3D11_VIDEO_DECODER_BUFFER_DESC: 72 bytes / align 8 on a 64-bit guest, 64 / 4 on i386 */
 #define WINE_REPACK32_SIZE_D3D11_VIDEO_DECODER_BUFFER_DESC 64
-static inline void wine_repack32_D3D11_VIDEO_DECODER_BUFFER_DESC( D3D11_VIDEO_DECODER_BUFFER_DESC *dst, const void *src32 )
+static inline void wine_repack32_D3D11_VIDEO_DECODER_BUFFER_DESC( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 4 );
     memcpy( (char *)dst + 4, (const char *)src32 + 4, 4 );
@@ -718,12 +850,12 @@ static inline void wine_repack32_D3D11_VIDEO_DECODER_BUFFER_DESC( D3D11_VIDEO_DE
     memcpy( (char *)dst + 28, (const char *)src32 + 28, 4 );
     memcpy( (char *)dst + 32, (const char *)src32 + 32, 4 );
     memcpy( (char *)dst + 36, (const char *)src32 + 36, 4 );
-    *(ULONG64 *)((char *)dst + 40) = (ULONG64)*(const UINT32 *)((const char *)src32 + 40);
+    *(unsigned long long *)((char *)dst + 40) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 40);
     memcpy( (char *)dst + 48, (const char *)src32 + 44, 4 );
     memcpy( (char *)dst + 52, (const char *)src32 + 48, 4 );
     memcpy( (char *)dst + 56, (const char *)src32 + 52, 12 );
 }
-static inline void wine_repack64_D3D11_VIDEO_DECODER_BUFFER_DESC( void *dst32, const D3D11_VIDEO_DECODER_BUFFER_DESC *src )
+static inline void wine_repack64_D3D11_VIDEO_DECODER_BUFFER_DESC( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 4 );
     memcpy( (char *)dst32 + 4, (const char *)src + 4, 4 );
@@ -735,7 +867,7 @@ static inline void wine_repack64_D3D11_VIDEO_DECODER_BUFFER_DESC( void *dst32, c
     memcpy( (char *)dst32 + 28, (const char *)src + 28, 4 );
     memcpy( (char *)dst32 + 32, (const char *)src + 32, 4 );
     memcpy( (char *)dst32 + 36, (const char *)src + 36, 4 );
-    *(UINT32 *)((char *)dst32 + 40) = (UINT32)*(const ULONG64 *)((const char *)src + 40);
+    *(unsigned int *)((char *)dst32 + 40) = (unsigned int)*(const unsigned long long *)((const char *)src + 40);
     memcpy( (char *)dst32 + 44, (const char *)src + 48, 4 );
     memcpy( (char *)dst32 + 48, (const char *)src + 52, 4 );
     memcpy( (char *)dst32 + 52, (const char *)src + 56, 12 );
@@ -743,164 +875,164 @@ static inline void wine_repack64_D3D11_VIDEO_DECODER_BUFFER_DESC( void *dst32, c
 
 /* D3D11_VIDEO_DECODER_BUFFER_DESC1: 48 bytes / align 8 on a 64-bit guest, 28 / 4 on i386 */
 #define WINE_REPACK32_SIZE_D3D11_VIDEO_DECODER_BUFFER_DESC1 28
-static inline void wine_repack32_D3D11_VIDEO_DECODER_BUFFER_DESC1( D3D11_VIDEO_DECODER_BUFFER_DESC1 *dst, const void *src32 )
+static inline void wine_repack32_D3D11_VIDEO_DECODER_BUFFER_DESC1( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 4 );
     memcpy( (char *)dst + 4, (const char *)src32 + 4, 4 );
     memcpy( (char *)dst + 8, (const char *)src32 + 8, 4 );
-    *(ULONG64 *)((char *)dst + 16) = (ULONG64)*(const UINT32 *)((const char *)src32 + 12);
+    *(unsigned long long *)((char *)dst + 16) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 12);
     memcpy( (char *)dst + 24, (const char *)src32 + 16, 4 );
-    *(ULONG64 *)((char *)dst + 32) = (ULONG64)*(const UINT32 *)((const char *)src32 + 20);
+    *(unsigned long long *)((char *)dst + 32) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 20);
     memcpy( (char *)dst + 40, (const char *)src32 + 24, 4 );
 }
-static inline void wine_repack64_D3D11_VIDEO_DECODER_BUFFER_DESC1( void *dst32, const D3D11_VIDEO_DECODER_BUFFER_DESC1 *src )
+static inline void wine_repack64_D3D11_VIDEO_DECODER_BUFFER_DESC1( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 4 );
     memcpy( (char *)dst32 + 4, (const char *)src + 4, 4 );
     memcpy( (char *)dst32 + 8, (const char *)src + 8, 4 );
-    *(UINT32 *)((char *)dst32 + 12) = (UINT32)*(const ULONG64 *)((const char *)src + 16);
+    *(unsigned int *)((char *)dst32 + 12) = (unsigned int)*(const unsigned long long *)((const char *)src + 16);
     memcpy( (char *)dst32 + 16, (const char *)src + 24, 4 );
-    *(UINT32 *)((char *)dst32 + 20) = (UINT32)*(const ULONG64 *)((const char *)src + 32);
+    *(unsigned int *)((char *)dst32 + 20) = (unsigned int)*(const unsigned long long *)((const char *)src + 32);
     memcpy( (char *)dst32 + 24, (const char *)src + 40, 4 );
 }
 
 /* D3D11_VIDEO_DECODER_EXTENSION: 48 bytes / align 8 on a 64-bit guest, 28 / 4 on i386 */
 #define WINE_REPACK32_SIZE_D3D11_VIDEO_DECODER_EXTENSION 28
-static inline void wine_repack32_D3D11_VIDEO_DECODER_EXTENSION( D3D11_VIDEO_DECODER_EXTENSION *dst, const void *src32 )
+static inline void wine_repack32_D3D11_VIDEO_DECODER_EXTENSION( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 4 );
-    *(ULONG64 *)((char *)dst + 8) = (ULONG64)*(const UINT32 *)((const char *)src32 + 4);
+    *(unsigned long long *)((char *)dst + 8) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 4);
     memcpy( (char *)dst + 16, (const char *)src32 + 8, 4 );
-    *(ULONG64 *)((char *)dst + 24) = (ULONG64)*(const UINT32 *)((const char *)src32 + 12);
+    *(unsigned long long *)((char *)dst + 24) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 12);
     memcpy( (char *)dst + 32, (const char *)src32 + 16, 4 );
     memcpy( (char *)dst + 36, (const char *)src32 + 20, 4 );
-    *(ULONG64 *)((char *)dst + 40) = (ULONG64)*(const UINT32 *)((const char *)src32 + 24);
+    *(unsigned long long *)((char *)dst + 40) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 24);
 }
-static inline void wine_repack64_D3D11_VIDEO_DECODER_EXTENSION( void *dst32, const D3D11_VIDEO_DECODER_EXTENSION *src )
+static inline void wine_repack64_D3D11_VIDEO_DECODER_EXTENSION( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 4 );
-    *(UINT32 *)((char *)dst32 + 4) = (UINT32)*(const ULONG64 *)((const char *)src + 8);
+    *(unsigned int *)((char *)dst32 + 4) = (unsigned int)*(const unsigned long long *)((const char *)src + 8);
     memcpy( (char *)dst32 + 8, (const char *)src + 16, 4 );
-    *(UINT32 *)((char *)dst32 + 12) = (UINT32)*(const ULONG64 *)((const char *)src + 24);
+    *(unsigned int *)((char *)dst32 + 12) = (unsigned int)*(const unsigned long long *)((const char *)src + 24);
     memcpy( (char *)dst32 + 16, (const char *)src + 32, 4 );
     memcpy( (char *)dst32 + 20, (const char *)src + 36, 4 );
-    *(UINT32 *)((char *)dst32 + 24) = (UINT32)*(const ULONG64 *)((const char *)src + 40);
+    *(unsigned int *)((char *)dst32 + 24) = (unsigned int)*(const unsigned long long *)((const char *)src + 40);
 }
 
 /* D3D11_VIDEO_PROCESSOR_STREAM: 72 bytes / align 8 on a 64-bit guest, 44 / 4 on i386 */
 #define WINE_REPACK32_SIZE_D3D11_VIDEO_PROCESSOR_STREAM 44
-static inline void wine_repack32_D3D11_VIDEO_PROCESSOR_STREAM( D3D11_VIDEO_PROCESSOR_STREAM *dst, const void *src32 )
+static inline void wine_repack32_D3D11_VIDEO_PROCESSOR_STREAM( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 4 );
     memcpy( (char *)dst + 4, (const char *)src32 + 4, 4 );
     memcpy( (char *)dst + 8, (const char *)src32 + 8, 4 );
     memcpy( (char *)dst + 12, (const char *)src32 + 12, 4 );
     memcpy( (char *)dst + 16, (const char *)src32 + 16, 4 );
-    *(ULONG64 *)((char *)dst + 24) = (ULONG64)*(const UINT32 *)((const char *)src32 + 20);
-    *(ULONG64 *)((char *)dst + 32) = (ULONG64)*(const UINT32 *)((const char *)src32 + 24);
-    *(ULONG64 *)((char *)dst + 40) = (ULONG64)*(const UINT32 *)((const char *)src32 + 28);
-    *(ULONG64 *)((char *)dst + 48) = (ULONG64)*(const UINT32 *)((const char *)src32 + 32);
-    *(ULONG64 *)((char *)dst + 56) = (ULONG64)*(const UINT32 *)((const char *)src32 + 36);
-    *(ULONG64 *)((char *)dst + 64) = (ULONG64)*(const UINT32 *)((const char *)src32 + 40);
+    *(unsigned long long *)((char *)dst + 24) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 20);
+    *(unsigned long long *)((char *)dst + 32) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 24);
+    *(unsigned long long *)((char *)dst + 40) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 28);
+    *(unsigned long long *)((char *)dst + 48) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 32);
+    *(unsigned long long *)((char *)dst + 56) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 36);
+    *(unsigned long long *)((char *)dst + 64) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 40);
 }
-static inline void wine_repack64_D3D11_VIDEO_PROCESSOR_STREAM( void *dst32, const D3D11_VIDEO_PROCESSOR_STREAM *src )
+static inline void wine_repack64_D3D11_VIDEO_PROCESSOR_STREAM( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 4 );
     memcpy( (char *)dst32 + 4, (const char *)src + 4, 4 );
     memcpy( (char *)dst32 + 8, (const char *)src + 8, 4 );
     memcpy( (char *)dst32 + 12, (const char *)src + 12, 4 );
     memcpy( (char *)dst32 + 16, (const char *)src + 16, 4 );
-    *(UINT32 *)((char *)dst32 + 20) = (UINT32)*(const ULONG64 *)((const char *)src + 24);
-    *(UINT32 *)((char *)dst32 + 24) = (UINT32)*(const ULONG64 *)((const char *)src + 32);
-    *(UINT32 *)((char *)dst32 + 28) = (UINT32)*(const ULONG64 *)((const char *)src + 40);
-    *(UINT32 *)((char *)dst32 + 32) = (UINT32)*(const ULONG64 *)((const char *)src + 48);
-    *(UINT32 *)((char *)dst32 + 36) = (UINT32)*(const ULONG64 *)((const char *)src + 56);
-    *(UINT32 *)((char *)dst32 + 40) = (UINT32)*(const ULONG64 *)((const char *)src + 64);
+    *(unsigned int *)((char *)dst32 + 20) = (unsigned int)*(const unsigned long long *)((const char *)src + 24);
+    *(unsigned int *)((char *)dst32 + 24) = (unsigned int)*(const unsigned long long *)((const char *)src + 32);
+    *(unsigned int *)((char *)dst32 + 28) = (unsigned int)*(const unsigned long long *)((const char *)src + 40);
+    *(unsigned int *)((char *)dst32 + 32) = (unsigned int)*(const unsigned long long *)((const char *)src + 48);
+    *(unsigned int *)((char *)dst32 + 36) = (unsigned int)*(const unsigned long long *)((const char *)src + 56);
+    *(unsigned int *)((char *)dst32 + 40) = (unsigned int)*(const unsigned long long *)((const char *)src + 64);
 }
 
 /* DXGI_ADAPTER_DESC: 304 bytes / align 8 on a 64-bit guest, 292 / 4 on i386 */
 #define WINE_REPACK32_SIZE_DXGI_ADAPTER_DESC 292
-static inline void wine_repack32_DXGI_ADAPTER_DESC( DXGI_ADAPTER_DESC *dst, const void *src32 )
+static inline void wine_repack32_DXGI_ADAPTER_DESC( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 256 );
     memcpy( (char *)dst + 256, (const char *)src32 + 256, 4 );
     memcpy( (char *)dst + 260, (const char *)src32 + 260, 4 );
     memcpy( (char *)dst + 264, (const char *)src32 + 264, 4 );
     memcpy( (char *)dst + 268, (const char *)src32 + 268, 4 );
-    *(ULONG64 *)((char *)dst + 272) = (ULONG64)*(const UINT32 *)((const char *)src32 + 272);
-    *(ULONG64 *)((char *)dst + 280) = (ULONG64)*(const UINT32 *)((const char *)src32 + 276);
-    *(ULONG64 *)((char *)dst + 288) = (ULONG64)*(const UINT32 *)((const char *)src32 + 280);
+    *(unsigned long long *)((char *)dst + 272) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 272);
+    *(unsigned long long *)((char *)dst + 280) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 276);
+    *(unsigned long long *)((char *)dst + 288) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 280);
     memcpy( (char *)dst + 296, (const char *)src32 + 284, 8 );
 }
-static inline void wine_repack64_DXGI_ADAPTER_DESC( void *dst32, const DXGI_ADAPTER_DESC *src )
+static inline void wine_repack64_DXGI_ADAPTER_DESC( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 256 );
     memcpy( (char *)dst32 + 256, (const char *)src + 256, 4 );
     memcpy( (char *)dst32 + 260, (const char *)src + 260, 4 );
     memcpy( (char *)dst32 + 264, (const char *)src + 264, 4 );
     memcpy( (char *)dst32 + 268, (const char *)src + 268, 4 );
-    *(UINT32 *)((char *)dst32 + 272) = (UINT32)*(const ULONG64 *)((const char *)src + 272);
-    *(UINT32 *)((char *)dst32 + 276) = (UINT32)*(const ULONG64 *)((const char *)src + 280);
-    *(UINT32 *)((char *)dst32 + 280) = (UINT32)*(const ULONG64 *)((const char *)src + 288);
+    { unsigned long long v = *(const unsigned long long *)((const char *)src + 272); *(unsigned int *)((char *)dst32 + 272) = v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }
+    { unsigned long long v = *(const unsigned long long *)((const char *)src + 280); *(unsigned int *)((char *)dst32 + 276) = v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }
+    { unsigned long long v = *(const unsigned long long *)((const char *)src + 288); *(unsigned int *)((char *)dst32 + 280) = v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }
     memcpy( (char *)dst32 + 284, (const char *)src + 296, 8 );
 }
 
 /* DXGI_ADAPTER_DESC1: 312 bytes / align 8 on a 64-bit guest, 296 / 4 on i386 */
 #define WINE_REPACK32_SIZE_DXGI_ADAPTER_DESC1 296
-static inline void wine_repack32_DXGI_ADAPTER_DESC1( DXGI_ADAPTER_DESC1 *dst, const void *src32 )
+static inline void wine_repack32_DXGI_ADAPTER_DESC1( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 256 );
     memcpy( (char *)dst + 256, (const char *)src32 + 256, 4 );
     memcpy( (char *)dst + 260, (const char *)src32 + 260, 4 );
     memcpy( (char *)dst + 264, (const char *)src32 + 264, 4 );
     memcpy( (char *)dst + 268, (const char *)src32 + 268, 4 );
-    *(ULONG64 *)((char *)dst + 272) = (ULONG64)*(const UINT32 *)((const char *)src32 + 272);
-    *(ULONG64 *)((char *)dst + 280) = (ULONG64)*(const UINT32 *)((const char *)src32 + 276);
-    *(ULONG64 *)((char *)dst + 288) = (ULONG64)*(const UINT32 *)((const char *)src32 + 280);
+    *(unsigned long long *)((char *)dst + 272) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 272);
+    *(unsigned long long *)((char *)dst + 280) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 276);
+    *(unsigned long long *)((char *)dst + 288) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 280);
     memcpy( (char *)dst + 296, (const char *)src32 + 284, 8 );
     memcpy( (char *)dst + 304, (const char *)src32 + 292, 4 );
 }
-static inline void wine_repack64_DXGI_ADAPTER_DESC1( void *dst32, const DXGI_ADAPTER_DESC1 *src )
+static inline void wine_repack64_DXGI_ADAPTER_DESC1( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 256 );
     memcpy( (char *)dst32 + 256, (const char *)src + 256, 4 );
     memcpy( (char *)dst32 + 260, (const char *)src + 260, 4 );
     memcpy( (char *)dst32 + 264, (const char *)src + 264, 4 );
     memcpy( (char *)dst32 + 268, (const char *)src + 268, 4 );
-    *(UINT32 *)((char *)dst32 + 272) = (UINT32)*(const ULONG64 *)((const char *)src + 272);
-    *(UINT32 *)((char *)dst32 + 276) = (UINT32)*(const ULONG64 *)((const char *)src + 280);
-    *(UINT32 *)((char *)dst32 + 280) = (UINT32)*(const ULONG64 *)((const char *)src + 288);
+    { unsigned long long v = *(const unsigned long long *)((const char *)src + 272); *(unsigned int *)((char *)dst32 + 272) = v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }
+    { unsigned long long v = *(const unsigned long long *)((const char *)src + 280); *(unsigned int *)((char *)dst32 + 276) = v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }
+    { unsigned long long v = *(const unsigned long long *)((const char *)src + 288); *(unsigned int *)((char *)dst32 + 280) = v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }
     memcpy( (char *)dst32 + 284, (const char *)src + 296, 8 );
     memcpy( (char *)dst32 + 292, (const char *)src + 304, 4 );
 }
 
 /* DXGI_ADAPTER_DESC2: 320 bytes / align 8 on a 64-bit guest, 304 / 4 on i386 */
 #define WINE_REPACK32_SIZE_DXGI_ADAPTER_DESC2 304
-static inline void wine_repack32_DXGI_ADAPTER_DESC2( DXGI_ADAPTER_DESC2 *dst, const void *src32 )
+static inline void wine_repack32_DXGI_ADAPTER_DESC2( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 256 );
     memcpy( (char *)dst + 256, (const char *)src32 + 256, 4 );
     memcpy( (char *)dst + 260, (const char *)src32 + 260, 4 );
     memcpy( (char *)dst + 264, (const char *)src32 + 264, 4 );
     memcpy( (char *)dst + 268, (const char *)src32 + 268, 4 );
-    *(ULONG64 *)((char *)dst + 272) = (ULONG64)*(const UINT32 *)((const char *)src32 + 272);
-    *(ULONG64 *)((char *)dst + 280) = (ULONG64)*(const UINT32 *)((const char *)src32 + 276);
-    *(ULONG64 *)((char *)dst + 288) = (ULONG64)*(const UINT32 *)((const char *)src32 + 280);
+    *(unsigned long long *)((char *)dst + 272) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 272);
+    *(unsigned long long *)((char *)dst + 280) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 276);
+    *(unsigned long long *)((char *)dst + 288) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 280);
     memcpy( (char *)dst + 296, (const char *)src32 + 284, 8 );
     memcpy( (char *)dst + 304, (const char *)src32 + 292, 4 );
     memcpy( (char *)dst + 308, (const char *)src32 + 296, 4 );
     memcpy( (char *)dst + 312, (const char *)src32 + 300, 4 );
 }
-static inline void wine_repack64_DXGI_ADAPTER_DESC2( void *dst32, const DXGI_ADAPTER_DESC2 *src )
+static inline void wine_repack64_DXGI_ADAPTER_DESC2( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 256 );
     memcpy( (char *)dst32 + 256, (const char *)src + 256, 4 );
     memcpy( (char *)dst32 + 260, (const char *)src + 260, 4 );
     memcpy( (char *)dst32 + 264, (const char *)src + 264, 4 );
     memcpy( (char *)dst32 + 268, (const char *)src + 268, 4 );
-    *(UINT32 *)((char *)dst32 + 272) = (UINT32)*(const ULONG64 *)((const char *)src + 272);
-    *(UINT32 *)((char *)dst32 + 276) = (UINT32)*(const ULONG64 *)((const char *)src + 280);
-    *(UINT32 *)((char *)dst32 + 280) = (UINT32)*(const ULONG64 *)((const char *)src + 288);
+    { unsigned long long v = *(const unsigned long long *)((const char *)src + 272); *(unsigned int *)((char *)dst32 + 272) = v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }
+    { unsigned long long v = *(const unsigned long long *)((const char *)src + 280); *(unsigned int *)((char *)dst32 + 276) = v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }
+    { unsigned long long v = *(const unsigned long long *)((const char *)src + 288); *(unsigned int *)((char *)dst32 + 280) = v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }
     memcpy( (char *)dst32 + 284, (const char *)src + 296, 8 );
     memcpy( (char *)dst32 + 292, (const char *)src + 304, 4 );
     memcpy( (char *)dst32 + 296, (const char *)src + 308, 4 );
@@ -909,31 +1041,31 @@ static inline void wine_repack64_DXGI_ADAPTER_DESC2( void *dst32, const DXGI_ADA
 
 /* DXGI_ADAPTER_DESC3: 320 bytes / align 8 on a 64-bit guest, 304 / 4 on i386 */
 #define WINE_REPACK32_SIZE_DXGI_ADAPTER_DESC3 304
-static inline void wine_repack32_DXGI_ADAPTER_DESC3( DXGI_ADAPTER_DESC3 *dst, const void *src32 )
+static inline void wine_repack32_DXGI_ADAPTER_DESC3( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 256 );
     memcpy( (char *)dst + 256, (const char *)src32 + 256, 4 );
     memcpy( (char *)dst + 260, (const char *)src32 + 260, 4 );
     memcpy( (char *)dst + 264, (const char *)src32 + 264, 4 );
     memcpy( (char *)dst + 268, (const char *)src32 + 268, 4 );
-    *(ULONG64 *)((char *)dst + 272) = (ULONG64)*(const UINT32 *)((const char *)src32 + 272);
-    *(ULONG64 *)((char *)dst + 280) = (ULONG64)*(const UINT32 *)((const char *)src32 + 276);
-    *(ULONG64 *)((char *)dst + 288) = (ULONG64)*(const UINT32 *)((const char *)src32 + 280);
+    *(unsigned long long *)((char *)dst + 272) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 272);
+    *(unsigned long long *)((char *)dst + 280) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 276);
+    *(unsigned long long *)((char *)dst + 288) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 280);
     memcpy( (char *)dst + 296, (const char *)src32 + 284, 8 );
     memcpy( (char *)dst + 304, (const char *)src32 + 292, 4 );
     memcpy( (char *)dst + 308, (const char *)src32 + 296, 4 );
     memcpy( (char *)dst + 312, (const char *)src32 + 300, 4 );
 }
-static inline void wine_repack64_DXGI_ADAPTER_DESC3( void *dst32, const DXGI_ADAPTER_DESC3 *src )
+static inline void wine_repack64_DXGI_ADAPTER_DESC3( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 256 );
     memcpy( (char *)dst32 + 256, (const char *)src + 256, 4 );
     memcpy( (char *)dst32 + 260, (const char *)src + 260, 4 );
     memcpy( (char *)dst32 + 264, (const char *)src + 264, 4 );
     memcpy( (char *)dst32 + 268, (const char *)src + 268, 4 );
-    *(UINT32 *)((char *)dst32 + 272) = (UINT32)*(const ULONG64 *)((const char *)src + 272);
-    *(UINT32 *)((char *)dst32 + 276) = (UINT32)*(const ULONG64 *)((const char *)src + 280);
-    *(UINT32 *)((char *)dst32 + 280) = (UINT32)*(const ULONG64 *)((const char *)src + 288);
+    { unsigned long long v = *(const unsigned long long *)((const char *)src + 272); *(unsigned int *)((char *)dst32 + 272) = v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }
+    { unsigned long long v = *(const unsigned long long *)((const char *)src + 280); *(unsigned int *)((char *)dst32 + 276) = v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }
+    { unsigned long long v = *(const unsigned long long *)((const char *)src + 288); *(unsigned int *)((char *)dst32 + 280) = v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }
     memcpy( (char *)dst32 + 284, (const char *)src + 296, 8 );
     memcpy( (char *)dst32 + 292, (const char *)src + 304, 4 );
     memcpy( (char *)dst32 + 296, (const char *)src + 308, 4 );
@@ -942,100 +1074,100 @@ static inline void wine_repack64_DXGI_ADAPTER_DESC3( void *dst32, const DXGI_ADA
 
 /* DXGI_INFO_QUEUE_FILTER: 96 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
 #define WINE_REPACK32_SIZE_DXGI_INFO_QUEUE_FILTER 48
-static inline void wine_repack32_DXGI_INFO_QUEUE_FILTER( DXGI_INFO_QUEUE_FILTER *dst, const void *src32 )
+static inline void wine_repack32_DXGI_INFO_QUEUE_FILTER( void *dst, const void *src32 )
 {
-    wine_repack32_DXGI_INFO_QUEUE_FILTER_DESC( (DXGI_INFO_QUEUE_FILTER_DESC *)((char *)dst + 0), (const char *)src32 + 0 );
-    wine_repack32_DXGI_INFO_QUEUE_FILTER_DESC( (DXGI_INFO_QUEUE_FILTER_DESC *)((char *)dst + 48), (const char *)src32 + 24 );
+    wine_repack32_DXGI_INFO_QUEUE_FILTER_DESC( (char *)dst + 0, (const char *)src32 + 0 );
+    wine_repack32_DXGI_INFO_QUEUE_FILTER_DESC( (char *)dst + 48, (const char *)src32 + 24 );
 }
-static inline void wine_repack64_DXGI_INFO_QUEUE_FILTER( void *dst32, const DXGI_INFO_QUEUE_FILTER *src )
+static inline void wine_repack64_DXGI_INFO_QUEUE_FILTER( void *dst32, const void *src )
 {
-    wine_repack64_DXGI_INFO_QUEUE_FILTER_DESC( (char *)dst32 + 0, (const DXGI_INFO_QUEUE_FILTER_DESC *)((const char *)src + 0) );
-    wine_repack64_DXGI_INFO_QUEUE_FILTER_DESC( (char *)dst32 + 24, (const DXGI_INFO_QUEUE_FILTER_DESC *)((const char *)src + 48) );
+    wine_repack64_DXGI_INFO_QUEUE_FILTER_DESC( (char *)dst32 + 0, (const char *)src + 0 );
+    wine_repack64_DXGI_INFO_QUEUE_FILTER_DESC( (char *)dst32 + 24, (const char *)src + 48 );
 }
 
 /* DXGI_INFO_QUEUE_FILTER_DESC: 48 bytes / align 8 on a 64-bit guest, 24 / 4 on i386 */
 #define WINE_REPACK32_SIZE_DXGI_INFO_QUEUE_FILTER_DESC 24
-static inline void wine_repack32_DXGI_INFO_QUEUE_FILTER_DESC( DXGI_INFO_QUEUE_FILTER_DESC *dst, const void *src32 )
+static inline void wine_repack32_DXGI_INFO_QUEUE_FILTER_DESC( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 4 );
-    *(ULONG64 *)((char *)dst + 8) = (ULONG64)*(const UINT32 *)((const char *)src32 + 4);
+    *(unsigned long long *)((char *)dst + 8) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 4);
     memcpy( (char *)dst + 16, (const char *)src32 + 8, 4 );
-    *(ULONG64 *)((char *)dst + 24) = (ULONG64)*(const UINT32 *)((const char *)src32 + 12);
+    *(unsigned long long *)((char *)dst + 24) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 12);
     memcpy( (char *)dst + 32, (const char *)src32 + 16, 4 );
-    *(ULONG64 *)((char *)dst + 40) = (ULONG64)*(const UINT32 *)((const char *)src32 + 20);
+    *(unsigned long long *)((char *)dst + 40) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 20);
 }
-static inline void wine_repack64_DXGI_INFO_QUEUE_FILTER_DESC( void *dst32, const DXGI_INFO_QUEUE_FILTER_DESC *src )
+static inline void wine_repack64_DXGI_INFO_QUEUE_FILTER_DESC( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 4 );
-    *(UINT32 *)((char *)dst32 + 4) = (UINT32)*(const ULONG64 *)((const char *)src + 8);
+    *(unsigned int *)((char *)dst32 + 4) = (unsigned int)*(const unsigned long long *)((const char *)src + 8);
     memcpy( (char *)dst32 + 8, (const char *)src + 16, 4 );
-    *(UINT32 *)((char *)dst32 + 12) = (UINT32)*(const ULONG64 *)((const char *)src + 24);
+    *(unsigned int *)((char *)dst32 + 12) = (unsigned int)*(const unsigned long long *)((const char *)src + 24);
     memcpy( (char *)dst32 + 16, (const char *)src + 32, 4 );
-    *(UINT32 *)((char *)dst32 + 20) = (UINT32)*(const ULONG64 *)((const char *)src + 40);
+    *(unsigned int *)((char *)dst32 + 20) = (unsigned int)*(const unsigned long long *)((const char *)src + 40);
 }
 
 /* DXGI_INFO_QUEUE_MESSAGE: 48 bytes / align 8 on a 64-bit guest, 36 / 4 on i386 */
 #define WINE_REPACK32_SIZE_DXGI_INFO_QUEUE_MESSAGE 36
-static inline void wine_repack32_DXGI_INFO_QUEUE_MESSAGE( DXGI_INFO_QUEUE_MESSAGE *dst, const void *src32 )
+static inline void wine_repack32_DXGI_INFO_QUEUE_MESSAGE( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 16 );
     memcpy( (char *)dst + 16, (const char *)src32 + 16, 4 );
     memcpy( (char *)dst + 20, (const char *)src32 + 20, 4 );
     memcpy( (char *)dst + 24, (const char *)src32 + 24, 4 );
-    *(ULONG64 *)((char *)dst + 32) = (ULONG64)*(const UINT32 *)((const char *)src32 + 28);
-    *(ULONG64 *)((char *)dst + 40) = (ULONG64)*(const UINT32 *)((const char *)src32 + 32);
+    *(unsigned long long *)((char *)dst + 32) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 28);
+    *(unsigned long long *)((char *)dst + 40) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 32);
 }
-static inline void wine_repack64_DXGI_INFO_QUEUE_MESSAGE( void *dst32, const DXGI_INFO_QUEUE_MESSAGE *src )
+static inline void wine_repack64_DXGI_INFO_QUEUE_MESSAGE( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 16 );
     memcpy( (char *)dst32 + 16, (const char *)src + 16, 4 );
     memcpy( (char *)dst32 + 20, (const char *)src + 20, 4 );
     memcpy( (char *)dst32 + 24, (const char *)src + 24, 4 );
-    *(UINT32 *)((char *)dst32 + 28) = (UINT32)*(const ULONG64 *)((const char *)src + 32);
-    *(UINT32 *)((char *)dst32 + 32) = (UINT32)*(const ULONG64 *)((const char *)src + 40);
+    *(unsigned int *)((char *)dst32 + 28) = (unsigned int)*(const unsigned long long *)((const char *)src + 32);
+    { unsigned long long v = *(const unsigned long long *)((const char *)src + 40); *(unsigned int *)((char *)dst32 + 32) = v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }
 }
 
 /* DXGI_MAPPED_RECT: 16 bytes / align 8 on a 64-bit guest, 8 / 4 on i386 */
 #define WINE_REPACK32_SIZE_DXGI_MAPPED_RECT 8
-static inline void wine_repack32_DXGI_MAPPED_RECT( DXGI_MAPPED_RECT *dst, const void *src32 )
+static inline void wine_repack32_DXGI_MAPPED_RECT( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 4 );
-    *(ULONG64 *)((char *)dst + 8) = (ULONG64)*(const UINT32 *)((const char *)src32 + 4);
+    *(unsigned long long *)((char *)dst + 8) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 4);
 }
-static inline void wine_repack64_DXGI_MAPPED_RECT( void *dst32, const DXGI_MAPPED_RECT *src )
+static inline void wine_repack64_DXGI_MAPPED_RECT( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 4 );
-    *(UINT32 *)((char *)dst32 + 4) = (UINT32)*(const ULONG64 *)((const char *)src + 8);
+    *(unsigned int *)((char *)dst32 + 4) = (unsigned int)*(const unsigned long long *)((const char *)src + 8);
 }
 
 /* DXGI_OUTPUT_DESC: 96 bytes / align 8 on a 64-bit guest, 92 / 4 on i386 */
 #define WINE_REPACK32_SIZE_DXGI_OUTPUT_DESC 92
-static inline void wine_repack32_DXGI_OUTPUT_DESC( DXGI_OUTPUT_DESC *dst, const void *src32 )
+static inline void wine_repack32_DXGI_OUTPUT_DESC( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 64 );
     memcpy( (char *)dst + 64, (const char *)src32 + 64, 16 );
     memcpy( (char *)dst + 80, (const char *)src32 + 80, 4 );
     memcpy( (char *)dst + 84, (const char *)src32 + 84, 4 );
-    *(ULONG64 *)((char *)dst + 88) = (ULONG64)*(const UINT32 *)((const char *)src32 + 88);
+    *(unsigned long long *)((char *)dst + 88) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 88);
 }
-static inline void wine_repack64_DXGI_OUTPUT_DESC( void *dst32, const DXGI_OUTPUT_DESC *src )
+static inline void wine_repack64_DXGI_OUTPUT_DESC( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 64 );
     memcpy( (char *)dst32 + 64, (const char *)src + 64, 16 );
     memcpy( (char *)dst32 + 80, (const char *)src + 80, 4 );
     memcpy( (char *)dst32 + 84, (const char *)src + 84, 4 );
-    *(UINT32 *)((char *)dst32 + 88) = (UINT32)*(const ULONG64 *)((const char *)src + 88);
+    *(unsigned int *)((char *)dst32 + 88) = (unsigned int)*(const unsigned long long *)((const char *)src + 88);
 }
 
 /* DXGI_OUTPUT_DESC1: 152 bytes / align 8 on a 64-bit guest, 144 / 4 on i386 */
 #define WINE_REPACK32_SIZE_DXGI_OUTPUT_DESC1 144
-static inline void wine_repack32_DXGI_OUTPUT_DESC1( DXGI_OUTPUT_DESC1 *dst, const void *src32 )
+static inline void wine_repack32_DXGI_OUTPUT_DESC1( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 64 );
     memcpy( (char *)dst + 64, (const char *)src32 + 64, 16 );
     memcpy( (char *)dst + 80, (const char *)src32 + 80, 4 );
     memcpy( (char *)dst + 84, (const char *)src32 + 84, 4 );
-    *(ULONG64 *)((char *)dst + 88) = (ULONG64)*(const UINT32 *)((const char *)src32 + 88);
+    *(unsigned long long *)((char *)dst + 88) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 88);
     memcpy( (char *)dst + 96, (const char *)src32 + 92, 4 );
     memcpy( (char *)dst + 100, (const char *)src32 + 96, 4 );
     memcpy( (char *)dst + 104, (const char *)src32 + 100, 8 );
@@ -1046,13 +1178,13 @@ static inline void wine_repack32_DXGI_OUTPUT_DESC1( DXGI_OUTPUT_DESC1 *dst, cons
     memcpy( (char *)dst + 140, (const char *)src32 + 136, 4 );
     memcpy( (char *)dst + 144, (const char *)src32 + 140, 4 );
 }
-static inline void wine_repack64_DXGI_OUTPUT_DESC1( void *dst32, const DXGI_OUTPUT_DESC1 *src )
+static inline void wine_repack64_DXGI_OUTPUT_DESC1( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 64 );
     memcpy( (char *)dst32 + 64, (const char *)src + 64, 16 );
     memcpy( (char *)dst32 + 80, (const char *)src + 80, 4 );
     memcpy( (char *)dst32 + 84, (const char *)src + 84, 4 );
-    *(UINT32 *)((char *)dst32 + 88) = (UINT32)*(const ULONG64 *)((const char *)src + 88);
+    *(unsigned int *)((char *)dst32 + 88) = (unsigned int)*(const unsigned long long *)((const char *)src + 88);
     memcpy( (char *)dst32 + 92, (const char *)src + 96, 4 );
     memcpy( (char *)dst32 + 96, (const char *)src + 100, 4 );
     memcpy( (char *)dst32 + 100, (const char *)src + 104, 8 );
@@ -1066,52 +1198,52 @@ static inline void wine_repack64_DXGI_OUTPUT_DESC1( void *dst32, const DXGI_OUTP
 
 /* DXGI_PRESENT_PARAMETERS: 32 bytes / align 8 on a 64-bit guest, 16 / 4 on i386 */
 #define WINE_REPACK32_SIZE_DXGI_PRESENT_PARAMETERS 16
-static inline void wine_repack32_DXGI_PRESENT_PARAMETERS( DXGI_PRESENT_PARAMETERS *dst, const void *src32 )
+static inline void wine_repack32_DXGI_PRESENT_PARAMETERS( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 4 );
-    *(ULONG64 *)((char *)dst + 8) = (ULONG64)*(const UINT32 *)((const char *)src32 + 4);
-    *(ULONG64 *)((char *)dst + 16) = (ULONG64)*(const UINT32 *)((const char *)src32 + 8);
-    *(ULONG64 *)((char *)dst + 24) = (ULONG64)*(const UINT32 *)((const char *)src32 + 12);
+    *(unsigned long long *)((char *)dst + 8) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 4);
+    *(unsigned long long *)((char *)dst + 16) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 8);
+    *(unsigned long long *)((char *)dst + 24) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 12);
 }
-static inline void wine_repack64_DXGI_PRESENT_PARAMETERS( void *dst32, const DXGI_PRESENT_PARAMETERS *src )
+static inline void wine_repack64_DXGI_PRESENT_PARAMETERS( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 4 );
-    *(UINT32 *)((char *)dst32 + 4) = (UINT32)*(const ULONG64 *)((const char *)src + 8);
-    *(UINT32 *)((char *)dst32 + 8) = (UINT32)*(const ULONG64 *)((const char *)src + 16);
-    *(UINT32 *)((char *)dst32 + 12) = (UINT32)*(const ULONG64 *)((const char *)src + 24);
+    *(unsigned int *)((char *)dst32 + 4) = (unsigned int)*(const unsigned long long *)((const char *)src + 8);
+    *(unsigned int *)((char *)dst32 + 8) = (unsigned int)*(const unsigned long long *)((const char *)src + 16);
+    *(unsigned int *)((char *)dst32 + 12) = (unsigned int)*(const unsigned long long *)((const char *)src + 24);
 }
 
 /* DXGI_SHARED_RESOURCE: 8 bytes / align 8 on a 64-bit guest, 4 / 4 on i386 */
 #define WINE_REPACK32_SIZE_DXGI_SHARED_RESOURCE 4
-static inline void wine_repack32_DXGI_SHARED_RESOURCE( DXGI_SHARED_RESOURCE *dst, const void *src32 )
+static inline void wine_repack32_DXGI_SHARED_RESOURCE( void *dst, const void *src32 )
 {
-    *(ULONG64 *)((char *)dst + 0) = (ULONG64)*(const UINT32 *)((const char *)src32 + 0);
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
 }
-static inline void wine_repack64_DXGI_SHARED_RESOURCE( void *dst32, const DXGI_SHARED_RESOURCE *src )
+static inline void wine_repack64_DXGI_SHARED_RESOURCE( void *dst32, const void *src )
 {
-    *(UINT32 *)((char *)dst32 + 0) = (UINT32)*(const ULONG64 *)((const char *)src + 0);
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
 }
 
 /* DXGI_SWAP_CHAIN_DESC: 72 bytes / align 8 on a 64-bit guest, 60 / 4 on i386 */
 #define WINE_REPACK32_SIZE_DXGI_SWAP_CHAIN_DESC 60
-static inline void wine_repack32_DXGI_SWAP_CHAIN_DESC( DXGI_SWAP_CHAIN_DESC *dst, const void *src32 )
+static inline void wine_repack32_DXGI_SWAP_CHAIN_DESC( void *dst, const void *src32 )
 {
     memcpy( (char *)dst + 0, (const char *)src32 + 0, 28 );
     memcpy( (char *)dst + 28, (const char *)src32 + 28, 8 );
     memcpy( (char *)dst + 36, (const char *)src32 + 36, 4 );
     memcpy( (char *)dst + 40, (const char *)src32 + 40, 4 );
-    *(ULONG64 *)((char *)dst + 48) = (ULONG64)*(const UINT32 *)((const char *)src32 + 44);
+    *(unsigned long long *)((char *)dst + 48) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 44);
     memcpy( (char *)dst + 56, (const char *)src32 + 48, 4 );
     memcpy( (char *)dst + 60, (const char *)src32 + 52, 4 );
     memcpy( (char *)dst + 64, (const char *)src32 + 56, 4 );
 }
-static inline void wine_repack64_DXGI_SWAP_CHAIN_DESC( void *dst32, const DXGI_SWAP_CHAIN_DESC *src )
+static inline void wine_repack64_DXGI_SWAP_CHAIN_DESC( void *dst32, const void *src )
 {
     memcpy( (char *)dst32 + 0, (const char *)src + 0, 28 );
     memcpy( (char *)dst32 + 28, (const char *)src + 28, 8 );
     memcpy( (char *)dst32 + 36, (const char *)src + 36, 4 );
     memcpy( (char *)dst32 + 40, (const char *)src + 40, 4 );
-    *(UINT32 *)((char *)dst32 + 44) = (UINT32)*(const ULONG64 *)((const char *)src + 48);
+    *(unsigned int *)((char *)dst32 + 44) = (unsigned int)*(const unsigned long long *)((const char *)src + 48);
     memcpy( (char *)dst32 + 48, (const char *)src + 56, 4 );
     memcpy( (char *)dst32 + 52, (const char *)src + 60, 4 );
     memcpy( (char *)dst32 + 56, (const char *)src + 64, 4 );

@@ -59,6 +59,7 @@
 @ stub OpenAdapter10_2
 
 @ stdcall __wine_com_dispatch(long long ptr)
+@ stdcall __wine_com_dispatch32(long long ptr)
 @ stdcall __wine_guest_D3D11CreateDevice(ptr long ptr long ptr long long ptr ptr ptr)
 @ stdcall __wine_guest_D3D11CreateDeviceAndSwapChain(ptr long ptr long ptr long long ptr ptr ptr ptr ptr)
 @ stdcall __wine_guest_D3D11CoreCreateDevice(ptr ptr long ptr long ptr)

@@ -844,6 +844,124 @@ def collect_spellings(ifaces):
 
 
 
+
+# --------------------------------------------------------------------------
+# the i386 struct audit -- WINECOM_F_I386_STRUCTS_OK and the reps tables
+# --------------------------------------------------------------------------
+# The geometry above answers how the i386 FRAME is decoded; this answers what
+# the frame's POINTERS point at.  An i386 guest lays pointer members out in
+# four bytes and its structs move fields; the repack roster
+# (gen_repack32.py --json) records, for every aggregate on the surface,
+# whether the two layouts agree.  Every CA_PASS/CA_RET_PTR pointer parameter
+# of a served row must be accounted for -- identical, repacked (a reps[]
+# entry naming the generated repack pair), or the row refuses on the 32-bit
+# lane with a named reason -- before the row may carry
+# WINECOM_F_I386_STRUCTS_OK.  A row without the flag is refused by the
+# 32-bit dispatcher wholesale, so nothing unaudited can pass a divergent
+# struct through raw.
+
+# Pointee types that lay out identically on both guests without appearing in
+# the repack roster: scalars, GUIDs, and the plain-data Win32 aggregates the
+# roster's scan regex does not cover.  Pointer-width scalars (SIZE_T and
+# friends) are deliberately ABSENT: a SIZE_T out-parameter is a 4-byte cell
+# on i386 and would need a widening rep of its own.
+SAFE_POINTEE = frozenset(
+    """void char BYTE UINT8 UCHAR USHORT UINT16 SHORT INT16 UINT INT
+       DWORD ULONG LONG BOOL WINBOOL FLOAT float GUID IID UINT64 INT64
+       ULONGLONG LONGLONG DOUBLE double LARGE_INTEGER RECT POINT SIZE
+       LUID SECURITY_ATTRIBUTES D3D11_RECT D3D10_RECT""".split())
+
+# Divergent-struct parameters that are ARRAYS, with the by-value parameter
+# holding the element count.  Keyed by (Interface::Method, parameter name);
+# per-method API knowledge, the same honesty rule as HAND_SLOTS.
+STRUCT_ARRAYS = {
+    ("ID3D11Device::CreateInputLayout", "pInputElementDescs"): "NumElements",
+    ("ID3D11Device::CreateGeometryShaderWithStreamOutput", "pSODeclaration"): "NumEntries",
+    ("ID3D10Device::CreateInputLayout", "pInputElementDescs"): "NumElements",
+    ("ID3D10Device::CreateGeometryShaderWithStreamOutput", "pSODeclaration"): "NumEntries",
+}
+
+# Divergent-struct array parameters whose element count is NOT a by-value
+# parameter (CreateTexture*'s initial data is MipLevels x ArraySize out of
+# the desc): no mechanical rep can serve them, so the ROW refuses on the
+# 32-bit lane until a hand32 walker takes it over -- which dlls/d3d11's
+# hand32 table does for the texture creates.
+STRUCT_SPECIAL = {
+    ("ID3D11Device::CreateTexture1D", "pInitialData"),
+    ("ID3D11Device::CreateTexture2D", "pInitialData"),
+    ("ID3D11Device::CreateTexture3D", "pInitialData"),
+    ("ID3D10Device::CreateTexture1D", "pInitialData"),
+    ("ID3D10Device::CreateTexture2D", "pInitialData"),
+    ("ID3D10Device::CreateTexture3D", "pInitialData"),
+}
+
+# Divergent-struct pointer parameters whose name LOOKS plural but which the
+# API defines as a single struct -- the plural-name tripwire below demands
+# each one be confirmed here rather than silently defaulted to scalar.
+CONFIRMED_SCALAR = {
+    ("IDXGISwapChain1::Present1", "pPresentParameters"),
+}
+
+_audit_tripwire = []
+
+
+def audit_i386(key, s, cls, layouts, byval_ok):
+    """-> (reps, refuse32).  reps: [(param_idx, count_idx_or_None, dir,
+    typename)] for the divergent pointees; refuse32: a reason string when
+    the row cannot be served on the 32-bit lane; (None, None) when no audit
+    roster exists at all (the row then carries no STRUCTS_OK and fails
+    closed at dispatch)."""
+    if layouts is None:
+        return None, None
+    params = [Param(p) for p in s["params"]]
+    reps = []
+    for i, p in enumerate(params):
+        if p.stars == 0:
+            continue
+        if cls[i] not in (CA["PASS"], CA["RET_PTR"]):
+            continue        # interface/riid/event machinery: width-safe
+        base = p.base
+        if base in SAFE_POINTEE or base in byval_ok:
+            continue        # scalar or enum pointee: identical bytes
+        if base in layouts["identical"]:
+            continue
+        if base not in layouts["divergent"]:
+            return None, ("parameter `%s` points at %s, which the i386 "
+                          "layout roster never audited" % (p.raw, base))
+        if p.stars > 1:
+            return None, ("parameter `%s` is a pointer to pointers of the "
+                          "divergent %s; no rep describes that shape"
+                          % (p.raw, base))
+        mkey = (key, p.name)
+        if mkey in STRUCT_SPECIAL:
+            return None, ("`%s` is an array of the divergent %s whose "
+                          "element count is not a by-value parameter; a "
+                          "hand32 walker must serve this row" % (p.name, base))
+        count_idx = None
+        if mkey in STRUCT_ARRAYS:
+            cname = STRUCT_ARRAYS[mkey]
+            count_idx = next((j for j, q in enumerate(params)
+                              if q.stars == 0 and q.name == cname), None)
+            if count_idx is None:
+                sys.exit("gen_winecom: STRUCT_ARRAYS names count parameter "
+                         "%r for %s, which the roster's %s does not have"
+                         % (cname, mkey[1], key))
+        elif p.name.endswith("s") and mkey not in CONFIRMED_SCALAR:
+            _audit_tripwire.append((key, p.raw, base))
+            continue
+        dir_bits = 1 if "const" in p.raw.split() else 2
+        if cls[i] == CA["RET_PTR"]:
+            dir_bits = 2
+        if (dir_bits & 2) and layouts["divergent"][base].get("out_unsafe"):
+            return None, ("writes %s through `%s`, and that struct carries a "
+                          "pointer field a 4-byte guest cell cannot hold -- "
+                          "repacking OUT would silently truncate it (a hand32 "
+                          "walker with a below-4GiB answer must serve this "
+                          "row)" % (base, p.raw))
+        reps.append((i, count_idx, dir_bits, base))
+    return reps, None
+
+
 def classify(key, slot, ifaces, iface_index, byval_ok, bearing,
              why_bearing, opaque, why_opaque, void_pp_is_memory, oracle):
     """-> (cls[], xaux[], caux[], aux, aux2, masks) or raise
@@ -1035,7 +1153,7 @@ def c_guid(u):
 
 
 def generate(roster, prefix, header_dir=HEADERS, surface=None,
-             roster_name="interfaces_dxvk.json", oracle=None):
+             roster_name="interfaces_dxvk.json", oracle=None, layouts=None):
     ifaces = roster["interfaces"]
     order = sorted(ifaces)
     iface_index = {n: i for i, n in enumerate(order)}
@@ -1082,7 +1200,8 @@ def generate(roster, prefix, header_dir=HEADERS, surface=None,
     out = []
     w = out.append
     stats = dict(marshalled=0, refused=0, hand=0, identity=0, iunknown=0,
-                 geom=0, geom_unproven=0, qword_slots=0, ret_qword=0)
+                 geom=0, geom_unproven=0, qword_slots=0, ret_qword=0,
+                 refused32=0)
     refusal_log = []
     qword_log = []
     unproven_log = []
@@ -1129,7 +1248,7 @@ def generate(roster, prefix, header_dir=HEADERS, surface=None,
         # claim geometry (and marshalled rows) this file does not publish --
         # the d3d11 banner said "2611 rows carry WINECOM_F_I386_GEOM" while
         # only 2593 existed, the 18 others living in elided tables.
-        istats = dict(marshalled=0, refused=0, hand=0,
+        istats = dict(marshalled=0, refused=0, hand=0, refused32=0,
                       geom=0, geom_unproven=0, qword_slots=0, ret_qword=0)
         iqword_log = []
         iunproven_log = []
@@ -1195,6 +1314,39 @@ def generate(roster, prefix, header_dir=HEADERS, surface=None,
                 refusal_log.append((n, s["slot"], key, reason))
                 interesting = True
                 continue
+            # The i386 struct audit.  A row it refuses (refuse32) is STILL a
+            # fully marshalled row for the 64-bit lane -- the first cut here
+            # emitted refuse32 rows with NULL cls/xaux, so the 64-bit
+            # dispatcher treated every parameter as CA_PASS and handed the
+            # guest a RAW HOST POINTER from CreateTexture2D's out parameter
+            # [MEASURED: check-d3d11-smoke went red at step 3, the texture
+            # unrecognizable one call later].  Only the LAST field differs.
+            reps, refuse32 = audit_i386(key, s, cls, layouts, byval_ok)
+            r32 = "NULL"
+            if refuse32 is not None:
+                r32 = '\n      "%s::%s: %s"' % (s["owner"], s["name"],
+                                                 refuse32.replace('"', "'"))
+                istats["refused32"] += 1
+                refusal_log.append((n, s["slot"], key, "[i386 only] " + refuse32))
+                interesting = True
+            rname = "NULL"
+            repn = 0
+            if refuse32 is None and reps is not None and layouts is not None:
+                gflags.append("WINECOM_F_I386_STRUCTS_OK")
+            if refuse32 is None and reps:
+                rname = "reps_%s_%d" % (n, s["slot"])
+                ents = []
+                for pi, ci, db, ty in reps:
+                    ents.append("{ %d, %s, %d, %d, %d, wine_repack32_%s,"
+                                " wine_repack64_%s }"
+                                % (pi, "0xff" if ci is None else str(ci), db,
+                                   layouts["divergent"][ty]["size64"],
+                                   layouts["divergent"][ty]["size32"],
+                                   ty, ty))
+                decls.append("static const struct winecom_rep %s[] =\n"
+                             "    { %s };" % (rname, ",\n      ".join(ents)))
+                repn = len(reps)
+                interesting = True
             cname = xname = kname = "NULL"
             if any(c != CA["PASS"] for c in cls):
                 cname = "cls_%s_%d" % (n, s["slot"])
@@ -1212,10 +1364,10 @@ def generate(roster, prefix, header_dir=HEADERS, surface=None,
             nm, nw, ns, dm, ds = masks
             rows.append('    { "%s", NULL, %s, %s, %d, %s, %d, %d, %s, 0, 0,'
                         ' 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%04x, 0x%04x,'
-                        ' 0x%04x },'
+                        ' 0x%04x, %s, %d, %s },'
                         % (label, cname, xname, argc,
                            "|".join(flags + gflags) or "0", aux, aux2, kname,
-                           0, nm, nw, ns, dm, ds, qm))
+                           0, nm, nw, ns, dm, ds, qm, rname, repn, r32))
             istats["marshalled"] += 1
 
         if not interesting:
@@ -1261,6 +1413,14 @@ def generate(roster, prefix, header_dir=HEADERS, surface=None,
              "NULL" if t is None else "slots_" + n))
     w("};")
 
+    if _audit_tripwire:
+        sys.exit("gen_winecom: %d divergent-struct pointer parameter(s) have "
+                 "plural-looking names and no plurality ruling; add each to "
+                 "STRUCT_ARRAYS, STRUCT_SPECIAL or CONFIRMED_SCALAR:\n  %s"
+                 % (len(_audit_tripwire),
+                    "\n  ".join("%s: %s (-> %s)" % t
+                                 for t in sorted(set(_audit_tripwire)))))
+
     # The second opinion on every published frame: clang's own stdcall @N.
     checked = oracle.check_stdcall_frames(chk_entries, {})
 
@@ -1270,11 +1430,12 @@ def generate(roster, prefix, header_dir=HEADERS, surface=None,
       " * i386 geometry: %d row(s) carry WINECOM_F_I386_GEOM (%d distinct\n"
       " * frames re-checked against clang's stdcall @N decoration), %d with\n"
       " * a non-zero qwordmask, %d returning EDX:EAX; %d row(s) publish no\n"
-      " * i386 geometry and a 32-bit lane must fail closed on them. */"
+      " * i386 geometry and a 32-bit lane must fail closed on them; %d\n"
+      " * row(s) refuse on the 32-bit lane only (refuse32). */"
       % (stats["marshalled"], stats["hand"], stats["refused"],
          stats["iunknown"], stats["identity"],
          stats["geom"], checked, stats["qword_slots"], stats["ret_qword"],
-         stats["geom_unproven"]))
+         stats["geom_unproven"], stats["refused32"]))
     return ("\n".join(out) + "\n", stats, refusal_log, qword_log,
             unproven_log)
 
@@ -1294,6 +1455,12 @@ def main():
     ap.add_argument("--report", action="store_true")
     ap.add_argument("--clang", default="clang",
                     help="the compiler the i386 width oracle asks")
+    ap.add_argument("--repack-json", default=None,
+                    help="the layout roster gen_repack32.py --json wrote; "
+                         "defaults to repack32_<prefix>.json beside this "
+                         "script when that exists.  Without one, no row gets "
+                         "WINECOM_F_I386_STRUCTS_OK and the 32-bit lane "
+                         "fails closed on every marshalled row.")
     ap.add_argument("--build-include", default=None,
                     help="directory holding Wine's widl-GENERATED headers "
                          "(wtypes.h and friends); defaults to the sibling "
@@ -1332,9 +1499,24 @@ def main():
                          os.path.join(wine_root, "include", "msvcrt")],
                         set(), args.prefix)
 
+    repack_json = args.repack_json
+    if repack_json is None:
+        cand = os.path.join(HERE, "repack32_%s.json" % args.prefix)
+        repack_json = cand if os.path.exists(cand) else None
+    layouts = None
+    if repack_json:
+        with open(repack_json) as fh:
+            layouts = json.load(fh)
+        print("i386 struct audit: %d divergent, %d identical aggregates "
+              "from %s" % (len(layouts["divergent"]),
+                           len(layouts["identical"]), repack_json))
+    else:
+        print("i386 struct audit: NO layout roster; every marshalled row "
+              "will fail closed on the 32-bit lane")
+
     text, stats, refusals, qwords, unproven = generate(
         roster, args.prefix, args.headers, surface,
-        os.path.basename(args.roster), oracle)
+        os.path.basename(args.roster), oracle, layouts)
 
     print("surface %s: %d marshalled, %d hand-written, %d refused, "
           "%d IUnknown, %d identity-only interface(s)"

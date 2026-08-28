@@ -21,6 +21,7 @@
 @ stdcall DXGIDeclareAdapterRemovalSupport() d3d11.__wine_dxvk_DXGIDeclareAdapterRemovalSupport
 @ stdcall DXGIGetDebugInterface1(long ptr ptr) d3d11.__wine_dxvk_DXGIGetDebugInterface1
 @ stdcall __wine_com_dispatch(long long ptr) d3d11.__wine_com_dispatch
+@ stdcall __wine_com_dispatch32(long long ptr) d3d11.__wine_com_dispatch32
 @ stdcall __wine_guest_CreateDXGIFactory(ptr ptr) d3d11.__wine_guest_CreateDXGIFactory
 @ stdcall __wine_guest_CreateDXGIFactory1(ptr ptr) d3d11.__wine_guest_CreateDXGIFactory1
 @ stdcall __wine_guest_CreateDXGIFactory2(long ptr ptr) d3d11.__wine_guest_CreateDXGIFactory2

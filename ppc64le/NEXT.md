@@ -19,9 +19,9 @@ the per-title board, `ppc64le/WORKING-ON-THIS.md` is the operational knowledge
   resolves content from CWD and exited rc=0 politely without it).
 * **33 gates green, sabotage sweep included** — every negative control goes
   red, none skipped, none failed.  That sentence is finally true.
-* **The 32-bit lane is half built.**  dexwin boots and shows a window; it has
-  no graphics because i386 d3d11 exports no dxvk surface.  Item 2 has the
-  state, and `ppc64le/dxvk/docs/i386-lane-design.md` the design and the crux.
+* **The 32-bit lane is BUILT (2026-08-28)** -- geometry, dispatch32, repacks,
+  Map bounce, gate green and byte-identical to native.  Item 2 has the map;
+  dexwin's end-to-end run is the next act.
 * **Performance is one thread.**  Not the old ~2.5-core ceiling (which does
   not reproduce): the game pulls ~15 cores with GameThread pinned at 92%.
   Item 6 has the measured lever matrix.
@@ -44,48 +44,50 @@ give the sweep its own Xvfb.  And it takes about half an hour, so it is a
 
 ## 2. The 32-bit lane: the i386 half of the dxvk thunk surface
 
-**DIAGNOSED, SCOPED, GEOMETRY LANDED — emitter still to write** (updated
-2026-08-22).  The winecom table can now describe an i386 stdcall frame:
-`winecom_slot::qwordmask` distinguishes true 64-bit scalars (UINT64,
-D3D12_GPU_VIRTUAL_ADDRESS — two i386 stack slots) from pointer-sized values
-(HANDLE, SIZE_T, ULONG_PTR — one), which the old QWORD_BYVAL class conflated.
-`WINECOM_F_RET_QWORD` marks EDX:EAX return, and `WINECOM_F_I386_GEOM` is the
-contract flag a reader must consult before trusting the fields.  Widths come
-from clang for the i386 target — never from name matching, which is exactly
-how HANDLE and UINT64 ended up in one bucket the first time.  314 rows gained
-qword markings and 11 return EDX:EAX; float-returning slots refuse geometry
-rather than lying about it (i386 returns float in x87 ST(0), and a lane
-trusting a wrong flag would return garbage and leak x87 stack entries; the
-seven refused are d3d11's GetResourceMinLOD and d3d9's GetNPatchMode).
-Nothing in the tree READS any of the new fields yet, so the fail-closed rule
-is a CONTRACT and not an enforcement — the header now says so.
+**BUILT AND GATED (2026-08-28).**  The whole lane is in the tree and
+`ppc64le/dxvk/check-d3d11-smoke32.sh` holds it to the same standard as the
+64-bit gate: the same d3d11_smoke.c, built as an i386 PE, printing stdout
+byte-identical to the native ppc64le run -- PASS 7/7 on the first full run,
+including Map(READ) walking all 4096 texels.  The pieces, and where each
+lives:
 
-dexwin (Dex's Windows build, PE32, Unity 5) is the canary and it gets further
-than anyone knew: the i386 guest boots through the ABI-4 bridge and Unity puts
-its window up.  It dies where the 32-bit lane has no graphics at all — i386
-`dxgi.dll`'s forwards to `d3d11.__wine_dxvk_*` resolve to nothing, because
-this port's i386 d3d11 exports none of the dxvk surface (`err:module:
-find_forwarded_export`, four entries).  Portal 2, Half-Life 2 and the Win32
-Styx wait behind the same wall, so this is the whole 32-bit game lane in one
-piece of work.
+* spec2thunk **version 8**: an i386 module carries a geom32 frame word per
+  export, measured by a second oracle pass at the i386 target (the x64
+  width words cannot tell a pointer from an int64, and stdcall's callee-pop
+  makes a wrong frame wrong-Esp-forever).  spec2thunk-check checks the slot
+  arithmetic (8m).
+* ntdll: `EMU32_RUN_TRAP` + `emu32_dispatch_thunk` (signal_ppc64.c) --
+  32-bit loader-list resolve, the shared RIP cache (lane32-stamped), flat
+  stdcall dispatch, COM slots handed whole to the native module's
+  `__wine_com_dispatch32`.
+* libs/winecom: ONE runtime keyed by guest machine at attach (a process has
+  exactly one guest machine -- the "crux" of the design doc resolved to a
+  per-process constant).  Proxies and the 4-byte-slot vtable block sit
+  below 4 GiB; `winecom_dispatch32` owns the whole stdcall epilogue and
+  serves a row only under both stamps (I386_GEOM + I386_STRUCTS_OK).
+* generators: `gen_repack32.py --json` measures every aggregate's layout on
+  both guests (divergence now includes same-offset pointer members, which
+  the first test missed) and gen_winecom audits every pointer parameter
+  against it -- divergent pointees repack through generated `reps[]`,
+  out-direction repacks that would truncate a host pointer refuse
+  (`refuse32`), and a refuse32 row KEEPS its full 64-bit marshal classes
+  (the first cut dropped them and broke the 64-bit lane's texture wrap --
+  caught by the sweep, one run).
+* dlls/d3d11: `hand32` walkers for what no rep can express -- floats from
+  stack slots, presentation, the texture creates (initial-data count =
+  MipLevels x ArraySize out of the desc), and **Map/Unmap, which BOUNCE**
+  through a guest-legal buffer because DXVK's mapped host pointer sits
+  above 4 GiB.  Flat wrappers stage interface-out cells and narrow them to
+  the guest's 4-byte width.
 
-`ppc64le/dxvk/docs/i386-lane-design.md` carries the design: an i386 COM
-emitter in spec2thunk (`int 0x80` stubs — the instruction the wow64 lane
-already routes into the OS_GENERIC sink), stub-RIP mapping in the bounded
-emu32 run loop, a `dispatch32` in libs/winecom that widens stdcall's 4-byte
-stack slots into the same `UINT64 args[]` everything downstream already
-speaks, and hand walkers for the descriptor structs an i386 guest lays out
-differently.
-
-That last set is MEASURED, not guessed: `ppc64le/dxvk/layout32.py` compiles
-all 297 D3D11_/DXGI_ aggregates from Wine's own headers for both guest
-targets and diffs size/alignment — **47 diverge**, and ~35 of those are
-content-protection/video surfaces (D3D11_AUTHENTICATED_*, VIDEO_DECODER_*)
-that no title of this era touches and should be refused by name.  The dozen
-that matter (INPUT_ELEMENT_DESC, SUBRESOURCE_DATA, MAPPED_SUBRESOURCE,
-SWAP_CHAIN_DESC, ADAPTER_DESC*, OUTPUT_DESC*, ...) are all on cold
-creation/query slots, one mechanical widen/narrow walker each.  The 250
-identical ones keep passing their pointer straight through, as on 64-bit.
+Remaining, none of it blocking the canary:
+* dexwin (the canary title) end-to-end -- next session's first act.
+* D3D10's texture creates on the 32-bit lane refuse32 (the D3D11 walkers
+  have no D3D10 twins yet); ~85 rows total refuse32, each with a named
+  reason, enumerable from the marshal header banner.
+* GetResourceMinLOD / GetNPatchMode return float in x87 ST(0): no geometry,
+  fails closed, needs an x87-return path if a title ever calls them.
+* An i386 d3d9 lane would need repack32_d3d9.json + the same audit run.
 
 ## 3. Cyberpunk: from character creation to playable, and the graphics issues on the way
 

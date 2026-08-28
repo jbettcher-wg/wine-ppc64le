@@ -78,6 +78,7 @@ INCLUDE-DIR ../../ppc64le/dxvk
 # same shape as __wine_com_dispatch: ntdll asks the NATIVE module for a slot's
 # name when the crossing-frequency sink interns its row.
 EXCLUDE __wine_com_dispatch
+EXCLUDE __wine_com_dispatch32
 EXCLUDE __wine_com_slot_name
 EXCLUDE __wine_guest_D3D11CreateDevice
 EXCLUDE __wine_guest_D3D11CreateDeviceAndSwapChain

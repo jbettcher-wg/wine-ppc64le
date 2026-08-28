@@ -53,7 +53,46 @@ in the native ppc64 module.  No amount of WoW64 helps with that.
    GENERATION time — never silently — anything it cannot decide.
    Verified: compiles clean for ppc64le, x86_64-windows and i386-windows.
 
-## NOT DONE — and the real crux, which is not the struct layouts
+## BUILT (2026-08-28) — the crux resolved to a per-process constant
+
+Everything below this banner is the 2026-08-19 stopping point, kept for the
+record.  The three pieces it names are now in the tree, and the deciding
+insight was that "one proxy runtime parameterised by guest width, or a
+separate 32-bit one" was a false choice: **a process has exactly one guest
+machine for its whole life** (an i386 guest is a WoW64 process), so the
+runtime is keyed once, at attach, and `struct com_proxy` never changed —
+proxies and the 4-byte-slot vtable block are allocated below 4 GiB, and on
+this little-endian host the guest's 4-byte load at offset 0 reads exactly
+the low half of the field the native side reads as 8.
+
+* **emu32 routing**: `EMU32_RUN_TRAP` (unix classifies an `int 0x80` at a
+  non-bop Eip as a trap, the PE side resolves it), `emu32_dispatch_thunk` in
+  signal_ppc64.c — 32-bit loader-list walk, shared RIP cache (`lane32`),
+  flat stdcall dispatch from the version-8 **geom32** frame word spec2thunk
+  now measures with a second oracle pass at the i386 target (an 8-byte-class
+  x64 argument is a pointer=1 slot or an int64=2 there, and the width words
+  could not tell them apart; no geometry ⇒ the frame cannot even be popped ⇒
+  refuse).
+* **dispatch32** (`winecom_dispatch32`): serves a row only under BOTH
+  version stamps — `WINECOM_F_I386_GEOM` (decode + callee-pop) and
+  `WINECOM_F_I386_STRUCTS_OK` (every pointer parameter audited against
+  `gen_repack32.py --json`'s measured layout roster; divergent pointees are
+  repacked through `reps[]`, out-direction repacks that would truncate a
+  host pointer are refused as `refuse32`).  It owns the whole epilogue —
+  Eax, Edx for EDX:EAX, the stdcall pop — because on i386 the pop is
+  per-slot knowledge.  `hand32` walkers (matched by slot name at attach)
+  serve what no rep can: the float slots, presentation, the texture creates
+  (initial-data count = MipLevels×ArraySize out of the desc), and
+  **Map/Unmap, which BOUNCE**: DXVK's mapped host pointer sits above 4 GiB,
+  so the guest is served a guest-legal buffer sized from the resource's own
+  description, copied in for the read modes and flushed back before Unmap.
+* **The gate**: `check-d3d11-smoke32.sh` — the same d3d11_smoke.c probe,
+  built PE32, must print stdout byte-identical to the native ppc64le run,
+  and the +d3d11 trace must show Map served by its walker.  First full run:
+  PASS 7/7, byte-identical, `Map(READ)` walking 4096 texels through the
+  bounce.
+
+## NOT DONE (2026-08-19 record) — and the real crux, which is not the struct layouts
 
 An i386 guest now binds d3d11 and traps at a stub that nothing answers.  Three
 pieces remain, and the third is much bigger than this document originally said.

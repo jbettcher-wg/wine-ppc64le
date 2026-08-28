@@ -70,6 +70,10 @@
 #include "wine/winecom.h"
 
 #include "unixlib.h"
+/* The i386 struct repacks: untyped offset-copy functions (gen_repack32.py),
+ * referenced by d3d11_marshal.h's reps tables, so the order matters.  No
+ * D3D header rides in with them -- see that file's banner. */
+#include "d3d11_repack32.h"
 #include "d3d11_marshal.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(d3d11);
@@ -131,6 +135,61 @@ static UINT64 hand_create_swapchain_for_hwnd( void *host, UINT slot, AMD64_CONTE
 static UINT64 hand_swapchain_present( void *host, UINT slot, AMD64_CONTEXT *ctx );
 static UINT64 hand_swapchain_present1( void *host, UINT slot, AMD64_CONTEXT *ctx );
 
+static UINT64 hand32_get_private_data( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_set_private_data( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_set_private_data_iface( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_clear_depth_stencil_view( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_set_resource_min_lod( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_create_swapchain( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_create_swapchain_for_hwnd( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_swapchain_present( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_swapchain_present1( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_map( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_unmap( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_create_texture1d( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_create_texture2d( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_create_texture3d( void *host, UINT slot, I386_CONTEXT *ctx );
+
+/* The 32-bit lane's hand walkers, matched to rows BY SLOT NAME at attach --
+ * independent of the 64-bit hand table, because the two lanes' reasons to
+ * hand-write differ: the float and presentation slots mirror their 64-bit
+ * twins over stdcall slots, and the texture creates exist ONLY here, where
+ * the initial-data array's element count (MipLevels x ArraySize, out of the
+ * desc) is beyond any mechanical rep.  GetResourceMinLOD has no 32-bit
+ * walker on purpose: it returns a float in x87 ST(0), which the dispatch
+ * geometry cannot express -- it stays refused until an x87-return path
+ * exists. */
+static const struct winecom_hand32 d3d11_hand32[] =
+{
+    { "ID3D11DeviceChild::GetPrivateData",          hand32_get_private_data },
+    { "ID3D11Device::GetPrivateData",               hand32_get_private_data },
+    { "ID3D10DeviceChild::GetPrivateData",          hand32_get_private_data },
+    { "ID3D10Device::GetPrivateData",               hand32_get_private_data },
+    { "IDXGIObject::GetPrivateData",                hand32_get_private_data },
+    { "ID3D11DeviceChild::SetPrivateData",          hand32_set_private_data },
+    { "ID3D11Device::SetPrivateData",               hand32_set_private_data },
+    { "ID3D10DeviceChild::SetPrivateData",          hand32_set_private_data },
+    { "ID3D10Device::SetPrivateData",               hand32_set_private_data },
+    { "IDXGIObject::SetPrivateData",                hand32_set_private_data },
+    { "ID3D11DeviceChild::SetPrivateDataInterface", hand32_set_private_data_iface },
+    { "ID3D11Device::SetPrivateDataInterface",      hand32_set_private_data_iface },
+    { "ID3D10DeviceChild::SetPrivateDataInterface", hand32_set_private_data_iface },
+    { "ID3D10Device::SetPrivateDataInterface",      hand32_set_private_data_iface },
+    { "IDXGIObject::SetPrivateDataInterface",       hand32_set_private_data_iface },
+    { "ID3D11DeviceContext::ClearDepthStencilView", hand32_clear_depth_stencil_view },
+    { "ID3D11DeviceContext::SetResourceMinLOD",     hand32_set_resource_min_lod },
+    { "ID3D10Device::ClearDepthStencilView",        hand32_clear_depth_stencil_view },
+    { "IDXGIFactory::CreateSwapChain",              hand32_create_swapchain },
+    { "IDXGIFactory2::CreateSwapChainForHwnd",      hand32_create_swapchain_for_hwnd },
+    { "IDXGISwapChain::Present",                    hand32_swapchain_present },
+    { "IDXGISwapChain1::Present1",                  hand32_swapchain_present1 },
+    { "ID3D11DeviceContext::Map",                   hand32_map },
+    { "ID3D11DeviceContext::Unmap",                 hand32_unmap },
+    { "ID3D11Device::CreateTexture1D",              hand32_create_texture1d },
+    { "ID3D11Device::CreateTexture2D",              hand32_create_texture2d },
+    { "ID3D11Device::CreateTexture3D",              hand32_create_texture3d },
+};
+
 static const winecom_hand_fn d3d11_hand_funcs[] =
 {
     hand_get_private_data,
@@ -148,6 +207,42 @@ static const winecom_hand_fn d3d11_hand_funcs[] =
 
 C_ASSERT( ARRAYSIZE(d3d11_hand_funcs) == D3D11_HAND_COUNT );
 
+/* The concrete-type upgrade (winecom_surface::wrap_concrete): a caller may
+ * static_cast a returned ID3D11Resource* to the texture or buffer type it
+ * knows it created -- Unity casts ID3D11View::GetResource's answer to
+ * ID3D11Texture2D and calls GetDesc, a slot the Resource-sized vtable does
+ * not have.  The host knows the concrete type (ID3D11Resource::GetType,
+ * slot 7 by fixed vtable geometry; same for ID3D10), so resources intern
+ * under it and every derived-type call lands on a real stub. */
+#define D3D11_RESOURCE_SLOT_GET_TYPE_ 7
+static UINT d3d11_wrap_concrete( void *host, UINT iface )
+{
+    UINT64 args[D3D11_UNIX_MAX_ARGS] = { 0 };
+    UINT dim = 0;
+
+    if (iface != D3D11_IFACE_ID3D11Resource && iface != D3D11_IFACE_ID3D10Resource)
+        return iface;
+    args[1] = (UINT64)(ULONG_PTR)&dim;
+    unix_vtbl_call( host, D3D11_RESOURCE_SLOT_GET_TYPE_, 2, args );
+    if (iface == D3D11_IFACE_ID3D11Resource)
+        switch (dim)
+        {
+        case 1: return D3D11_IFACE_ID3D11Buffer;
+        case 2: return D3D11_IFACE_ID3D11Texture1D;
+        case 3: return D3D11_IFACE_ID3D11Texture2D;
+        case 4: return D3D11_IFACE_ID3D11Texture3D;
+        }
+    else
+        switch (dim)
+        {
+        case 1: return D3D11_IFACE_ID3D10Buffer;
+        case 2: return D3D11_IFACE_ID3D10Texture1D;
+        case 3: return D3D11_IFACE_ID3D10Texture2D;
+        case 4: return D3D11_IFACE_ID3D10Texture3D;
+        }
+    return iface;
+}
+
 static const struct winecom_surface d3d11_surface =
 {
     .name = "d3d11",
@@ -158,6 +253,9 @@ static const struct winecom_surface d3d11_surface =
     .invoke = unix_vtbl_call,
     .hand_funcs = d3d11_hand_funcs,
     .hand_count = D3D11_HAND_COUNT,
+    .hand32 = d3d11_hand32,
+    .hand32_count = ARRAYSIZE(d3d11_hand32),
+    .wrap_concrete = d3d11_wrap_concrete,
 };
 
 static LONG com_init_state;            /* 0 = no, 1 = in progress, 2 = ok,
@@ -186,6 +284,15 @@ NTSTATUS WINAPI __wine_com_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
 {
     if (!com_runtime_init()) return STATUS_DLL_INIT_FAILED;
     return winecom_dispatch( iface, slot, ctx );
+}
+
+/* The i386 twin: same lazy initialisation, the 32-bit dispatch loop.  The
+ * contract differs from the 64-bit one -- winecom_dispatch32 owns the whole
+ * epilogue including the stdcall pop; see its banner in libs/winecom. */
+NTSTATUS WINAPI __wine_com_dispatch32( UINT iface, UINT slot, I386_CONTEXT *ctx )
+{
+    if (!com_runtime_init()) return STATUS_DLL_INIT_FAILED;
+    return winecom_dispatch32( iface, slot, ctx );
 }
 
 /* The crossing-frequency sink's name lookup; see winecom_slot_names.  Never
@@ -803,7 +910,608 @@ static UINT64 hand_swapchain_present1( void *host, UINT slot, AMD64_CONTEXT *ctx
     return present_common( host, slot, 4, args );
 }
 
+/* ------------------------------------------------- 32-bit hand walkers
+ *
+ * The stdcall frame a walker reads: esp[0] the return address, esp[1]
+ * `this`, parameters one 4-byte slot each from esp[2] (none of these
+ * methods has an 8-byte parameter).  The dispatcher performs the pop from
+ * the row's geometry; a walker only reads. */
+
+static const ULONG *frame32( const I386_CONTEXT *ctx )
+{
+    return (const ULONG *)(ULONG_PTR)ctx->Esp;
+}
+
+static UINT64 hand32_get_private_data( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    const ULONG *esp = frame32( ctx );
+    const GUID *guid = (const GUID *)(ULONG_PTR)esp[2];
+    UINT *size = (UINT *)(ULONG_PTR)esp[3];
+    void *data = (void *)(ULONG_PTR)esp[4];
+    UINT64 args[D3D11_UNIX_MAX_ARGS] = { 0 };
+    struct private_iface *p;
+
+    if (!guid || !size) return (UINT64)(UINT)E_INVALIDARG;
+
+    RtlEnterCriticalSection( &priv_cs );
+    for (p = private_ifaces; p; p = p->next)
+        if (p->host == host && IsEqualGUID( &p->guid, guid )) break;
+    RtlLeaveCriticalSection( &priv_cs );
+
+    if (p)
+    {
+        void *proxy_host;
+
+        /* the guest's pointer cell is FOUR bytes; so is the size contract */
+        if (!data)
+        {
+            *size = sizeof(UINT);
+            return (UINT64)(UINT)S_OK;
+        }
+        if (*size < sizeof(UINT))
+        {
+            *size = sizeof(UINT);
+            return (UINT64)(UINT)DXGI_ERROR_MORE_DATA;
+        }
+        if (!(proxy_host = winecom_unwrap( p->guest )))
+            return (UINT64)(UINT)E_FAIL;
+        *(UINT *)data = (UINT)(ULONG_PTR)host_addref_wrap( proxy_host, p->iface );
+        *size = sizeof(UINT);
+        return (UINT64)(UINT)S_OK;
+    }
+
+    args[1] = (UINT64)(ULONG_PTR)guid;
+    args[2] = (UINT64)(ULONG_PTR)size;
+    args[3] = (UINT64)(ULONG_PTR)data;
+    return unix_vtbl_call( host, slot, 4, args );
+}
+
+static UINT64 hand32_set_private_data( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    const ULONG *esp = frame32( ctx );
+    const GUID *guid = (const GUID *)(ULONG_PTR)esp[2];
+    UINT64 args[D3D11_UNIX_MAX_ARGS] = { 0 };
+
+    if (guid) private_drop( private_take( host, guid ) );
+    args[1] = (UINT64)(ULONG_PTR)guid;
+    args[2] = esp[3];
+    args[3] = esp[4];
+    return unix_vtbl_call( host, slot, 4, args );
+}
+
+static UINT64 hand32_set_private_data_iface( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    const ULONG *esp = frame32( ctx );
+    const GUID *guid = (const GUID *)(ULONG_PTR)esp[2];
+    void *guest = (void *)(ULONG_PTR)esp[3];
+    UINT64 args[D3D11_UNIX_MAX_ARGS] = { 0 };
+    struct private_iface *p;
+    void *host_iface = NULL;
+    UINT64 ret;
+
+    if (!guid) return (UINT64)(UINT)E_INVALIDARG;
+    private_drop( private_take( host, guid ) );
+
+    if (guest && !winecom_translate_in( guest, &host_iface ))
+    {
+        FIXME( "SetPrivateDataInterface with a guest-implemented object %p; "
+               "reverse proxies do not exist yet\n", guest );
+        return (UINT64)(UINT)E_NOTIMPL;
+    }
+
+    args[1] = (UINT64)(ULONG_PTR)guid;
+    args[2] = (UINT64)(ULONG_PTR)host_iface;
+    ret = unix_vtbl_call( host, slot, 3, args );
+    if (FAILED((HRESULT)ret) || !guest) return ret;
+
+    if (!(p = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, sizeof(*p) )))
+        return (UINT64)(UINT)E_OUTOFMEMORY;
+    p->host = host;
+    p->guest = guest;
+    p->guid = *guid;
+    p->iface = D3D11_IFACE_IUnknown;
+    {
+        UINT64 a[D3D11_UNIX_MAX_ARGS] = { 0 };
+        unix_vtbl_call( host, 1 /* AddRef */, 1, a );
+    }
+    RtlEnterCriticalSection( &priv_cs );
+    p->next = private_ifaces;
+    private_ifaces = p;
+    RtlLeaveCriticalSection( &priv_cs );
+    return ret;
+}
+
+/* ClearDepthStencilView( view, UINT flags, FLOAT depth, UINT8 stencil ):
+ * on i386 the float is simply the third parameter slot's bytes -- no XMM,
+ * no lazy-context dance. */
+static UINT64 hand32_clear_depth_stencil_view( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    const ULONG *esp = frame32( ctx );
+    struct d3d11_float_params p = { 0 };
+    void *view_host = NULL;
+
+    if (!winecom_translate_in( (void *)(ULONG_PTR)esp[2], &view_host ))
+    {
+        FIXME( "ClearDepthStencilView on a guest-implemented view\n" );
+        return 0;
+    }
+    p.self = (UINT64)(ULONG_PTR)host;
+    p.res = (UINT64)(ULONG_PTR)view_host;
+    p.a = esp[3];                                   /* ClearFlags */
+    p.f = *(const float *)&esp[4];                  /* Depth */
+    p.b = (UINT8)esp[5];                            /* Stencil */
+    p.slot = slot;
+    p.shape = FLOAT_SHAPE_RES_UINT_FLOAT_BYTE;
+    if (D3D11_UNIX_CALL( float, &p )) ERR( "unix float call failed\n" );
+    return 0;
+}
+
+static UINT64 hand32_set_resource_min_lod( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    const ULONG *esp = frame32( ctx );
+    struct d3d11_float_params p = { 0 };
+    void *res = NULL;
+
+    if (!winecom_translate_in( (void *)(ULONG_PTR)esp[2], &res ))
+    {
+        FIXME( "SetResourceMinLOD on a guest-implemented resource\n" );
+        return 0;
+    }
+    p.self = (UINT64)(ULONG_PTR)host;
+    p.res = (UINT64)(ULONG_PTR)res;
+    p.f = *(const float *)&esp[3];
+    p.slot = slot;
+    p.shape = FLOAT_SHAPE_RES_FLOAT;
+    if (D3D11_UNIX_CALL( float, &p )) ERR( "unix float call failed\n" );
+    return 0;
+}
+
+static UINT64 hand32_create_swapchain( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    const ULONG *esp = frame32( ctx );
+    void *guest_device = (void *)(ULONG_PTR)esp[2];
+    const void *desc32 = (const void *)(ULONG_PTR)esp[3];
+    UINT *out = (UINT *)(ULONG_PTR)esp[4];          /* 4-byte guest cell */
+    struct dxgi_swap_chain_desc desc;
+    UINT64 args[D3D11_UNIX_MAX_ARGS] = { 0 };
+    void *host_device = NULL, *host_swapchain = NULL;
+    HRESULT hr;
+
+    if (!desc32 || !out) return (UINT64)(UINT)E_INVALIDARG;
+    if (guest_device && !winecom_translate_in( guest_device, &host_device ))
+    {
+        FIXME( "CreateSwapChain with a guest-implemented device %p\n", guest_device );
+        return (UINT64)(UINT)E_NOTIMPL;
+    }
+
+    wine_repack32_DXGI_SWAP_CHAIN_DESC( &desc, desc32 );
+    TRACE( "device %p, %ux%u, hwnd %p, windowed %d, buffers %u [i386]\n",
+           guest_device, desc.BufferDesc_Width, desc.BufferDesc_Height,
+           desc.OutputWindow, desc.Windowed, desc.BufferCount );
+
+    push_hwnd_state( desc.OutputWindow );
+    args[1] = (UINT64)(ULONG_PTR)host_device;
+    args[2] = (UINT64)(ULONG_PTR)&desc;
+    args[3] = (UINT64)(ULONG_PTR)&host_swapchain;
+    hr = (HRESULT)unix_vtbl_call( host, slot, 4, args );
+    if (FAILED(hr)) return (UINT64)(UINT)hr;
+
+    swapchain_remember( host_swapchain, desc.OutputWindow );
+    *out = (UINT)(ULONG_PTR)winecom_wrap( host_swapchain, D3D11_IFACE_IDXGISwapChain );
+    return (UINT64)(UINT)hr;
+}
+
+/* DXGI_SWAP_CHAIN_DESC1 and DXGI_SWAP_CHAIN_FULLSCREEN_DESC carry no
+ * pointer members, so both cross raw; only the out-cell narrows. */
+static UINT64 hand32_create_swapchain_for_hwnd( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    const ULONG *esp = frame32( ctx );
+    void *guest_device = (void *)(ULONG_PTR)esp[2];
+    HWND hwnd = (HWND)(ULONG_PTR)esp[3];
+    void *guest_output = (void *)(ULONG_PTR)esp[6];
+    UINT *out = (UINT *)(ULONG_PTR)esp[7];
+    UINT64 args[D3D11_UNIX_MAX_ARGS] = { 0 };
+    void *host_device = NULL, *host_output = NULL, *host_swapchain = NULL;
+    HRESULT hr;
+
+    if (!out) return (UINT64)(UINT)E_INVALIDARG;
+    if ((guest_device && !winecom_translate_in( guest_device, &host_device )) ||
+        (guest_output && !winecom_translate_in( guest_output, &host_output )))
+    {
+        FIXME( "CreateSwapChainForHwnd with an untranslatable device or "
+               "output on the i386 lane (the d3d12 handoff has no 32-bit "
+               "path yet)\n" );
+        return (UINT64)(UINT)E_NOTIMPL;
+    }
+
+    TRACE( "device %p, hwnd %p, output %p [i386]\n", guest_device, hwnd, guest_output );
+
+    push_hwnd_state( hwnd );
+    args[1] = (UINT64)(ULONG_PTR)host_device;
+    args[2] = (UINT64)(ULONG_PTR)hwnd;
+    args[3] = esp[4];
+    args[4] = esp[5];
+    args[5] = (UINT64)(ULONG_PTR)host_output;
+    args[6] = (UINT64)(ULONG_PTR)&host_swapchain;
+    hr = (HRESULT)unix_vtbl_call( host, slot, 7, args );
+    if (FAILED(hr)) return (UINT64)(UINT)hr;
+
+    swapchain_remember( host_swapchain, hwnd );
+    *out = (UINT)(ULONG_PTR)winecom_wrap( host_swapchain, D3D11_IFACE_IDXGISwapChain1 );
+    return (UINT64)(UINT)hr;
+}
+
+static UINT64 hand32_swapchain_present( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    const ULONG *esp = frame32( ctx );
+    UINT64 args[D3D11_UNIX_MAX_ARGS] = { 0 };
+
+    args[1] = esp[2];
+    args[2] = esp[3];
+    return present_common( host, slot, 3, args );
+}
+
+static UINT64 hand32_swapchain_present1( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    const ULONG *esp = frame32( ctx );
+    UINT64 args[D3D11_UNIX_MAX_ARGS] = { 0 };
+    /* DXGI_PRESENT_PARAMETERS carries RECT/POINT pointers, so its i386
+     * layout diverges; 8 qwords cover (and align) the 32-byte native form */
+    UINT64 params[8];
+
+    args[1] = esp[2];
+    args[2] = esp[3];
+    if (esp[4])
+    {
+        wine_repack32_DXGI_PRESENT_PARAMETERS( params, (const void *)(ULONG_PTR)esp[4] );
+        args[3] = (UINT64)(ULONG_PTR)params;
+    }
+    return present_common( host, slot, 4, args );
+}
+
+/* ------------------------------- Map/Unmap, i386 lane only
+ *
+ * ID3D11DeviceContext::Map answers with a POINTER INTO HOST MEMORY, and on
+ * this 64-bit host that pointer routinely sits above 4 GiB where no i386
+ * guest can address it -- truncating it into the guest's 4-byte pData cell
+ * would be a silently wrong pointer, this codebase's most expensive bug
+ * class (the generator refuses the mechanical repack for exactly that
+ * reason; these walkers are the serve path it demands).  So the mapping is
+ * BOUNCED: a guest-legal buffer sized from the resource's own description,
+ * filled from the host mapping for the read modes, copied back before the
+ * host Unmap for the write modes.  Buffers are cached per (resource,
+ * subresource) -- a dynamic-buffer game maps the same resources every
+ * frame -- and bounded by the guest's own live-mapping count.
+ */
+
+struct map_bounce
+{
+    struct map_bounce *next;
+    void *res_host;          /* HOST resource pointer (the cache key) */
+    UINT sub;
+    void *low;               /* the guest-legal buffer */
+    SIZE_T cap;
+    void *host_ptr;          /* live host mapping, NULL when unmapped */
+    SIZE_T size;             /* live mapping's byte count */
+    UINT maptype;
+};
+
+static CRITICAL_SECTION bounce_cs;
+static CRITICAL_SECTION_DEBUG bounce_cs_debug =
+{
+    0, 0, &bounce_cs,
+    { &bounce_cs_debug.ProcessLocksList, &bounce_cs_debug.ProcessLocksList },
+      0, 0, { (DWORD_PTR)(__FILE__ ": d3d11 bounce_cs") }
+};
+static CRITICAL_SECTION bounce_cs = { &bounce_cs_debug, -1, 0, 0, 0, 0 };
+static struct map_bounce *map_bounces;
+
+/* ID3D11Resource's fixed vtable geometry: IUnknown 3 + DeviceChild 4,
+ * GetType at 7; the derived interfaces put GetDesc at 10. */
+#define D3D11_RESOURCE_SLOT_GET_TYPE 7
+#define D3D11_RESOURCE_SLOT_GET_DESC 10
+enum { D3D11_DIM_BUFFER = 1, D3D11_DIM_TEX1D = 2, D3D11_DIM_TEX2D = 3,
+       D3D11_DIM_TEX3D = 4 };
+
+/* The byte size of one mapped subresource, from the resource's own
+ * description plus what the host Map answered.  0 = cannot be sized, and
+ * the walker refuses rather than guesses. */
+static SIZE_T map_subresource_size( void *res_host, UINT sub,
+                                    UINT row_pitch, UINT depth_pitch )
+{
+    UINT64 args[D3D11_UNIX_MAX_ARGS] = { 0 };
+    UINT dim = 0;
+    UINT desc[16];
+
+    args[1] = (UINT64)(ULONG_PTR)&dim;
+    unix_vtbl_call( res_host, D3D11_RESOURCE_SLOT_GET_TYPE, 2, args );
+    memset( desc, 0, sizeof(desc) );
+    args[1] = (UINT64)(ULONG_PTR)desc;
+    if (dim != D3D11_DIM_BUFFER)
+        unix_vtbl_call( res_host, D3D11_RESOURCE_SLOT_GET_DESC, 2, args );
+
+    switch (dim)
+    {
+    case D3D11_DIM_BUFFER:
+        /* D3D11_BUFFER_DESC::ByteWidth */
+        unix_vtbl_call( res_host, D3D11_RESOURCE_SLOT_GET_DESC, 2, args );
+        return desc[0];
+    case D3D11_DIM_TEX1D:
+    case D3D11_DIM_TEX2D:
+        /* one mip slice: DXVK's Map fills DepthPitch with exactly that */
+        return depth_pitch;
+    case D3D11_DIM_TEX3D:
+    {
+        /* D3D11_TEXTURE3D_DESC: Width, Height, Depth, MipLevels, ... */
+        UINT mips = desc[3] ? desc[3] : 1;
+        UINT mip = mips ? sub % mips : 0;
+        UINT d = desc[2] >> mip;
+
+        if (!d) d = 1;
+        return (SIZE_T)depth_pitch * d;
+    }
+    }
+    return 0;
+}
+
+static UINT64 hand32_map( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    const ULONG *esp = frame32( ctx );
+    void *guest_res = (void *)(ULONG_PTR)esp[2];
+    UINT sub = esp[3], maptype = esp[4], mapflags = esp[5];
+    UINT *out = (UINT *)(ULONG_PTR)esp[6];   /* {pData, RowPitch, DepthPitch} x 4 bytes */
+    UINT64 args[D3D11_UNIX_MAX_ARGS] = { 0 };
+    UINT64 mapped[2] = { 0 };                /* native D3D11_MAPPED_SUBRESOURCE */
+    void *res_host = NULL;
+    UINT row_pitch, depth_pitch;
+    void *ptr;
+    HRESULT hr;
+
+    if (!out) return (UINT64)(UINT)E_INVALIDARG;
+    if (!winecom_translate_in( guest_res, &res_host ) || !res_host)
+    {
+        FIXME( "Map on an untranslatable resource %p\n", guest_res );
+        return (UINT64)(UINT)E_INVALIDARG;
+    }
+
+    args[1] = (UINT64)(ULONG_PTR)res_host;
+    args[2] = sub;
+    args[3] = maptype;
+    args[4] = mapflags;
+    args[5] = (UINT64)(ULONG_PTR)mapped;
+    hr = (HRESULT)unix_vtbl_call( host, slot, 6, args );
+    if (FAILED(hr))
+    {
+        out[0] = out[1] = out[2] = 0;
+        return (UINT64)(UINT)hr;
+    }
+    ptr = (void *)(ULONG_PTR)mapped[0];
+    row_pitch = (UINT)mapped[1];
+    depth_pitch = (UINT)(mapped[1] >> 32);
+
+    if ((ULONG_PTR)ptr < 0x100000000ull)
+    {
+        /* already guest-legal: no bounce, no copies */
+        TRACE( "map32: resource %p sub %u mapped guest-legal at %p\n",
+               res_host, sub, ptr );
+        out[0] = (UINT)(ULONG_PTR)ptr;
+        out[1] = row_pitch;
+        out[2] = depth_pitch;
+        return (UINT64)(UINT)hr;
+    }
+
+    {
+        SIZE_T size = map_subresource_size( res_host, sub, row_pitch, depth_pitch );
+        struct map_bounce *b;
+
+        if (!size)
+        {
+            ERR( "cannot size the mapping of resource %p sub %u; unmapping "
+                 "and refusing rather than truncating pData\n", res_host, sub );
+            args[1] = (UINT64)(ULONG_PTR)res_host;
+            args[2] = sub;
+            unix_vtbl_call( host, slot + 1 /* Unmap */, 3, args );
+            out[0] = out[1] = out[2] = 0;
+            return (UINT64)(UINT)E_NOTIMPL;
+        }
+
+        RtlEnterCriticalSection( &bounce_cs );
+        for (b = map_bounces; b; b = b->next)
+            if (b->res_host == res_host && b->sub == sub) break;
+        if (b && b->cap < size)
+        {
+            SIZE_T zero = 0;
+            NtFreeVirtualMemory( NtCurrentProcess(), &b->low, &zero, MEM_RELEASE );
+            b->low = NULL;
+            b->cap = 0;
+        }
+        if (!b)
+        {
+            if ((b = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap,
+                                      HEAP_ZERO_MEMORY, sizeof(*b) )))
+            {
+                b->res_host = res_host;
+                b->sub = sub;
+                b->next = map_bounces;
+                map_bounces = b;
+            }
+        }
+        if (b && !b->low)
+        {
+            SIZE_T cap = (size + 0xffff) & ~(SIZE_T)0xffff;
+            void *mem = NULL;
+
+            if (!NtAllocateVirtualMemory( NtCurrentProcess(), &mem, 0x7fffffff, &cap,
+                                          MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE ))
+            {
+                b->low = mem;
+                b->cap = cap;
+            }
+        }
+        if (!b || !b->low)
+        {
+            RtlLeaveCriticalSection( &bounce_cs );
+            ERR( "no guest-legal bounce for a %Iu-byte mapping; unmapping\n", size );
+            args[1] = (UINT64)(ULONG_PTR)res_host;
+            args[2] = sub;
+            unix_vtbl_call( host, slot + 1 /* Unmap */, 3, args );
+            out[0] = out[1] = out[2] = 0;
+            return (UINT64)(UINT)E_OUTOFMEMORY;
+        }
+        b->host_ptr = ptr;
+        b->size = size;
+        b->maptype = maptype;
+        TRACE( "map32: resource %p sub %u BOUNCED %p -> %p (%Iu bytes, type %u)\n",
+               res_host, sub, ptr, b->low, size, maptype );
+        /* READ(1) and READ_WRITE(3) see the resource's current bytes */
+        if (maptype == 1 || maptype == 3) memcpy( b->low, ptr, size );
+        out[0] = (UINT)(ULONG_PTR)b->low;
+        out[1] = row_pitch;
+        out[2] = depth_pitch;
+        RtlLeaveCriticalSection( &bounce_cs );
+    }
+    return (UINT64)(UINT)hr;
+}
+
+static UINT64 hand32_unmap( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    const ULONG *esp = frame32( ctx );
+    void *guest_res = (void *)(ULONG_PTR)esp[2];
+    UINT sub = esp[3];
+    UINT64 args[D3D11_UNIX_MAX_ARGS] = { 0 };
+    void *res_host = NULL;
+    struct map_bounce *b;
+
+    if (!winecom_translate_in( guest_res, &res_host ) || !res_host)
+        return 0;
+
+    RtlEnterCriticalSection( &bounce_cs );
+    for (b = map_bounces; b; b = b->next)
+        if (b->res_host == res_host && b->sub == sub) break;
+    if (b && b->host_ptr)
+    {
+        /* every WRITE mode (2, 3, 4, 5) flushes the guest's bytes back */
+        if (b->maptype != 1) memcpy( b->host_ptr, b->low, b->size );
+        b->host_ptr = NULL;
+    }
+    RtlLeaveCriticalSection( &bounce_cs );
+
+    args[1] = (UINT64)(ULONG_PTR)res_host;
+    args[2] = sub;
+    unix_vtbl_call( host, slot, 3, args );
+    return 0;
+}
+
+/* ------------------------- the texture creates, i386 lane only
+ *
+ * Their initial-data parameter is an ARRAY of the divergent
+ * D3D11_SUBRESOURCE_DATA whose element count is MipLevels x ArraySize out
+ * of the DESC -- beyond any mechanical rep, which is why the generator
+ * refuse32's these rows and this table serves them.  The descs themselves
+ * are all-UINT and cross raw; only what is read here is mirrored, the same
+ * rule as struct dxgi_swap_chain_desc. */
+
+static UINT full_mip_chain( UINT w, UINT h, UINT d )
+{
+    UINT m = 1, e = w > h ? w : h;
+
+    if (d > e) e = d;
+    while (e > 1) { e >>= 1; m++; }
+    return m;
+}
+
+static UINT64 create_texture32_common( void *host, UINT slot, I386_CONTEXT *ctx,
+                                       UINT nsub, UINT out_iface )
+{
+    const ULONG *esp = frame32( ctx );
+    const void *desc = (const void *)(ULONG_PTR)esp[2];
+    const char *init32 = (const char *)(ULONG_PTR)esp[3];
+    UINT *out = (UINT *)(ULONG_PTR)esp[4];
+    UINT64 args[D3D11_UNIX_MAX_ARGS] = { 0 };
+    void *host_tex = NULL;
+    void *heap = NULL;
+    HRESULT hr;
+
+    if (!desc) return (UINT64)(UINT)E_INVALIDARG;
+    if (init32 && nsub)
+    {
+        char *dst;
+        UINT k;
+
+        if (!(heap = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0,
+                                      nsub * (SIZE_T)16 )))
+            return (UINT64)(UINT)E_OUTOFMEMORY;
+        for (k = 0, dst = heap; k < nsub; k++, dst += 16)
+            wine_repack32_D3D11_SUBRESOURCE_DATA( dst, init32 + (SIZE_T)k * 12 );
+        C_ASSERT( WINE_REPACK32_SIZE_D3D11_SUBRESOURCE_DATA == 12 );
+    }
+    args[1] = (UINT64)(ULONG_PTR)desc;
+    args[2] = (UINT64)(ULONG_PTR)(init32 ? heap : NULL);
+    args[3] = (UINT64)(ULONG_PTR)(out ? (void *)&host_tex : NULL);
+    hr = (HRESULT)unix_vtbl_call( host, slot, 4, args );
+    if (heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, heap );
+    if (out)
+        *out = SUCCEEDED(hr) && host_tex
+             ? (UINT)(ULONG_PTR)winecom_wrap( host_tex, out_iface ) : 0;
+    return (UINT64)(UINT)hr;
+}
+
+static UINT64 hand32_create_texture1d( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    const UINT *d = (const UINT *)(ULONG_PTR)frame32( ctx )[2];
+    UINT mips, nsub = 0;
+
+    if (d)
+    {
+        mips = d[1] ? d[1] : full_mip_chain( d[0], 1, 1 );
+        nsub = mips * d[2];                       /* MipLevels x ArraySize */
+    }
+    return create_texture32_common( host, slot, ctx, nsub,
+                                    D3D11_IFACE_ID3D11Texture1D );
+}
+
+static UINT64 hand32_create_texture2d( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    const UINT *d = (const UINT *)(ULONG_PTR)frame32( ctx )[2];
+    UINT mips, nsub = 0;
+
+    if (d)
+    {
+        mips = d[2] ? d[2] : full_mip_chain( d[0], d[1], 1 );
+        nsub = mips * d[3];                       /* MipLevels x ArraySize */
+    }
+    return create_texture32_common( host, slot, ctx, nsub,
+                                    D3D11_IFACE_ID3D11Texture2D );
+}
+
+static UINT64 hand32_create_texture3d( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    const UINT *d = (const UINT *)(ULONG_PTR)frame32( ctx )[2];
+    UINT nsub = 0;
+
+    if (d) nsub = d[3] ? d[3] : full_mip_chain( d[0], d[1], d[2] );
+    return create_texture32_common( host, slot, ctx, nsub,
+                                    D3D11_IFACE_ID3D11Texture3D );
+}
+
 /* ---------------------------------------------------------- flat entries */
+
+/* guest32 out-cell staging for the flat entries.  On the i386 lane the
+ * guest's interface-out cell is FOUR bytes, and both the unixlib and the
+ * wrap helpers write eight: stage_out() redirects such a cell to a native
+ * local, and unstage_out() narrows the wrapped result back.  On the 64-bit
+ * lane both are no-ops and the cell is used directly, exactly as before. */
+static void **stage_out( void **cell, void **local )
+{
+    if (!winecom_guest32() || !cell) return cell;
+    *local = NULL;
+    return local;
+}
+
+static void unstage_out( void **cell, void **staged )
+{
+    if (cell && staged != cell) winecom_store_guest_ptr( cell, *staged );
+}
 
 static HRESULT flat_call( UINT func, UINT argc, UINT64 *args, UINT64 *ret )
 {
@@ -850,7 +1558,8 @@ HRESULT WINAPI __wine_guest_D3D11CreateDevice( void *adapter, UINT driver_type,
                                                void **context )
 {
     UINT64 args[12] = { 0 };
-    void *host_adapter = NULL;
+    void *host_adapter = NULL, *dl = NULL, *cl = NULL;
+    void **device_s, **context_s;
     HRESULT hr;
 
     TRACE( "adapter %p, driver_type %#x, flags %#x, levels %u, device %p, "
@@ -863,6 +1572,8 @@ HRESULT WINAPI __wine_guest_D3D11CreateDevice( void *adapter, UINT driver_type,
                "reverse proxies do not exist yet\n", adapter );
         return E_NOTIMPL;
     }
+    device_s = stage_out( device, &dl );
+    context_s = stage_out( context, &cl );
     args[0] = (UINT64)(ULONG_PTR)host_adapter;
     args[1] = driver_type;
     args[2] = (UINT64)(ULONG_PTR)software;
@@ -870,15 +1581,17 @@ HRESULT WINAPI __wine_guest_D3D11CreateDevice( void *adapter, UINT driver_type,
     args[4] = (UINT64)(ULONG_PTR)feature_levels;
     args[5] = levels;
     args[6] = sdk_version;
-    args[7] = (UINT64)(ULONG_PTR)device;
+    args[7] = (UINT64)(ULONG_PTR)device_s;
     args[8] = (UINT64)(ULONG_PTR)feature_level;
-    args[9] = (UINT64)(ULONG_PTR)context;
+    args[9] = (UINT64)(ULONG_PTR)context_s;
     hr = flat_call( FLAT_D3D11CreateDevice, 10, args, NULL );
     if (FAILED(hr)) return hr;
     /* Both out-interfaces are statically typed, so there is no REFIID to look
      * up; the roster index is fixed here. */
-    winecom_wrap_static( device, D3D11_IFACE_ID3D11Device );
-    winecom_wrap_static( context, D3D11_IFACE_ID3D11DeviceContext );
+    winecom_wrap_static( device_s, D3D11_IFACE_ID3D11Device );
+    winecom_wrap_static( context_s, D3D11_IFACE_ID3D11DeviceContext );
+    unstage_out( device, device_s );
+    unstage_out( context, context_s );
     return hr;
 }
 
@@ -895,7 +1608,8 @@ HRESULT WINAPI __wine_guest_D3D11CoreCreateDevice( void *factory, void *adapter,
                                                    UINT levels, void **device )
 {
     UINT64 args[12] = { 0 };
-    void *host_factory = NULL, *host_adapter = NULL;
+    void *host_factory = NULL, *host_adapter = NULL, *dl = NULL;
+    void **device_s;
     HRESULT hr;
 
     TRACE( "factory %p, adapter %p, flags %#x, levels %u, device %p\n",
@@ -908,15 +1622,17 @@ HRESULT WINAPI __wine_guest_D3D11CoreCreateDevice( void *factory, void *adapter,
         FIXME( "D3D11CoreCreateDevice with a guest-implemented DXGI object\n" );
         return E_NOTIMPL;
     }
+    device_s = stage_out( device, &dl );
     args[0] = (UINT64)(ULONG_PTR)host_factory;
     args[1] = (UINT64)(ULONG_PTR)host_adapter;
     args[2] = flags;
     args[3] = (UINT64)(ULONG_PTR)feature_levels;
     args[4] = levels;
-    args[5] = (UINT64)(ULONG_PTR)device;
+    args[5] = (UINT64)(ULONG_PTR)device_s;
     hr = flat_call( FLAT_D3D11CoreCreateDevice, 6, args, NULL );
     if (FAILED(hr)) return hr;
-    winecom_wrap_static( device, D3D11_IFACE_ID3D11Device );
+    winecom_wrap_static( device_s, D3D11_IFACE_ID3D11Device );
+    unstage_out( device, device_s );
     return hr;
 }
 
@@ -937,8 +1653,11 @@ HRESULT WINAPI __wine_guest_D3D11CreateDeviceAndSwapChain( void *adapter, UINT d
                                                            void **context )
 {
     const struct dxgi_swap_chain_desc *desc = swapchain_desc;
+    struct dxgi_swap_chain_desc desc_native;
     UINT64 args[12] = { 0 };
     void *host_adapter = NULL, *host_swapchain = NULL;
+    void *sl = NULL, *dl = NULL, *cl = NULL;
+    void **swapchain_s, **device_s, **context_s;
     HRESULT hr;
 
     TRACE( "adapter %p, driver_type %#x, flags %#x, levels %u, desc %p, "
@@ -953,12 +1672,23 @@ HRESULT WINAPI __wine_guest_D3D11CreateDeviceAndSwapChain( void *adapter, UINT d
         return E_NOTIMPL;
     }
 
+    /* An i386 guest's DXGI_SWAP_CHAIN_DESC lays HWND out in four bytes and
+     * everything after it moves: repack into the native form first. */
+    if (desc && winecom_guest32())
+    {
+        wine_repack32_DXGI_SWAP_CHAIN_DESC( &desc_native, swapchain_desc );
+        desc = &desc_native;
+    }
+
     /* The window's client size has to be in the unixlib's hands before DXVK
      * builds the swapchain, because DXVK asks for it during construction --
      * and an application that passed 0x0 in the descriptor is asking to be
      * sized to the window. */
     if (desc) push_hwnd_state( desc->OutputWindow );
 
+    swapchain_s = stage_out( swapchain, &sl );
+    device_s = stage_out( device, &dl );
+    context_s = stage_out( context, &cl );
     args[0] = (UINT64)(ULONG_PTR)host_adapter;
     args[1] = driver_type;
     args[2] = (UINT64)(ULONG_PTR)software;
@@ -966,18 +1696,21 @@ HRESULT WINAPI __wine_guest_D3D11CreateDeviceAndSwapChain( void *adapter, UINT d
     args[4] = (UINT64)(ULONG_PTR)feature_levels;
     args[5] = levels;
     args[6] = sdk_version;
-    args[7] = (UINT64)(ULONG_PTR)swapchain_desc;
-    args[8] = (UINT64)(ULONG_PTR)swapchain;
-    args[9] = (UINT64)(ULONG_PTR)device;
+    args[7] = (UINT64)(ULONG_PTR)desc;
+    args[8] = (UINT64)(ULONG_PTR)swapchain_s;
+    args[9] = (UINT64)(ULONG_PTR)device_s;
     args[10] = (UINT64)(ULONG_PTR)feature_level;
-    args[11] = (UINT64)(ULONG_PTR)context;
+    args[11] = (UINT64)(ULONG_PTR)context_s;
     hr = flat_call( FLAT_D3D11CreateDeviceAndSwapChain, 12, args, NULL );
     if (FAILED(hr)) return hr;
 
-    if (swapchain) host_swapchain = *swapchain;
-    winecom_wrap_static( swapchain, D3D11_IFACE_IDXGISwapChain );
-    winecom_wrap_static( device, D3D11_IFACE_ID3D11Device );
-    winecom_wrap_static( context, D3D11_IFACE_ID3D11DeviceContext );
+    if (swapchain_s) host_swapchain = *swapchain_s;
+    winecom_wrap_static( swapchain_s, D3D11_IFACE_IDXGISwapChain );
+    winecom_wrap_static( device_s, D3D11_IFACE_ID3D11Device );
+    winecom_wrap_static( context_s, D3D11_IFACE_ID3D11DeviceContext );
+    unstage_out( swapchain, swapchain_s );
+    unstage_out( device, device_s );
+    unstage_out( context, context_s );
     if (desc) swapchain_remember( host_swapchain, desc->OutputWindow );
     return hr;
 }
@@ -1010,8 +1743,8 @@ HRESULT WINAPI __wine_guest_D3D11On12CreateDevice( void *device12, UINT flags,
                "refused a frame later, in the middle of a resource wrap, where "
                "the reason would be illegible.  Refused here instead.\n" );
     }
-    if (device) *device = NULL;
-    if (context) *context = NULL;
+    if (device) winecom_store_guest_ptr( device, NULL );
+    if (context) winecom_store_guest_ptr( context, NULL );
     return E_NOTIMPL;
 }
 
@@ -1034,14 +1767,18 @@ HRESULT WINAPI D3D11CoreRegisterLayers( void )
 HRESULT WINAPI __wine_guest_CreateDXGIFactory( const GUID *riid, void **factory )
 {
     UINT64 args[12] = { 0 };
+    void *ol = NULL, **out_s;
     HRESULT hr;
 
     TRACE( "riid %s, factory %p\n", debugstr_guid(riid), factory );
     if (!com_runtime_init()) return E_FAIL;
+    out_s = stage_out( factory, &ol );
     args[0] = (UINT64)(ULONG_PTR)riid;
-    args[1] = (UINT64)(ULONG_PTR)factory;
+    args[1] = (UINT64)(ULONG_PTR)out_s;
     hr = flat_call( FLAT_CreateDXGIFactory, 2, args, NULL );
-    return winecom_wrap_out_iface( hr, riid, factory );
+    hr = winecom_wrap_out_iface( hr, riid, out_s );
+    unstage_out( factory, out_s );
+    return hr;
 }
 
 HRESULT WINAPI CreateDXGIFactory( const GUID *riid, void **factory )
@@ -1052,14 +1789,18 @@ HRESULT WINAPI CreateDXGIFactory( const GUID *riid, void **factory )
 HRESULT WINAPI __wine_guest_CreateDXGIFactory1( const GUID *riid, void **factory )
 {
     UINT64 args[12] = { 0 };
+    void *ol = NULL, **out_s;
     HRESULT hr;
 
     TRACE( "riid %s, factory %p\n", debugstr_guid(riid), factory );
     if (!com_runtime_init()) return E_FAIL;
+    out_s = stage_out( factory, &ol );
     args[0] = (UINT64)(ULONG_PTR)riid;
-    args[1] = (UINT64)(ULONG_PTR)factory;
+    args[1] = (UINT64)(ULONG_PTR)out_s;
     hr = flat_call( FLAT_CreateDXGIFactory1, 2, args, NULL );
-    return winecom_wrap_out_iface( hr, riid, factory );
+    hr = winecom_wrap_out_iface( hr, riid, out_s );
+    unstage_out( factory, out_s );
+    return hr;
 }
 
 HRESULT WINAPI CreateDXGIFactory1( const GUID *riid, void **factory )
@@ -1071,15 +1812,19 @@ HRESULT WINAPI __wine_guest_CreateDXGIFactory2( UINT flags, const GUID *riid,
                                                 void **factory )
 {
     UINT64 args[12] = { 0 };
+    void *ol = NULL, **out_s;
     HRESULT hr;
 
     TRACE( "flags %#x, riid %s, factory %p\n", flags, debugstr_guid(riid), factory );
     if (!com_runtime_init()) return E_FAIL;
+    out_s = stage_out( factory, &ol );
     args[0] = flags;
     args[1] = (UINT64)(ULONG_PTR)riid;
-    args[2] = (UINT64)(ULONG_PTR)factory;
+    args[2] = (UINT64)(ULONG_PTR)out_s;
     hr = flat_call( FLAT_CreateDXGIFactory2, 3, args, NULL );
-    return winecom_wrap_out_iface( hr, riid, factory );
+    hr = winecom_wrap_out_iface( hr, riid, out_s );
+    unstage_out( factory, out_s );
+    return hr;
 }
 
 HRESULT WINAPI CreateDXGIFactory2( UINT flags, const GUID *riid, void **factory )
@@ -1091,15 +1836,19 @@ HRESULT WINAPI __wine_guest_DXGIGetDebugInterface1( UINT flags, const GUID *riid
                                                     void **debug )
 {
     UINT64 args[12] = { 0 };
+    void *ol = NULL, **out_s;
     HRESULT hr;
 
     TRACE( "flags %#x, riid %s, debug %p\n", flags, debugstr_guid(riid), debug );
     if (!com_runtime_init()) return E_FAIL;
+    out_s = stage_out( debug, &ol );
     args[0] = flags;
     args[1] = (UINT64)(ULONG_PTR)riid;
-    args[2] = (UINT64)(ULONG_PTR)debug;
+    args[2] = (UINT64)(ULONG_PTR)out_s;
     hr = flat_call( FLAT_DXGIGetDebugInterface1, 3, args, NULL );
-    return winecom_wrap_out_iface( hr, riid, debug );
+    hr = winecom_wrap_out_iface( hr, riid, out_s );
+    unstage_out( debug, out_s );
+    return hr;
 }
 
 HRESULT WINAPI DXGIGetDebugInterface1( UINT flags, const GUID *riid, void **debug )
@@ -1134,7 +1883,7 @@ HRESULT WINAPI __wine_guest_DXGID3D10CreateDevice( void *d3d11_module, void *fac
                "argument is an HMODULE of Wine's d3d11, which does not exist "
                "here.\n" );
     }
-    if (device) *device = NULL;
+    if (device) winecom_store_guest_ptr( device, NULL );
     return E_NOTIMPL;
 }
 
@@ -1160,7 +1909,8 @@ HRESULT WINAPI __wine_guest_D3D10CoreCreateDevice( void *factory, void *adapter,
                                                    void **device )
 {
     UINT64 args[12] = { 0 };
-    void *host_factory = NULL, *host_adapter = NULL;
+    void *host_factory = NULL, *host_adapter = NULL, *dl = NULL;
+    void **device_s;
     HRESULT hr;
 
     TRACE( "factory %p, adapter %p, flags %#x, feature_level %#x, device %p\n",
@@ -1173,14 +1923,16 @@ HRESULT WINAPI __wine_guest_D3D10CoreCreateDevice( void *factory, void *adapter,
         FIXME( "D3D10CoreCreateDevice with a guest-implemented DXGI object\n" );
         return E_NOTIMPL;
     }
+    device_s = stage_out( device, &dl );
     args[0] = (UINT64)(ULONG_PTR)host_factory;
     args[1] = (UINT64)(ULONG_PTR)host_adapter;
     args[2] = flags;
     args[3] = feature_level;
-    args[4] = (UINT64)(ULONG_PTR)device;
+    args[4] = (UINT64)(ULONG_PTR)device_s;
     hr = flat_call( FLAT_D3D10CoreCreateDevice, 5, args, NULL );
     if (FAILED(hr)) return hr;
-    winecom_wrap_static( device, D3D11_IFACE_ID3D10Device );
+    winecom_wrap_static( device_s, D3D11_IFACE_ID3D10Device );
+    unstage_out( device, device_s );
     return hr;
 }
 
@@ -1309,7 +2061,8 @@ HRESULT WINAPI __wine_guest_D3D10CreateDevice( void *adapter, UINT driver_type,
                                                UINT sdk_version, void **device )
 {
     UINT64 args[12] = { 0 };
-    void *factory = NULL, *host_adapter = NULL, *own_adapter = NULL;
+    void *factory = NULL, *host_adapter = NULL, *own_adapter = NULL, *dl = NULL;
+    void **device_s;
     HRESULT hr;
 
     TRACE( "adapter %p, driver_type %#x, flags %#x, sdk_version %u, device %p\n",
@@ -1333,17 +2086,19 @@ HRESULT WINAPI __wine_guest_D3D10CreateDevice( void *adapter, UINT driver_type,
     if (FAILED(hr = d3d10_host_factory( &factory, &own_adapter ))) return hr;
     if (!host_adapter) host_adapter = own_adapter;
 
+    device_s = stage_out( device, &dl );
     args[0] = (UINT64)(ULONG_PTR)factory;
     args[1] = (UINT64)(ULONG_PTR)host_adapter;
     args[2] = flags;
     args[3] = D3D_FEATURE_LEVEL_10_0_VALUE;
-    args[4] = (UINT64)(ULONG_PTR)device;
+    args[4] = (UINT64)(ULONG_PTR)device_s;
     hr = flat_call( FLAT_D3D10CoreCreateDevice, 5, args, NULL );
 
     host_release( own_adapter );
     host_release( factory );
     if (FAILED(hr)) return hr;
-    winecom_wrap_static( device, D3D11_IFACE_ID3D10Device );
+    winecom_wrap_static( device_s, D3D11_IFACE_ID3D10Device );
+    unstage_out( device, device_s );
     return hr;
 }
 
@@ -1360,9 +2115,11 @@ HRESULT WINAPI __wine_guest_D3D10CreateDeviceAndSwapChain( void *adapter, UINT d
                                                            void **swapchain, void **device )
 {
     const struct dxgi_swap_chain_desc *desc = swapchain_desc;
+    struct dxgi_swap_chain_desc desc_native;
     UINT64 args[12] = { 0 };
     void *factory = NULL, *host_adapter = NULL, *own_adapter = NULL;
-    void *host_swapchain = NULL;
+    void *host_swapchain = NULL, *dl = NULL, *sl = NULL;
+    void **device_s, **swapchain_s;
     HRESULT hr;
 
     TRACE( "adapter %p, flags %#x, desc %p, swapchain %p, device %p\n",
@@ -1386,11 +2143,18 @@ HRESULT WINAPI __wine_guest_D3D10CreateDeviceAndSwapChain( void *adapter, UINT d
     if (FAILED(hr = d3d10_host_factory( &factory, &own_adapter ))) return hr;
     if (!host_adapter) host_adapter = own_adapter;
 
+    if (desc && winecom_guest32())
+    {
+        wine_repack32_DXGI_SWAP_CHAIN_DESC( &desc_native, swapchain_desc );
+        desc = &desc_native;
+    }
+    device_s = stage_out( device, &dl );
+    swapchain_s = stage_out( swapchain, &sl );
     args[0] = (UINT64)(ULONG_PTR)factory;
     args[1] = (UINT64)(ULONG_PTR)host_adapter;
     args[2] = flags;
     args[3] = D3D_FEATURE_LEVEL_10_0_VALUE;
-    args[4] = (UINT64)(ULONG_PTR)device;
+    args[4] = (UINT64)(ULONG_PTR)device_s;
     hr = flat_call( FLAT_D3D10CoreCreateDevice, 5, args, NULL );
     if (FAILED(hr))
     {
@@ -1403,32 +2167,35 @@ HRESULT WINAPI __wine_guest_D3D10CreateDeviceAndSwapChain( void *adapter, UINT d
      * either is wrapped: IDXGIFactory::CreateSwapChain wants an IUnknown the
      * runtime owns, and a proxy is not one.  Same window bookkeeping the
      * hand-written CreateSwapChain slot does, for the same reasons. */
-    if (desc && swapchain)
+    if (desc && swapchain_s)
     {
         UINT64 a[D3D11_UNIX_MAX_ARGS] = { 0 };
 
         push_hwnd_state( desc->OutputWindow );
-        a[1] = (UINT64)(ULONG_PTR)*device;
+        a[1] = (UINT64)(ULONG_PTR)*device_s;
         a[2] = (UINT64)(ULONG_PTR)desc;
-        a[3] = (UINT64)(ULONG_PTR)swapchain;
+        a[3] = (UINT64)(ULONG_PTR)swapchain_s;
         hr = (HRESULT)unix_vtbl_call( factory, DXGI_FACTORY_SLOT_CREATE_SWAPCHAIN, 4, a );
-        if (SUCCEEDED(hr)) host_swapchain = *swapchain;
+        if (SUCCEEDED(hr)) host_swapchain = *swapchain_s;
     }
 
     host_release( own_adapter );
     host_release( factory );
     if (FAILED(hr))
     {
-        host_release( *device );
-        *device = NULL;
+        host_release( *device_s );
+        *device_s = NULL;
+        unstage_out( device, device_s );
         return hr;
     }
-    winecom_wrap_static( device, D3D11_IFACE_ID3D10Device );
+    winecom_wrap_static( device_s, D3D11_IFACE_ID3D10Device );
+    unstage_out( device, device_s );
     if (host_swapchain)
     {
-        winecom_wrap_static( swapchain, D3D11_IFACE_IDXGISwapChain );
+        winecom_wrap_static( swapchain_s, D3D11_IFACE_IDXGISwapChain );
         swapchain_remember( host_swapchain, desc->OutputWindow );
     }
+    unstage_out( swapchain, swapchain_s );
     return hr;
 }
 
@@ -1513,6 +2280,11 @@ ULONG_PTR WINAPI D3D11On12CreateDevice( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3
 ULONG_PTR WINAPI __wine_com_dispatch( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3 )
 {
     __wine_spec_unimplemented_stub( "d3d11.dll", "__wine_com_dispatch" );
+}
+
+ULONG_PTR WINAPI __wine_com_dispatch32( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "__wine_com_dispatch32" );
 }
 
 ULONG_PTR WINAPI __wine_com_slot_name( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4 )

@@ -46,6 +46,7 @@
 @ stdcall D3D10StateBlockMaskUnion(ptr ptr ptr)
 
 @ stdcall __wine_com_dispatch(long long ptr) d3d11.__wine_com_dispatch
+@ stdcall __wine_com_dispatch32(long long ptr) d3d11.__wine_com_dispatch32
 @ stdcall __wine_com_refuse() combase.__wine_com_refuse
 @ stdcall __wine_guest_D3D10CreateDevice(ptr long ptr long long ptr) d3d11.__wine_guest_D3D10CreateDevice
 @ stdcall __wine_guest_D3D10CreateDeviceAndSwapChain(ptr long ptr long long ptr ptr ptr) d3d11.__wine_guest_D3D10CreateDeviceAndSwapChain

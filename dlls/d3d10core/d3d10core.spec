@@ -9,6 +9,7 @@
 @ stdcall D3D10CoreGetVersion() d3d11.__wine_dxvk_D3D10CoreGetVersion
 @ stdcall D3D10CoreRegisterLayers() d3d11.__wine_dxvk_D3D10CoreRegisterLayers
 @ stdcall __wine_com_dispatch(long long ptr) d3d11.__wine_com_dispatch
+@ stdcall __wine_com_dispatch32(long long ptr) d3d11.__wine_com_dispatch32
 @ stdcall __wine_guest_D3D10CoreCreateDevice(ptr ptr long long ptr) d3d11.__wine_guest_D3D10CoreCreateDevice
 
 # Appended at the END so no `@` export above it is renumbered:
