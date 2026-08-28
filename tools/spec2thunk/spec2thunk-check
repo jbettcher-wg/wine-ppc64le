@@ -53,8 +53,8 @@ import struct
 import sys
 
 STRIDE = 16
-INFO_VERSION = 7
-INFO_FIELDS = 11                # version..signs_rva
+INFO_VERSION = 8
+INFO_FIELDS = 12                # version..geom32_rva
 DESC_VOID = 0x100               # bit 8
 DESC_VARIADIC = 0x200           # bit 9
 DESC_RESERVED = 0x0000fc00      # bits 10..15, must be zero
@@ -1321,11 +1321,11 @@ def main():
         return 1
 
     (version, count, stubs_rva, stride, names_rva, sigs_rva, trap_off,
-     impl_names_rva, fp_rva, widths_rva, signs_rva) = fields
+     impl_names_rva, fp_rva, widths_rva, signs_rva, geom32_rva) = fields
     r.note('__wine_thunk_info',
            'ver=%d count=%d stubs_rva=0x%x stride=%d names_rva=0x%x '
            'sigs_rva=0x%x trap_off=%d impl_names_rva=0x%x fp_rva=0x%x '
-           'widths_rva=0x%x signs_rva=0x%x' % fields)
+           'widths_rva=0x%x signs_rva=0x%x geom32_rva=0x%x' % fields)
     r.check(version == INFO_VERSION,
             '8b __wine_thunk_info.version == %d' % INFO_VERSION, str(version))
     # Against the EXPORT DIRECTORY, not against the list: the image is allowed
@@ -1341,6 +1341,40 @@ def main():
             '0x%x' % widths_rva)
     r.check(signs_rva != 0, '8l signs_rva present (version 7)',
             '0x%x' % signs_rva)
+    r.check(geom32_rva != 0, '8m geom32_rva present (version 8)',
+            '0x%x' % geom32_rva)
+    # The i386 frame word's own consistency: on an x86_64 module every word
+    # must be 0 (the field exists, the geometry does not apply); on an i386
+    # module a VALID word's slot arithmetic must at least cover the sig's
+    # argc -- each argument is one slot or two, so slots is argc plus the
+    # popcount of the qword mask, and the mask may not name arguments past
+    # argc.  0 is always legal: it is the fail-closed refusal.
+    try:
+        geoms = [pe.u32(geom32_rva + 4 * i) for i in range(count)]
+    except Fail as e:
+        geoms = None
+        r.check(False, '8m2 geom32 words readable', str(e))
+    if geoms is not None:
+        if pe.machine != 0x14c:
+            bad = [i for i, g in enumerate(geoms) if g]
+            r.check(not bad, '8m3 x86_64 module publishes all-zero geom32',
+                    'first nonzero at index %d' % bad[0] if bad else 'all 0')
+        else:
+            bad = []
+            for i, g in enumerate(geoms):
+                if not (g & 0x80000000):
+                    continue
+                sig = pe.u32(sigs_rva + 4 * i)
+                argc = sig & 0xff
+                slots = g & 0xff
+                qmask = (g >> 8) & 0xffff
+                if argc < 16 and qmask >> argc:
+                    bad.append('%d: qword mask past argc' % i)
+                elif slots != argc + bin(qmask).count('1'):
+                    bad.append('%d: slots %d != argc %d + qwords %d'
+                               % (i, slots, argc, bin(qmask).count('1')))
+            r.check(not bad, '8m3 valid geom32 slot arithmetic matches sigs',
+                    '; '.join(bad[:4]) if bad else 'ok')
     for tag, rva in (('__wine_thunk_info', info_rva), ('names_rva', names_rva),
                      ('sigs_rva', sigs_rva), ('impl_names_rva', impl_names_rva)):
         s = pe.section_of(rva)

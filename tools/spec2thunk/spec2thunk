@@ -179,7 +179,90 @@ import wine_sig
 from wine_sig import Refused
 
 STRIDE = 16
-INFO_VERSION = 7
+INFO_VERSION = 8
+
+# --------------------------------------------------------------------------
+# geom32 -- the i386 stdcall frame word (thunk info version 8)
+# --------------------------------------------------------------------------
+# The version-6/7 width and sign words are measured on the x86-64 guest, and
+# for the i386 dispatcher they are AMBIGUOUS at exactly the point that
+# matters: an 8-byte-class argument there is a pointer (ONE 4-byte stdcall
+# slot) or a genuine 64-bit integer (TWO), and the frame cannot be decoded --
+# nor the stdcall pop performed -- without knowing which.  So an i386 module
+# carries one more word per export, measured by the SAME clang width probe at
+# the i386 target, where sizeof answers the stack-slot question directly.
+#
+#   bit  31     geometry VALID.  0 means "not measured / not expressible" and
+#               the host must fail closed: it cannot even pop the frame.
+#   bits 0..7   total argument slot count, in 4-byte slots.  The stdcall
+#               callee pops 4*slots bytes (the return address is separate).
+#   bits 8..23  bit 8+i: argument i occupies TWO slots (an 8-byte value).
+#               Everything unmarked is one slot; 1- and 2-byte arguments
+#               are pushed as full slots by the i386 ABI.
+#   bit  24     the return value is 8 bytes and integer-class: EDX:EAX.
+#               (An FP return is already named by the fp word's THUNK_FP_RET
+#               and gets NO geometry -- x87 ST(0) is neither EAX nor EDX:EAX.)
+#
+# Only plain `stdcall` exports whose signature came from a real header are
+# measured; cdecl/varargs/thiscall/fastcall and .spec-cited entries publish 0
+# and the i386 dispatcher refuses them by name.  An x86_64 module publishes
+# the table with every word 0 -- the field exists so ONE info version
+# describes both halves.
+GEOM32_VALID     = 1 << 31
+GEOM32_RET_QWORD = 1 << 24
+
+def i386_geometry(exports, headers32):
+    """Fill e['geom32'] for every export whose i386 stdcall frame the oracle
+    can measure.  No answer is published as 0, which the host reads as a
+    refusal -- never as 'every argument is one slot'."""
+    requests = []
+    for i, e in enumerate(exports):
+        sig = e['sig']
+        params = sig.get('params')
+        ret = sig.get('ret')
+        if (e.get('spec_type') != 'stdcall' or sig.get('variadic') or
+            params is None or str(sig.get('header') or '').endswith('.spec')):
+            continue
+        want = list(params)
+        if ret and ret.strip() != 'void':
+            want.append(ret)
+        requests.append((i, want))
+        if not want:
+            # zero-argument void function: nothing to measure, trivially valid
+            e['geom32'] = GEOM32_VALID
+    sizes32 = headers32.widths([r for r in requests if r[1]])
+    for i, want in requests:
+        if not want:
+            continue
+        e = exports[i]
+        sig = e['sig']
+        sizes = sizes32.get(i)
+        has_ret = len(want) > sig['nargs']
+        if not sizes or len(sizes) != len(want):
+            continue                       # no answer -> no geometry
+        slots, qmask, ok = 0, 0, True
+        for j in range(sig['nargs']):
+            if sizes[j] in (1, 2, 4):
+                slots += 1
+            elif sizes[j] == 8:
+                slots += 2
+                qmask |= 1 << j
+            else:
+                ok = False                 # by-value aggregate past 8 bytes:
+                break                      # a hidden-sret frame this word
+                                           # cannot spell
+        if not ok or slots > 0xff or qmask > 0xffff:
+            continue
+        geom = GEOM32_VALID | slots | (qmask << 8)
+        if has_ret:
+            rsz = sizes[sig['nargs']]
+            if (e.get('fp', 0) >> 16) & 3:  # THUNK_FP_RET: float or double
+                continue                   # x87 ST(0): no geometry, by design
+            if rsz == 8:
+                geom |= GEOM32_RET_QWORD
+            elif rsz not in (1, 2, 4):
+                continue                   # sret aggregate: same refusal
+        e['geom32'] = geom
 
 # Exports this generator makes up, past the end of the module's ordinal space.
 # A .thunks or .spec file that names one of them is refused, because the two
@@ -2125,6 +2208,18 @@ def emit_asm(dll, exports, mode, com_ifaces=None, machine='x86_64'):
     a('\t.long\twine_thunk_fpv@IMGREL\t# fp_rva  (version 5)')
     a('\t.long\twine_thunk_widthv@IMGREL\t# widths_rva  (version 6)')
     a('\t.long\twine_thunk_signv@IMGREL\t# signs_rva   (version 7)')
+    a('\t.long\twine_thunk_geomv@IMGREL\t# geom32_rva  (version 8)')
+    a('')
+    # One i386 frame-geometry word per export; see the GEOM32 banner at the
+    # top of this file.  Every word is 0 in an x86_64 module (the field
+    # exists so one info version describes both halves), and 0 in an i386
+    # module for an export whose frame the oracle could not measure -- the
+    # host reads 0 as a refusal, never as "every argument is one slot",
+    # because 0 could not even pop the frame honestly.
+    a('\t.balign\t4')
+    a('wine_thunk_geomv:')
+    for e in exports:
+        a('\t.long\t0x%08X\t\t# %s' % (e.get('geom32', 0), e['name']))
     a('')
     # One signedness descriptor per export, ONE bit per argument: set means
     # that argument is a SIGNED sub-word integer and the host must sign-extend
@@ -2613,6 +2708,27 @@ def main():
         ap.error('one of --out or --outdir is required')
     outpath = args.out or os.path.join(args.outdir, dll)
     os.makedirs(os.path.dirname(outpath), exist_ok=True)
+
+    # The i386 half measures its own frame geometry (version 8): a second
+    # oracle at the i386 target, the same headers, the same width probe --
+    # sizeof at that target IS the stack-slot answer.  The x86_64 half skips
+    # this and publishes zeros.
+    if args.machine == 'i386' and args.body == 'trap':
+        headers32 = wine_sig.WineHeaders(
+            args.wine_include, args.wine_generated,
+            clang=args.clang,
+            target=MACHINES['i386']['clang_target'],
+            workdir=os.path.join(args.builddir, 'sigprobe32'),
+            defines=crt_defines,
+            probe_src=probe_src,
+            probe_extra=probe_extra,
+            extra_includes=[spec_relative(d) for d in extra['include_dirs']])
+        i386_geometry(exports, headers32)
+        n_geom = sum(1 for e in exports if e.get('geom32'))
+        if len(exports) - n_geom:
+            print("i386 geometry: %d of %d export(s) carry no frame word and "
+                  "will be REFUSED by the host dispatcher"
+                  % (len(exports) - n_geom, len(exports)))
 
     tag = '%s.%s.%s' % (stem, args.body, args.machine)
     spath = os.path.join(args.builddir, tag + '.s')

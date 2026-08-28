@@ -96,6 +96,7 @@ extern void call_guest_tls_callback( void *callback, void *module, UINT reason )
 extern WCHAR *get_apiset_target_name( const WCHAR *name );
 extern BOOL call_guest_dll_entry_point( void *entry, void *module, UINT reason, void *reserved );
 extern void flush_guest_thunk_cache(void);
+extern NTSTATUS emu32_dispatch_thunk( I386_CONTEXT *ctx );
 extern void dump_guest_thunk_profile(void);
 extern void emu_xstat_dump(void);
 #endif

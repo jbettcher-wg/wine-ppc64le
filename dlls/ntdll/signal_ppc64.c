@@ -1344,9 +1344,17 @@ struct thunk_info
                              argument: that sub-word argument is SIGNED and
                              must be sign-extended rather than zero-extended.
                              Added at version 7, by the same rule again. */
+    UINT geom32_rva;      /* count i386 stdcall frame words, see THUNK_GEOM32_*
+                             below.  Added at version 8; all-zero words in an
+                             x86_64 module (the field exists so one version
+                             describes both guest halves), measured words in
+                             an i386 one -- and 0 there is a REFUSAL the
+                             dispatcher must honour, never "one slot each",
+                             because a frame it cannot decode is also a frame
+                             it cannot pop. */
 };
 
-#define THUNK_INFO_VERSION   7
+#define THUNK_INFO_VERSION   8
 #define THUNK_SIG_ARGC(sig)  ((sig) & 0xff)   /* for a variadic, the FIXED count */
 #define THUNK_SIG_VOID       0x100u           /* returns void */
 #define THUNK_SIG_VARIADIC   0x200u           /* synthesise a va_list, see below */
@@ -1474,6 +1482,22 @@ static inline ULONG_PTR narrow_thunk_arg( ULONG_PTR v, UINT width, UINT sign )
 #define THUNK_FP_RET_NONE    0u
 #define THUNK_FP_RET_DOUBLE  1u
 #define THUNK_FP_RET_FLOAT   2u
+
+/* ---------------------------------------------------------------------------
+ * The i386 frame word (version 8), one UINT per export of an i386 module.
+ * ---------------------------------------------------------------------------
+ * The width word above answers "how many of the bits are real" for the
+ * x86-64 guest and cannot answer the i386 frame question: its 8-byte class
+ * names both a pointer (ONE 4-byte stdcall slot there) and a 64-bit integer
+ * (TWO), and a dispatcher that cannot tell them apart cannot walk the stack
+ * -- or perform the stdcall pop, which is wrong-Esp-forever, not merely a
+ * wrong argument.  So the i386 half of a module carries its own word,
+ * measured by the same clang oracle at the i386 target, where sizeof IS the
+ * slot answer.  See the GEOM32 banner in tools/spec2thunk/spec2thunk. */
+#define THUNK_GEOM32_VALID(g)     ((g) & 0x80000000u)
+#define THUNK_GEOM32_SLOTS(g)     ((g) & 0xffu)          /* total 4-byte slots */
+#define THUNK_GEOM32_QWORD(g, i)  (((g) >> (8 + (i))) & 1u)  /* arg i: 2 slots */
+#define THUNK_GEOM32_RET_QWORD(g) ((g) & 0x01000000u)    /* EDX:EAX return */
 
 #define THUNK_MAX_ARGS 16
 #define THUNK_MAX_FP_ARGS 8
@@ -7497,6 +7521,16 @@ struct com_thunk_iface
 
 typedef NTSTATUS (WINAPI *com_dispatch_func)( UINT iface, UINT slot, AMD64_CONTEXT *ctx );
 
+/* Native namesakes are loaded FROM THE SYSTEM DIRECTORY, never searched by
+ * bare name: the default search order starts at the application directory,
+ * and a game that ships its own guest-machine copy of a thunked module
+ * beside the .exe (Dex ships d3d11.dll and dxgi.dll) would have the loader
+ * pick the GUEST's image up as the "native" module -- import_dll then walks
+ * a wrong-machine image and faults with loader_section held.  Nothing an
+ * application ships can be the native half of a thunk module. */
+static WCHAR native_system_dir[] = { 'C',':','\\','w','i','n','d','o','w','s','\\',
+                                     's','y','s','t','e','m','3','2',0 };
+
 struct com_thunk_hit
 {
     com_dispatch_func dispatch;
@@ -7551,8 +7585,8 @@ static BOOL find_guest_com_target( LDR_DATA_TABLE_ENTRY *mod, ULONG_PTR rip,
             if (cache[n].base == mod->DllBase) { proc = (void *)cache[n].fn; break; }
         if (!proc)
         {
-            if (LdrGetDllHandle( NULL, 0, &mod->BaseDllName, &native ) &&
-                LdrLoadDll( NULL, 0, &mod->BaseDllName, &native ))
+            if (LdrGetDllHandle( native_system_dir, 0, &mod->BaseDllName, &native ) &&
+                LdrLoadDll( native_system_dir, 0, &mod->BaseDllName, &native ))
             {
                 ERR( "no native %s to serve COM slots\n", debugstr_w(mod->BaseDllName.Buffer) );
                 return FALSE;
@@ -7619,6 +7653,50 @@ static void xstat_name_com_slot( LDR_DATA_TABLE_ENTRY *mod, const struct com_thu
     else
     {
         SIZE_T at = xstat_put_w( buf, len, 0, mod->BaseDllName.Buffer );
+
+        at = xstat_put( buf, len, at, " iface " );
+        at = xstat_put_num( buf, len, at, com->iface, 10 );
+        at = xstat_put( buf, len, at, " slot " );
+        xstat_put_num( buf, len, at, com->slot, 10 );
+    }
+}
+
+/* The 32-bit lane's spelling of the same lookup: the guest module is named
+ * by a UNICODE_STRING32 out of the 32-bit loader list rather than by a
+ * 64-bit LDR entry, and the native namesake -- which owns __wine_com_slot_name
+ * -- is found by that name.  Same one-shot cost, same fallback naming. */
+static void xstat_name_com_slot32( const UNICODE_STRING32 *mod32, const struct com_thunk_hit *com,
+                                   char *buf, SIZE_T len )
+{
+    BOOL (WINAPI *slot_name)( UINT, UINT, const char **, const char ** );
+    const char *iname = NULL, *sname = NULL;
+    UNICODE_STRING modname;
+    ANSI_STRING name;
+    HMODULE native;
+
+    modname.Buffer = (WCHAR *)(ULONG_PTR)mod32->Buffer;
+    modname.Length = mod32->Length;
+    modname.MaximumLength = mod32->MaximumLength;
+    RtlInitAnsiString( &name, "__wine_com_slot_name" );
+    if (!LdrGetDllHandle( NULL, 0, &modname, &native ) &&
+        !LdrGetProcedureAddress( native, &name, 0, (void **)&slot_name ) &&
+        slot_name( com->iface, com->slot, &iname, &sname ) && iname && sname)
+    {
+        SIZE_T ilen = strlen( iname );
+        SIZE_T at = 0;
+
+        if (!strncmp( sname, iname, ilen ) && !strncmp( sname + ilen, "::", 2 ))
+            xstat_put( buf, len, 0, sname );
+        else
+        {
+            at = xstat_put( buf, len, 0, iname );
+            at = xstat_put( buf, len, at, strstr( sname, "::" ) ? "/" : "::" );
+            xstat_put( buf, len, at, sname );
+        }
+    }
+    else
+    {
+        SIZE_T at = xstat_put_w( buf, len, 0, modname.Buffer );
 
         at = xstat_put( buf, len, at, " iface " );
         at = xstat_put_num( buf, len, at, com->iface, 10 );
@@ -7711,6 +7789,14 @@ struct thunk_rip_cache_entry
     UINT sig;
     thunk_override_func override;
     UINT cb_mask, cb_wide, cb_argc, fp, widths, signs;
+    UINT geom32;                 /* the version-8 i386 frame word; 0 on the
+                                    64-bit lane and for a refused i386 frame */
+    UCHAR lane32;                /* resolved by the i386 dispatcher: com.dispatch
+                                    is then a com_dispatch32_func and geom32 is
+                                    live.  The two lanes' RIPs cannot collide
+                                    (i386 images sit below 4 GiB, the x86-64
+                                    thunk base is 0x180000000), so this is a
+                                    cross-check, not a namespace. */
     struct com_thunk_hit com;    /* com.dispatch NULL unless this RIP is a slot */
     UINT stat_row;               /* WINE_PPC64LE_TRAP_STATS row, or XSTAT_NO_ROW.
                                   * Here rather than in a table of its own for
@@ -7817,6 +7903,8 @@ static BOOL thunk_rip_cache_get( ULONG_PTR rip, struct thunk_rip_cache_entry *ou
     out->fp           = e->fp;
     out->widths       = e->widths;
     out->signs        = e->signs;
+    out->geom32       = e->geom32;
+    out->lane32       = e->lane32;
     out->com.dispatch = e->com.dispatch;
     out->com.iface    = e->com.iface;
     out->com.slot     = e->com.slot;
@@ -7942,6 +8030,8 @@ static void thunk_rip_cache_put( ULONG_PTR rip, const struct thunk_rip_cache_ent
     e->fp           = val->fp;
     e->widths       = val->widths;
     e->signs        = val->signs;
+    e->geom32       = val->geom32;
+    e->lane32       = val->lane32;
     e->com.dispatch = val->com.dispatch;
     e->com.iface    = val->com.iface;
     e->com.slot     = val->com.slot;
@@ -8256,12 +8346,15 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
 
         *sig_out = sig;
 
-        /* The native namespace: same base name, resolved for our own machine.
-         * Nothing native necessarily references it -- a guest process may be
-         * the only reason the module is wanted at all -- so load it if it is
-         * not already present rather than treating that as a failure. */
-        if (LdrGetDllHandle( NULL, 0, &mod->BaseDllName, &native ) &&
-            LdrLoadDll( NULL, 0, &mod->BaseDllName, &native ))
+        /* The native namespace: same base name, resolved for our own machine
+         * FROM THE SYSTEM DIRECTORY (see native_system_dir above -- an
+         * application's own copy of a thunked module must never be loaded as
+         * the native half).  Nothing native necessarily references it -- a
+         * guest process may be the only reason the module is wanted at all --
+         * so load it if it is not already present rather than treating that
+         * as a failure. */
+        if (LdrGetDllHandle( native_system_dir, 0, &mod->BaseDllName, &native ) &&
+            LdrLoadDll( native_system_dir, 0, &mod->BaseDllName, &native ))
         {
             WARN( "no native %s; only an override can serve this\n",
                   debugstr_w(mod->BaseDllName.Buffer) );
@@ -8855,6 +8948,484 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
 
     status = NtCallbackReturn( NULL, 0, status );
     RtlRaiseStatus( status );
+}
+
+
+/***********************************************************************
+ *           the i386 (WoW64) guest thunk dispatcher
+ *
+ * The 32-bit lane is real WoW64: Wine's own i386 builtins run under the
+ * emulator and convert at the SYSCALL boundary, so almost nothing 32-bit
+ * ever reaches this file.  The exception is the modules whose implementation
+ * this tree REPLACED with a native library behind a unixlib -- d3d11, dxgi,
+ * d3d10core (DXVK) -- whose i386 halves are spec2thunk stub PEs exactly like
+ * their x86-64 siblings: `int 0x80` at every export and every COM vtable
+ * slot.  unix_emu32_run classifies such a trap as EMU32_RUN_TRAP and
+ * BTCpuSimulate hands the I386_CONTEXT here, already on the Win32 stack (the
+ * bounded-run shape: there is no emulator frame below us to preserve).
+ *
+ * The resolve walks the 32-BIT loader list -- the i386 loader is the guest's
+ * own ntdll32 and these modules never appear in the 64-bit PEB -- and
+ * resolves the NATIVE namesake exactly as the 64-bit lane does, through
+ * LdrLoadDll/LdrGetProcedureAddress, which work fine from native code in a
+ * wow64 process (wow64.dll itself is loaded that way).  Flat slots then need
+ * what MS-x64 never did: the stdcall FRAME -- i386 passes everything in
+ * 4-byte stack slots and the CALLEE pops them -- which is exactly what the
+ * version-8 geom32 word carries, measured by the generator's own clang at
+ * the i386 target.  A slot with no geometry is REFUSED, loudly, because a
+ * frame that cannot be decoded cannot be popped either.
+ *
+ * A COM slot is handed whole to the native module's __wine_com_dispatch32
+ * (libs/winecom's 32-bit dispatcher), which owns everything including the
+ * pop: the frame arithmetic lives in the marshal table's I386_GEOM rows and
+ * this side has no view of them.  Contrast the 64-bit contract, where the
+ * dispatcher pops -- on MS-x64 the caller cleans up and the pop is one
+ * return-address; on i386 stdcall the pop IS per-slot knowledge.
+ *
+ * The RIP cache is shared with the 64-bit lane: the two key spaces cannot
+ * collide (i386 images sit below 4 GiB, the x86-64 thunk base is
+ * 0x180000000), and lane32 cross-checks it anyway.
+ */
+typedef NTSTATUS (WINAPI *com_dispatch32_func)( UINT iface, UINT slot, I386_CONTEXT *ctx );
+
+typedef struct
+{
+    LIST_ENTRY32        InLoadOrderLinks;
+    LIST_ENTRY32        InMemoryOrderLinks;
+    LIST_ENTRY32        InInitializationOrderLinks;
+    ULONG               DllBase;
+    ULONG               EntryPoint;
+    ULONG               SizeOfImage;
+    UNICODE_STRING32    FullDllName;
+    UNICODE_STRING32    BaseDllName;
+} EMU32_LDR_ENTRY;
+
+/* Export lookup on a mapped PE32 image that the 64-bit loader has never
+ * seen: RtlImageDirectoryEntryToData reads either optional-header shape, and
+ * the export directory itself is machine-independent.  Forwarders are not
+ * followed -- every name asked for here is a data table or a private entry
+ * the module defines itself. */
+static void *find_export32( ULONG_PTR base, const char *name )
+{
+    const IMAGE_EXPORT_DIRECTORY *exp;
+    const UINT *names, *funcs;
+    const USHORT *ords;
+    ULONG size;
+    UINT i;
+
+    exp = RtlImageDirectoryEntryToData( (HMODULE)base, TRUE,
+                                        IMAGE_DIRECTORY_ENTRY_EXPORT, &size );
+    if (!exp || !exp->NumberOfNames) return NULL;
+    names = (const UINT *)(base + exp->AddressOfNames);
+    ords  = (const USHORT *)(base + exp->AddressOfNameOrdinals);
+    funcs = (const UINT *)(base + exp->AddressOfFunctions);
+    for (i = 0; i < exp->NumberOfNames; i++)
+        if (!strcmp( (const char *)(base + names[i]), name ))
+        {
+            if (ords[i] >= exp->NumberOfFunctions) return NULL;
+            return (void *)(base + funcs[ords[i]]);
+        }
+    return NULL;
+}
+
+/* The native namesake of a 32-bit thunk module, loaded on demand.  The name
+ * arrives as a UNICODE_STRING32 -- and the load is PINNED to the system
+ * directory, not searched by bare name: the default search order starts at
+ * the APPLICATION directory, and a game that ships its own i386 d3d11.dll /
+ * dxgi.dll beside the .exe (Dex does) would have the 64-bit loader pick THE
+ * GUEST'S COPY up as the "native" module.  [MEASURED 2026-08-28: import_dll
+ * faulted at +0x31c reading inside the mis-loaded image, the exception
+ * leaked loader_section, and every later thread in the process piled up
+ * behind it.]  The native builtins live in system32 on this port; nothing
+ * an application ships can be the native half of a thunk module. */
+static HMODULE emu32_native_module( const UNICODE_STRING32 *name32 )
+{
+    UNICODE_STRING name;
+    HMODULE native;
+
+    name.Buffer = (WCHAR *)(ULONG_PTR)name32->Buffer;
+    name.Length = name32->Length;
+    name.MaximumLength = name32->MaximumLength;
+    if (LdrGetDllHandle( native_system_dir, 0, &name, &native ) &&
+        LdrLoadDll( native_system_dir, 0, &name, &native ))
+        return NULL;
+    return native;
+}
+
+/* The locked walk half of the 32-bit resolve; the caller below owns the
+ * loader lock and the fault protection.  no_cache is passed in so the two
+ * halves read one answer. */
+static void *find_guest_thunk_target32_walk( ULONG_PTR rip, UINT *sig_out, UINT *fp,
+                                             UINT *widths, UINT *signs, UINT *geom32,
+                                             struct com_thunk_hit *com, UINT *stat_out,
+                                             int no_cache )
+{
+    UINT stat_row = XSTAT_NO_ROW;
+    PEB_LDR_DATA32 *ldr;
+    LIST_ENTRY32 *mark;
+    ULONG e32;
+    TEB32 *teb32;
+    PEB32 *peb32;
+    void *ret = NULL;
+
+    teb32 = (TEB32 *)((char *)NtCurrentTeb() + NtCurrentTeb()->WowTebOffset);
+    if (!NtCurrentTeb()->WowTebOffset || !(peb32 = (PEB32 *)(ULONG_PTR)teb32->Peb) ||
+        !(ldr = (PEB_LDR_DATA32 *)(ULONG_PTR)peb32->LdrData))
+        return NULL;
+
+    mark = &ldr->InMemoryOrderModuleList;
+    for (e32 = mark->Flink; e32 != (ULONG)(ULONG_PTR)mark;
+         e32 = ((LIST_ENTRY32 *)(ULONG_PTR)e32)->Flink)
+    {
+        EMU32_LDR_ENTRY *mod = CONTAINING_RECORD( (LIST_ENTRY32 *)(ULONG_PTR)e32,
+                                                  EMU32_LDR_ENTRY, InMemoryOrderLinks );
+        ULONG_PTR base = mod->DllBase;
+        const IMAGE_NT_HEADERS *nt = RtlImageNtHeader( (HMODULE)base );
+        const struct thunk_info *info;
+        const struct com_thunk_info *cinfo;
+        const UINT *names, *impl_names;
+        ANSI_STRING func_name;
+        HMODULE native;
+        void *proc;
+        UINT idx, sig, i;
+
+        if (!nt || nt->FileHeader.Machine != IMAGE_FILE_MACHINE_I386) continue;
+        if (rip < base || rip >= base + nt->OptionalHeader.SizeOfImage) continue;
+
+        if (!(info = find_export32( base, "__wine_thunk_info" )))
+        {
+            /* Wine's own i386 builtins and the application's DLLs live in
+             * this list too; an int 0x80 inside one of those is not a thunk
+             * trap, it is the guest's problem.  Fall through to the fault. */
+            TRACE( "i386 trap at %p is inside %s, which is not a thunk module\n",
+                   (void *)rip, debugstr_wn( (WCHAR *)(ULONG_PTR)mod->BaseDllName.Buffer,
+                                             mod->BaseDllName.Length / sizeof(WCHAR) ) );
+            goto done;
+        }
+        if (info->version != THUNK_INFO_VERSION || !info->stride)
+        {
+            ERR( "i386 module at %p has thunk info version %u, expected %u\n",
+                 (void *)base, info->version, THUNK_INFO_VERSION );
+            goto done;
+        }
+
+        if (rip < base + info->stubs_rva + info->trap_off) goto try_com32;
+        idx = (rip - (base + info->stubs_rva + info->trap_off)) / info->stride;
+        if (idx >= info->count) goto try_com32;
+        if (base + info->stubs_rva + info->trap_off + (ULONG_PTR)idx * info->stride != rip)
+            goto try_com32;
+
+        names      = (const UINT *)(base + info->names_rva);
+        impl_names = (const UINT *)(base + info->impl_names_rva);
+        sig     = ((const UINT *)(base + info->sigs_rva))[idx];
+        *fp     = ((const UINT *)(base + info->fp_rva))[idx];
+        *widths = ((const UINT *)(base + info->widths_rva))[idx];
+        *signs  = ((const UINT *)(base + info->signs_rva))[idx];
+        *geom32 = ((const UINT *)(base + info->geom32_rva))[idx];
+        *sig_out = sig;
+
+        if (!(native = emu32_native_module( &mod->BaseDllName )))
+        {
+            WARN( "no native module to serve i386 %s\n",
+                  (const char *)(base + names[idx]) );
+            proc = NULL;
+        }
+        else
+        {
+            RtlInitAnsiString( &func_name, (char *)(base + impl_names[idx]) );
+            if (LdrGetProcedureAddress( native, &func_name, 0, &proc ))
+            {
+                WARN( "native module has no %s to serve the i386 stub\n",
+                      func_name.Buffer );
+                proc = NULL;
+            }
+        }
+
+        TRACE( "i386 %s -> %s %p (%u args, geom %08x)\n",
+               (const char *)(base + names[idx]),
+               (const char *)(base + impl_names[idx]), proc,
+               THUNK_SIG_ARGC(sig), *geom32 );
+
+        ret = proc;
+        if (xstat)
+        {
+            char name[EMU_XSTAT_NAME];
+
+            xstat_name_export( name, sizeof(name),
+                               (WCHAR *)(ULONG_PTR)mod->BaseDllName.Buffer,
+                               (const char *)(base + names[idx]) );
+            stat_row = xstat_intern( EMU_XSTAT_FLAT, rip, name );
+            xstat_hit( stat_row );
+        }
+        *stat_out = stat_row;
+        if (!no_cache)
+        {
+            struct thunk_rip_cache_entry val = { 0 };
+
+            val.stat_row = stat_row;
+            val.proc     = proc;
+            val.sig      = sig;
+            val.fp       = *fp;
+            val.widths   = *widths;
+            val.signs    = *signs;
+            val.geom32   = *geom32;
+            val.lane32   = 1;
+            thunk_rip_cache_put( rip, &val );
+        }
+        goto done;
+
+    try_com32:
+        if (!com || !(cinfo = find_export32( base, "__wine_com_thunk_info" )))
+            goto done;
+        if (cinfo->version != COM_THUNK_INFO_VERSION || !cinfo->stride) goto done;
+        for (i = 0; i < cinfo->iface_count; i++)
+        {
+            const struct com_thunk_iface *ifaces =
+                (const struct com_thunk_iface *)(base + cinfo->ifaces_rva);
+            ULONG_PTR start = base + ifaces[i].stubs_rva + cinfo->trap_off;
+            UINT slot;
+
+            if (rip < start) continue;
+            slot = (rip - start) / cinfo->stride;
+            if (slot >= ifaces[i].slot_count) continue;
+            if (start + (ULONG_PTR)slot * cinfo->stride != rip) continue;
+
+            if (!(native = emu32_native_module( &mod->BaseDllName )))
+            {
+                ERR( "no native module to serve an i386 COM slot at %p\n", (void *)rip );
+                goto done;
+            }
+            RtlInitAnsiString( &func_name, "__wine_com_dispatch32" );
+            if (LdrGetProcedureAddress( native, &func_name, 0, &proc ))
+            {
+                ERR( "the native module behind the i386 COM stubs at %p exports "
+                     "no __wine_com_dispatch32\n", (void *)rip );
+                goto done;
+            }
+            com->dispatch = (com_dispatch_func)proc;   /* really com_dispatch32_func */
+            com->iface = i;
+            com->slot = slot;
+            if (xstat)
+            {
+                char name[EMU_XSTAT_NAME];
+
+                xstat_name_com_slot32( &mod->BaseDllName, com, name, sizeof(name) );
+                stat_row = xstat_intern( EMU_XSTAT_COM, rip, name );
+                xstat_hit( stat_row );
+            }
+            *stat_out = stat_row;
+            if (!no_cache)
+            {
+                struct thunk_rip_cache_entry val = { 0 };
+
+                val.stat_row = stat_row;
+                val.com = *com;
+                val.lane32 = 1;
+                thunk_rip_cache_put( rip, &val );
+            }
+            goto done;
+        }
+        goto done;
+    }
+done:
+    return ret;
+}
+
+/* Resolve a trapping i386 EIP to a flat native proc or a COM slot, through
+ * the shared RIP cache.  Caller is BTCpuSimulate: PE code, no locks held.
+ *
+ * THE WALK CAN FAULT, and the first Dex run proved it [MEASURED 2026-08-28:
+ * native fault in ntdll reading 0xFEB703B0 with the loader lock held, every
+ * other thread then piling up behind loader_section].  The 32-bit loader
+ * list belongs to the guest's own ntdll32 and is guarded by the GUEST's
+ * loader lock, which no native thread can take -- so a guest thread inside
+ * its 32-bit LoadLibrary can splice the list mid-walk, and a torn link is
+ * not just a miss, it is a wild pointer.  The walk therefore runs under
+ * __TRY, the loader lock is released on the way out of a fault instead of
+ * leaking (which is what turned one torn read into a process-wide hang),
+ * and the resolve retries: the splice window is instructions wide, so the
+ * second attempt lands after the store that tore the first. */
+static void *find_guest_thunk_target32( ULONG_PTR rip, UINT *sig_out, UINT *fp,
+                                        UINT *widths, UINT *signs, UINT *geom32,
+                                        struct com_thunk_hit *com, UINT *stat_out )
+{
+    static int no_cache = -1;
+    struct thunk_rip_cache_entry hit;
+    void *ret = NULL;
+    ULONG_PTR magic;
+    UINT attempt;
+    BOOL torn;
+
+    if (no_cache == -1) no_cache = emu_env_flag( L"WINEEMUNORIPCACHE" );
+    if (!xstat_probed) xstat_probe();
+
+    *sig_out = *fp = *widths = *signs = *geom32 = 0;
+    *stat_out = XSTAT_NO_ROW;
+
+    if (!no_cache && thunk_rip_cache_get( rip, &hit ))
+    {
+        if (!hit.lane32)
+        {
+            /* the two lanes' keys cannot collide; if this ever fires the
+             * cache is corrupt and a miss is the only safe answer */
+            ERR( "i386 trap at %p hit a 64-bit cache entry\n", (void *)rip );
+            return NULL;
+        }
+        *sig_out = hit.sig;
+        *fp      = hit.fp;
+        *widths  = hit.widths;
+        *signs   = hit.signs;
+        *geom32  = hit.geom32;
+        *stat_out = hit.stat_row;
+        if (com && hit.com.dispatch) *com = hit.com;
+        if (xstat)
+        {
+            xstat_hit( hit.stat_row );
+            xstat_tick_check();
+        }
+        return hit.proc;
+    }
+
+    for (attempt = 0; attempt < 16; attempt++)
+    {
+        torn = FALSE;
+        *sig_out = *fp = *widths = *signs = *geom32 = 0;
+        *stat_out = XSTAT_NO_ROW;
+        memset( com, 0, sizeof(*com) );
+
+        /* The 64-bit loader lock, not for the 32-bit list (it does not guard
+         * it) but because the resolve loads native modules (LdrLoadDll) and
+         * one lock order beats two. */
+        LdrLockLoaderLock( 0, NULL, &magic );
+        __TRY
+        {
+            ret = find_guest_thunk_target32_walk( rip, sig_out, fp, widths, signs,
+                                                  geom32, com, stat_out, no_cache );
+        }
+        __EXCEPT_ALL
+        {
+            torn = TRUE;
+        }
+        __ENDTRY
+        LdrUnlockLoaderLock( 0, magic );
+        if (!torn) return ret;
+        WARN( "torn 32-bit loader-list walk resolving %p (attempt %u); retrying\n",
+              (void *)rip, attempt );
+        NtYieldExecution();
+    }
+    ERR( "the 32-bit loader-list walk for %p kept faulting; giving the trap up\n",
+         (void *)rip );
+    return NULL;
+}
+
+/***********************************************************************
+ *           emu32_dispatch_thunk
+ *
+ * Serve one i386 thunk trap: flat export or COM vtable slot.  Returns
+ * STATUS_SUCCESS with the context advanced past the call (Eip popped, the
+ * stdcall frame popped, Eax/Edx carrying the result); any other status means
+ * the trap was not served and the caller raises the guest-shaped fault.
+ */
+NTSTATUS emu32_dispatch_thunk( I386_CONTEXT *ctx )
+{
+    struct com_thunk_hit com = { 0 };
+    ULONG_PTR rip = ctx->Eip;
+    const ULONG *esp = (const ULONG *)(ULONG_PTR)ctx->Esp;
+    UINT sig = 0, fp = 0, widths = 0, signs = 0, geom = 0, stat_row = XSTAT_NO_ROW;
+    UINT argc, i, slot;
+    ULONG_PTR ret;
+    void *proc;
+
+    proc = find_guest_thunk_target32( rip, &sig, &fp, &widths, &signs, &geom,
+                                      &com, &stat_row );
+
+    if (com.dispatch)
+    {
+        NTSTATUS status = ((com_dispatch32_func)com.dispatch)( com.iface, com.slot, ctx );
+        if (status)
+            ERR( "i386 com dispatch iface %u slot %u failed, status %08x\n",
+                 com.iface, com.slot, (UINT)status );
+        return status ? STATUS_ILLEGAL_INSTRUCTION : STATUS_SUCCESS;
+    }
+    if (!proc)
+    {
+        ERR( "unhandled i386 guest trap at %p\n", (void *)rip );
+        return STATUS_ILLEGAL_INSTRUCTION;
+    }
+    if (!THUNK_GEOM32_VALID( geom ))
+    {
+        /* No frame word, no service: without it this side cannot even pop
+         * the caller's arguments, and a wrong Esp is forever.  The generator
+         * refuses geometry for variadics, x87 returns, hidden-sret frames
+         * and anything its oracle could not measure. */
+        ERR( "i386 stub at %p resolves to %p but publishes no frame geometry; "
+             "refusing the call\n", (void *)rip, proc );
+        return STATUS_ILLEGAL_INSTRUCTION;
+    }
+
+    argc = THUNK_SIG_ARGC( sig );
+
+    if (!fp)
+    {
+        ULONG_PTR a[THUNK_MAX_ARGS] = { 0 };
+
+        for (i = 0, slot = 1; i < argc && i < THUNK_MAX_ARGS; i++)
+        {
+            if (THUNK_GEOM32_QWORD( geom, i ))
+            {
+                a[i] = esp[slot] | ((ULONG_PTR)esp[slot + 1] << 32);
+                slot += 2;
+            }
+            else a[i] = esp[slot++];
+            /* the same declared-width cut as the 64-bit lane: an i386 caller
+             * owes only the declared bits of a sub-word slot too */
+            a[i] = narrow_thunk_arg( a[i], THUNK_WIDTH( widths, i ),
+                                     THUNK_SIGNED( signs, i ) );
+        }
+        ret = call_native_thunk( proc, a );
+    }
+    else
+    {
+        /* Floating point on either side: same two ELFv2 register files as
+         * the 64-bit lane, loaded from i386 stack slots instead of XMMs.  An
+         * FP RETURN never gets here -- the generator publishes no geometry
+         * for x87 ST(0) returns and the VALID check above already refused. */
+        const UINT fp_mask = THUNK_FP_MASK( fp ), single = THUNK_FP_SINGLE( fp );
+        ULONG_PTR gpr[THUNK_MAX_ARGS];
+        double fpr[THUNK_MAX_FP_ARGS], fp_ret = 0.0;
+        UINT nfpr = 0;
+
+        memset( gpr, 0, sizeof(gpr) );
+        memset( fpr, 0, sizeof(fpr) );
+        for (i = 0, slot = 1; i < argc && i < THUNK_MAX_ARGS; i++)
+        {
+            if (fp_mask & (1u << i))
+            {
+                double v;
+                if (single & (1u << i)) v = *(const float *)&esp[slot];
+                else memcpy( &v, &esp[slot], sizeof(v) );
+                if (nfpr < THUNK_MAX_FP_ARGS) fpr[nfpr++] = v;
+            }
+            else
+            {
+                if (THUNK_GEOM32_QWORD( geom, i ))
+                    gpr[i] = esp[slot] | ((ULONG_PTR)esp[slot + 1] << 32);
+                else
+                    gpr[i] = esp[slot];
+                gpr[i] = narrow_thunk_arg( gpr[i], THUNK_WIDTH( widths, i ),
+                                           THUNK_SIGNED( signs, i ) );
+            }
+            slot += THUNK_GEOM32_QWORD( geom, i ) ? 2 : 1;
+        }
+        ret = call_native_thunk_fp( proc, gpr, fpr, &fp_ret );
+        (void)fp_ret;   /* no geometry for an FP return; unreachable by the guard */
+    }
+
+    ctx->Eax = (ULONG)ret;
+    if (THUNK_GEOM32_RET_QWORD( geom )) ctx->Edx = (ULONG)(ret >> 32);
+    ctx->Eip = esp[0];
+    ctx->Esp += 4 + 4 * THUNK_GEOM32_SLOTS( geom );
+    return STATUS_SUCCESS;
 }
 
 

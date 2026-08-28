@@ -263,6 +263,17 @@ NTSTATUS WINAPI BTCpuNotifyMapViewOfSection( void *unknown, void *addr, void *ta
     return STATUS_SUCCESS;
 }
 
+void WINAPI BTCpuNotifyUnmapViewOfSection( void *addr, BOOL after, NTSTATUS status )
+{
+    /* The i386 thunk dispatcher caches trap-site resolutions keyed by EIP
+     * (the same RIP cache the 64-bit lane uses), and the 32-bit loader --
+     * the guest's own ntdll32 -- unmaps modules through here, never through
+     * free_modref, whose flush covers only the 64-bit list.  Flushing on
+     * every unmap costs one pass over 1024 slots on an event that already
+     * unmapped a view. */
+    if (after && !status) flush_guest_thunk_cache();
+}
+
 void WINAPI BTCpuNotifyMemoryAlloc( void *addr, SIZE_T size, ULONG type, ULONG prot,
                                     BOOL after, NTSTATUS status )
 {
@@ -387,6 +398,38 @@ void WINAPI BTCpuSimulate(void)
             cpu->Flags &= ~WOW64_CPURESERVED_FLAG_RESET_STATE;
             break;
         }
+
+        case EMU32_RUN_TRAP:
+            /* An int 0x80 that is neither bop: a thunk-stub site (the DXVK
+             * modules' i386 halves -- the one surface real WoW64 cannot
+             * serve, because this tree's implementation of it is native) or
+             * a stray vector.  The dispatcher serves the former completely
+             * -- result in Eax/Edx, return address and stdcall frame popped
+             * -- and refuses the latter, which then raises exactly the
+             * access violation 32-bit Windows raises for an unassigned
+             * vector: the canonical (0, ffffffff) pair. */
+            if (!emu32_dispatch_thunk( wow_ctx ))
+            {
+                cpu->Flags &= ~WOW64_CPURESERVED_FLAG_RESET_STATE;
+                break;
+            }
+            {
+                CONTEXT context;
+                volatile BOOL raised = FALSE;
+                EXCEPTION_RECORD rec = { 0 };
+
+                rec.ExceptionCode = EXCEPTION_ACCESS_VIOLATION;
+                rec.ExceptionAddress = ULongToPtr( wow_ctx->Eip );
+                rec.NumberParameters = 2;
+                rec.ExceptionInformation[1] = ~0u;
+                RtlCaptureContext( &context );
+                if (!raised)
+                {
+                    raised = TRUE;
+                    NtRaiseException( &rec, &context, TRUE );
+                }
+            }
+            break;
 
         case EMU32_RUN_FAULT:
         {

@@ -22,6 +22,7 @@
 @ stdcall -arch=ppc64 BTCpuNotifyMemoryAlloc(ptr long long long long long)
 @ stdcall -arch=ppc64 BTCpuNotifyMemoryDirty(ptr long)
 @ stdcall -arch=ppc64 BTCpuNotifyMemoryProtect(ptr long long long long)
+@ stdcall -arch=ppc64 BTCpuNotifyUnmapViewOfSection(ptr long long)
 @ stdcall -arch=ppc64 BTCpuProcessInit()
 @ stdcall -arch=ppc64 BTCpuResetToConsistentState(ptr)
 @ stdcall -arch=ppc64 BTCpuSetContext(long long ptr ptr)

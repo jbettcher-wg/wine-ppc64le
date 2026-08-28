@@ -2590,13 +2590,13 @@ static NTSTATUS unixcall_emu32_run( void *args )
         params->rec.ExceptionCode = EXCEPTION_PRIV_INSTRUCTION;
         break;
     case EMU_RUN_EXITED:
-        /* an int 0x80 that is not one of the two bop sites: an unassigned
-         * vector, which 32-bit Windows surfaces as an access violation with
-         * the canonical (0, ffffffff) information pair */
-        params->rec.ExceptionCode = EXCEPTION_ACCESS_VIOLATION;
-        params->rec.NumberParameters = 2;
-        params->rec.ExceptionInformation[1] = ~0u;
-        break;
+        /* an int 0x80 that is not one of the two bop sites: a thunk-stub
+         * trap if the PE side's dispatcher knows the Eip, an unassigned
+         * vector otherwise.  Only the PE side can tell -- the stub tables
+         * live in PE modules this side has no view of -- so hand it up as
+         * TRAP and let it classify. */
+        params->reason = EMU32_RUN_TRAP;
+        return STATUS_SUCCESS;
     default:
         ERR( "emulator run error %d at eip=%08x\n", r, (UINT)ctx.Rip );
         return STATUS_UNSUCCESSFUL;

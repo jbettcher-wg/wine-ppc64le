@@ -192,10 +192,16 @@ struct emu32_thread_params
 };
 
 /* Why the run stopped.  SYSCALL/UNIXCALL name the bop site the guest reached
- * (told apart by Eip); FAULT carries a guest-shaped record in rec. */
+ * (told apart by Eip); FAULT carries a guest-shaped record in rec.  TRAP is
+ * an int 0x80 at any OTHER address: a thunk-stub site if the PE-side
+ * dispatcher recognises the Eip (emu32_dispatch_thunk), an unassigned vector
+ * -- 32-bit Windows' canonical (0, ffffffff) access violation -- if not.
+ * The unix side cannot tell those apart (the stub tables live in PE modules
+ * it has no view of), so the classification is the PE side's. */
 #define EMU32_RUN_SYSCALL   0
 #define EMU32_RUN_UNIXCALL  1
 #define EMU32_RUN_FAULT     2
+#define EMU32_RUN_TRAP      3
 
 struct emu32_run_params
 {

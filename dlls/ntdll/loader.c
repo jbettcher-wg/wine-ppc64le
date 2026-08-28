@@ -3598,7 +3598,19 @@ static NTSTATUS find_dll_file( const WCHAR *load_path, const WCHAR *libname, USH
 
     if (RtlDetermineDosPathNameType_U( libname ) == RtlPathTypeRelative)
     {
-        status = search_dll_file( load_path, libname, nt_name, pwm, mapping, image_info, id, 0 );
+        /* The demanded machine rides the whole search, not just the guest
+         * machine_dir branch above.  This branch serves machine == 0 (no
+         * demand) and machine == native -- and a NATIVE importer's demand
+         * used to be dropped here, so a game shipping a guest-machine copy
+         * of a thunked module beside its .exe (Dex ships i386 d3d11.dll and
+         * dxgi.dll) had the app directory satisfy native dxgi's forward into
+         * d3d11: the guest image was loaded as the forward's target, its
+         * attach dragged a second copy of the guest's system DLLs through
+         * the native import path, and import_dll faulted walking them with
+         * loader_section held [MEASURED 2026-08-28, the Dex canary].
+         * search_dll_file already knows how to keep walking past a
+         * wrong-machine candidate; it just has to be told the machine. */
+        status = search_dll_file( load_path, libname, nt_name, pwm, mapping, image_info, id, machine );
         switch (status)
         {
         case STATUS_NOT_SUPPORTED:
@@ -3606,12 +3618,12 @@ static NTSTATUS find_dll_file( const WCHAR *load_path, const WCHAR *libname, USH
             if (!is_prefix_bootstrap) break;
             /* fall through */
         case STATUS_DLL_NOT_FOUND:
-            status = find_builtin_without_file( libname, 0, nt_name, pwm, mapping, image_info, id );
+            status = find_builtin_without_file( libname, machine, nt_name, pwm, mapping, image_info, id );
             break;
         }
     }
     else if (!(status = RtlDosPathNameToNtPathName_U_WithStatus( libname, nt_name, NULL, NULL )))
-        status = open_dll_file( nt_name, pwm, mapping, image_info, id, 0 );
+        status = open_dll_file( nt_name, pwm, mapping, image_info, id, machine );
 
     if (status == STATUS_NOT_SUPPORTED) status = STATUS_INVALID_IMAGE_FORMAT;
 
