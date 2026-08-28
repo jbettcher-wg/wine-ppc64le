@@ -408,9 +408,25 @@ and the COUNT of guest<->native crossings.  The levers, in order:
      that crosses on a path winecom never sees.  Two false leads worth
      not re-walking: the 58k "torn records" a plausibility check once
      flagged were LEGAL NULL CBVs ({0,0} range inits -- Cyberpunk writes
-     tens of thousands), and run-native (unlike steamtool/proton) never
-     arms FEX_HWTSO, which is a real gap on the bench path but not this
-     bug.  The paragraph below is the design as built; the correctness
+     tens of thousands), and the claim that run-native never arms
+     FEX_HWTSO -- it does: run-native execs steamtool/proton, whose lane
+     defaults apply unconditionally, and the 2026-08-27 bench leg logs
+     show "lane default FEX_HWTSO=1" + the bridge's "FEX_HWTSO live"
+     confirmation on every run-native launch.  There is no bench-path
+     gap.  The driver-fragility question was also checked ON DATA
+     (2026-08-28, op4k journal history): every gfx-ring timeout on the
+     render GPU falls inside a journal-armed leg, the one journal-off
+     leg interleaved mid-train (ab-nodev, 20:49) is exactly the one gap
+     in the timeout cadence, and dozens of journal-off legs are clean --
+     the TIMEOUTS are this bug, not amdgpu flakiness.  What IS driver
+     fragility is the recovery path: a soft gfx ring reset usually
+     succeeds (six for six on the 22:57 boot, legs kept running), but
+     when it fails the driver escalates to MODE1 + "VRAM is lost", the
+     compositor's context dies, and on this box the clients re-wedge the
+     ring on resubmit -- the 22:16 crashloop re-reset the GPU ~140 times
+     in 11 minutes and needed a reboot.  So one journal hang can cost
+     the session even though the hang itself is ours.
+     The paragraph below is the design as built; the correctness
      comments live above wc_dev_drain in libs/winecom/winecom.c.
 
      **The device-pair DESIGN is settled (2026-08-27 evening), unbuilt.**
