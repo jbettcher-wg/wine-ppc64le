@@ -1041,6 +1041,7 @@ FAST_PATH_EXPORTS = ('QueryPerformanceCounter', 'QueryPerformanceFrequency',
                      'LeaveCriticalSection', 'PeekMessageW')
 QPC_BLOCK_EXPORT  = '__wine_thunk_qpc'
 QPC_ENABLED       = 24
+QPC_CS_DISABLE    = 26
 QPC_BLOCK_SIZE    = 48
 QPC_MAGIC         = 0x5150433150504336          # "QPC1PPC6"
 FAST_BODY_MAX     = 96                          # bytes to look in for the fallback
@@ -1412,15 +1413,39 @@ def main():
                 except Fail as e:
                     bad.append('%s: %s' % (n, e))
                     continue
-                # cmpb $1, disp32(%rip) -- the arming test, and its operand
-                # must be the block's enabled byte and nothing else.
-                if body[0:2] != b'\x80\x3d' or body[6] != 1:
-                    bad.append('%s: does not begin with cmpb $1, disp32(%%rip)' % n)
-                    continue
-                disp = struct.unpack('<i', body[2:6])[0]
-                if rva + 7 + disp != qpc_rva + QPC_ENABLED:
-                    bad.append('%s: tests 0x%x, not %s+%d'
-                               % (n, rva + 7 + disp, QPC_BLOCK_EXPORT, QPC_ENABLED))
+                # Each kind's contractual HEAD.  The qpc pair must open on the
+                # arming test against the block's enabled byte; the CS pair on
+                # its kill-switch test against cs_disable; tid and peek carry
+                # no block state and must open on their known first
+                # instruction (the gs load their probes also check for).  The
+                # original qpc-only spelling reported the later kinds as bad,
+                # which was the check lying about legitimate bodies.
+                head_kind = ('qpc' if n.startswith('QueryPerformance')
+                             else 'cs' if 'CriticalSection' in n
+                             else n)
+                if head_kind in ('qpc', 'cs'):
+                    want_imm = 1 if head_kind == 'qpc' else 0
+                    want_off = QPC_ENABLED if head_kind == 'qpc' else QPC_CS_DISABLE
+                    if body[0:2] != b'\x80\x3d' or body[6] != want_imm:
+                        bad.append('%s: does not begin with cmpb $%d, disp32(%%rip)'
+                                   % (n, want_imm))
+                        continue
+                    disp = struct.unpack('<i', body[2:6])[0]
+                    if rva + 7 + disp != qpc_rva + want_off:
+                        bad.append('%s: tests 0x%x, not %s+%d'
+                                   % (n, rva + 7 + disp, QPC_BLOCK_EXPORT, want_off))
+                        continue
+                elif head_kind == 'GetCurrentThreadId':
+                    if body[0:8] != b'\x65\x8b\x04\x25\x48\x00\x00\x00':
+                        bad.append('%s: does not begin with movl %%gs:0x48, %%eax' % n)
+                        continue
+                elif head_kind == 'PeekMessageW':
+                    if body[0:9] != b'\x65\x4c\x8b\x14\x25\x98\x01\x00\x00':
+                        bad.append('%s: does not begin with movq %%gs:0x198, %%r10' % n)
+                        continue
+                else:
+                    bad.append('%s: fast-path export with no head contract here -- '
+                               'teach this check its first instruction' % n)
                     continue
                 # and somewhere in it a direct jump back to ITS OWN trap stub,
                 # which is what makes the fallback a fallback.
