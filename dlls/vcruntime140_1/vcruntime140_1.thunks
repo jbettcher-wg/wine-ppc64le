@@ -9,3 +9,40 @@
 # module's own .spec.
 DLL vcruntime140_1.dll
 FROM-SPEC auto
+
+# ---------------------------------------------------------------------------
+# 2026-08-29, guest-cxx-eh-plan Session A: confirmed empty, and why it stays
+# that way for now
+# ---------------------------------------------------------------------------
+# This module's .spec has exactly one non-stub entry, `__CxxFrameHandler4`
+# (dlls/vcruntime140_1/vcruntime140_1.spec:1), and it is declared in NO Wine
+# header the oracle reads.  FROM-SPEC auto therefore refuses it ("no
+# declaration found") the same as any other undeclared name -- confirmed by
+# building this module and reading spec2thunk's own "WARNING: every export
+# was refused; emitting a module with no [stub] exports" line, and by
+# spec2thunk-check, which passes an all-refused module rather than treating
+# it as a build failure (see the tool's own comment: "an all-refused module
+# is still worth emitting").  So: yes, this thunk really exports nothing
+# today, and both games' VCRUNTIME140_1.__CxxFrameHandler4 import binds to
+# ntdll's missing-import sentinel when THIS module answers the load.
+#
+# It does NOT need fixing here.  __CxxFrameHandler4 is not an API a guest
+# calls; it is the LANGUAGE PERSONALITY ROUTINE the unwinder invokes with
+# that image's exception/context records and expects to walk that image's
+# FuncInfo4 tables and resume in its code -- exactly the __CxxFrameHandler3
+# class vcruntime140.thunks refuses by name, for the same reason.  The
+# eventual fix, once guest-cxx-eh-plan.md's Session B lands real x86-64
+# FH4 code in dlls/guestcrt (compiling Wine's own handler4.c +
+# except_x86_64.c, per that plan's section 4), is exactly the setjmp/
+# _CxxThrowException shape: `FORWARD __CxxFrameHandler4
+# guestcrt.__CxxFrameHandler4`.  Adding that FORWARD now, ahead of the guest
+# code it would point at, would trade a diagnosable "no such export" hole for
+# a load-time forwarder-resolution failure against a symbol that does not
+# exist yet -- worse, not better.  Session A's actual unblock for these two
+# titles is elsewhere: Proton already stages a REAL x86-64
+# vcruntime140_1.dll (Wine's own build, genuine FH4 machine code) into every
+# Proton prefix, and THAT module's own imports -- not this one's exports --
+# are what vcruntime140.thunks and ucrtbase.thunks now serve
+# (_CxxThrowException, __C_specific_handler, __processing_throw).  A non-
+# Proton prefix, or a builtin-DLL override that prefers this module, still
+# gets the named refusal above, honestly, until Session B exists.
