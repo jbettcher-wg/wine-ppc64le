@@ -1899,6 +1899,84 @@ static ULONG_PTR emu_wglGetProcAddress( const ULONG_PTR *a, void *native )
     return (ULONG_PTR)proc;
 }
 
+/***********************************************************************
+ *           Vulkan entry points, vended at runtime like GL's
+ *
+ * vkGetInstanceProcAddr and vkGetDeviceProcAddr are wglGetProcAddress's
+ * problem in Vulkan clothes: the ANSWER is a code address the guest will
+ * CALL, and pass-through hands it native winevulkan code.  MEASURED
+ * 2026-08-22, Quake II (2023 remaster): SDL2's SDL_Vulkan_LoadLibrary got
+ * vkGetInstanceProcAddr from the guest vulkan-1 thunk (a fine guest stub),
+ * called it, received the RAW NATIVE pointer the pass-through returned, and
+ * called that -- c0000005 at winevulkan.dll+0x2bf68, ppc64 bytes decoded as
+ * x86-64, "in no guest image".  A title that statically imports vulkan-1
+ * never sees this; every title that RESOLVES vulkan at runtime -- SDL,
+ * every loader library, DXVK as a guest DLL -- does.
+ *
+ * Easier than GL in one way: there is an export table to answer from.  The
+ * guest vulkan-1 thunk module exports the whole surface the oracle accepted
+ * (253 names, vkCreateWin32SurfaceKHR and the other extensions included),
+ * and native vulkan-1.dll exports the same names as forwards into
+ * winevulkan -- so the stub is an ordinary LdrGetProcedureAddress against
+ * the guest module, and no thunk_resolvers[] entry is needed.  WHETHER a
+ * name may be had stays the native side's decision, exactly as with GL: it
+ * is asked first, and only a name it answers for gets a stub.  A name it
+ * offers that the guest module lacks is a gap in THIS port and is an ERR
+ * naming it, once (gl_say_once serves both APIs; the namespaces do not
+ * collide).
+ *
+ * One handler serves both registration points: both are (handle, name) with
+ * the name in slot 1, and `native` is the export the row stands in for, so
+ * the probe call is the right one either way.
+ *
+ * KNOWN GAP, deliberate: the guest module's surface is vulkan-1.spec's, not
+ * winevulkan's.  winevulkan answers ~745 names through these two entry
+ * points -- every KHR alias and EXT included -- and the guest thunk carries
+ * stubs for the ~262 vulkan-1.spec exports, so a name outside that set
+ * (vkGetPhysicalDeviceProperties2KHR, say, from DXVK loaded as a guest DLL)
+ * answers NULL here, with the ERR above naming it once.  That is the
+ * refuse-and-name trade this tree makes everywhere: pass-through's answer
+ * for the same name was a raw native pointer and a c0000005 in no guest
+ * image.  Widening the answer is generation-time work in
+ * dlls/vulkan-1/vulkan-1.thunks, not a runtime patch here. */
+static ULONG_PTR emu_vkGetProcAddr( const ULONG_PTR *a, void *native )
+{
+    const char *name = (const char *)a[1];
+    ANSI_STRING str;
+    HMODULE guest;
+    void *proc;
+
+    if (!native)
+    {
+        ERR( "no native vulkan-1 to answer vkGet*ProcAddr\n" );
+        return 0;
+    }
+    if (!name) return 0;
+
+    if (!((ULONG_PTR (*)( ULONG_PTR, ULONG_PTR ))native)( a[0], a[1] ))
+    {
+        if (gl_say_once( name ))
+            WARN( "vkGet*ProcAddr(%s): not offered natively; NULL\n", debugstr_a(name) );
+        return 0;
+    }
+    if (!(guest = find_guest_module( L"vulkan-1.dll" )))
+    {
+        ERR( "vkGet*ProcAddr(%s) with no guest vulkan-1 loaded\n", debugstr_a(name) );
+        return 0;
+    }
+    RtlInitAnsiString( &str, name );
+    if (LdrGetProcedureAddress( guest, &str, 0, &proc ))
+    {
+        if (gl_say_once( name ))
+            ERR( "vkGet*ProcAddr(%s): native vulkan-1 offers it but the guest "
+                 "thunk module has no stub -- refused at generation time; NULL "
+                 "(see dlls/vulkan-1/vulkan-1.thunks)\n", debugstr_a(name) );
+        return 0;
+    }
+    TRACE( "vkGet*ProcAddr(%s) -> guest stub %p\n", debugstr_a(name), proc );
+    return (ULONG_PTR)proc;
+}
+
 void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len );
 
 /***********************************************************************
@@ -6719,6 +6797,11 @@ static const struct thunk_override thunk_overrides[] =
     { L"kernel32.dll",   "LoadLibraryExW",   3, emu_LoadLibraryExW },
     { L"kernelbase.dll", "LoadLibraryExA",   3, emu_LoadLibraryExA },
     { L"kernelbase.dll", "LoadLibraryExW",   3, emu_LoadLibraryExW },
+    /* Vulkan's runtime-vended entry points: the answer is a code address the
+     * guest will CALL, so it must be the guest thunk module's own stub; see
+     * emu_vkGetProcAddr above.  Both rows are (handle, name). */
+    { L"vulkan-1.dll",   "vkGetInstanceProcAddr", 2, emu_vkGetProcAddr },
+    { L"vulkan-1.dll",   "vkGetDeviceProcAddr",   2, emu_vkGetProcAddr },
     /* native->guest: the pointer is queued here and run by our own native
      * handler at exit; see run_guest_atexit_handlers */
     { L"ucrtbase.dll", "_crt_atexit",       1, emu_crt_atexit },
@@ -8361,6 +8444,7 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
             native = NULL;
         }
         RtlInitAnsiString( &func_name, (char *)(base + impl_names[idx]) );
+
         if (LdrGetProcedureAddress( native, &func_name, 0, &proc ))
         {
             /* A module whose surface is genuinely larger than its export
