@@ -145,6 +145,14 @@ typedef struct
 } cxx_frame_info;
 
 frame_info* __cdecl _CreateFrameInfo(frame_info *fi, void *obj);
+/* Exported by ucrtbase.spec but declared in no public header (the same
+ * tooling gap _lock/_unlock hit -- see dlls/ucrtbase/ucrtbase.thunks' 2026-
+ * 08-29 guest-cxx-eh-plan Session A comment): both only touch the native
+ * frame_info list rooted in thread_data_t.frame_info_head, so a ucrtbase
+ * trap thunk is the correct answer for them, and this declaration is what
+ * lets spec2thunk's oracle see that. */
+void __cdecl _FindAndUnlinkFrame(frame_info *fi);
+BOOL __cdecl _IsExceptionObjectToBeDestroyed(const void *obj);
 BOOL __cdecl __CxxRegisterExceptionObject(EXCEPTION_POINTERS*, cxx_frame_info*);
 void __cdecl __CxxUnregisterExceptionObject(cxx_frame_info*, BOOL);
 void CDECL __DestructExceptionObject(EXCEPTION_RECORD*);

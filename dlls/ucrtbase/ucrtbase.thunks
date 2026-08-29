@@ -269,3 +269,67 @@ div                       0x00000D1F  2  int   ucrtbase.spec:2272
 # sentinels, until real guest-side unwinding exists.
 FORWARD __intrinsic_setjmp guestcrt.__intrinsic_setjmp
 FORWARD longjmp            guestcrt.longjmp
+
+# ---------------------------------------------------------------------------
+# The 2026-08-29 guest-cxx-eh-plan Session A triage: the throw half, a mis-
+# served language handler, and the flat thread-state accessors it needs
+# ---------------------------------------------------------------------------
+# game_x64.dll (Quake II's 2023 remaster) and libxess*.dll (Cyberpunk's XeSS)
+# both statically import VCRUNTIME140._CxxThrowException and
+# VCRUNTIME140.__C_specific_handler, which vcruntime140.spec:2/13 forward to
+# THIS module (see vcruntime140.thunks for the matching FORWARD lines it
+# grew the same day).  Two of the four names below are themselves forwards;
+# the other two are ordinary data-only traps.
+#
+#   * _CxxThrowException forwards on to the real x86-64 code in
+#     dlls/guestcrt/cxxthrow.c -- see that file's banner for the full
+#     contract and why a trap can never serve it (it would raise the
+#     exception over the HOST's native stack, and the dispatcher's search
+#     phase would then never reach a guest language handler at all).
+#
+#   * __C_specific_handler forwards to ntdll's own copy rather than being
+#     served by THIS module's real (but differently-addressed) native
+#     implementation.  dlls/ntdll/signal_ppc64.c's frame walk recognises
+#     __C_specific_handler by ADDRESS IDENTITY against the guest ntdll's own
+#     export (guest_c_specific_handler_addr()); any other address -- ucrtbase
+#     exports its own working native implementation at ucrtbase.spec:51, but
+#     at a DIFFERENT guest address -- fails that check and gets entered as
+#     unknown guest code instead, where it would trap into native ppc64 with
+#     an AMD64 DISPATCHER_CONTEXT it cannot interpret.  Forwarding here means
+#     every route into this name -- straight from a guest's VCRUNTIME140
+#     import, or through this module directly -- ends at the one address the
+#     identity check actually recognises.
+#
+#   * __processing_throw needed no new declaration at all: msvcrt.h already
+#     declares it (PROBE-EXTRA msvcrt.h, below, has carried it into this
+#     oracle's view since the 2026-08-17 DOOM triage) and thunkcxx.h says why
+#     it belongs conceptually with the other flat accessors even though it
+#     lives in the other header -- it hands back a POINTER into native
+#     thread-local data, exactly like __current_exception/
+#     __current_exception_context already do, so the guest FH3/FH4
+#     personality that will eventually read and write through it needs no
+#     host->guest call to do so.  It only ever lacked a ROW here; the oracle
+#     could already see it.
+#
+#   * _CreateFrameInfo and _FindAndUnlinkFrame only link and unlink a node in
+#     a list rooted in native thread-local data (msvcrt_get_thread_data()'s
+#     frame_info_head); _IsExceptionObjectToBeDestroyed only walks that same
+#     list comparing pointers.  None of the three ever calls a guest function
+#     pointer, so -- unlike __CxxRegisterExceptionObject/
+#     __CxxUnregisterExceptionObject/__DestructExceptionObject, which DO (the
+#     last one calls the thrown object's own destructor) and so stay holes
+#     here pending guest-cxx-eh-plan.md's Session B support file -- a trap is
+#     the correct, not merely convenient, answer for these three.
+#     _CreateFrameInfo was already declared in msvcrt.h; the other two were
+#     exported by this module's .spec but declared in no header at all (the
+#     same tooling gap _lock/_unlock hit), so msvcrt.h grew their
+#     declarations too rather than falling back to the .spec-location
+#     downgrade -- both are ordinary two-argument-or-fewer pointer/int
+#     functions with nothing a header-based check would catch less of.
+FORWARD _CxxThrowException   guestcrt._CxxThrowException
+FORWARD __C_specific_handler ntdll.__C_specific_handler
+
+__processing_throw              0x00000E01  0  int   msvcrt.h:161
+_CreateFrameInfo                0x00000E02  2  int   msvcrt.h:147
+_FindAndUnlinkFrame             0x00000E03  1  void  msvcrt.h:154
+_IsExceptionObjectToBeDestroyed 0x00000E04  1  int   msvcrt.h:155

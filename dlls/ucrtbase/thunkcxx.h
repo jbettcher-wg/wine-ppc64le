@@ -19,12 +19,40 @@
  * null or non-polymorphic object will die loudly rather than get the guest
  * exception MSVC promises.  That is accepted and this comment is the record.
  *
- * Deliberately NOT declared, so they stay refused:
- *   _CxxThrowException, __CxxFrameHandler3 -- the EH personality belongs to
- *     the guest; a native throw/unwind over guest frames is never right.
+ * Deliberately NOT declared here, so the oracle never turns them into traps:
+ *   _CxxThrowException -- the EH personality belongs to the guest; a native
+ *     throw over guest frames is never right.  It is no longer a plain
+ *     refused hole, though: ucrtbase.thunks now carries
+ *     `FORWARD _CxxThrowException guestcrt._CxxThrowException`, which
+ *     bypasses this header (and the oracle) entirely and resolves to real
+ *     x86-64 code in dlls/guestcrt/cxxthrow.c.
+ *   __CxxFrameHandler3 -- same reasoning, still an actual hole: nobody has
+ *     written the guest-side personality that a FORWARD would point at
+ *     (guest-cxx-eh-plan.md's Session B/C).
  *   __unDNameEx -- takes caller-supplied malloc/free FUNCTION POINTERS, which
  *     from a guest are guest code; its only known wanter is the game-shipped
  *     dbghelp.dll that the builtin thunk serves anyway.
+ *
+ * __processing_throw is NOT declared below, unlike the rest of this file's
+ * subject -- it does not need to be.  dlls/msvcrt/msvcrt.h already declares
+ * it (used internally by handler4.c/except.c), and this module's own
+ * ucrtbase.thunks already carries `PROBE-EXTRA msvcrt.h` from an earlier
+ * triage, so the oracle already sees it there; ucrtbase.thunks' 2026-08-29
+ * guest-cxx-eh-plan Session A row cites msvcrt.h directly instead of adding
+ * a second, redundant declaration here (spec2thunk's oracle hard-fails a
+ * `spec disagrees with Wine's headers` mismatch if a name resolves to a
+ * DIFFERENT declaration site than the one asserted -- measured, not
+ * theoretical).  It hands back a POINTER into native thread-local data
+ * (msvcrt_get_thread_data()->processing_throw) exactly the way
+ * __current_exception does above, so guestcrt's future FH3/FH4 personality
+ * (guest-cxx-eh-plan.md Session B) can read and write it directly, with no
+ * host->guest call needed.  Adding it now, alongside
+ * _CreateFrameInfo/_FindAndUnlinkFrame/_IsExceptionObjectToBeDestroyed also
+ * in msvcrt.h, stops a staged Proton vcruntime140/vcruntime140_1's own real
+ * FH4 code from resolving __processing_throw to a sentinel (guest-cxx-eh-
+ * plan.md section 3).  The three ExceptionObject names in that same section
+ * stay sentinels for now -- they are guest code, not flat traps, for the
+ * reason given above.
  */
 
 #ifndef __WINE_UCRTBASE_THUNKCXX_H

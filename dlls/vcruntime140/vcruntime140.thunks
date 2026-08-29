@@ -28,17 +28,11 @@ FROM-SPEC auto
 #     way ucrtbase.thunks already gets _lock/_unlock/_amsg_exit.  That is a
 #     real clang-checked declaration, not an assertion.
 #
-#   * the other four use the .spec location column, the documented downgrade
+#   * the other three use the .spec location column, the documented downgrade
 #     for an export Wine declares in NO header.  A .spec pins the arity and the
 #     argument classes but carries no return type, so the <int|void> column
 #     below is an unchecked human assertion.  Each is justified against the
 #     implementation it forwards to, named here so the claim can be rechecked:
-#       _CxxThrowException            dlls/msvcrt/cppexcept.h:149 -- WINAPI,
-#                                     DECLSPEC_NORETURN, (void*, const
-#                                     cxx_exception_type*).  "void" for the
-#                                     same reason exit() is void in
-#                                     ucrtbase.thunks: it never returns to the
-#                                     dispatcher at all.
 #       __std_terminate               forwards to ucrtbase.terminate (see
 #                                     ucrtbase.spec:147), which is noreturn.
 #       __std_type_info_destroy_list  dlls/msvcrt/cpp.c:1071 --
@@ -48,21 +42,34 @@ FROM-SPEC auto
 #                                     BOOL CDECL (CRITICAL_SECTION*, DWORD,
 #                                     DWORD).  BOOL is int class.
 #
-# __CxxFrameHandler3 IS DELIBERATELY LEFT A HOLE, and must stay one.  It is not
-# an API the guest calls; it is the LANGUAGE PERSONALITY ROUTINE named by the
-# guest image's own .pdata/UNWIND_INFO, invoked BY the unwinder with that
-# image's exception and context records and expected to walk that image's
-# funclet tables and resume in its code.  Thunking it would send a guest's
-# unwind into the host's ppc64 __CxxFrameHandler, which has neither the guest's
-# frame layout nor any way to resume x86-64 execution -- a silent wrong answer
-# where the hole is a named, diagnosable sentinel.  Serving it needs a real
-# guest-side EH personality, not an export line.  Nothing on mfc140u's LOAD
-# path reaches it (measured: the module now initialises and its exports call),
-# and a guest that actually throws C++ across this boundary must fail loudly.
+# __CxxFrameHandler3/4 ARE DELIBERATELY LEFT HOLES, and must stay one.  They
+# are not an API the guest calls; each is the LANGUAGE PERSONALITY ROUTINE
+# named by the guest image's own .pdata/UNWIND_INFO, invoked BY the unwinder
+# with that image's exception and context records and expected to walk that
+# image's funclet tables and resume in its code.  Thunking either would send
+# a guest's unwind into the host's ppc64 __CxxFrameHandler, which has neither
+# the guest's frame layout nor any way to resume x86-64 execution -- a silent
+# wrong answer where the hole is a named, diagnosable sentinel.  Serving them
+# needs a real guest-side EH personality, not an export line -- guest-cxx-
+# eh-plan.md's Session B/C, not done here.  Nothing on mfc140u's LOAD path
+# reaches __CxxFrameHandler3 (measured: the module now initialises and its
+# exports call), and a guest that actually throws C++ across this boundary
+# must fail loudly.
+#
+# WHAT THIS COMMENT COULD NOT SAY ON 2026-08-17: a THIRD vehicle exists now.
+# _CxxThrowException used to sit in this same "no vehicle exists yet" bucket
+# and was trap-thunked below (0x00000B01) as the least-bad option at the
+# time.  It no longer is one: dlls/guestcrt + spec2thunk FORWARD (landed
+# 2026-08-22 for setjmp/longjmp, commit b9553bf3403) means a register- or
+# stack-contract export can be REAL x86-64 code in a guestpe-built module,
+# reached by an ordinary PE forwarder the guest loader follows itself -- see
+# the 2026-08-29 triage below.  __CxxFrameHandler3/4 stay refused not because
+# no vehicle exists, but because nobody has written the guest-side FH3/FH4
+# personality that would go behind it; the day one exists, it forwards here
+# exactly the way _CxxThrowException now does.
 INCLUDE-DIR   ../msvcrt
 PROBE-EXTRA   msvcrt.h        # _purecall
 
-_CxxThrowException                 0x00000B01  2  void  vcruntime140.spec:2
 __std_terminate                    0x00000B02  0  void  vcruntime140.spec:42
 __std_type_info_destroy_list       0x00000B03  1  void  vcruntime140.spec:44
 __vcrt_InitializeCriticalSectionEx 0x00000B04  3  int   vcruntime140.spec:55
@@ -88,3 +95,49 @@ __vcrt_InitializeCriticalSectionEx 0x00000B04  3  int   vcruntime140.spec:55
 # never unwinds.
 FORWARD __intrinsic_setjmp ucrtbase.__intrinsic_setjmp
 FORWARD longjmp            ucrtbase.longjmp
+
+# ---------------------------------------------------------------------------
+# The 2026-08-29 guest-cxx-eh-plan Session A triage: the throw half, and a
+# mis-served language handler
+# ---------------------------------------------------------------------------
+# game_x64.dll (Quake II's 2023 remaster) and libxess*.dll (Cyberpunk's XeSS)
+# both statically import VCRUNTIME140._CxxThrowException and
+# VCRUNTIME140.__C_specific_handler; neither imports __CxxFrameHandler3, and
+# both import VCRUNTIME140_1.__CxxFrameHandler4 (see guest-cxx-eh-plan.md,
+# section 3, for the measured import tables).  Two fixes:
+#
+#   * _CxxThrowException moves from the 0x00000B01 trap line above (deleted)
+#     to a FORWARD, following vcruntime140.spec:2's own hop to
+#     ucrtbase._CxxThrowException.  ucrtbase's thunk carries the second hop,
+#     on to the real x86-64 code in dlls/guestcrt/cxxthrow.c -- see that
+#     file's banner for why a trap can never be right here: it would raise
+#     the exception over the HOST's native stack, and the dispatcher's search
+#     phase would then walk frames with no .xdata at all and never reach a
+#     guest __CxxFrameHandler3/4, however it is eventually served.  This was
+#     the DEAD0009 sentinel a prefix-staged Proton vcruntime140 produced: its
+#     own _CxxThrowException is itself a forward to ucrtbase, and the old
+#     trap line here shadowed it for the builtin case while the forward died
+#     at load for the staged case -- one bug, two symptoms.
+#
+#   * __C_specific_handler was, until this line, whatever FROM-SPEC auto's
+#     default machinery produces for a name winnt.h declares: an ordinary
+#     TRAP stub.  That is wrong for exactly one reason, but it is a serious
+#     one -- dlls/ntdll/signal_ppc64.c's frame walk recognises __C_specific_
+#     handler by ADDRESS IDENTITY (guest_c_specific_handler_addr(), matched
+#     against the guest ntdll's own export) so it can serve the call with a
+#     real, guest-frame-aware implementation instead of entering it as
+#     unknown guest code.  A trap stub here is a SEPARATE address that fails
+#     that identity check; the frame would then be entered "as guest code",
+#     immediately execute the stub's `mov r10,rcx; syscall`, and trap into
+#     the native ppc64 __C_specific_handler with an AMD64 DISPATCHER_CONTEXT
+#     it cannot interpret -- a silent wrong answer for the first /MD __try
+#     frame dispatch crosses (INFERRED consequence in guest-cxx-eh-plan.md
+#     section 1, not yet observed in a log; probes/check-cxx-throw.sh's
+#     compiled __try lane is what actually exercises this).  The fix is the
+#     same shape as setjmp/longjmp and _CxxThrowException above: forward
+#     along the spec's own hop (vcruntime140.spec:13 already names
+#     ucrtbase.__C_specific_handler) so the guest IAT ends up holding
+#     ucrtbase's thunk address, which itself forwards on to ntdll's -- the
+#     one address identity recognises.
+FORWARD _CxxThrowException   ucrtbase._CxxThrowException
+FORWARD __C_specific_handler ucrtbase.__C_specific_handler

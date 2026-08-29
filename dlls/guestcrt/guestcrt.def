@@ -1,7 +1,8 @@
 ; guestcrt.dll -- the guest-side CRT primitives no trap thunk can carry.
-; See setjmp.c for why these two must be real x86-64 code, and
+; See setjmp.c and cxxthrow.c for why these must be real x86-64 code, and
 ; guestcrt.guestpe for how this module is built.
 LIBRARY guestcrt.dll
 EXPORTS
     __intrinsic_setjmp
     longjmp
+    _CxxThrowException

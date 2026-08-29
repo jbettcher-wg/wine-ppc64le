@@ -1,7 +1,8 @@
 # guestcrt.guestpe -- declarative source list for the guest x86-64
 # guestcrt.dll: CRT primitives that MUST be real x86-64 machine code the
-# guest instruction stream executes, because their whole contract is the
-# GUEST's own register file.
+# guest instruction stream executes, because their whole contract is either
+# the GUEST's own register file (setjmp/longjmp) or the GUEST's own call
+# stack, which the dispatcher's frame walk has to see (_CxxThrowException).
 #
 # Every other CRT export in this tree is served by a spec2thunk trap stub
 # that marshals to the native ppc64 implementation.  setjmp/longjmp cannot
@@ -9,6 +10,10 @@
 # and stack pointer, which is a silent wrong answer of exactly the class
 # this tree's discipline exists to refuse.  And the 16-byte stub slot
 # spec2thunk owns (RAW_BODY_EXPORTS) cannot hold the ~100 bytes each needs.
+# _CxxThrowException cannot be a trap stub for a related but distinct reason
+# -- see cxxthrow.c's own banner -- even though its body is short enough to
+# fit a stub: a trap would raise the exception over the HOST's native call
+# stack, and the search phase would then walk frames with no .xdata at all.
 # So this module is built the way steamclient64.dll is -- see
 # dlls/steamclient64/steamclient64.guestpe for the annotated original and
 # the keyword reference, and tools/guestpe/guestpe for the tool.
@@ -23,17 +28,31 @@
 #     -> ucrtbase guest thunk forwards to guestcrt.__intrinsic_setjmp
 #     -> this module's real code.
 #
-# Both hops are ordinary PE forwarders the guest loader resolves itself
+#   game imports VCRUNTIME140._CxxThrowException
+#     -> vcruntime140 guest thunk forwards to ucrtbase._CxxThrowException
+#        (matching vcruntime140.spec:2's own forward -- see
+#        vcruntime140.thunks for the 2026-08-29 hygiene fix that replaced a
+#        native trap line with this FORWARD), OR a prefix-staged Proton
+#        vcruntime140 carries that same forward itself
+#     -> ucrtbase guest thunk forwards to guestcrt._CxxThrowException
+#     -> this module's real code.
+#
+# Both chains are ordinary PE forwarders the guest loader resolves itself
 # (ntdll's find_forwarded_export recurses through chains), and the
 # forwarder target loads from <build_dir>/dlls/guestcrt/x86_64-windows/
 # guestcrt.dll (or $(libdir)/wine/x86_64-windows once installed) exactly the
 # way steamclient64's directory-name contract documents.
 #
-# No IMPORT lines: setjmp.c is freestanding register save/restore plus a
-# DllMain that does nothing, so this PE has no import table at all.
+# IMPORT lines: setjmp.c is freestanding register save/restore plus a
+# DllMain that does nothing and needs none.  cxxthrow.c genuinely calls out
+# -- see its own banner for exactly which two traps and why they are safe to
+# use from otherwise-guest code.
+IMPORT   kernel32
+IMPORT   ntdll
 
 DLL      guestcrt.dll
 ENTRY    DllMain
 DEF      guestcrt.def
 
 SOURCE   setjmp.c
+SOURCE   cxxthrow.c
