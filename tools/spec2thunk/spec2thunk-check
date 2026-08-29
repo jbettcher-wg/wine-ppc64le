@@ -804,6 +804,11 @@ def parse_spec(path):
                 # replacing it; the checker only needs to not choke on it.
                 extra.setdefault('probe_extra', []).append(parts[1])
                 continue
+            if parts[0].upper() == 'PROBE-DEFINE':
+                # An extra -D for the generator's oracle (psapi's
+                # PSAPI_VERSION=1); the checker only needs to not choke on it.
+                extra.setdefault('probe_defines', []).append(parts[1])
+                continue
             if parts[0].upper() == 'INCLUDE-DIR':
                 extra['include_dirs'].append(parts[1])
                 continue

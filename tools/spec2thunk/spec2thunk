@@ -368,6 +368,22 @@ def parse_spec(path):
                           no public header does).  Pair with INCLUDE-DIR.
         include_dirs   -- INCLUDE-DIR <dir>: extra -I directories for the
                           oracle, searched before Wine's include tree.
+        probe_defines  -- PROBE-DEFINE <NAME>[=<VALUE>]: an extra -D flag for
+                          the oracle's clang invocation, on top of whatever
+                          crt_defines_for_dll() derives from the DLL line.
+                          This is how a module whose PUBLIC header renames its
+                          whole surface under a compile-time switch gets asked
+                          the question that makes the header answer with the
+                          name the .spec actually exports: psapi.h defaults to
+                          PSAPI_VERSION 2, which #defines every one of its 27
+                          names to a K32* equivalent before declaring them, so
+                          `PROBE-DEFINE PSAPI_VERSION=1` makes it declare the
+                          plain names instead.  The signature is identical
+                          either way -- this asks the oracle the right
+                          question, it does not guess an answer for it.  Same
+                          plumbing as --crt-define: see the crt_defines_for_dll
+                          banner in wine_sig.py and how args.crt_define flows
+                          into WineHeaders(defines=...) in main() below.
     Relative paths are relative to the .thunks file that names them.
 
     TWO ROLES, AND THE FILE SAYS WHICH.  Without a FROM-SPEC line the export
@@ -387,8 +403,8 @@ def parse_spec(path):
     excludes = []
     exports = []          # (name, imm32, nargs, returns_void, header, line)
     extra = dict(from_def=None, com_json=None, probe_includes=[],
-                 probe_extra=[], include_dirs=[], guest_impl={}, guest_refuse={},
-                 guest_pass={})
+                 probe_extra=[], probe_defines=[], include_dirs=[],
+                 guest_impl={}, guest_refuse={}, guest_pass={})
     with open(path) as f:
         for lineno, raw in enumerate(f, 1):
             line = raw.split('#', 1)[0].strip()
@@ -462,6 +478,18 @@ def parse_spec(path):
                     sys.exit("%s:%d: PROBE-EXTRA needs exactly one header"
                              % (path, lineno))
                 extra['probe_extra'].append(parts[1])
+                continue
+            if parts[0].upper() == 'PROBE-DEFINE':
+                if len(parts) != 2:
+                    sys.exit("%s:%d: PROBE-DEFINE needs exactly one "
+                             "'<NAME>[=<VALUE>]'" % (path, lineno))
+                macro_name = parts[1].split('=', 1)[0]
+                if not macro_name or not (macro_name[0].isalpha()
+                                          or macro_name[0] == '_') \
+                        or not macro_name.replace('_', 'a').isalnum():
+                    sys.exit("%s:%d: PROBE-DEFINE name %r is not a valid "
+                             "macro identifier" % (path, lineno, macro_name))
+                extra['probe_defines'].append(parts[1])
                 continue
             if parts[0].upper() == 'INCLUDE-DIR':
                 if len(parts) != 2:
@@ -2473,7 +2501,7 @@ def main():
     # ---------------- where the export list comes from
     dll, spec_exports, from_spec, excludes = None, [], None, []
     extra = dict(from_def=None, com_json=None, probe_includes=[],
-                 probe_extra=[], include_dirs=[])
+                 probe_extra=[], probe_defines=[], include_dirs=[])
     if args.spec:
         dll, spec_exports, from_spec, excludes, extra = parse_spec(args.spec)
 
@@ -2563,6 +2591,12 @@ def main():
     crt_defines = ([d for d in args.crt_define if d]
                    if args.crt_define is not None
                    else wine_sig.crt_defines_for_dll(dll))
+    # PROBE-DEFINE lines from the .thunks file: same -D-flag plumbing as
+    # crt_defines, just sourced from the .thunks file instead of the DLL-name
+    # rule.  Appended after crt_defines so a .thunks override wins on a name
+    # clash, though the two are never expected to name the same macro.
+    probe_defines = ['-D' + d for d in extra['probe_defines']]
+    all_defines = crt_defines + probe_defines
 
     if not args.wine_generated:
         args.wine_generated = wine_sig.find_generated_include()
@@ -2578,7 +2612,7 @@ def main():
     headers = wine_sig.WineHeaders(args.wine_include, args.wine_generated,
                                    clang=args.clang,
                                    workdir=os.path.join(args.builddir, 'sigprobe'),
-                                   defines=crt_defines,
+                                   defines=all_defines,
                                    probe_src=probe_src,
                                    probe_extra=probe_extra,
                                    extra_includes=[spec_relative(d) for d in
@@ -2719,7 +2753,12 @@ def main():
             clang=args.clang,
             target=MACHINES['i386']['clang_target'],
             workdir=os.path.join(args.builddir, 'sigprobe32'),
-            defines=crt_defines,
+            # all_defines, not crt_defines: a PROBE-DEFINE reshapes what the
+            # header DECLARES (psapi.h's PSAPI_VERSION rename), and the
+            # geometry oracle reads the same headers -- both oracles must be
+            # asked the same question or the i386 pass refuses what the
+            # x86_64 pass emitted.
+            defines=all_defines,
             probe_src=probe_src,
             probe_extra=probe_extra,
             extra_includes=[spec_relative(d) for d in extra['include_dirs']])
@@ -2764,6 +2803,8 @@ def main():
     print("body mode    : %s" % args.body)
     print("crt mode     : %s" % (' '.join(crt_defines) if crt_defines
                                  else '(none -- not a C runtime module)'))
+    if probe_defines:
+        print("probe define : %s" % ' '.join(probe_defines))
     print("info version : %d" % INFO_VERSION)
     if ord_limit and exports:
         pinned = sum(1 for e in exports if e.get('ordinal_pinned'))

@@ -19,21 +19,37 @@ DLL wldap32.dll
 FROM-SPEC auto
 
 # winldap.h is not in the oracle's default translation unit; without it every
-# one of the 244 eligible exports was refused.  With it, 169 are emitted.
+# one of the 244 eligible exports was refused.
 #
-# The 75 still refused -- including ten of Boltgun's sixteen -- are NOT a
-# shape this generator cannot describe.  They are the ANSI/Unicode pairs:
-# winldap.h declares ldap_initA (line 535) and ldap_initW (536) and never the
-# undecorated name, which it instead #defines through Wine's own A/W macro
-# (`#define ldap_memfree WINELIB_NAME_AW(ldap_memfree)` and its ~120 siblings).
-# The oracle looks up the export name the .spec publishes -- ldap_init -- and
-# finds no declaration under it.  The same macro-rename hides all 27 exports
-# of psapi.dll (see dlls/psapi/psapi.thunks), by a different macro and for a
-# different reason, which is what makes it a class rather than a quirk: the
-# oracle resolves an export NAME, and a header is entitled to declare that
-# name's implementation under another one.  It is a gap in the signature
-# oracle, not in this module, and ppc64le/games/STATUS.md records it as
-# such rather than papering over it here.  Each of the ten keeps its ordinal
-# as a named sentinel, so a guest that CALLS one faults by name; Boltgun
-# imports them and, so far, calls none.
+# winldap.h renames its ANSI/Unicode pairs too -- ldap_initA (line 535) /
+# ldap_initW (536) are declared directly, and the undecorated ldap_init is
+# only `#define ldap_init WINELIB_NAME_AW(ldap_init)`, ~120 siblings the
+# same way -- which LOOKS like psapi.dll's PSAPI_VERSION rename (see
+# dlls/psapi/psapi.thunks): the oracle resolves an export NAME, and a header
+# is entitled to declare that name's implementation under another one.
+#
+# It does NOT take the same PROBE-DEFINE treatment, though, because it is a
+# different mechanism: WINELIB_NAME_AW is keyed on UNICODE (a per-CALL-SITE
+# switch every Winelib header uses this same way, not a module-local
+# version knob), and no single -D flag makes it declare ldap_init itself.
+# What actually resolves it is wldap32.spec's OWN alias column -- every
+# renamed line already names its target directly, e.g.
+# `143 cdecl ldap_init(str long) ldap_initA` -- and spec2thunk's oracle
+# already retries a "no declaration found" export under that .spec-named
+# alias (see the exception handler in resolve_signatures() keyed on
+# e['spec_alias']).  That mechanism did not exist when this file's ordinal
+# table above was first measured; it does now, and it needs no help from
+# this file.
+#
+# Measured today: 244 eligible, 230 emitted, 14 refused.  Of Boltgun's
+# sixteen ordinals, fifteen are served (including all ten this file used to
+# name as still-refused).  The lone holdout is ber_free (301), and NOT for
+# an A/W reason -- winber.h declares it (and ber_alloc_t/ber_init/
+# ber_bvecfree/ber_bvdup/ber_skip_tag/ber_peek_tag/ber_first_element/
+# ber_next_element/ber_flatten/ber_printf/ber_scanf) under its own plain
+# name with no rename at all; this file simply does not PROBE-EXTRA that
+# header.  (ldap_next_reference and ldap_set_dbg_flags are also still
+# refused, declared in no Wine header under any name -- a different, older,
+# and unrelated gap.)  None of this is in scope for the psapi PROBE-DEFINE
+# fix; left as found.
 PROBE-EXTRA   winldap.h

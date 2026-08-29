@@ -8,18 +8,27 @@
 DLL psapi.dll
 FROM-SPEC auto
 
-# NO PROBE-EXTRA, because psapi.h does not help: it is the one case where the
-# module's own public header RENAMES the entire API.  With PSAPI_VERSION > 1,
-# which is the default the header itself sets, psapi.h #defines all 27 names
-# to their K32* equivalents BEFORE declaring them, so what the translation
-# unit ends up declaring is K32GetProcessMemoryInfo and the oracle looking up
-# the export name psapi.spec publishes -- GetProcessMemoryInfo -- finds
-# nothing.  Adding the header changes not one verdict.
+# psapi.h is the one case where the module's own public header RENAMES the
+# entire API.  With PSAPI_VERSION > 1, which is the default the header itself
+# sets, psapi.h #defines all 27 names to their K32* equivalents BEFORE
+# declaring them, so what the translation unit ends up declaring is
+# K32GetProcessMemoryInfo and the oracle looking up the export name
+# psapi.spec publishes -- GetProcessMemoryInfo -- finds nothing.  PROBE-EXTRA
+# alone does not fix this: the header still declares only the K32* name.
 #
-# So all 27 exports are holes today, each a named sentinel.  That is still the
-# fix this file is for: the module LOADS, StyxGame.exe gets past loader_init,
-# and a call to either of the two above faults BY NAME instead of the image
-# never starting.  The same macro-rename hides ten of wldap32's exports; it is
-# a gap in the signature oracle (it resolves an export name, not the
-# declaration a header redirects that name to) and is recorded as such in
-# ppc64le/games/STATUS.md rather than papered over here.
+# PROBE-DEFINE PSAPI_VERSION=1 makes psapi.h skip the rename and declare the
+# plain names directly (psapi.h:24-26 only defaults PSAPI_VERSION when it is
+# not already defined).  The signature is identical either way --
+# K32GetModuleFileNameExW and GetModuleFileNameExW share one prototype -- so
+# this asks the oracle the question psapi.spec's own export names pose,
+# rather than guessing an answer for it.  PROBE-EXTRA is still needed because
+# psapi.h is not in the oracle's default translation unit (see PROBE_SRC in
+# wine_sig.py): no PROBE-EXTRA means psapi.h is never read at all, define or
+# no define.
+#
+# The same macro-rename hides ten of wldap32's exports, but by a DIFFERENT
+# mechanism -- winldap.h's WINELIB_NAME_AW(), keyed on UNICODE, not a
+# module-local version switch -- so it does not take this same PROBE-DEFINE
+# treatment; see wldap32.thunks and ppc64le/games/STATUS.md.
+PROBE-EXTRA psapi.h
+PROBE-DEFINE PSAPI_VERSION=1
