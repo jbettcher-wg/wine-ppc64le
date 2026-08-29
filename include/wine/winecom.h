@@ -571,6 +571,19 @@ extern void *winecom_wrap( void *host, UINT iface );
  * ERR -- never a blind dereference. */
 extern void *winecom_unwrap( void *maybe_proxy );
 
+/* Drop/take ONE guest-visible reference on a forward proxy, for a hand walker
+ * over a by-value aggregate that may CARRY one (system-com-design.md §9.2:
+ * VARIANT's VT_UNKNOWN/VT_DISPATCH slot, PROPVARIANT's mirror).  This is NOT
+ * the same operation as winecom_unwrap() + a native IUnknown_AddRef/Release:
+ * the proxy owns exactly ONE host reference for its whole life and interns it
+ * until its OWN guest-visible count reaches zero, so touching the host
+ * reference directly while the proxy still interns it double-frees the day
+ * the proxy itself dies.  NULL-safe and fails closed (0 back, no crash) on a
+ * pointer that is not one of our proxies -- classify with winecom_translate_in
+ * first and call these only once that says "yes, ours". */
+extern ULONG winecom_release_guest_seen( void *ptr );
+extern ULONG winecom_addref_guest_seen( void *ptr );
+
 /* ----------------------------------------------------- the reverse direction
  *
  * A REVERSE PROXY is the mirror of the object above: a NATIVE vtable wrapping

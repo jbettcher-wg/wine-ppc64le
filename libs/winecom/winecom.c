@@ -2105,6 +2105,40 @@ static ULONG proxy_release( struct com_proxy *p )
     return refs;
 }
 
+/* The PUBLIC form of wc_forward_release/proxy_addref (include/wine/winecom.h),
+ * for a sibling module's hand walker over a by-value aggregate that MAY carry
+ * one of our forward proxies -- system-com-design.md §9.2's VARIANT/PROPVARIANT
+ * case.  A VARIANT's VT_UNKNOWN/VT_DISPATCH slot holds a plain guest-visible
+ * pointer, not an argument winecom_dispatch ever classifies on its own, so the
+ * walker that clears or copies it needs to drop or take exactly the reference
+ * a forward proxy owes WITHOUT ever touching the one host reference the proxy
+ * itself owns for its whole life.  That is the whole reason this exists rather
+ * than the walker calling winecom_unwrap() + a native IUnknown_AddRef/Release:
+ * the host reference belongs to the proxy's intern entry, not to whichever
+ * guest-visible reference happens to be getting dropped, and releasing it
+ * directly while the proxy still interns it double-frees the day the proxy's
+ * OWN guest-visible count later reaches zero.
+ *
+ * Both are NULL-safe (0 back) and fail closed on a pointer that is not one of
+ * our proxies (0 back, no crash) -- but the caller is expected to have already
+ * classified the pointer with winecom_translate_in()/winecom_to_native() and
+ * to call these only on the "yes, one of ours" branch of that classification;
+ * a caller that skips classification and calls this on a guest-implemented
+ * object gets a silent no-op, not the release it wanted. */
+ULONG winecom_release_guest_seen( void *ptr )
+{
+    struct com_proxy *p = proxy_from_pointer( ptr );
+
+    return p ? proxy_release( p ) : 0;
+}
+
+ULONG winecom_addref_guest_seen( void *ptr )
+{
+    struct com_proxy *p = proxy_from_pointer( ptr );
+
+    return p ? proxy_addref( p ) : 0;
+}
+
 static HRESULT proxy_qi( struct com_proxy *p, const GUID *riid, void **ppv )
 {
     UINT idx;
