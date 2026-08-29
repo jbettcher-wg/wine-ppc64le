@@ -298,7 +298,8 @@ def verdict(app, facts, args):
             return 'NO GAME EXE', 'only installers and helpers found'
         return 'NO WINDOWS EXE', 'a native Linux build, or nothing installed'
     machines = {e['machine'] for e in cands}
-    if 0x8664 not in machines:
+    is32 = 0x8664 not in machines
+    if is32:
         only = ', '.join(sorted(MACHINE.get(m, hex(m)) for m in machines))
         if not any(m in (0x14c, 0x8664) for m in machines):
             return 'WRONG MACHINE', 'candidates are %s, which this port does not ' \
@@ -311,26 +312,32 @@ def verdict(app, facts, args):
             missing.append('no bridge with fexbridge_process_init32')
         if missing:
             return '32-BIT: BLOCKED', '; '.join(missing)
-        return '32-BIT', 'runs through the WoW64 lane; this setup has it'
+        if not args.audit:
+            return '32-BIT', 'runs through the WoW64 lane; this setup has it'
+        # This setup CAN run it and import_chain.py can now read a PE32
+        # subject, so give it the same real verdict a 64-bit title gets
+        # rather than stopping at "it will start".
     note = ''
     if facts['prereq']:
         note = 'ships a prerequisite installer (%s)' % \
                os.path.basename(facts['prereq'][0])
-    if not args.audit:
+    if not is32 and not args.audit:
         return 'UNAUDITED', note or 'run again with --audit to check its imports'
-    subjects = [e['path'] for e in cands if e['machine'] == 0x8664][:args.max_exes]
+    want_machine = 0x14c if is32 else 0x8664
+    subjects = [e['path'] for e in cands if e['machine'] == want_machine][:args.max_exes]
     try:
         modules, exports = audit(subjects, args.src, args.build)
     except Exception as e:                       # a malformed PE is a finding
         return 'UNREADABLE', 'import audit failed: %s' % e
+    bit = '32-bit, WoW64 lane: ' if is32 else ''
     if modules:
-        return 'WILL NOT LOAD', 'no guest thunk for %s%s' % (
+        return 'WILL NOT LOAD', bit + 'no guest thunk for %s%s' % (
             ', '.join(modules[:4]), ' and %d more' % (len(modules) - 4)
             if len(modules) > 4 else '')
     if exports:
-        return 'MISSING EXPORTS', '%d import(s) bind to a sentinel; fatal only ' \
-                                  'if called%s' % (exports, '; ' + note if note else '')
-    return 'READY', note or 'imports all bind'
+        return 'MISSING EXPORTS', bit + '%d import(s) bind to a sentinel; fatal ' \
+                                  'only if called%s' % (exports, '; ' + note if note else '')
+    return 'READY', bit + (note or 'imports all bind')
 
 
 ORDER = ['ANTI-CHEAT', 'WRONG MACHINE', 'WILL NOT LOAD', '32-BIT: BLOCKED',
