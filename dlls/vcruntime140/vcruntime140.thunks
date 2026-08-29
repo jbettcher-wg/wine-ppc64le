@@ -66,3 +66,25 @@ _CxxThrowException                 0x00000B01  2  void  vcruntime140.spec:2
 __std_terminate                    0x00000B02  0  void  vcruntime140.spec:42
 __std_type_info_destroy_list       0x00000B03  1  void  vcruntime140.spec:44
 __vcrt_InitializeCriticalSectionEx 0x00000B04  3  int   vcruntime140.spec:55
+
+# ---------------------------------------------------------------------------
+# The 2026-08-22 Quake II triage (S4): setjmp/longjmp -- forwards, like
+# Wine's own .spec
+# ---------------------------------------------------------------------------
+# quake2ex_steam.exe statically imports __intrinsic_setjmp and longjmp from
+# THIS module and died on sentinel 0xDEAD0007 the moment it called the
+# first.  Both are register-contract exports no trap stub can carry (the
+# stub would save native ppc64 registers, not the guest's -- see
+# dlls/guestcrt/setjmp.c), so this thunk forwards them exactly where
+# vcruntime140.spec:35/75 already forwards them: ucrtbase, whose own thunk
+# forwards on to the real x86-64 code in guestcrt.dll.  Keeping the
+# spec's own hop (rather than jumping straight to guestcrt) means every
+# CRT-family thunk that grows these names forwards to ONE place, and the
+# chain is the same one a prefix-staged Proton vcruntime140 takes -- so
+# both mixes resolve identically.
+#
+# __intrinsic_setjmpex stays a deliberate hole for the reason named in
+# ucrtbase.thunks: it is the unwinding variant, and guestcrt's longjmp
+# never unwinds.
+FORWARD __intrinsic_setjmp ucrtbase.__intrinsic_setjmp
+FORWARD longjmp            ucrtbase.longjmp

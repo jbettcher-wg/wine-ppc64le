@@ -106,7 +106,16 @@ def main():
         "-I%s" % args.moduledir,
         "-I%s" % os.path.join(args.moduledir, "proton"),
         "-D_MSVCR_VER=0", "-D__WINESRC__",
-        "-include", "steamclient_guest.h",
+    ]
+    # steamclient64 (the module this recipe was measured on) forces its
+    # compatibility preamble into every translation unit; a module that does
+    # not carry the header (dlls/guestcrt is the second guestpe user, and its
+    # sources are self-contained) compiles without it.  Keyed on the file's
+    # presence in --moduledir rather than a new keyword so steamclient64's
+    # build command stays byte-for-byte the measured one.
+    if os.path.isfile(os.path.join(args.moduledir, "steamclient_guest.h")):
+        compile_cmd += ["-include", "steamclient_guest.h"]
+    compile_cmd += [
         "-Wall", "-Wno-pragma-pack", "-O1", "-fno-builtin", "-g",
     ]
 

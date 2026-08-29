@@ -87,6 +87,16 @@ Spec file format (see kernel32.thunks):
 Export order in the file IS the stub index order.  The optional sixth token is
 the ONLY way to describe a variadic; five tokens keep their exact old meaning.
 
+A `FORWARD <Export> <targetmodule.Symbol>` line emits that export as a real
+PE FORWARDER into another GUEST module instead of a trap stub, keeping the
+ordinal the module's own .spec assigns.  This is the only correct shape for a
+register-contract export whose implementation must be real x86-64 code the
+guest itself executes (setjmp/longjmp -- see dlls/guestcrt): a trap stub
+would save the WRONG machine's registers, and the 16-byte stub slot cannot
+hold the real code.  The guest loader follows the forwarder string exactly as
+Windows does; the host dispatcher never sees these, so they are absent from
+__wine_thunk_info by design.
+
 The location column may name a Wine `.spec` file instead of a header, for the
 handful of exports Wine implements in C and exports from a .spec but declares
 in NO header (kernel32's delay-load entry points).  That path is a deliberate
@@ -404,7 +414,7 @@ def parse_spec(path):
     exports = []          # (name, imm32, nargs, returns_void, header, line)
     extra = dict(from_def=None, com_json=None, probe_includes=[],
                  probe_extra=[], probe_defines=[], include_dirs=[],
-                 guest_impl={}, guest_refuse={}, guest_pass={})
+                 guest_impl={}, guest_refuse={}, guest_pass={}, forwards={})
     with open(path) as f:
         for lineno, raw in enumerate(f, 1):
             line = raw.split('#', 1)[0].strip()
@@ -515,6 +525,33 @@ def parse_spec(path):
                 if from_spec is not None:
                     sys.exit("%s:%d: a second FROM-SPEC line" % (path, lineno))
                 from_spec = parts[1]
+                continue
+            if parts[0].upper() == 'FORWARD':
+                # FORWARD <Export> <targetmodule.Symbol> -- emit this export
+                # as a PE FORWARDER to another GUEST module instead of a trap
+                # stub.  This exists for the register-contract exports a trap
+                # thunk CANNOT carry (setjmp/longjmp save the GUEST's own
+                # register file; a trap out to native ppc64 would save the
+                # wrong machine's) whose real x86-64 implementation lives in a
+                # guestpe-built module (see tools/guestpe/guestpe and
+                # dlls/guestcrt).  The name must be an entry of the module's
+                # own authoritative export list (FROM-SPEC/FROM-DEF), so it
+                # keeps the ordinal the real module gives it; it never meets
+                # the signature oracle and never appears in __wine_thunk_info,
+                # because the host never dispatches it -- the guest loader
+                # follows the forwarder string itself, exactly as Windows
+                # does.
+                if len(parts) != 3 or '.' not in parts[2]:
+                    sys.exit("%s:%d: FORWARD needs '<Export> "
+                             "<targetmodule.Symbol>'" % (path, lineno))
+                tmod, _, tsym = parts[2].rpartition('.')
+                if not tmod or not tsym:
+                    sys.exit("%s:%d: FORWARD target %r is not "
+                             "<targetmodule.Symbol>" % (path, lineno, parts[2]))
+                if parts[1] in extra['forwards']:
+                    sys.exit("%s:%d: duplicate FORWARD for %s"
+                             % (path, lineno, parts[1]))
+                extra['forwards'][parts[1]] = parts[2]
                 continue
             if parts[0].upper() == 'EXCLUDE':
                 if len(parts) != 2:
@@ -2355,7 +2392,7 @@ def emit_asm(dll, exports, mode, com_ifaces=None, machine='x86_64'):
 
 
 def emit_def(dll, exports, have_com=False, ord_limit=0, machine='x86_64',
-             mode='trap'):
+             mode='trap', forwards=()):
     """The .def the thunk PE is linked from.
 
     Each export carries the ordinal assign_ordinals() gave it, because a guest
@@ -2382,6 +2419,15 @@ def emit_def(dll, exports, have_com=False, ord_limit=0, machine='x86_64',
             target = 'wine_thunk_stub_%d' % i
         out.append('    %s = %s%s'
                    % (e['name'], sym(target),
+                      ' @%d' % e['ordinal'] if e.get('ordinal') else ''))
+    # FORWARD entries: lld-link turns `Name = module.Symbol` (the internal
+    # name containing a dot) into a real PE forwarder -- an export whose RVA
+    # points at the string inside the export directory, which the guest
+    # loader resolves itself.  Verified against this tree's lld on the AC922
+    # before this was written; spec2thunk-check re-reads the finished bytes.
+    for e in forwards:
+        out.append('    %s = %s%s'
+                   % (e['name'], e['forward_to'],
                       ' @%d' % e['ordinal'] if e.get('ordinal') else ''))
     info_ord = ord_limit + 1 if ord_limit else 0
     out.append('    __wine_thunk_info = %s%s DATA'
@@ -2501,7 +2547,8 @@ def main():
     # ---------------- where the export list comes from
     dll, spec_exports, from_spec, excludes = None, [], None, []
     extra = dict(from_def=None, com_json=None, probe_includes=[],
-                 probe_extra=[], probe_defines=[], include_dirs=[])
+                 probe_extra=[], probe_defines=[], include_dirs=[],
+                 forwards={})
     if args.spec:
         dll, spec_exports, from_spec, excludes, extra = parse_spec(args.spec)
 
@@ -2559,9 +2606,41 @@ def main():
         spec_exports = [e for e in spec_exports if e['name'] not in keep]
     if args.dll_name:
         dll = args.dll_name
-    if not spec_exports:
+
+    # ---------------- FORWARD partition (see parse_spec's FORWARD banner)
+    # A FORWARD entry keeps the ordinal the authoritative export list gave it
+    # but is emitted as a PE forwarder line in the .def, not as a stub: it
+    # never meets the oracle and never enters __wine_thunk_info.
+    forward_exports = []
+    if extra['forwards']:
+        if not (from_spec or extra['from_def']):
+            sys.exit('FORWARD needs a FROM-SPEC or FROM-DEF module: the '
+                     'forwarded name must hold the ordinal the real module '
+                     'gives it, and only an authoritative export list can '
+                     'say what that is')
+        have = {e['name']: e for e in spec_exports}
+        missing = sorted(set(extra['forwards']) - set(have))
+        if missing:
+            sys.exit('FORWARD for name(s) the export list does not carry: %s'
+                     % ', '.join(missing))
+        own_stem = os.path.splitext(os.path.basename(dll))[0].lower()
+        for name, target in sorted(extra['forwards'].items()):
+            e = have[name]
+            if e.get('asserted'):
+                sys.exit('%s both has a hand-written export line and a '
+                         'FORWARD; it must be one or the other' % name)
+            tmod = target.rpartition('.')[0].lower()
+            if tmod in (own_stem, own_stem + '.dll'):
+                sys.exit('FORWARD %s -> %s forwards into this module itself'
+                         % (name, target))
+            e = dict(e, forward_to=target)
+            forward_exports.append(e)
+        fwd_names = set(extra['forwards'])
+        spec_exports = [e for e in spec_exports if e['name'] not in fwd_names]
+
+    if not spec_exports and not forward_exports:
         sys.exit('no exports to emit')
-    names = [e['name'] for e in spec_exports]
+    names = [e['name'] for e in spec_exports] + [e['name'] for e in forward_exports]
     if len(set(names)) != len(names):
         dup = sorted({n for n in names if names.count(n) > 1})
         sys.exit('duplicate export names: %s' % ', '.join(dup))
@@ -2654,7 +2733,7 @@ def main():
                 hist.setdefault(refusal_class(why), []).append((name, why))
             for cls, rows in sorted(hist.items(), key=lambda kv: -len(kv[1])):
                 print("  %5d  %.1f%%  %s"
-                      % (len(rows), 100.0 * len(rows) / len(spec_exports), cls))
+                      % (len(rows), 100.0 * len(rows) / (len(spec_exports) or 1), cls))
                 for name, why in rows[:2]:
                     print("           e.g. %-26s %s" % (name, why[:150]))
         print()
@@ -2708,11 +2787,18 @@ def main():
                   % len(wine_spec_skipped))
             for cls, n in sorted(hist.items(), key=lambda kv: -kv[1]):
                 print("         %5d  %s" % (n, cls))
+        neligible = len(spec_exports) or 1   # all-FORWARD module: avoid /0
         print("  %5d  eligible export(s) considered" % len(spec_exports))
         print("  %5d  emitted        (%.1f%% of eligible)"
-              % (len(exports), 100.0 * len(exports) / len(spec_exports)))
+              % (len(exports), 100.0 * len(exports) / neligible))
         print("  %5d  refused        (%.1f%% of eligible)"
-              % (len(refused), 100.0 * len(refused) / len(spec_exports)))
+              % (len(refused), 100.0 * len(refused) / neligible))
+        if forward_exports:
+            print("  %5d  forwarded to another guest module (FORWARD lines):"
+                  % len(forward_exports))
+            for e in forward_exports:
+                print("         %-28s -> %s  @%d"
+                      % (e['name'], e['forward_to'], e['ordinal']))
         print()
 
     if args.report:
@@ -2735,6 +2821,9 @@ def main():
                         % (e['name'], s['nargs'],
                            'void' if s['returns_void'] else 'value',
                            s['header'], s['line']))
+            for e in forward_exports:
+                f.write('%s\tforwarded\t-> %s (ordinal %d)\n'
+                        % (e['name'], e['forward_to'], e['ordinal']))
             for n, why in refused:
                 f.write('%s\trefused\t%s\n' % (n, why.replace('\t', ' ')))
 
@@ -2784,7 +2873,8 @@ def main():
     with open(dpath, 'w') as f:
         f.write(emit_def(dll, exports, have_com=bool(com_ifaces),
                          ord_limit=ord_limit, machine=args.machine,
-                         mode=args.body))
+                         mode=args.body,
+                         forwards=forward_exports))
 
     mach = MACHINES[args.machine]
     run([args.clang, '-target', mach['clang_target'], '-c', spath, '-o', opath],

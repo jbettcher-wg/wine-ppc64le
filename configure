@@ -1209,6 +1209,7 @@ enable_glu32
 enable_gphoto2_ds
 enable_gpkcsp
 enable_graphicscapture
+enable_guestcrt
 enable_hal
 enable_hhctrl_ocx
 enable_hid
@@ -22499,7 +22500,7 @@ do
         eval "${wine_arch}_DEBUG="
         eval "${wine_arch}_DELAYLOADFLAG=\"-Wl,-delayload,\""
     as_fn_append PE_ARCHS " $wine_arch"
-                            if test -n "$wine_pe_archs"
+                                        if test -n "$wine_pe_archs"
     then
         enable_compiler_rt=${enable_compiler_rt:-`echo $wine_pe_archs | sed 's/^ *//;s/ /,/g'`}
     else
@@ -22897,6 +22898,7 @@ wine_fn_config_makefile dlls/gphoto2.ds enable_gphoto2_ds
 wine_fn_config_makefile dlls/gpkcsp enable_gpkcsp
 wine_fn_config_makefile dlls/graphicscapture enable_graphicscapture
 wine_fn_config_makefile dlls/graphicscapture/tests enable_tests
+wine_fn_config_makefile dlls/guestcrt enable_guestcrt
 wine_fn_config_makefile dlls/hal enable_hal
 wine_fn_config_makefile dlls/hhctrl.ocx enable_hhctrl_ocx
 wine_fn_config_makefile dlls/hid enable_hid

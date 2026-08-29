@@ -1,0 +1,39 @@
+# guestcrt.guestpe -- declarative source list for the guest x86-64
+# guestcrt.dll: CRT primitives that MUST be real x86-64 machine code the
+# guest instruction stream executes, because their whole contract is the
+# GUEST's own register file.
+#
+# Every other CRT export in this tree is served by a spec2thunk trap stub
+# that marshals to the native ppc64 implementation.  setjmp/longjmp cannot
+# be: a trap stub would save (and restore) the NATIVE machine's registers
+# and stack pointer, which is a silent wrong answer of exactly the class
+# this tree's discipline exists to refuse.  And the 16-byte stub slot
+# spec2thunk owns (RAW_BODY_EXPORTS) cannot hold the ~100 bytes each needs.
+# So this module is built the way steamclient64.dll is -- see
+# dlls/steamclient64/steamclient64.guestpe for the annotated original and
+# the keyword reference, and tools/guestpe/guestpe for the tool.
+#
+# Nothing imports guestcrt.dll directly.  It is reached ONLY through PE
+# forwarders (spec2thunk FORWARD lines):
+#
+#   game imports VCRUNTIME140.__intrinsic_setjmp
+#     -> vcruntime140 guest thunk forwards to ucrtbase.__intrinsic_setjmp
+#        (matching dlls/vcruntime140/vcruntime140.spec's own forward), OR a
+#        prefix-staged Proton vcruntime140 carries that same forward itself
+#     -> ucrtbase guest thunk forwards to guestcrt.__intrinsic_setjmp
+#     -> this module's real code.
+#
+# Both hops are ordinary PE forwarders the guest loader resolves itself
+# (ntdll's find_forwarded_export recurses through chains), and the
+# forwarder target loads from <build_dir>/dlls/guestcrt/x86_64-windows/
+# guestcrt.dll (or $(libdir)/wine/x86_64-windows once installed) exactly the
+# way steamclient64's directory-name contract documents.
+#
+# No IMPORT lines: setjmp.c is freestanding register save/restore plus a
+# DllMain that does nothing, so this PE has no import table at all.
+
+DLL      guestcrt.dll
+ENTRY    DllMain
+DEF      guestcrt.def
+
+SOURCE   setjmp.c

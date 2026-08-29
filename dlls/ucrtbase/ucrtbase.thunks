@@ -242,3 +242,30 @@ PROBE-EXTRA   thunkcxx.h
 # line is `-ret64` for the same reason.  Arguments are two ints, integer
 # class, nothing to marshal.
 div                       0x00000D1F  2  int   ucrtbase.spec:2272
+
+# ---------------------------------------------------------------------------
+# The 2026-08-22 Quake II triage (S4): setjmp/longjmp are GUEST code
+# ---------------------------------------------------------------------------
+# quake2ex_steam.exe imports VCRUNTIME140.__intrinsic_setjmp / .longjmp,
+# which Wine's x86-64 vcruntime140 (staged Proton's included) forwards to
+# THIS module -- and this module refused both ("no declaration found in Wine
+# headers"), so the forward failed at load and the first setjmp call died on
+# sentinel 0xDEAD0007.  Every id-engine title stops there; structural.
+#
+# A trap stub can NEVER serve these: setjmp's contract is the GUEST's own
+# register file and stack pointer, and a trap out to native ppc64
+# _setjmp/longjmp would save the wrong machine's registers -- the same
+# register-contract class as __chkstk (RAW_BODY_EXPORTS), but ~100 bytes of
+# code, which no 16-byte stub slot holds.  So the real x86-64 implementation
+# lives in the guestpe-built dlls/guestcrt/guestcrt.dll (see its setjmp.c
+# for the layout proofs and the unwinding limitation), and these two exports
+# are PE FORWARDERS the guest loader follows itself.
+#
+# __intrinsic_setjmpex and `setjmp` (the -private x64 alias) are DELIBERATELY
+# NOT forwarded: their contract is the unwinding variant, guestcrt.dll's
+# longjmp never unwinds (Frame is stored as 0 -- see setjmp.c's banner), and
+# serving them non-unwinding would be a silent downgrade for exactly the
+# callers that asked for unwinding.  They stay holes: named, diagnosable
+# sentinels, until real guest-side unwinding exists.
+FORWARD __intrinsic_setjmp guestcrt.__intrinsic_setjmp
+FORWARD longjmp            guestcrt.longjmp

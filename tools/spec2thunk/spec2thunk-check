@@ -777,7 +777,7 @@ class SpecScan:
 def parse_spec(path):
     dll, exports, from_spec, excludes = None, [], None, []
     extra = dict(from_def=None, com_json=None, probe_includes=[],
-                 include_dirs=[])
+                 include_dirs=[], forwards={})
     with open(path) as f:
         for raw in f:
             line = raw.split('#', 1)[0].strip()
@@ -814,6 +814,14 @@ def parse_spec(path):
                 continue
             if parts[0].upper() == 'EXCLUDE':
                 excludes.append(parts[1])
+                continue
+            if parts[0].upper() == 'FORWARD':
+                # FORWARD <Export> <targetmodule.Symbol>: emitted as a real PE
+                # forwarder, not a stub.  Verified against the image bytes in
+                # run() -- see checks 5f/5g/5h.
+                if len(parts) != 3:
+                    raise SystemExit('%s: malformed FORWARD line: %s' % (path, line))
+                extra['forwards'][parts[1]] = parts[2]
                 continue
             # Flat-surface interception directives (spec2thunk §4.3): the
             # checker does not police them (spec2thunk's own build-time audit
@@ -1096,7 +1104,7 @@ def main():
     spec_dll, overrides, from_spec, excludes = None, [], None, []
     guest_impl = {}
     extra = dict(from_def=None, com_json=None, probe_includes=[],
-                 include_dirs=[])
+                 include_dirs=[], forwards={})
     if args.spec:
         spec_dll, overrides, from_spec, excludes, extra = parse_spec(args.spec)
         # Both of the flat-surface REDIRECTS ride impl_names_rva, the field a
@@ -1211,6 +1219,39 @@ def main():
             '5a export directory Name matches spec DLL name', dllname)
 
     # ------------------------------------------------------------------
+    # FORWARDERS.  An export whose RVA falls inside the export directory is
+    # a PE forwarder: its "address" is a "module.Symbol" string the guest
+    # loader resolves itself.  The generator emits one only for a FORWARD
+    # line in the .thunks file, so the two sets must agree exactly, target
+    # string included -- and a forwarder never has a stub, so they are
+    # removed from the function-export list every later check walks.
+    # ------------------------------------------------------------------
+    img_forwards = {}
+    for n, rva in list(exp.items()):
+        if edir_va <= rva < edir_va + edir_sz:
+            try:
+                img_forwards[n] = pe.cstr(rva)
+            except Fail:
+                img_forwards[n] = '<unreadable forwarder string at 0x%x>' % rva
+            del exp[n]
+    want_fwd = dict(extra.get('forwards') or {})
+    bad_fwd = ['%s -> %r (want %r)' % (n, t, want_fwd.get(n))
+               for n, t in sorted(img_forwards.items())
+               if want_fwd.get(n) != t]
+    r.check(not bad_fwd,
+            '5f every image forwarder matches a FORWARD line, target included',
+            '; '.join(bad_fwd) if bad_fwd
+            else '%d forwarder(s)' % len(img_forwards))
+    missing_fwd = sorted(set(want_fwd) - set(img_forwards))
+    r.check(not missing_fwd, '5g every FORWARD line is a forwarder in the image',
+            'missing: %s' % missing_fwd if missing_fwd
+            else '%d forwarder(s)' % len(want_fwd))
+    fwd_unlisted = sorted(n for n in img_forwards if n not in set(listed_names))
+    r.check(not fwd_unlisted,
+            '5h every forwarded name is in the eligible export list',
+            'not in the list: %s' % fwd_unlisted if fwd_unlisted else '')
+
+    # ------------------------------------------------------------------
     # WHAT THE IMAGE CARRIES vs WHAT THE LIST OFFERS.
     # ------------------------------------------------------------------
     # The generator REFUSES anything clang cannot prove is register-passable,
@@ -1263,7 +1304,8 @@ def main():
             '5b2 exported names keep the export list\'s relative order',
             'out of order' if positions != sorted(positions)
             else '%d name(s) in list order' % len(positions))
-    omitted = [n for n in listed_names if n not in set(img_names)]
+    omitted = [n for n in listed_names
+               if n not in set(img_names) and n not in img_forwards]
     if args.require_complete:
         r.check(not omitted, '5b3 no export omitted (--require-complete)',
                 'omitted=%s' % omitted[:10] if omitted else '')
