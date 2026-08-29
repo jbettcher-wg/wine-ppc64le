@@ -45,6 +45,15 @@ PROBE-EXTRA   olectl.h        # ordinals 417..421 + the rest of the Ole* control
 # audited pass-throughs: the interface-bearing type is inert here
 GUEST-PASS   VariantInit                      writes VT_EMPTY and reads no interface pointer
 
+# hand walker (system-com-design.md §9.2): VARIANT is a by-value carrier that
+# CAN hold VT_UNKNOWN/VT_DISPATCH, so the export classifies the payload
+# instead of passing it straight to native -- a scalar/BSTR/BYREF/bad-vt
+# VARIANT still reaches native untouched, but a proxy inside VT_UNKNOWN/
+# VT_DISPATCH has its guest-visible reference dropped through the proxy, and
+# a guest-implemented object or an interface-element SAFEARRAY/VT_RECORD is
+# refused by name.  See dlls/combase/syscom.c __wine_guest_VariantClear.
+GUEST-IMPL   VariantClear                     __wine_guest_VariantClear
+
 # refused loudly (E_NOTIMPL) until their wrapper/walker lands -- never
 # a pass-through that would hand the guest a native vtable
 GUEST-REFUSE BstrFromVector
@@ -163,7 +172,6 @@ GUEST-REFUSE VarUI8FromDisp
 GUEST-REFUSE VarXor
 GUEST-REFUSE VariantChangeType
 GUEST-REFUSE VariantChangeTypeEx
-GUEST-REFUSE VariantClear
 GUEST-REFUSE VariantCopy
 GUEST-REFUSE VariantCopyInd
 GUEST-REFUSE VectorFromBstr

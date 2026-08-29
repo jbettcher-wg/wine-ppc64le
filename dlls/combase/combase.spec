@@ -364,11 +364,14 @@
 @ stdcall __wine_com_wrap_static(ptr long)
 @ stdcall __wine_com_iface_from_iid(ptr)
 @ stdcall __wine_com_refuse()
+@ stdcall __wine_com_release_guest(ptr)
+@ stdcall __wine_com_addref_guest(ptr)
 @ stdcall __wine_guest_CoCreateInstance(ptr ptr long ptr ptr)
 @ stdcall __wine_guest_CoGetClassObject(ptr long ptr ptr ptr)
 @ stdcall __wine_guest_CoGetMalloc(long ptr)
 @ stdcall __wine_guest_CreateStreamOnHGlobal(ptr long ptr)
 @ stdcall __wine_guest_GetHGlobalFromStream(ptr ptr)
+@ stdcall __wine_guest_VariantClear(ptr)
 
 # Appended at the END so no `@` export above it is renumbered:
 # ordinals are assigned in file order and guests import by ordinal

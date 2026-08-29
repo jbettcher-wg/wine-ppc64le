@@ -87,6 +87,7 @@
 #include "windef.h"
 #include "winbase.h"
 #include "objbase.h"
+#include "oleauto.h"
 #include "winternl.h"
 #include "wine/debug.h"
 #include "wine/winecom.h"
@@ -829,6 +830,22 @@ UINT WINAPI __wine_com_iface_from_iid( const GUID *riid )
     return winecom_iface_from_iid( riid );
 }
 
+/* The sibling-module surface for a hand walker over a by-value aggregate that
+ * may CARRY a forward proxy (system-com-design.md §9.2) -- VariantClear's
+ * VT_UNKNOWN/VT_DISPATCH slot below, and PropVariantClear's mirror later.
+ * Same no-readiness-check shape as __wine_com_unwrap above: a caller can only
+ * have a genuine proxy pointer to pass here once winecom_wrap() already
+ * succeeded once, which already required the runtime to be ready. */
+ULONG WINAPI __wine_com_release_guest( void *ptr )
+{
+    return winecom_release_guest_seen( ptr );
+}
+
+ULONG WINAPI __wine_com_addref_guest( void *ptr )
+{
+    return winecom_addref_guest_seen( ptr );
+}
+
 /* The shared loud-refusal stub every GUEST-REFUSE export resolves to: a flat
  * export that vends or consumes interfaces but has no wrapper yet.  Returns
  * E_NOTIMPL (0 = NULL for the pointer/void-returning ones), never a
@@ -1028,4 +1045,189 @@ HRESULT WINAPI __wine_guest_GetHGlobalFromStream( IStream *stream, HGLOBAL *phgl
         return E_NOTIMPL;
     }
     return GetHGlobalFromStream( host, phglobal );
+}
+
+/* ------------------------------------------------------- VariantClear
+ *
+ * system-com-design.md §9.2's first "hand walker": VARIANT is a by-value
+ * carrier that CAN hold an interface pointer (VT_UNKNOWN, VT_DISPATCH, and
+ * the VT_ARRAY/VT_RECORD hulls that can hold either at one remove), so unlike
+ * an ordinary flat export, native VariantClear can never be handed a
+ * guest-visible pointer unclassified.  Layout is measured identical on this
+ * lane for every case this wrapper serves (ppc64le/syscom/probes/
+ * variant_layout_probe.c): VARIANT is 24 bytes, vt at offset 0, the payload
+ * union at offset 8 -- a scalar/BSTR/BYREF/bad-vt VARIANT is bytes native
+ * oleaut32 reads exactly as the guest wrote them, so those cases are pure
+ * pass-through below.
+ *
+ * Native reference: dlls/oleaut32/variant.c VariantClear (its actual body,
+ * not VARIANT_ClearInd, which VariantCopyInd uses and this export does not).
+ * Its shape drives every branch here:
+ *
+ *   - it validates vt FIRST and touches nothing on failure -- a bad vt comes
+ *     back DISP_E_BADVARTYPE with the VARIANT untouched, which is also this
+ *     wrapper's answer for anything it does not specifically classify below;
+ *
+ *   - ANY VT_BYREF combination frees NOTHING -- V_ISBYREF() short-circuits
+ *     the whole free block and only V_VT is ever written -- so even
+ *     VT_BYREF|VT_UNKNOWN over a live proxy is safe to hand native as-is: no
+ *     pointer the BYREF slot points AT is ever dereferenced, so the referent
+ *     stays exactly as owned as it was before the call;
+ *
+ *   - VT_UNKNOWN/VT_DISPATCH (non-byref) is the one case that must NEVER
+ *     reach native as-is: native would IUnknown_Release() a guest-visible
+ *     pointer, and for one of our forward proxies that pointer is not the
+ *     host IUnknown at all -- releasing it directly would either crash (it
+ *     is not a real vtable) or, if it happened to alias something, release a
+ *     reference nobody asked native to touch.  The proxy's OWN guest-visible
+ *     reference is what has to go, and only __wine_com_release_guest knows
+ *     how to do that without touching the ONE host reference the proxy
+ *     itself owns for its whole life;
+ *
+ *   - VT_RECORD (non-byref) with a non-NULL pRecInfo calls
+ *     IRecordInfo_RecordClear + Release through an interface pointer this
+ *     lane's class-G roster does not carry yet (see the design study this
+ *     wrapper was built from, §1 class E) -- refused by name rather than
+ *     guessed;
+ *
+ *   - VT_SAFEARRAY/VT_ARRAY|* with a non-NULL descriptor is scalar-element
+ *     pass-through UNLESS fFeatures says the array holds interface elements
+ *     (FADF_UNKNOWN/FADF_DISPATCH/FADF_VARIANT/FADF_RECORD/FADF_HAVEIID),
+ *     which SafeArrayDestroy would AddRef/Release per element natively --
+ *     refused by name, v1 does not recurse into array elements.
+ *
+ * Every refusal below returns E_NOTIMPL and leaves the VARIANT untouched --
+ * exactly __wine_com_refuse's discipline, but now naming VariantClear and the
+ * concrete vt instead of the generic "no wrapper yet" message. */
+
+/* Mirrors dlls/oleaut32/variant.c's VARIANT_ValidateType (static, so this
+ * wrapper cannot call it directly) for the ONE thing this wrapper needs to
+ * know before native does its own validation: whether `vt` is even shaped
+ * like a real VARIANT type, i.e. whether it is safe to read the payload
+ * union as a SAFEARRAY* and dereference its fFeatures.  Without this gate, a
+ * guest VARIANT with the VT_ARRAY bit set over a bogus base type (which
+ * native's validator would refuse before ever touching V_ARRAY) would make
+ * this wrapper dereference a pointer native itself would never have looked
+ * at.  Copied rather than reinvented; if oleaut32's validator ever changes
+ * this must move with it, and gen_layout_check.py's oleaut32 extension
+ * (design doc §9.2/§12.7) is the right place to pin that in a gate. */
+static BOOL syscom_variant_type_ok( VARTYPE vt )
+{
+    VARTYPE extra = vt & (VT_VECTOR | VT_ARRAY | VT_BYREF | VT_RESERVED);
+    VARTYPE base = vt & VT_TYPEMASK;
+
+    if (extra & (VT_VECTOR | VT_RESERVED)) return FALSE;
+    if (!(base < VT_VOID || base == VT_RECORD || base == VT_CLSID)) return FALSE;
+    if ((extra & (VT_BYREF | VT_ARRAY)) && base <= VT_NULL) return FALSE;
+    return base != 15;
+}
+
+/* WINEEMUVARIANTUNSAFERELEASE=1 -- the negative control for the ONE new
+ * mechanism this wrapper adds, same shape as WINEEMUNOCOMWRAP for the older
+ * one.  Set, it makes the VT_UNKNOWN/VT_DISPATCH branch below release the
+ * HOST reference directly instead of going through __wine_com_release_guest,
+ * which is exactly the double-free ppc64le/syscom/probes/variant_clear_smoke.c
+ * proves out: the proxy still interns that host reference, so a second
+ * legitimate use of the same underlying object corrupts or crashes.  A gate
+ * that cannot go red proves nothing. */
+static BOOL syscom_variant_unsafe_release( void )
+{
+    static int cached = -1;
+
+    if (cached < 0)
+    {
+        WCHAR buf[8];
+        cached = GetEnvironmentVariableW( L"WINEEMUVARIANTUNSAFERELEASE",
+                                          buf, ARRAYSIZE(buf) ) > 0 &&
+                 buf[0] == '1';
+    }
+    return cached;
+}
+
+HRESULT WINAPI __wine_guest_VariantClear( VARIANTARG *v )
+{
+    VARTYPE vt;
+
+    if (!syscom_ready()) return E_FAIL;
+
+    vt = V_VT( v );
+
+    /* Any BYREF form: pass straight to native, unconditionally.  See the
+     * file comment above -- native frees nothing through a BYREF slot. */
+    if (V_ISBYREF( v ))
+        return VariantClear( v );
+
+    switch (vt)
+    {
+    case VT_UNKNOWN:
+    case VT_DISPATCH:
+    {
+        IUnknown *punk = V_UNKNOWN( v );
+        void *host;
+
+        /* NULL classifies as a hit here (__wine_com_translate_in(NULL, ...)
+         * answers TRUE with host NULL), which lands it on the same path
+         * native takes for a NULL punkVal: nothing to release, write
+         * VT_EMPTY, S_OK.  No separate NULL check needed. */
+        if (__wine_com_translate_in( punk, &host ))
+        {
+            /* A forward proxy (or NULL): drop the GUEST-VISIBLE reference
+             * through the proxy itself and clear the slot ourselves.  Never
+             * __wine_com_unwrap() + native IUnknown_Release(host) here --
+             * see the file comment; that double-frees the proxy's own host
+             * reference the day the proxy later dies. */
+            if (syscom_variant_unsafe_release() && host)
+            {
+                /* THE SABOTAGE LEG, permanently in the tree and off by
+                 * default: exactly the bug the comment above forbids,
+                 * released through the host vtable instead of the proxy. */
+                ((IUnknown *)host)->lpVtbl->Release( (IUnknown *)host );
+            }
+            else
+                __wine_com_release_guest( punk );
+            V_VT( v ) = VT_EMPTY;
+            return S_OK;
+        }
+        /* A guest-implemented object.  v1 refuses rather than guessing who
+         * owns a Release run through a borrowed reverse proxy -- a design
+         * decision nobody has made yet, not a mechanism gap. */
+        FIXME( "syscom: VariantClear refuses a guest-implemented %s %p "
+               "(vt %#x): releasing it through a reverse proxy has "
+               "ownership semantics nobody has designed yet\n",
+               vt == VT_DISPATCH ? "IDispatch" : "IUnknown", punk, vt );
+        return E_NOTIMPL;
+    }
+
+    case VT_RECORD:
+        if (V_RECORDINFO( v ))
+        {
+            FIXME( "syscom: VariantClear refuses VT_RECORD (vt %#x) with a "
+                   "non-NULL IRecordInfo %p: RecordClear+Release is an "
+                   "interface call this lane's roster does not carry yet, "
+                   "and swapping in an unwrapped pointer would double-free "
+                   "whatever it is a proxy for\n", vt, V_RECORDINFO( v ) );
+            return E_NOTIMPL;
+        }
+        return VariantClear( v );
+
+    default:
+        if ((V_ISARRAY( v ) || (vt & ~VT_BYREF) == VT_SAFEARRAY) &&
+            syscom_variant_type_ok( vt ))
+        {
+            SAFEARRAY *sa = V_ARRAY( v );
+
+            if (sa && (sa->fFeatures & (FADF_UNKNOWN | FADF_DISPATCH |
+                                        FADF_VARIANT | FADF_RECORD |
+                                        FADF_HAVEIID)))
+            {
+                FIXME( "syscom: VariantClear refuses vt %#x (SAFEARRAY %p, "
+                       "fFeatures %#x): SafeArrayDestroy would AddRef/"
+                       "Release its elements natively and v1 does not "
+                       "recurse into array elements\n",
+                       vt, sa, sa->fFeatures );
+                return E_NOTIMPL;
+            }
+        }
+        return VariantClear( v );
+    }
 }

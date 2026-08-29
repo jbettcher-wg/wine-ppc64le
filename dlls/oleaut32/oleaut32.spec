@@ -422,6 +422,15 @@
 @ stdcall __wine_com_dispatch(long long ptr) combase.__wine_com_dispatch
 @ stdcall __wine_com_refuse() combase.__wine_com_refuse
 
+# The VariantClear GUEST-IMPL wrapper (oleaut32.thunks): a VARIANT can carry
+# an interface pointer (VT_UNKNOWN/VT_DISPATCH), so the real implementation
+# lives beside the single winecom runtime instance, exactly like
+# ole32.__wine_guest_CoGetMalloc forwards to combase.  Everything the wrapper
+# itself needs (__wine_com_translate_in, __wine_com_release_guest) is a plain
+# intra-combase call -- those two are not forwarded here because nothing in
+# oleaut32 ever has to resolve them by name.
+@ stdcall __wine_guest_VariantClear(ptr) combase.__wine_guest_VariantClear
+
 # Appended at the END so no `@` export above it is renumbered:
 # ordinals are assigned in file order and guests import by ordinal
 # (ppc64le/vkd3d/check-ordinal-imports.sh).  Asked of the NATIVE
