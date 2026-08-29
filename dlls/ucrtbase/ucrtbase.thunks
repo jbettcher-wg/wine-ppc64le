@@ -317,17 +317,57 @@ FORWARD longjmp            guestcrt.longjmp
 #     list comparing pointers.  None of the three ever calls a guest function
 #     pointer, so -- unlike __CxxRegisterExceptionObject/
 #     __CxxUnregisterExceptionObject/__DestructExceptionObject, which DO (the
-#     last one calls the thrown object's own destructor) and so stay holes
-#     here pending guest-cxx-eh-plan.md's Session B support file -- a trap is
-#     the correct, not merely convenient, answer for these three.
+#     last one calls the thrown object's own destructor) -- a trap is the
+#     correct, not merely convenient, answer for these three.
 #     _CreateFrameInfo was already declared in msvcrt.h; the other two were
 #     exported by this module's .spec but declared in no header at all (the
 #     same tooling gap _lock/_unlock hit), so msvcrt.h grew their
 #     declarations too rather than falling back to the .spec-location
 #     downgrade -- both are ordinary two-argument-or-fewer pointer/int
 #     functions with nothing a header-based check would catch less of.
+#
+# CORRECTION, 2026-08-29 (same day, caught by adversarial review before this
+# reached anywhere else): this paragraph originally claimed the three
+# ExceptionObject names above "stay holes here pending guest-cxx-eh-plan.md's
+# Session B support file".  That was FALSE from the moment it was written,
+# and stayed false until the EXCLUDE lines below were added.  msvcrt.h:156-
+# 158 declares all three (the pre-existing lines immediately below the block
+# this triage added to that header), and FROM-SPEC auto has no way to know a
+# declared name is meant to stay guest-only pending a later session -- it saw
+# the declaration and emitted all three as ordinary native trap stubs,
+# MEASURED in the built ucrtbase.dll at RVA 0x1c0c0/0x1c0d0/0x1c0e0 and in
+# vcruntime140.dll at 0x2030/0x2040/0x2050.  A trap is wrong here for exactly
+# the reason __DestructExceptionObject is singled out above: it calls the
+# thrown object's OWN destructor, a GUEST x86-64 function pointer read out of
+# the ThrowInfo, so a native trap means native ppc64 code indirect-calling an
+# x86-64 address the moment any FH3/FH4 personality reaches it -- the same
+# "silent wrong answer" class this file's __C_specific_handler paragraph and
+# dlls/guestcrt/cxxthrow.c's own banner both warn about.  Nothing reached it
+# before this correction (FH4 is a genuine sentinel today), so it was a
+# mis-documented armed landmine, not yet an active regression -- but this
+# whole triage's safety story rested on a false premise until now.  EXCLUDE
+# makes the refusal REAL rather than assumed: dropped from FROM-SPEC auto's
+# list, so ntdll binds each to its own named 0xDEADnnnn sentinel instead of a
+# callable stub -- a diagnosable refusal, exactly what "no declaration at
+# all" gets, not a trap that happens to go unused today.  Also corrected: the
+# "staged Proton vcruntime140/vcruntime140_1" framing this triage used
+# elsewhere in this file and in vcruntime140_1.thunks does not describe a
+# real mechanism -- dlls/ntdll/loader.c's guest module resolution
+# (find_dll_file's machine_dir branch, ~3540-3565) tries the BUILTIN thunk
+# before the ordinary search path a prefix-staged file would be found on, so
+# a same-named builtin thunk always wins and a staged file is never reached
+# for an unqualified import.  What this fix (and the __processing_throw row
+# above) actually serves is the BUILTIN vcruntime140_1 thunk's own FH4 code,
+# in every prefix, staged files or not.  All five modules that export this
+# trio -- this one, vcruntime140, msvcrt, msvcr100, msvcr120 -- carried the
+# identical live-trap landmine and grew the matching EXCLUDE lines the same
+# day.
 FORWARD _CxxThrowException   guestcrt._CxxThrowException
 FORWARD __C_specific_handler ntdll.__C_specific_handler
+
+EXCLUDE __CxxRegisterExceptionObject
+EXCLUDE __CxxUnregisterExceptionObject
+EXCLUDE __DestructExceptionObject
 
 __processing_throw              0x00000E01  0  int   msvcrt.h:161
 _CreateFrameInfo                0x00000E02  2  int   msvcrt.h:147

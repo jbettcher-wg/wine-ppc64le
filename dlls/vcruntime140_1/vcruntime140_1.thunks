@@ -38,11 +38,43 @@ FROM-SPEC auto
 # guestcrt.__CxxFrameHandler4`.  Adding that FORWARD now, ahead of the guest
 # code it would point at, would trade a diagnosable "no such export" hole for
 # a load-time forwarder-resolution failure against a symbol that does not
-# exist yet -- worse, not better.  Session A's actual unblock for these two
+# exist yet -- worse, not better.
+#
+# CORRECTION, 2026-08-29 (same day, adversarial review): this paragraph
+# originally ended by claiming "Session A's actual unblock for these two
 # titles is elsewhere: Proton already stages a REAL x86-64
 # vcruntime140_1.dll (Wine's own build, genuine FH4 machine code) into every
-# Proton prefix, and THAT module's own imports -- not this one's exports --
-# are what vcruntime140.thunks and ucrtbase.thunks now serve
-# (_CxxThrowException, __C_specific_handler, __processing_throw).  A non-
-# Proton prefix, or a builtin-DLL override that prefers this module, still
-# gets the named refusal above, honestly, until Session B exists.
+# Proton prefix, and THAT module's own imports ... are what vcruntime140.
+# thunks and ucrtbase.thunks now serve ... A non-Proton prefix, or a
+# builtin-DLL override that prefers this module, still gets the named
+# refusal above."  Two things measured wrong with that:
+#
+#   1. The file actually staged into a real Proton prefix's system32
+#      (compatdata/<id>/pfx/drive_c/windows/system32/vcruntime140_1.dll,
+#      confirmed present for prefix 2320) is Microsoft's own redistributable
+#      binary, not a Wine build: no "Wine builtin DLL" signature, Microsoft
+#      certificate strings, and its _CxxThrowException is that module's OWN
+#      code at a fixed RVA, not a PE forwarder into ucrtbase.  The Wine-built
+#      vcruntime140_1.dll this paragraph meant is what ships in Proton's own
+#      `files/lib64/wine/x86_64-windows/` tree, which is not what gets
+#      staged into a running prefix's system32.
+#
+#   2. Even if a Wine-built vcruntime140_1 WERE staged into system32, it
+#      would not matter: dlls/ntdll/loader.c's guest module resolution
+#      (find_dll_file's machine_dir branch, ~3540-3565) tries the BUILTIN
+#      thunk -- this module, from the build/install tree -- before it ever
+#      tries the ordinary search path a staged system32 file sits on.  For
+#      an unqualified `LoadLibraryA("vcruntime140_1.dll")` or a static
+#      import by that name, the builtin (this refused, no-export module)
+#      always answers first.  There is no "staged Proton" lane a guest
+#      import can reach that bypasses it -- "a builtin-DLL override that
+#      prefers this module" describes WINEDLLOVERRIDES, a real but separate
+#      and unrelated mechanism, not what a plain Proton prefix does.
+#
+# So: every Proton prefix gets exactly the same named refusal a non-Proton
+# prefix does, from exactly this module, until Session B lands real guest
+# FH4 code and the FORWARD above can be added.  What the sibling commit's
+# `_CxxThrowException`/`__C_specific_handler`/`__processing_throw` fixes
+# actually serve is THIS module's own future FH4 code (via the FORWARD noted
+# above) and the builtin ucrtbase/vcruntime140 lane every title -- Proton or
+# not -- already goes through today.

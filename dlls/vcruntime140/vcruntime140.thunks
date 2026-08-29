@@ -114,10 +114,17 @@ FORWARD longjmp            ucrtbase.longjmp
 #     the exception over the HOST's native stack, and the dispatcher's search
 #     phase would then walk frames with no .xdata at all and never reach a
 #     guest __CxxFrameHandler3/4, however it is eventually served.  This was
-#     the DEAD0009 sentinel a prefix-staged Proton vcruntime140 produced: its
-#     own _CxxThrowException is itself a forward to ucrtbase, and the old
-#     trap line here shadowed it for the builtin case while the forward died
-#     at load for the staged case -- one bug, two symptoms.
+#     the DEAD0009 sentinel measured on this triage's own titles.  (An
+#     earlier draft of this comment attributed part of that sentinel to a
+#     prefix-staged Proton vcruntime140's own forward "dying at load" --
+#     WRONG, corrected same-day by adversarial review: dlls/ntdll/loader.c's
+#     guest module resolution tries the BUILTIN thunk before the ordinary
+#     search path a prefix-staged file would be found on
+#     (find_dll_file's machine_dir branch, ~3540-3565), so for an unqualified
+#     import a same-named builtin always wins and a staged file is never even
+#     opened.  DEAD0009 was purely the builtin-lane bug: this module's own
+#     old trap line, full stop, in every prefix.  There was one bug and one
+#     symptom, not two.)
 #
 #   * __C_specific_handler was, until this line, whatever FROM-SPEC auto's
 #     default machinery produces for a name winnt.h declares: an ordinary
@@ -141,3 +148,24 @@ FORWARD longjmp            ucrtbase.longjmp
 #     one address identity recognises.
 FORWARD _CxxThrowException   ucrtbase._CxxThrowException
 FORWARD __C_specific_handler ucrtbase.__C_specific_handler
+
+# CORRECTION, 2026-08-29 (same day, adversarial review): this module's .spec
+# also declares __CxxRegisterExceptionObject/__CxxUnregisterExceptionObject/
+# __DestructExceptionObject (vcruntime140.spec:22-24, each a spec-level
+# forward to the ucrtbase namesake -- which parse_wine_spec does not turn
+# into a thunk-level FORWARD, so each still needed its own signature), and
+# msvcrt.h:156-158 declares all three.  PROBE-EXTRA msvcrt.h (above, for
+# _purecall) is enough for the oracle to see them, so FROM-SPEC auto emitted
+# all three as ordinary native trap stubs here too -- MEASURED at RVA
+# 0x2030/0x2040/0x2050 in the built vcruntime140.dll, alongside the identical
+# landmine in ucrtbase (see that file's matching correction for why a trap is
+# wrong: __DestructExceptionObject calls the thrown object's own destructor,
+# a GUEST function pointer, so a native trap means native ppc64 code
+# indirect-calling x86-64 the moment any FH3/FH4 personality reaches it).
+# Nothing in this file ever claimed these three "stay sentinels" -- that
+# claim was made in ucrtbase.thunks and dlls/guestcrt/cxxthrow.c's banner --
+# but this module carried the same live trap regardless, undocumented.
+# EXCLUDE below makes it a real, diagnosable refusal.
+EXCLUDE __CxxRegisterExceptionObject
+EXCLUDE __CxxUnregisterExceptionObject
+EXCLUDE __DestructExceptionObject

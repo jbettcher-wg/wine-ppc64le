@@ -87,6 +87,26 @@
  *     the ThrowInfo -- so it belongs with the rest of the FH3/FH4 support
  *     file (Session B), not bolted on here alone.
  *
+ *     CORRECTION, 2026-08-29 (same day, adversarial review): the commit that
+ *     added this file described these three as staying "sentinels" pending
+ *     Session B.  That was FALSE the moment it was written.
+ *     msvcrt.h:156-158 declares all three, and the ucrtbase/vcruntime140/
+ *     msvcrt/msvcr100/msvcr120 thunks all PROBE-EXTRA or otherwise see that
+ *     header, so FROM-SPEC auto emitted all three as ordinary native TRAP
+ *     stubs in every one of those five modules, MEASURED by reading the
+ *     built PEs' export tables (e.g. ucrtbase.dll RVA 0x1c0c0/0x1c0d0/
+ *     0x1c0e0, vcruntime140.dll RVA 0x2030/0x2040/0x2050).  That is exactly
+ *     the "silent wrong answer" class this file's own banner and
+ *     thunkcxx.h's doctrine both exist to refuse:
+ *     __DestructExceptionObject's trap would have native ppc64 code
+ *     indirect-call a guest x86-64 destructor pointer the first moment any
+ *     FH3/FH4 personality called it.  Nothing reached it before this
+ *     correction (FH4 is a genuine sentinel today), so it was a
+ *     mis-documented armed landmine, not yet an active regression.  A
+ *     follow-up, same-day fix added an explicit EXCLUDE line for each name
+ *     in all five .thunks files, so they are now true named refusals -- see
+ *     ucrtbase.thunks for the full correction.
+ *
  * Copyright 2026 the ppc64le port authors
  *
  * This library is free software; you can redistribute it and/or modify it

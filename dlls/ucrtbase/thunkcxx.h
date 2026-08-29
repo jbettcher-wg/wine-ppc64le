@@ -48,11 +48,24 @@
  * (guest-cxx-eh-plan.md Session B) can read and write it directly, with no
  * host->guest call needed.  Adding it now, alongside
  * _CreateFrameInfo/_FindAndUnlinkFrame/_IsExceptionObjectToBeDestroyed also
- * in msvcrt.h, stops a staged Proton vcruntime140/vcruntime140_1's own real
- * FH4 code from resolving __processing_throw to a sentinel (guest-cxx-eh-
- * plan.md section 3).  The three ExceptionObject names in that same section
- * stay sentinels for now -- they are guest code, not flat traps, for the
- * reason given above.
+ * in msvcrt.h, serves the BUILTIN ucrtbase/vcruntime140_1's own real FH4
+ * code -- not, as an earlier draft of this comment claimed, "a staged Proton
+ * vcruntime140/vcruntime140_1".  CORRECTED, 2026-08-29 (same day, adversarial
+ * review): dlls/ntdll/loader.c's guest module resolution tries the builtin
+ * thunk before the ordinary search path a prefix-staged file would be found
+ * on, so a same-named builtin always wins and a staged file is never even
+ * opened for an unqualified import -- there is no "staged" lane distinct
+ * from the builtin one to serve.  The three ExceptionObject names in that
+ * same section were ALSO claimed to "stay sentinels for now" -- also false
+ * when written: msvcrt.h declares all three and FROM-SPEC auto emitted
+ * ordinary native trap stubs for them in every module that sees that header
+ * (MEASURED at RVA 0x1c0c0/0x1c0d0/0x1c0e0 in ucrtbase.dll alone), the same
+ * "silent wrong answer" class this header's own banner exists to prevent,
+ * since __DestructExceptionObject calls the thrown object's own destructor
+ * -- a guest function pointer -- from what would have been native code.  A
+ * same-day follow-up added an explicit EXCLUDE line for each name in
+ * ucrtbase.thunks (and the four sibling CRT modules' .thunks files), so they
+ * are true named refusals now, not an accident that happened to go unused.
  */
 
 #ifndef __WINE_UCRTBASE_THUNKCXX_H
