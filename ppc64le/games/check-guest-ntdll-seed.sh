@@ -292,7 +292,7 @@ native_lane() {
         -fvisibility=hidden -fno-stack-protector -fno-strict-aliasing -gdwarf-4 \
         -fPIC -fasynchronous-unwind-tables -mlong-double-64 -fno-builtin \
         -fshort-wchar -Wno-format -g -O1 2>"$OUT/native.build.err" || return 1
-    "$SRC/tools/winegcc/winegcc" -o "$OUT/probe_native.exe" --wine-objdir "$BUILD" \
+    "$BUILD/tools/winegcc/winegcc" -o "$OUT/probe_native.exe" --wine-objdir "$BUILD" \
         --cc-cmd="${CC:-gcc}" -mno-cygwin -fPIC -fasynchronous-unwind-tables \
         -Wl,--wine-builtin -mconsole "$OUT/probe_native.o" \
         "$BUILD/libs/winecrt0/ppc64-windows/libwinecrt0.a" \
@@ -303,7 +303,7 @@ native_lane() {
     rm -f "$OUT/probe_native.exe"
     "$SRC/tools/elf2pe" "$OUT/probe_native.exe.so" "$OUT/probe_native.exe" \
         2>>"$OUT/native.build.err" || return 1
-    "$SRC/tools/winebuild/winebuild" --builtin "$OUT/probe_native.exe" \
+    "$BUILD/tools/winebuild/winebuild" --builtin "$OUT/probe_native.exe" \
         2>>"$OUT/native.build.err" || return 1
     return 0
 }

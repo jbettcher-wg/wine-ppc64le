@@ -117,7 +117,7 @@ ${CC:-gcc} -c -o "$OUT/wininet_status.o" "$HERE/wininet_status.c" $INCL \
     -mlong-double-64 -fno-builtin -fshort-wchar -Wno-format -g -O2 \
     || skip "native compile failed"
 
-"$SRC/tools/winegcc/winegcc" -o "$OUT/wininet_status.exe" --wine-objdir "$BUILD" \
+"$BUILD/tools/winegcc/winegcc" -o "$OUT/wininet_status.exe" --wine-objdir "$BUILD" \
     --cc-cmd="${CC:-gcc}" -mno-cygwin -fPIC -fasynchronous-unwind-tables \
     -Wl,--wine-builtin -mconsole "$OUT/wininet_status.o" \
     "$BUILD/libs/winecrt0/ppc64-windows/libwinecrt0.a" \
@@ -128,7 +128,7 @@ ${CC:-gcc} -c -o "$OUT/wininet_status.o" "$HERE/wininet_status.c" $INCL \
 rm -f "$OUT/wininet_status.exe"
 "$SRC/tools/elf2pe" "$OUT/wininet_status.exe.so" "$OUT/wininet_status.exe" \
     || skip "elf2pe failed"
-"$SRC/tools/winebuild/winebuild" --builtin "$OUT/wininet_status.exe" \
+"$BUILD/tools/winebuild/winebuild" --builtin "$OUT/wininet_status.exe" \
     || skip "winebuild --builtin failed"
 
 # ---- build 2: the x86-64 guest PE ----------------------------------------

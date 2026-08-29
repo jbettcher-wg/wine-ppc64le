@@ -182,7 +182,7 @@ ${CC:-gcc} -c -o "$OUT/reader.o" "$HERE/probes/guest_debug_read.c" $INCL \
     sed 's/^/  reader| /' "$OUT/reader.build.err" >&2
     skip "the native ppc64 reader did not compile"
 }
-"$SRC/tools/winegcc/winegcc" -o "$OUT/reader.exe" --wine-objdir "$BUILD" \
+"$BUILD/tools/winegcc/winegcc" -o "$OUT/reader.exe" --wine-objdir "$BUILD" \
     --cc-cmd="${CC:-gcc}" -mno-cygwin -fPIC -fasynchronous-unwind-tables \
     -Wl,--wine-builtin -mconsole "$OUT/reader.o" \
     "$BUILD/dlls/kernel32/ppc64-windows/libkernel32.a" \
@@ -196,7 +196,7 @@ ${CC:-gcc} -c -o "$OUT/reader.o" "$HERE/probes/guest_debug_read.c" $INCL \
 rm -f "$OUT/reader.exe"
 "$SRC/tools/elf2pe" "$OUT/reader.exe.so" "$OUT/reader.exe" 2>>"$OUT/reader.build.err" || \
     skip "elf2pe failed for the native reader"
-"$SRC/tools/winebuild/winebuild" --builtin "$OUT/reader.exe" \
+"$BUILD/tools/winebuild/winebuild" --builtin "$OUT/reader.exe" \
     2>>"$OUT/reader.build.err" || skip "winebuild --builtin failed for the native reader"
 say "build: guest probe (crashing and parking) and native ppc64 reader"
 

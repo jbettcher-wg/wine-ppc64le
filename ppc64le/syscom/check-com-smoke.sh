@@ -65,7 +65,7 @@ ${CC:-gcc} -c -o "$OUT/com_smoke.o" "$HERE/com_smoke.c" $INCL \
     -fPIC -fasynchronous-unwind-tables -mlong-double-64 -fno-builtin \
     -fshort-wchar -Wno-format -g -O2 || skip "native compile failed"
 
-"$SRC/tools/winegcc/winegcc" -o "$OUT/com_smoke.exe" --wine-objdir "$BUILD" \
+"$BUILD/tools/winegcc/winegcc" -o "$OUT/com_smoke.exe" --wine-objdir "$BUILD" \
     --cc-cmd="${CC:-gcc}" -mno-cygwin -fPIC -fasynchronous-unwind-tables \
     -Wl,--wine-builtin -mconsole "$OUT/com_smoke.o" \
     "$BUILD/libs/winecrt0/ppc64-windows/libwinecrt0.a" \
@@ -76,7 +76,7 @@ ${CC:-gcc} -c -o "$OUT/com_smoke.o" "$HERE/com_smoke.c" $INCL \
 rm -f "$OUT/com_smoke.exe"
 "$SRC/tools/elf2pe" "$OUT/com_smoke.exe.so" "$OUT/com_smoke.exe" \
     || skip "elf2pe failed"
-"$SRC/tools/winebuild/winebuild" --builtin "$OUT/com_smoke.exe" \
+"$BUILD/tools/winebuild/winebuild" --builtin "$OUT/com_smoke.exe" \
     || skip "winebuild --builtin failed"
 
 # ---- build 2: the x86-64 guest PE ----------------------------------------

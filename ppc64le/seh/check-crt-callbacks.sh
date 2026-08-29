@@ -148,7 +148,7 @@ ${CC:-gcc} -c -o "$OUT/crt_callbacks.o" "$HERE/crt_callbacks.c" $INCL \
     -mlong-double-64 -fno-builtin -fshort-wchar -Wno-format -g -O2 \
     || skip "native compile failed"
 
-"$SRC/tools/winegcc/winegcc" -o "$OUT/crt_callbacks.exe" --wine-objdir "$BUILD" \
+"$BUILD/tools/winegcc/winegcc" -o "$OUT/crt_callbacks.exe" --wine-objdir "$BUILD" \
     --cc-cmd="${CC:-gcc}" -mno-cygwin -fPIC -fasynchronous-unwind-tables \
     -Wl,--wine-builtin -mconsole "$OUT/crt_callbacks.o" \
     "$BUILD/libs/winecrt0/ppc64-windows/libwinecrt0.a" \
@@ -158,7 +158,7 @@ ${CC:-gcc} -c -o "$OUT/crt_callbacks.o" "$HERE/crt_callbacks.c" $INCL \
 rm -f "$OUT/crt_callbacks.exe"
 "$SRC/tools/elf2pe" "$OUT/crt_callbacks.exe.so" "$OUT/crt_callbacks.exe" \
     || skip "elf2pe failed"
-"$SRC/tools/winebuild/winebuild" --builtin "$OUT/crt_callbacks.exe" \
+"$BUILD/tools/winebuild/winebuild" --builtin "$OUT/crt_callbacks.exe" \
     || skip "winebuild --builtin failed"
 
 # ---- build 2: the x86-64 guest PE ----------------------------------------

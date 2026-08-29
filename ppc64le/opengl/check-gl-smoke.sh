@@ -304,7 +304,7 @@ native_build() {   # native_build <output> [extra cflags...]
         -fvisibility=hidden -fno-stack-protector -fno-strict-aliasing -gdwarf-4 \
         -fPIC -fasynchronous-unwind-tables -mlong-double-64 -fno-builtin \
         -fshort-wchar -Wno-format -g -O1 2>"$OUT/native.build.err" || return 1
-    "$SRC/tools/winegcc/winegcc" -o "$nout" --wine-objdir "$BUILD" \
+    "$BUILD/tools/winegcc/winegcc" -o "$nout" --wine-objdir "$BUILD" \
         --cc-cmd="${CC:-gcc}" -mno-cygwin -fPIC -fasynchronous-unwind-tables \
         -Wl,--wine-builtin -mconsole "$OUT/native.o" \
         "$BUILD/dlls/opengl32/ppc64-windows/libopengl32.a" \
@@ -317,7 +317,7 @@ native_build() {   # native_build <output> [extra cflags...]
         2>>"$OUT/native.build.err" || return 1
     rm -f "$nout"
     "$SRC/tools/elf2pe" "$nout.so" "$nout" 2>>"$OUT/native.build.err" || return 1
-    "$SRC/tools/winebuild/winebuild" --builtin "$nout" \
+    "$BUILD/tools/winebuild/winebuild" --builtin "$nout" \
         2>>"$OUT/native.build.err" || return 1
     return 0
 }
