@@ -365,3 +365,35 @@ GUEST-IMPL   _initterm_e                      __wine_guest__initterm_e
 INCLUDE-DIR   .
 PROBE-EXTRA   mtdll.h
 PROBE-EXTRA   msvcrt.h        # _amsg_exit, __dllonexit
+
+# ---------------------------------------------------------------------------
+# 2026-08-29, guest-cxx-eh-plan Session A follow-up (adversarial review):
+# the same __C_specific_handler identity bug and ExceptionObject landmine
+# vcruntime140/ucrtbase carried, also live here
+# ---------------------------------------------------------------------------
+# msvcrt.spec:177 declares __C_specific_handler (winnt.h-visible, so FROM-
+# SPEC auto emitted a plain TRAP stub, MEASURED at RVA 0xb040 in the built
+# msvcrt.dll) -- the exact identity-defeating shape the 2026-08-29 triage
+# fixed for vcruntime140/ucrtbase: dlls/ntdll/signal_ppc64.c's frame walk
+# recognises __C_specific_handler by ADDRESS IDENTITY against the guest
+# ntdll's own export, so any /MD or /MT title whose .xdata handler resolves
+# through THIS module's own trap (any VS2010-era-or-earlier /MT title
+# statically linking msvcrt's own EH support) would be entered as unknown
+# guest code and trap into native ppc64 with an AMD64 DISPATCHER_CONTEXT it
+# cannot interpret.  Same fix, same target: forward straight to ntdll's own
+# copy, landing on the one address the identity check recognises.
+FORWARD __C_specific_handler ntdll.__C_specific_handler
+
+# msvcrt.spec:189-191 also declares __CxxRegisterExceptionObject/
+# __CxxUnregisterExceptionObject/__DestructExceptionObject, and msvcrt.h:
+# 156-158 declares them too (PROBE-EXTRA msvcrt.h, above) -- so this module
+# carried the identical live-trap landmine ucrtbase/vcruntime140 did, MEASURED
+# at RVA 0xb050/0xb060/0xb070.  __DestructExceptionObject calls the thrown
+# object's own destructor, a GUEST function pointer, so a native trap means
+# native ppc64 code indirect-calling x86-64 the moment any FH3/FH4
+# personality reaches it -- see ucrtbase.thunks' matching correction for the
+# full reasoning.  EXCLUDE makes the refusal real and diagnosable instead of
+# an accidental callable stub nobody meant to serve.
+EXCLUDE __CxxRegisterExceptionObject
+EXCLUDE __CxxUnregisterExceptionObject
+EXCLUDE __DestructExceptionObject

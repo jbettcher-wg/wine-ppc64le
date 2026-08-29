@@ -8,16 +8,25 @@
 # guest call (c000007b), and the whole image failed to load (c0000135) before
 # one guest instruction ran.
 #
-# 766 of 1185 eligible exports are emitted from this module's own .spec.  The
-# 419 refusals are named classes, not guesses -- the printf/scanf family
-# (true varargs, which need the variadic= column and a per-name v-variant);
-# the MSVC C++ EH ABI (_CxxThrowException, __CxxFrameHandler{,2,3},
-# __RTDynamicCast, __Cxx{Register,Unregister}ExceptionObject), which is the
-# guest image's OWN language personality and must not be sent into the host
-# unwinder, exactly as vcruntime140.__CxxFrameHandler3 is a documented hole in
+# 796 of 1187 eligible exports are emitted from this module's own .spec,
+# re-measured 2026-08-29 (the "766 of 1185"/"419 refusals" this banner
+# originally claimed had drifted from reality well before this file's
+# ExceptionObject trio correction below -- this module's surface has grown a
+# few PROBE-EXTRA/GUEST-IMPL rows since the 2026-08-17 corpus pass and nobody
+# had re-measured the totals; not itself part of that correction, just
+# caught alongside it).  The 391 refusals are named classes, not guesses --
+# the printf/scanf family (true varargs, which need the variadic= column and
+# a per-name v-variant); the MSVC C++ EH ABI (_CxxThrowException,
+# __CxxFrameHandler{,2,3}, __RTDynamicCast), which is the guest image's OWN
+# language personality and must not be sent into the host unwinder, exactly
+# as vcruntime140.__CxxFrameHandler3 is a documented hole in
 # ppc64le/thunks/check-import-chain.sh; the C++ mangled names, which are not
 # flat prototypes at all; and div/ldiv/lldiv/_cabs, which pass a struct by
-# value.  Each keeps its slot as a named sentinel.
+# value.  Each keeps its slot as a named sentinel.  __Cxx{Register,
+# Unregister}ExceptionObject and __DestructExceptionObject are NOT part of
+# this refused set -- see the EXCLUDE lines and their correction below for
+# why they need their own, more recently added, mechanism to get the same
+# named-sentinel outcome this banner has always claimed for them.
 DLL msvcr100.dll
 FROM-SPEC auto
 
@@ -59,6 +68,38 @@ PROBE-EXTRA   sys/timeb.h
 PROBE-EXTRA   mtdll.h
 PROBE-EXTRA   msvcrt.h
 PROBE-EXTRA   mbstring.h
+
+# ---------------------------------------------------------------------------
+# 2026-08-29, guest-cxx-eh-plan Session A follow-up (adversarial review):
+# the same __C_specific_handler identity bug and ExceptionObject landmine
+# vcruntime140/ucrtbase carried, also live here
+# ---------------------------------------------------------------------------
+# CORRECTION to the banner at the top of this file: it has claimed since the
+# 2026-08-17 corpus pass that __Cxx{Register,Unregister}ExceptionObject
+# "keeps its slot as a named sentinel" alongside __CxxFrameHandler3 and
+# _CxxThrowException.  That was FALSE for those two (and for
+# __DestructExceptionObject, not even named in that list) from the day this
+# file was written: msvcr100.spec:728-730 declares all three, msvcrt.h:156-
+# 158 declares all three, PROBE-EXTRA msvcrt.h above has always carried that
+# declaration into this oracle's view, and FROM-SPEC auto has no way to know
+# a declared name is meant to stay refused -- it emitted ordinary native trap
+# stubs, MEASURED at RVA 0xe0e0/0xe0f0/0xe100 in the built msvcr100.dll.  The
+# EXCLUDE lines below are what actually makes the banner's claim true.
+#
+# msvcr100.spec:715 similarly declares __C_specific_handler (MEASURED trap at
+# RVA 0xe0d0) -- the exact identity-defeating shape the 2026-08-29 triage
+# fixed for vcruntime140/ucrtbase: dlls/ntdll/signal_ppc64.c's frame walk
+# recognises __C_specific_handler by ADDRESS IDENTITY against the guest
+# ntdll's own export, so a VS2010-era /MD title (this module's whole reason
+# for existing) whose .xdata handler resolves through THIS module's trap
+# would be entered as unknown guest code and trap into native ppc64 with an
+# AMD64 DISPATCHER_CONTEXT it cannot interpret.  Same fix: forward to ntdll's
+# own copy.
+FORWARD __C_specific_handler ntdll.__C_specific_handler
+
+EXCLUDE __CxxRegisterExceptionObject
+EXCLUDE __CxxUnregisterExceptionObject
+EXCLUDE __DestructExceptionObject
 
 # _initterm walks a table of the CALLER's initializers.  For a guest caller
 # those entries are x86-64 code and this walker is ppc64, so the guest import
