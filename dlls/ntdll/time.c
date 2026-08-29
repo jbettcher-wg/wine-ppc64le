@@ -376,11 +376,123 @@ LONGLONG WINAPI RtlGetSystemTimePrecise( void )
     return ret;
 }
 
+#ifdef __i386__
+/* The i386 lane's QPC fast path (the ppc64le port).
+ *
+ * On this port every wow64 syscall is a bounded emulator-run exit and
+ * re-entry, and QueryPerformanceCounter was the 64-bit lane's #1 crossing
+ * row (14k/frame in Cyberpunk) before its guest-side fast path.  The i386
+ * lane cannot ride that path -- its kernel32 is a real WoW64 builtin, not a
+ * thunk module -- but it does not need to: the KUSER_SHARED_DATA page the
+ * guest already maps at 0x7ffe0000 carries the port's QPC session block in
+ * its tail (wine/emu_qpc.h; seeded by virtual_init_user_shared_data), and
+ * under the emulator RDTSC reads the POWER timebase left-shifted by the
+ * bridge's TSC scale.  qpc = mulhi(tb, multiplier) + bias, so the only
+ * missing number is the SHIFT -- which is CALIBRATED, not assumed: one
+ * reference syscall, then the unique shift in 0..EMU_QPC_MAX_SHIFT whose
+ * rdtsc-derived answer lands within a millisecond of it.  Candidate shifts
+ * are powers of two apart, so exactly one can ever match; if none does
+ * (a bridge whose TSC is not the timebase, an unseeded session block, any
+ * other host) the path disarms itself and every call keeps the syscall it
+ * always had.  WINE_PPC64LE_NO_QPC_BYPASS=1 is the same kill switch the
+ * 64-bit lane's fast path honours.
+ *
+ * The session block is written once per session before any guest runs and
+ * never rewritten, so no reader needs a seqlock (emu_qpc.h's contract). */
+#define QPC32_SESSION ((const struct qpc32_session *)0x7ffe0f00)
+#define QPC32_MAGIC   (((ULONGLONG)0x51504331 << 32) | 0x50504336)  /* "QPC1PPC6" */
+#define QPC32_MAX_SHIFT 16
+struct qpc32_session
+{
+    ULONGLONG magic;
+    ULONGLONG multiplier;
+    ULONGLONG bias;
+    ULONGLONG tb_freq;
+    ULONGLONG qpc_freq;
+};
+
+static LONG qpc32_shift = -1;   /* -1 uncalibrated, -2 disabled */
+
+static inline ULONGLONG qpc32_rdtsc(void)
+{
+    UINT lo, hi;
+    __asm__ __volatile__( "rdtsc" : "=a"(lo), "=d"(hi) );
+    return ((ULONGLONG)hi << 32) | lo;
+}
+
+/* the high 64 bits of a 64x64 product, in 32-bit halves (no __int128 here) */
+static ULONGLONG qpc32_mulhi( ULONGLONG a, ULONGLONG b )
+{
+    ULONGLONG al = (UINT)a, ah = a >> 32, bl = (UINT)b, bh = b >> 32;
+    ULONGLONG mid = ah * bl + ((al * bl) >> 32);
+    ULONGLONG mid2 = al * bh + (UINT)mid;
+
+    return ah * bh + (mid >> 32) + (mid2 >> 32);
+}
+
+static ULONGLONG qpc32_value( const struct qpc32_session *s, int shift )
+{
+    return qpc32_mulhi( qpc32_rdtsc() >> shift, s->multiplier ) + s->bias;
+}
+
+static BOOL qpc32_calibrate( const struct qpc32_session *s )
+{
+    UNICODE_STRING name, value;
+    LARGE_INTEGER ref;
+    WCHAR buf[4];
+    int shift;
+
+    value.Buffer = buf;
+    value.MaximumLength = sizeof(buf);
+    value.Length = 0;
+    RtlInitUnicodeString( &name, L"WINE_PPC64LE_NO_QPC_BYPASS" );
+    if (!RtlQueryEnvironmentVariable_U( NULL, &name, &value ) &&
+        value.Length && buf[0] == '1')
+    {
+        ERR( "WINE_PPC64LE_NO_QPC_BYPASS=1 -- i386 QPC keeps the syscall on "
+             "every call\n" );
+        InterlockedExchange( &qpc32_shift, -2 );
+        return FALSE;
+    }
+
+    NtQueryPerformanceCounter( &ref, NULL );
+    for (shift = 0; shift <= QPC32_MAX_SHIFT; shift++)
+    {
+        LONGLONG d = qpc32_value( s, shift ) - ref.QuadPart;
+
+        if (d < 0) d = -d;
+        if (d < 10000)   /* within 1ms of the syscall's own answer */
+        {
+            TRACE( "i386 QPC fast path armed, tsc shift %d\n", shift );
+            InterlockedExchange( &qpc32_shift, shift );
+            return TRUE;
+        }
+    }
+    WARN( "no tsc shift reproduces the syscall's QPC; the i386 fast path "
+          "stays off\n" );
+    InterlockedExchange( &qpc32_shift, -2 );
+    return FALSE;
+}
+#endif  /* __i386__ */
+
 /******************************************************************************
  *  RtlQueryPerformanceCounter   [NTDLL.@]
  */
 BOOL WINAPI DECLSPEC_HOTPATCH RtlQueryPerformanceCounter( LARGE_INTEGER *counter )
 {
+#ifdef __i386__
+    const struct qpc32_session *s = QPC32_SESSION;
+    LONG shift = qpc32_shift;
+
+    if (shift != -2 && s->magic == QPC32_MAGIC && s->multiplier)
+    {
+        if (shift >= 0 || qpc32_calibrate( s ))
+        {
+            counter->QuadPart = qpc32_value( s, qpc32_shift );
+            return TRUE;
+        }
+    }
+#endif
     NtQueryPerformanceCounter( counter, NULL );
     return TRUE;
 }

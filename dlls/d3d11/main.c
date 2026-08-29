@@ -1194,6 +1194,11 @@ struct map_bounce
     void *host_ptr;          /* live host mapping, NULL when unmapped */
     SIZE_T size;             /* live mapping's byte count */
     UINT maptype;
+    SIZE_T known_size;       /* the subresource's byte count, computed ONCE:
+                                a resource's extent never changes, and the
+                                first cut re-asked GetType+GetDesc on every
+                                Map -- two host calls per dynamic-buffer
+                                update, every frame [the Dex perf pass] */
 };
 
 static CRITICAL_SECTION bounce_cs;
@@ -1301,8 +1306,16 @@ static UINT64 hand32_map( void *host, UINT slot, I386_CONTEXT *ctx )
     }
 
     {
-        SIZE_T size = map_subresource_size( res_host, sub, row_pitch, depth_pitch );
         struct map_bounce *b;
+        SIZE_T size = 0;
+
+        RtlEnterCriticalSection( &bounce_cs );
+        for (b = map_bounces; b; b = b->next)
+            if (b->res_host == res_host && b->sub == sub) break;
+        if (b) size = b->known_size;
+        RtlLeaveCriticalSection( &bounce_cs );
+        if (!size)
+            size = map_subresource_size( res_host, sub, row_pitch, depth_pitch );
 
         if (!size)
         {
@@ -1318,6 +1331,7 @@ static UINT64 hand32_map( void *host, UINT slot, I386_CONTEXT *ctx )
         RtlEnterCriticalSection( &bounce_cs );
         for (b = map_bounces; b; b = b->next)
             if (b->res_host == res_host && b->sub == sub) break;
+        if (b) b->known_size = size;
         if (b && b->cap < size)
         {
             SIZE_T zero = 0;
@@ -1332,6 +1346,7 @@ static UINT64 hand32_map( void *host, UINT slot, I386_CONTEXT *ctx )
             {
                 b->res_host = res_host;
                 b->sub = sub;
+                b->known_size = size;
                 b->next = map_bounces;
                 map_bounces = b;
             }
