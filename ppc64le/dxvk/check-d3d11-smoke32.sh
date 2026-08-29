@@ -61,6 +61,15 @@ D3D11_SO="$DXVKBUILD/src/d3d11/libdxvk_d3d11.so"
 [ -e "$D3D11_SO" ] || skip "missing $D3D11_SO -- run ppc64le/dxvk/build-for-wine.sh first"
 
 mkdir -p "$OUT" || skip "cannot create $OUT"
+
+# DXVK writes <appname>_d3d11.log next to the CURRENT DIRECTORY by default, and
+# a gate is normally run from the top of the source tree -- so a plain run left
+# native_d3d11.log, native_dxgi.log and a wine-preloader_* pair lying in the
+# checkout.  Point them at this gate's own work directory instead; DXVK_LOG_PATH
+# takes a directory, and "none" would suppress the logs entirely, which is worse
+# when a leg fails and the log is the evidence.
+DXVK_LOG_PATH=$OUT
+export DXVK_LOG_PATH
 fail=0
 INCL="-I$BUILD/include -I$SRC/include -I$SRC/include/msvcrt"
 TIMEOUT=${TIMEOUT:-180}
