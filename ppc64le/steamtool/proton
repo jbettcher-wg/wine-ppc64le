@@ -42,6 +42,21 @@ if [ -z "$tree" ] && [ -x "$selfdir/../../wine" ]; then
 fi
 : "${tree:=$HOME/Projects/power8/wine-ppc64le}"
 
+# $tree IS THE BUILD DIRECTORY; THIS SCRIPT LIVES IN THE SOURCE TREE.  They are
+# the same directory only for an in-tree build, and using $tree for both is how
+# an out-of-tree build silently loses everything under ppc64le/.
+#
+# [MEASURED 2026-08-22] with the build at .../wine-build, bridge_start looked
+# for the helper at $tree/ppc64le/steamapi/helper/build-helper.sh -- which does
+# not exist there -- printed "helper build FAILED; the game will see no Steam
+# client", and DOOM then failed SteamAPI_Init and died in its own crash
+# reporter.  The visible error was three steps downstream of this line.
+#
+# selfdir already resolves the compatibilitytools.d symlink, so this is the
+# real source location whether the tool was invoked from the tree or through
+# Steam.
+src=$(cd "$selfdir/../.." && pwd -P)
+
 wine=$tree/wine
 wineserver=$tree/server/wineserver
 
@@ -683,10 +698,10 @@ bridge_stop() {
 trap 'bridge_stop' EXIT INT TERM
 
 bridge_start() {
-    helper=$tree/ppc64le/steamapi/helper/steamhelper
+    helper=$src/ppc64le/steamapi/helper/steamhelper
     if [ ! -x "$helper" ]; then
         say "building the steam bridge helper"
-        if ! "$tree/ppc64le/steamapi/helper/build-helper.sh"; then
+        if ! "$src/ppc64le/steamapi/helper/build-helper.sh"; then
             say "helper build FAILED; the game will see no Steam client"
             return 1
         fi
