@@ -81,10 +81,26 @@ done
 P=$TREE/dlls/steamclient64/proton
 D=$TREE/dlls/steamclient64
 
-for f in "$ROOTFS/usr/include/dlfcn.h" "$ROOTFS/usr/lib/Scrt1.o" \
+for f in "$ROOTFS/usr/include/dlfcn.h" \
          "$P/unixlib.cpp" "$D/steamrpc_wire.h"; do
     [ -e "$f" ] || { echo "build-helper.sh: missing $f" >&2; exit 2; }
 done
+
+# Scrt1.o sits in usr/lib on an Arch-style rootfs and in
+# usr/lib/x86_64-linux-gnu on a Debian/Ubuntu one, which uses multiarch paths.
+# clang's own Linux driver knows both given --sysroot, so only this preflight
+# check needed teaching -- it hardcoded the Arch layout and refused a perfectly
+# good Ubuntu_24_04 rootfs with "missing .../usr/lib/Scrt1.o".
+crt=
+for c in "$ROOTFS/usr/lib/Scrt1.o" "$ROOTFS/usr/lib/x86_64-linux-gnu/Scrt1.o"; do
+    [ -e "$c" ] && { crt=$c; break; }
+done
+[ -n "$crt" ] || {
+    echo "build-helper.sh: no x86-64 Scrt1.o under $ROOTFS/usr/lib" >&2
+    echo "  looked in usr/lib (Arch layout) and usr/lib/x86_64-linux-gnu (Debian/Ubuntu)." >&2
+    echo "  FEX_ROOTFS names the sysroot; it is currently $ROOTFS" >&2
+    exit 2
+}
 
 command -v clang++ >/dev/null || { echo "build-helper.sh: need clang++" >&2; exit 2; }
 
