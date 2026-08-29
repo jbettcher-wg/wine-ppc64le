@@ -1188,12 +1188,28 @@ HRESULT WINAPI __wine_guest_VariantClear( VARIANTARG *v )
             V_VT( v ) = VT_EMPTY;
             return S_OK;
         }
-        /* A guest-implemented object.  v1 refuses rather than guessing who
-         * owns a Release run through a borrowed reverse proxy -- a design
-         * decision nobody has made yet, not a mechanism gap. */
-        FIXME( "syscom: VariantClear refuses a guest-implemented %s %p "
-               "(vt %#x): releasing it through a reverse proxy has "
-               "ownership semantics nobody has designed yet\n",
+        /* TWO DIFFERENT THINGS REACH HERE, and the message must not name only
+         * one of them -- __wine_com_translate_in answers TRUE for NULL and for
+         * a forward proxy of ours, and FALSE for everything else.
+         *
+         *   1. A genuinely guest-implemented object.  v1 refuses rather than
+         *      guessing who owns a Release run through a borrowed reverse
+         *      proxy: a design decision nobody has made yet.
+         *   2. A pointer that WAS one of our proxies and is not any more --
+         *      a guest that over-released it, so the intern entry is gone and
+         *      proxy_from_pointer no longer recognises the address.
+         *
+         * [MEASURED 2026-08-29] (2) is reachable: a probe that clears the same
+         * proxy twice takes this path on the second clear, and correctly gets
+         * E_NOTIMPL with the VARIANT untouched rather than a use-after-free.
+         * Naming only (1) sent a reader toward reverse-proxy ownership design
+         * when the actual defect would be a guest refcount bug -- so say both,
+         * and say which is the likelier reading when a real title trips it. */
+        FIXME( "syscom: VariantClear refuses %s %p (vt %#x): either a "
+               "guest-implemented object (Release through a reverse proxy has "
+               "ownership semantics nobody has designed yet), or -- more "
+               "likely if a real title reaches this -- a pointer that was one "
+               "of our proxies and has already been released once too often\n",
                vt == VT_DISPATCH ? "IDispatch" : "IUnknown", punk, vt );
         return E_NOTIMPL;
     }

@@ -364,17 +364,26 @@
 @ stdcall __wine_com_wrap_static(ptr long)
 @ stdcall __wine_com_iface_from_iid(ptr)
 @ stdcall __wine_com_refuse()
-@ stdcall __wine_com_release_guest(ptr)
-@ stdcall __wine_com_addref_guest(ptr)
 @ stdcall __wine_guest_CoCreateInstance(ptr ptr long ptr ptr)
 @ stdcall __wine_guest_CoGetClassObject(ptr long ptr ptr ptr)
 @ stdcall __wine_guest_CoGetMalloc(long ptr)
 @ stdcall __wine_guest_CreateStreamOnHGlobal(ptr long ptr)
 @ stdcall __wine_guest_GetHGlobalFromStream(ptr ptr)
-@ stdcall __wine_guest_VariantClear(ptr)
 
 # Appended at the END so no `@` export above it is renumbered:
 # ordinals are assigned in file order and guests import by ordinal
 # (ppc64le/vkd3d/check-ordinal-imports.sh).  Asked of the NATIVE
 # module by ntdll when the crossing sink interns a COM slot row.
 @ stdcall __wine_com_slot_name(long long ptr ptr)
+
+# Same rule, same reason: these three arrived with the VariantClear wrapper
+# and were first written into the middle of the block above, which silently
+# renumbered every auto-ordinal after them -- exactly what the note above
+# exists to prevent.  Nothing in tree binds combase by number (every consumer
+# resolves by name: ntdll's signal_ppc64.c crossing sink, the GUEST-IMPL
+# redirects, and oleaut32's forward), so the renumbering was harmless here --
+# but an out-of-tree importer holding an old ordinal would have bound the
+# wrong export, and that is not a failure anything would have caught.
+@ stdcall __wine_com_release_guest(ptr)
+@ stdcall __wine_com_addref_guest(ptr)
+@ stdcall __wine_guest_VariantClear(ptr)
