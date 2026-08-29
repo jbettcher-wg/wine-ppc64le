@@ -1,3 +1,8 @@
 # vkd3d-proton's meson build tree, created by the generated Makefile's
 # dlls/d3d12/libvkd3d-proton-d3d12.so rule when srcdir == builddir.
 /vkd3d-build/
+
+# Python bytecode caches left by the generators and audit tools under this
+# directory (library_sweep, import_chain, callback_audit, gen_winecom, ...).
+# Importing one as a module -- which the sweep does -- creates these.
+__pycache__/
