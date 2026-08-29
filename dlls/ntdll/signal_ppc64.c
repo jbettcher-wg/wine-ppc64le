@@ -8445,6 +8445,29 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
         }
         RtlInitAnsiString( &func_name, (char *)(base + impl_names[idx]) );
 
+        /* A GUEST-REFUSE export resolves to the ONE shared refusal stub, which
+         * takes no arguments and therefore cannot name itself -- all
+         * __wine_com_refuse can say is "see the guest thunk trace for which",
+         * and the trace that would answer it is a +seh run measured in
+         * gigabytes.  The name is known right here, so say it right here.
+         * This is the discipline the loader already applies to a missing
+         * import, where a per-symbol 0xdead0000+n sentinel makes the faulting
+         * address name its symbol; a refusal deserves the same.
+         *
+         * The second half of the message is the part that costs sessions: the
+         * stub answers E_NOTIMPL and writes NOTHING to an out-pointer, so a
+         * caller that does not check the HRESULT reads whatever was on its
+         * stack.  [MEASURED 2026-08-22] DOOM does exactly that and ends up
+         * calling RtlTryEnterCriticalSection(NULL), which faults inside the
+         * lock and leaves two threads deadlocked against each other -- forty
+         * minutes and three symptoms away from this line. */
+        if (!strcmp( func_name.Buffer, "__wine_com_refuse" ))
+            ERR( "%s.%s is refused (GUEST-REFUSE): answers E_NOTIMPL and writes "
+                 "no out-pointer, so an unchecked caller uses uninitialised "
+                 "memory\n",
+                 debugstr_w(mod->BaseDllName.Buffer),
+                 (const char *)(base + names[idx]) );
+
         if (LdrGetProcedureAddress( native, &func_name, 0, &proc ))
         {
             /* A module whose surface is genuinely larger than its export
