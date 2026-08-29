@@ -99,7 +99,32 @@ builds, and the obvious suspect is ALREADY CLEARED, measured:
   stopped re-asking GetType/GetDesc per call.  Neither moved the fps
   needle far, consistent with the arithmetic above.
 
-Open theories, in test order:
+**A/B RESULTS (user-driven, 2026-08-28 late)**: overriding the forced SMC
+lane defaults helps -- `FEX_SMCLAZYINVAL=0 FEX_SMCLAZYLINK=0` (leg B) was
+the best feel; full FEX defaults (leg C, adding SOFTINVALIDATE=0
+FILEIMMUTABLE=0) ran about as well but loads noticeably slower (eager
+invalidation through Mono's JIT-heavy load).  Next actions: get numbers on
+B, make B (or a measured refinement) the 32-BIT lane's own defaults in
+steamtool/proton -- the CP2077 set must stop being inherited blind -- and
+try FEX_SMCSEMANTICPATCH=1 on top of the winner.
+
+**OPEN BUG, blocks calling this lane done for Dex: MENUS RENDER INVISIBLE**
+(reported during the A/B, present on plain launches too).  NOT the SMC
+knobs, NOT the i386 QPC fast path (WINE_PPC64LE_NO_QPC_BYPASS=1 does not
+fix it), no err/refuse/QI-warn rows in the run logs -- silent wrongness.
+The binaries are unchanged since a session where menus rendered (the
+16:42 run navigated them), so suspect state/flakiness or an
+order-dependent silent miss.  Unity draws UI from DYNAMIC buffers
+(Map WRITE_DISCARD/NO_OVERWRITE -> the hand32 bounce) and dynamic FONT
+atlases (UpdateSubresource); "world fine, UI missing" fingers exactly
+those paths -- the bounce's NO_OVERWRITE handling flushes the WHOLE
+buffer from a bounce that is only guaranteed current for DISCARD-reset
+content, which is the first place to look.  Repro headless on :77 with a
+clone of nw-dexwin (never drive the user's seat: no DISPLAY=:0/:1, no
+uinput injection -- keys go seat-wide) and screenshot via
+`DISPLAY=:77 magick x:root out.png`.
+
+Open theories for the remaining gap, in test order:
 
 1. **The forced SMC recipe vs Mono.**  Our proton force-sets the
    CP2077-tuned set (FEX_SMCCHECKS=mtrack + SOFTINVALIDATE + LAZYINVAL +
