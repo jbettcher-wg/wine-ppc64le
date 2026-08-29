@@ -80,6 +80,55 @@ lives:
   above 4 GiB.  Flat wrappers stage interface-out cells and narrow them to
   the guest's 4-byte width.
 
+**THE PERF HUNT (2026-08-28 evening, in progress)** -- Dex runs 13 fps
+steady in-game against ~27 on both the emulated-wine and native-Linux
+builds, and the obvious suspect is ALREADY CLEARED, measured:
+
+* The lane's crossing profile (WINE_PPC64LE_TRAP_STATS on the Dex menu,
+  dumps land beside the env's path; SIGUSR2 forces one and WORKS on this
+  lane): 13.5k crossings/s -- Unity's job-system semaphore churn leads
+  (Wait 2.3k + Release 2.1k + Create/Close 1.3k each per second),
+  Map/Unmap 648/s each, the D3D state spam behind them.
+* One wow64 syscall -- bounded-run exit, context conversion, dispatch,
+  re-entry -- costs **~2.0us** (microbench: 200k QueryPerformanceCounter
+  calls self-timed; /tmp/qpcbench on op4k has the probe).  The ENTIRE
+  crossing load is therefore a few percent of one core.  **Crossings do
+  not explain 13 fps.  Do not build the i386 call journal on that
+  theory** -- it was next on the list and the microbench killed it.
+* QPC is served guest-side now (128ns/call; the row is gone) and Map
+  stopped re-asking GetType/GetDesc per call.  Neither moved the fps
+  needle far, consistent with the arithmetic above.
+
+Open theories, in test order:
+
+1. **The forced SMC recipe vs Mono.**  Our proton force-sets the
+   CP2077-tuned set (FEX_SMCCHECKS=mtrack + SOFTINVALIDATE + LAZYINVAL +
+   FILEIMMUTABLE + LAZYLINK) as lane defaults; the emulated stack runs
+   FEX's own defaults and gets 27 fps.  FEX_SMCLAZYINVAL defers
+   invalidation to drain points -- if drains ride the bounded-run exits,
+   the i386 lane's ~10k exits/s under Mono's constant code-writing is an
+   invalidation storm the emulated lane never sees.  A/B: export
+   FEX_SMCLAZYINVAL=0 FEX_SMCLAZYLINK=0 (lane defaults yield to existing
+   env), then the whole set.  Headless fps proxy: the DrawIndexed row's
+   per-second rate is draws-per-frame x fps for a fixed scene (menu is
+   vsync-capped at 60 -- use an in-game save for the A/B, the user's
+   nw-dexwin prefix has one).
+2. **SMCSemanticPatch** (off on both lanes today; the JIT banner names
+   it).  Patches rel32 targets in place instead of reinvalidating --
+   plausibly big under Mono, needs its own A/B, forces BlockLinking off.
+3. **JIT-side i386 quality under the bridge** -- if the knob A/Bs are a
+   wash, the gap is inside fastppcx86 and wants its own agent on that
+   tree (the 32-bit register file is x32::SRA in
+   FEXCore/.../PPC64LE/JIT.cpp; compare a hot Mono block's code quality
+   bridge-vs-standalone).  FEX_ENABLECODECACHINGWIP (the persistent
+   cache) is NOT the lever: measured wash-to-loss on W3, off on both
+   stacks by deliberate default (fexproton line ~186).
+
+Housekeeping from the hunt: nw-dexwin-perf (a prefix clone for headless
+measurement) can be deleted when the hunt ends; run-native still skips
+wineboot's 32-bit registration pass for FRESH prefixes (fixed by hand in
+nw-dexwin and the clone).
+
 Remaining, none of it blocking the canary:
 * dexwin (the canary title) end-to-end -- next session's first act.
 * D3D10's texture creates on the 32-bit lane refuse32 (the D3D11 walkers
