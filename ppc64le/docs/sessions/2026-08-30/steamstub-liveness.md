@@ -363,3 +363,19 @@ concrt140 into `sysx8664` on every launch.
   to handle; something that finds an empty stream is in a state the real client
   never presents. Portal 2 was the shape of that argument and it did not hold
   up, so this stays a stated risk and not a finding.
+
+### Civ VI, corrected
+
+The paragraph above guessed that Civ VI's rc=51 was the same stub and the same
+content check. That guess is now contradicted by measurement, and the
+measurement wins. Another pass bisected it the same way Portal 2 was bisected
+(`ppc64le/games/STATUS.md`, handoff #8, commit `0744d1242ce`): two runs with
+the publisher active and one with it off, all three rc=51, the same seven
+modules and the same stop point after `winex11.drv`/`uxtheme.dll`.
+
+So **Civ VI is unmoved in either direction** -- the objects are neither its
+cause nor its cure. Its exe does carry a `.bind` entry point, but on this
+evidence whatever it refuses is not sensitive to these two objects at all, and
+the `0x33` is either a different code path or a coincidence of exit codes. Do
+not read the shared rc=51 as a shared mechanism without a trace; Oblivion's
+took `+seh` to establish and Civ VI's has not had one.
