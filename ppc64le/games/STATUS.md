@@ -535,11 +535,51 @@ rediscovered as "the Quake II bug".
    `Local\SteamStart_SharedMemFile` can never be satisfied by starting the
    client.
 
-**Next step:** the throw is a C++ exception (`0xe06d7363`), so `WINEDEBUG=+seh`
-should name the throw site and let it be mapped to a module and offset. Note
-that `WINEDEBUG` **does** propagate through `run-native` — the script only sets
-environment and execs, as `run-native:32` states. An earlier suspicion that the
-launcher was clobbering it was wrong.
+**[MEASURED 2026-08-30] The `+seh` trace was taken** (4.3M lines). What it
+established, and what it did not:
+
+The throw is a single C++ exception — `code=e06d7363`, and there is exactly
+**one** in the whole run, so nothing is being thrown and swallowed earlier. It
+is caught by handlers inside the game's own image (`ImageBase 140000000`, i.e.
+`quake2ex_steam.exe`) at RVA `0x315c22`, with an outer frame at `0x11e78b`.
+
+The trace also surfaced two lines that `stdout.txt` alone does not show, and
+**both appear on the emulated lane too**, which is the bar any candidate cause
+has to clear:
+
+```
+kexEngineLocal::InitCPUUtilization - No performance data available
+playfabUser_s: userState_e::Nill -> userState_e::DoingSignIn
+```
+
+On the first of those: the game really does use PDH. The trace shows it binding
+`PdhOpenQueryW`, `PdhAddEnglishCounterW` and `PdhCollectQueryData`. Wine's
+`dlls/pdh` is a hardcoded table of exactly **two** counters —
+`\Processor(_Total)\% Processor Time`, whose collector returns a literal
+`500000 /* FIXME */`, and `\System\System Up Time`. There are no
+per-processor instances, so an `AddEnglishCounter` for anything else returns
+`PDH_CSTATUS_NO_COUNTER`. That is consistent with the engine's message.
+
+**A guess of mine that the evidence killed, recorded so nobody repeats it:** I
+expected the engine to ask for `\Processor(*)\...` and be defeated by
+`PdhExpandWildCardPathW` being a stub. **It never calls that function.** The
+stub is real but irrelevant here.
+
+**Two live hypotheses, neither confirmed:**
+
+1. *PDH.* An empty per-core utilisation array, later indexed. Test: run with
+   `WINEDEBUG=+pdh` and read which counter path `PdhAddEnglishCounterW` is
+   actually given and what it returns. Cheap, one run.
+2. *PlayFab.* Sign-in enters `DoingSignIn` and the log records no subsequent
+   state transition; the throw follows about 20 seconds later, which has the
+   shape of a network timeout leaving an empty user/entitlement container.
+   Test: compare behaviour with the network unreachable, and look for a state
+   change that never arrives.
+
+**Honest status: characterised, not solved.** The single most valuable thing
+established is the elimination — this is a Wine-level gap present in both
+lanes, not a defect in this port, so it should not consume port-side effort
+until someone wants this specific title.
 
 ## The Steam overlay — what would have to happen, and what does today
 
