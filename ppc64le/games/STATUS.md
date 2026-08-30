@@ -905,3 +905,92 @@ Green after these changes, on the tree that carries them, re-run after the
 * guest `winepath` — PASS.
 
 The build is warning-free.
+
+---
+
+> ### Handoff #8 — Civilization VI's loader death was MSVCP140 + four UCRT holes,
+> ### and the sentinel WAS named all along
+>
+> **The premise this started from was false, and the false part is the useful
+> part.** Civ VI (appid 289070) aborts in `loader_init`:
+>
+> ```
+> err:seh:dispatch_guest_exception guest called through a wild pointer:
+>   00000000DEAD0047 ... from EOSSDK-Win64-Shipping.dll+35af79
+> err:module:loader_init "EOSSDK-Win64-Shipping.dll" failed to initialize
+> ```
+>
+> A run with `WINEDEBUG=warn+module` had produced **zero** `allocating stub`
+> lines, which read like the launcher discarding `WINEDEBUG`. It is not.
+> `run-native` and `proton` never touch `WINEDEBUG` (`run-native:32` says so),
+> the variable was in that run's own environment dump, and the log already held
+> **258** naming lines. **The string is different.**
+> `dlls/ntdll/loader.c` has four `allocate_stub()` call sites and all four warn,
+> but in two different texts:
+>
+> * **1298/1304**, inside the `if (!exports)` branch — a module with no export
+>   directory **at all** — end on the shared line at **1307**, `" imported from
+>   %s, allocating stub %p"`.
+> * **1327/1343**, the ordinary per-symbol path every real miss takes, say
+>   `"No implementation for %s.%s imported from %s, **setting to** %p"`.
+>
+> So there is no silent path and no diagnosability gap in the code — only a
+> grep that matched the branch nothing hits. **Grep for `setting to`**, or for
+> `No implementation for`, which covers all four. The fault and the naming WARN
+> also carried the same `0130:` thread prefix, so the sentinel index was
+> counting in the process that faulted and `0x47` meant what it looked like:
+> the 71st binding, `api-ms-win-crt-heap-l1-1-0.dll._get_heap_handle`.
+>
+> **What was actually missing.** 258 sentinels over 144 distinct names, and
+> only twelve of the 144 were fixable in a `.thunks` file:
+>
+> | where | what | how |
+> |---|---|---|
+> | ucrtbase | `_get_heap_handle`, `_heapchk`, `_ftime64` (+`_s`/`_o_` siblings) | `PROBE-EXTRA malloc.h`, `PROBE-EXTRA sys/timeb.h` — real declarations, just not in the oracle's TU |
+> | ucrtbase | `tmpnam_s`, `_wtmpnam_s`, `_seh_filter_exe` | the `.spec`-location downgrade, each justified against the implementation it forwards to |
+> | vcruntime140 | `__RTtypeid`, `__RTDynamicCast`, `__std_type_info_name`/`_compare`, `__std_exception_copy`/`_destroy`, `__uncaught_exception` | `FORWARD` to the ucrtbase namesakes, which is what `vcruntime140.spec:30-51` already says they are |
+> | advapi32 | `CredReadW`/`WriteW`/`DeleteW`/`Free` | `PROBE-EXTRA wincred.h` |
+> | wldap32 | ordinal **301** = `ber_free` (+9 `ber_*` siblings) | `PROBE-EXTRA winber.h` |
+>
+> The other 132 are **MSVCP140**, and no row can serve them: mangled member
+> functions, **vtable data** (`??_7ios_base@std@@6B@`) and a **data constant**
+> (`?_BADOFF@std@@3_JB`) are not a flat C surface. That takes the msvcp100 /
+> msvcp120 answer — a real x86-64 Wine build staged into the prefix's
+> `sysx8664` — now generalised in **`ppc64le/steamtool/stage-guest-runtime`**,
+> which sources the file from any **Proton dist tree** instead of from an app
+> prefix most titles (Civ VI included) do not have. `concrt140` is staged with
+> it, because msvcp140's own `DllMain` `LoadLibrary`s it.
+>
+> **vcruntime140 is deliberately NOT staged.** This tree's own thunk forwards
+> the entire C++ exception personality into `dlls/guestcrt`'s guest x86-64
+> code; replacing the module to gain six RTTI entry points would swap out a
+> load-bearing subsystem. The six were served properly instead.
+>
+> **Measured, headlessly** — `ppc64le/games/probe-dllload.sh`, a new guest
+> probe that does one `LoadLibrary` and needs no display, no GPU and no game
+> lock, which is what made this loop affordable with four agents queued for the
+> foreground:
+>
+> * `EOSSDK-Win64-Shipping.dll` — **loads, `DllMain` completes,
+>   `EOS_Initialize` resolves.** The module the title died in.
+> * `DatabaseDLL_FinalRelease.dll`, `Localization_FinalRelease.dll`,
+>   `HavokScript_FinalRelease.dll` — load, **zero** unresolved imports.
+> * `GameCore_Base_FinalRelease.dll` — faults `c0000005` in its own `DllMain`
+>   with a guest↔native recursion the bridge's `SPINSENTINEL` names. **Not
+>   established as the next wall**: `civilizationvi.exe` does not statically
+>   import it, so loading it alone is out of the game's own order.
+>
+> **Still open, both non-fatal here and both recorded where they live:**
+> `ucrtbase._invoke_watson` (`@ stub` — Wine has no implementation; a terminal
+> path anyway) and `ucrtbase._open` (a true variadic with no v-variant; the
+> `variadic=` guard correctly refuses the `.spec` fallback, and closing it means
+> adding a flat v-form). `ucrtbase._set_new_handler` stays absent **on purpose**
+> — its argument is a guest function pointer handed to native code that will
+> later call it, so a row without a matching callback-interception entry would
+> be worse than the hole.
+>
+> **The class, carried forward:** this is handoff #7's lesson one level up.
+> #7 was a module reached only through `LoadLibrary` and therefore invisible to
+> `check-import-chain.sh`. This one was visible the whole time — the log named
+> it — and cost the same because the *documented* WARN string only fires on a
+> branch real misses never take.
