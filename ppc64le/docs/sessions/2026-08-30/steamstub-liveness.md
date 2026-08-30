@@ -190,3 +190,48 @@ So this is not a two-title fix by construction. Two caveats, both measured:
   rc=51, so whatever blocks it (the EOSSDK import work) is somewhere else. The
   stub being present does not mean the stub is the current wall — only that a
   title cannot get past it without these objects.
+
+## Measured: Frostpunk 2 was never behind this wall at all
+
+The task this work came from asserted one mechanism killing two titles. That is
+half right. Frostpunk 2 has the same stub, but it had never reached it.
+
+**Run 1, 15:16, fresh prefix, `WINEDEBUG=warn+module`** — the presence objects
+published (`steam presence published (pid 1895002)`), and the exit code moved
+from 51 to **53**. That is not the stub taking a different branch; it is the
+Wine loader failing before the PE entry point ever runs:
+
+    0164:warn:module:load_dll Failed to load module L"imagehlp.dll"; status=c000007b
+    0164:err:module:import_dll Loading library imagehlp.dll (which is needed by
+        L"...\Frostpunk2-Win64-Shipping.exe") failed (error c000007b)
+    0164:err:module:loader_init Importing dlls for L"...exe" failed, status c0000135
+    [wine-ppc64le-native] game exited rc=53
+
+`c000007b` is `STATUS_INVALID_IMAGE_FORMAT`: the loader found `imagehlp.dll` —
+as the **native ppc64 builtin** — and correctly refused to splice it into a
+guest call, because this module had no guest thunk. `Frostpunk2-Win64-Shipping.exe`
+imports `ImageEnumerateCertificates`, `ImageGetCertificateHeader` and
+`ImageGetCertificateData` **statically**, so that kills the process in
+`loader_init`. Oblivion does not import `imagehlp` at all, which is why only
+one of the two titles ever got as far as the stub.
+
+Fixed by `dlls/imagehlp/imagehlp.thunks` (`FROM-SPEC auto`, `PROBE-EXTRA
+imagehlp.h`) — the same shape `wintrust.thunks` used in 2026-08-17. An audit of
+every static import of that binary against the guest build set says `imagehlp`
+was the only real gap; everything else is either a built guest DLL, an apiset,
+or a DLL the game ships beside itself.
+
+Verified headlessly, without the game lock, with `ppc64le/games/probe-dllload.sh`:
+
+    dllload_probe: loading
+    dllload_probe: loaded at 0x00003FFFFFB90000
+    dllload_probe: proc at 0x00003FFFFFB930E0
+    dllload_probe: OK
+
+`ImageEnumerateCertificates` resolves to a real trap thunk, not a `0xDEAD00nn`
+sentinel.
+
+**So the two titles were behind two different walls, and the "one mechanism, two
+titles" premise was wrong.** Oblivion is behind the SteamStub liveness probe.
+Frostpunk 2 was behind a missing guest `imagehlp`, and only after that is it
+even in a position to meet the stub.
