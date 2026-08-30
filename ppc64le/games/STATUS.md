@@ -476,28 +476,70 @@ Not installed. `/mnt/caution/steamapps/common/Styx Shards of Darkness/` is an
 empty directory and there is no `appmanifest_*.acf` for it. Its compatdata
 (`355790`) survives from an earlier install. No action.
 
-### Quake II (2023 remaster) — blocked, and the drive is the reason
+### Quake II (2023 remaster) — installed, and the wall is NOT this port
 
-Not runnable on this machine and not for a reason anyone can fix in this tree.
-`~/.local/share/Steam/steamapps/libraryfolders.vdf` lists four libraries and
-only two of them exist:
+**This entry previously said the title was not installed because the drive
+holding it was absent.** That was true on 2026-08-18 and is no longer true:
+`appmanifest_2320.acf` is present, the game is 5.3 GB under
+`~/.local/share/Steam/steamapps/common/Quake 2/`, and it has been launched
+repeatedly since. The old text is kept only in git history — do not act on it.
 
-| library | mounted |
-|---|---|
-| `~/.local/share/Steam` | yes |
-| `/mnt/caution` | yes — `/dev/nvme0n1p2`, the game list above |
-| `/mnt/b26f28df-d4ab-4293-8de7-e8972421838f/SteamLibrary` | **the directory does not exist** |
-| `/mnt/11012365-648a-4956-a2da-c5ad6bab12ad/SteamLibrary` | **the directory does not exist** |
+Current wall, reproducible, `rerelease/quake2ex_steam.exe`:
 
-[MEASURED] 2026-08-18, the test machine: `findmnt` shows exactly three filesystems — `/`,
-`/home` and `/mnt/caution`. `lsblk` shows `sdc` through `sdj` at **0 B**, which
-is what a SCSI slot with no disk in it reports. Neither library path is even a
-directory, so there is nothing to mount onto. There is no `appmanifest_2320.acf`
-anywhere reachable and no `common/Quake*` under any mounted library.
+```
+==== InitGame ====
+------- Server Initialization -------
+0 entities inhibited
+0 teams repaired
+0 teams with 0 entities
+Standard exception caught in kexPlatformApp::Main: index
+```
 
-Nothing was faked and nothing was substituted. The title stays on the list with
-its reason written down; when the drive is back it is one `import_chain.py` run
-away from a static answer and one launch away from a real one.
+**[MEASURED 2026-08-30] The fully emulated lane fails IDENTICALLY.** The
+game's own `stdout.txt` from the Proton prefix
+(`steamapps/compatdata/2320/pfx/.../Saved Games/Nightdive Studios/Quake II/`)
+ends on the same line, at the same point, after the same three
+server-init messages. Real x86-64 Wine under emulation hits it too. **That
+rules out this port as the cause** — no amount of thunk, marshalling or
+COM work will move it, and it should not be triaged as a port defect.
+
+Diffing the two lanes' `stdout.txt` is the cheapest tool here and is worth
+repeating for other titles. It surfaced three native-lane gaps that are
+**real but are NOT this failure**, since the emulated lane has none of them and
+dies anyway:
+
+| symptom | native | emulated |
+|---|---|---|
+| `kexAudioXA2::Init` | **fails**, empty reason string | `Sound System Initialized` |
+| video displays | 1 | 2 |
+| joystick | `not supported on this machine` | (no message) |
+| extra missing `vkGetInstanceProcAddr` entries | 9 more | — |
+
+Those are separate work items. Recording them here so they are not
+rediscovered as "the Quake II bug".
+
+**Hypotheses eliminated so far** — each measured, not argued:
+
+1. **Processor count / processor groups.** Both lanes report
+   `Max Worker Threads: 175` and `Max Logical CPU Cores: 176`, and the
+   exception message is literally `index`, so a fixed per-core array was the
+   obvious suspect — the same shape as the 2×40 view Cyberpunk 2077 refuses.
+   `WINE_PPC64LE_CPU_LIMIT=64` in an appconfig **did** take effect (the game
+   then reported `Max Logical CPU Cores: 64`, `RelationNumaNode count: 1`) and
+   the game **still threw the identical exception**. The appconfig was deleted
+   rather than left behind as a knob that does nothing.
+2. **Steam client presence.** A Steam client is running on this box — Linux
+   Steam under the emulator — and the emulated-lane run had full working
+   Steam integration. It failed anyway. Note for other titles: Linux Steam
+   publishes **no Win32 named kernel objects**, so anything probing for
+   `Local\SteamStart_SharedMemFile` can never be satisfied by starting the
+   client.
+
+**Next step:** the throw is a C++ exception (`0xe06d7363`), so `WINEDEBUG=+seh`
+should name the throw site and let it be mapped to a module and offset. Note
+that `WINEDEBUG` **does** propagate through `run-native` — the script only sets
+environment and execs, as `run-native:32` states. An earlier suspicion that the
+launcher was clobbering it was wrong.
 
 ## The Steam overlay — what would have to happen, and what does today
 
