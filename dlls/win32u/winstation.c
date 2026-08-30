@@ -250,6 +250,16 @@ NTSTATUS get_shared_desktop( struct object_lock *lock, const desktop_shm_t **des
  * fast body then answers EVERY common-shape poll empty without looking at
  * the bits, so a posted message is never seen -- the starvation
  * ppc64le/cpu/check-peek-fastpath.sh's negative control requires. */
+
+/* The guest body hardcodes these offsets (tools/spec2thunk, kind 'peek',
+ * "queue_shm layout"); an upstream rebase that moves a field must fail HERE,
+ * at compile time, not as a guest reading keystate bytes as wake bits. */
+C_ASSERT( offsetof( shared_object_t, seq ) == 0 );
+C_ASSERT( sizeof(((shared_object_t *)0)->seq) == 8 );
+C_ASSERT( offsetof( shared_object_t, shm.queue.wake_mask ) == 24 );
+C_ASSERT( offsetof( shared_object_t, shm.queue.wake_bits ) == 28 );
+C_ASSERT( offsetof( shared_object_t, shm.queue.changed_mask ) == 32 );
+C_ASSERT( offsetof( shared_object_t, shm.queue.changed_bits ) == 36 );
 static void seed_guest_peek_queue( const shared_object_t *object )
 {
     static int mode = -1;

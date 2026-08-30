@@ -3556,6 +3556,261 @@ BOOL WINAPI NtUserWaitMessage(void)
     return NtUserMsgWaitForMultipleObjectsEx( 0, NULL, INFINITE, QS_ALLINPUT, 0 ) != WAIT_FAILED;
 }
 
+#ifdef __powerpc64__
+/* ---------------------------------------------------------------------------
+ * TEMPORARY gate instrumentation for the guest PeekMessageW fast-path work
+ * (ppc64le/docs/sessions/2026-08-29/top-consumer-designs.md, A.2 and A.7).
+ * Both knobs cost one predicted branch per call when unset.
+ *
+ * WINE_PPC64LE_PEEK_SHAPE=N   A.2 shape-and-state capture.  Logs the first N
+ *   calls verbatim (shape + shm state + seed slot), then aggregates a
+ *   histogram keyed by (hwnd!=0, first, last, flags) with per-shape counts of
+ *   {calls, empty, message, generalized-predicate-would-serve, current-narrow-
+ *   shape-would-serve, refused-by-bits, refused-by-masks, seed-null}, plus a
+ *   per-bit breakdown of which QS_* bit refused.  Dumped via ERR every ~10 s.
+ *
+ * WINE_PPC64LE_PEEK_DELAY_NS=X   A.7 elasticity A/B: calibrated busy-wait
+ *   inserted immediately before every empty (FALSE) return.  Slope of
+ *   frametime against X decides whether the storm is critical-path burn
+ *   (slope~1) or an elastic spin (slope~0).
+ * ------------------------------------------------------------------------- */
+
+#include <time.h>
+#include <stdlib.h>
+
+struct peek_shape_slot
+{
+    volatile LONG   used;
+    UINT            hwndnn, first, last, flags;
+    volatile LONG64 calls, empty_ret, msg_ret;
+    volatile LONG64 would_serve, narrow_serve, serve_but_msg;
+    volatile LONG64 refused_bits, refused_mask, seed_null, seed_sab, shm_fail;
+};
+
+#define PEEK_SHAPE_SLOTS 64
+static struct peek_shape_slot peek_shapes[PEEK_SHAPE_SLOTS];
+static volatile LONG64 peek_bit_wake[32], peek_bit_changed[32];
+static volatile LONG64 peek_total, peek_overflow, peek_verbatim_left;
+static volatile LONG64 peek_last_dump_qpc;
+static int peek_shape_n = -1;   /* -1 unread, 0 off, >0 armed */
+static int peek_delay_ns = -1;
+
+struct peek_probe
+{
+    UINT hwndnn, first, last, flags;
+    UINT wake_mask, wake_bits, changed_mask, changed_bits;
+    UINT shm_ok, would, narrow, seed_state;   /* seed: 0 null, 1 clean, 2 sabotage */
+    struct peek_shape_slot *slot;
+};
+
+/* the A.4 generalized predicate, computed exactly as the guest body will --
+ * this is the number the capture exists to measure (serve fraction f) */
+static BOOL peek_generalized_predicate( UINT first, UINT last, UINT flags,
+                                        UINT wake_mask, UINT wake_bits,
+                                        UINT changed_mask, UINT changed_bits,
+                                        UINT *ref_signal, UINT *ref_clear )
+{
+    UINT signal = flags >> 16, clear = 0;
+
+    if (!signal) signal = QS_ALLINPUT;
+    if (signal & QS_POSTMESSAGE)
+    {
+        clear |= QS_POSTMESSAGE | QS_HOTKEY | QS_TIMER;
+        if (!first && !last) clear |= QS_ALLPOSTMESSAGE;
+    }
+    if (signal & QS_INPUT) clear |= QS_INPUT;
+    if (signal & QS_PAINT) clear |= QS_PAINT;
+    if (signal & QS_RAWINPUT) signal |= QS_KEY | QS_MOUSEMOVE | QS_MOUSEBUTTON;
+
+    *ref_signal = wake_bits & signal;
+    *ref_clear = changed_bits & clear;
+    return !wake_mask && !changed_mask && !*ref_signal && !*ref_clear;
+}
+
+static void peek_shape_dump(void)
+{
+    int i, b;
+    LONG64 total = __atomic_load_n( &peek_total, __ATOMIC_RELAXED );
+
+    ERR( "PEEKSHAPE-DUMP total=%lld overflow=%lld\n", (long long)total,
+         (long long)__atomic_load_n( &peek_overflow, __ATOMIC_RELAXED ) );
+    for (i = 0; i < PEEK_SHAPE_SLOTS; i++)
+    {
+        struct peek_shape_slot *s = &peek_shapes[i];
+        if (__atomic_load_n( &s->used, __ATOMIC_ACQUIRE ) != 2) continue;
+        ERR( "PEEKSHAPE hwndnn=%u first=%04x last=%04x flags=%05x calls=%lld empty=%lld msg=%lld "
+             "serve=%lld narrow=%lld servemsg=%lld refbits=%lld refmask=%lld "
+             "seednull=%lld seedsab=%lld shmfail=%lld\n",
+             s->hwndnn, s->first, s->last, s->flags,
+             (long long)s->calls, (long long)s->empty_ret, (long long)s->msg_ret,
+             (long long)s->would_serve, (long long)s->narrow_serve, (long long)s->serve_but_msg,
+             (long long)s->refused_bits, (long long)s->refused_mask,
+             (long long)s->seed_null, (long long)s->seed_sab, (long long)s->shm_fail );
+    }
+    for (b = 0; b < 32; b++)
+    {
+        LONG64 w = __atomic_load_n( &peek_bit_wake[b], __ATOMIC_RELAXED );
+        LONG64 c = __atomic_load_n( &peek_bit_changed[b], __ATOMIC_RELAXED );
+        if (w || c) ERR( "PEEKBIT qs=%08x wake=%lld changed=%lld\n", 1u << b, (long long)w, (long long)c );
+    }
+}
+
+static void peek_probe_entry( struct peek_probe *p, HWND hwnd, UINT first, UINT last, UINT flags )
+{
+    struct object_lock lock = OBJECT_LOCK_INIT;
+    const queue_shm_t *queue_shm;
+    UINT status, ref_signal = 0, ref_clear = 0;
+    UINT_PTR seed;
+    int i;
+
+    p->slot = NULL;
+    if (peek_shape_n < 0)
+    {
+        const char *env = getenv( "WINE_PPC64LE_PEEK_SHAPE" );
+        int n = env ? atoi( env ) : 0;
+        __atomic_store_n( &peek_verbatim_left, n, __ATOMIC_RELAXED );
+        peek_shape_n = n > 0 ? n : 0;
+        if (peek_shape_n) ERR( "PEEKSHAPE capture armed, %d verbatim\n", peek_shape_n );
+    }
+    if (!peek_shape_n) return;
+
+    p->hwndnn = hwnd != 0;
+    p->first = first;
+    p->last = last;
+    p->flags = flags;
+    p->wake_mask = p->wake_bits = p->changed_mask = p->changed_bits = 0;
+    p->shm_ok = FALSE;
+
+    seed = (UINT_PTR)NtCurrentTeb()->SystemReserved1[1];
+    p->seed_state = !seed ? 0 : (seed & 1) ? 2 : 1;
+
+    while ((status = get_shared_queue( &lock, &queue_shm )) == STATUS_PENDING)
+    {
+        p->wake_mask = queue_shm->wake_mask;
+        p->wake_bits = queue_shm->wake_bits;
+        p->changed_mask = queue_shm->changed_mask;
+        p->changed_bits = queue_shm->changed_bits;
+        p->shm_ok = TRUE;
+    }
+    if (status) p->shm_ok = FALSE;
+
+    p->would = p->shm_ok && peek_generalized_predicate( first, last, flags,
+                                                        p->wake_mask, p->wake_bits,
+                                                        p->changed_mask, p->changed_bits,
+                                                        &ref_signal, &ref_clear );
+    /* the shipped narrow admission: null hwnd, first==last==0, no PM_QS_* word */
+    p->narrow = p->would && !p->hwndnn && !first && !last && !(flags >> 16);
+
+    if (__atomic_load_n( &peek_verbatim_left, __ATOMIC_RELAXED ) > 0 &&
+        __atomic_fetch_sub( &peek_verbatim_left, 1, __ATOMIC_RELAXED ) > 0)
+        ERR( "PEEKCALL tid=%04x hwnd=%p first=%04x last=%04x flags=%05x wm=%08x wb=%08x cm=%08x cb=%08x "
+             "seed=%u serve=%u narrow=%u\n",
+             (UINT)(UINT_PTR)NtCurrentTeb()->ClientId.UniqueThread, hwnd, first, last, flags,
+             p->wake_mask, p->wake_bits, p->changed_mask, p->changed_bits,
+             p->seed_state, p->would, p->narrow );
+
+    /* find or claim the shape slot (open probe from a cheap hash) */
+    {
+        UINT h = (p->hwndnn * 0x9e3779b9u + first * 31u + last * 131u + flags * 65599u) % PEEK_SHAPE_SLOTS;
+        for (i = 0; i < PEEK_SHAPE_SLOTS; i++)
+        {
+            struct peek_shape_slot *s = &peek_shapes[(h + i) % PEEK_SHAPE_SLOTS];
+            LONG st = __atomic_load_n( &s->used, __ATOMIC_ACQUIRE );
+            if (st == 0)
+            {
+                LONG expect = 0;
+                if (__atomic_compare_exchange_n( &s->used, &expect, 1, FALSE,
+                                                 __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE ))
+                {
+                    s->hwndnn = p->hwndnn; s->first = first; s->last = last; s->flags = flags;
+                    __atomic_store_n( &s->used, 2, __ATOMIC_RELEASE );
+                    st = 2;
+                }
+                else st = __atomic_load_n( &s->used, __ATOMIC_ACQUIRE );
+            }
+            while (st == 1) st = __atomic_load_n( &s->used, __ATOMIC_ACQUIRE );
+            if (s->hwndnn == p->hwndnn && s->first == first && s->last == last && s->flags == flags)
+            {
+                p->slot = s;
+                break;
+            }
+        }
+        if (!p->slot) __atomic_fetch_add( &peek_overflow, 1, __ATOMIC_RELAXED );
+    }
+
+    __atomic_fetch_add( &peek_total, 1, __ATOMIC_RELAXED );
+    if (p->slot)
+    {
+        struct peek_shape_slot *s = p->slot;
+        __atomic_fetch_add( &s->calls, 1, __ATOMIC_RELAXED );
+        if (p->would) __atomic_fetch_add( &s->would_serve, 1, __ATOMIC_RELAXED );
+        if (p->narrow) __atomic_fetch_add( &s->narrow_serve, 1, __ATOMIC_RELAXED );
+        if (!p->shm_ok) __atomic_fetch_add( &s->shm_fail, 1, __ATOMIC_RELAXED );
+        if (p->seed_state == 0) __atomic_fetch_add( &s->seed_null, 1, __ATOMIC_RELAXED );
+        if (p->seed_state == 2) __atomic_fetch_add( &s->seed_sab, 1, __ATOMIC_RELAXED );
+        if (p->shm_ok && !p->would)
+        {
+            int b;
+            if (p->wake_mask || p->changed_mask)
+                __atomic_fetch_add( &s->refused_mask, 1, __ATOMIC_RELAXED );
+            if (ref_signal || ref_clear)
+                __atomic_fetch_add( &s->refused_bits, 1, __ATOMIC_RELAXED );
+            for (b = 0; b < 32; b++)
+            {
+                if (ref_signal & (1u << b)) __atomic_fetch_add( &peek_bit_wake[b], 1, __ATOMIC_RELAXED );
+                if (ref_clear & (1u << b)) __atomic_fetch_add( &peek_bit_changed[b], 1, __ATOMIC_RELAXED );
+            }
+        }
+    }
+
+    /* periodic dump, ~10 s, claimed by CAS so one thread prints */
+    {
+        LONG64 now = get_tick_count(), last_dump = __atomic_load_n( &peek_last_dump_qpc, __ATOMIC_RELAXED );
+        if (now - last_dump >= 10000 &&
+            __atomic_compare_exchange_n( &peek_last_dump_qpc, &last_dump, now, FALSE,
+                                         __ATOMIC_ACQ_REL, __ATOMIC_RELAXED ))
+            peek_shape_dump();
+    }
+}
+
+static void peek_probe_exit( struct peek_probe *p, BOOL ret )
+{
+    if (!p->slot) return;
+    __atomic_fetch_add( ret ? &p->slot->msg_ret : &p->slot->empty_ret, 1, __ATOMIC_RELAXED );
+    if (ret && p->would) __atomic_fetch_add( &p->slot->serve_but_msg, 1, __ATOMIC_RELAXED );
+}
+
+/* A.7: calibrated busy-wait before the empty return */
+static void peek_delay_inject(void)
+{
+    struct timespec ts;
+    long long deadline;
+
+    if (peek_delay_ns < 0)
+    {
+        const char *env = getenv( "WINE_PPC64LE_PEEK_DELAY_NS" );
+        peek_delay_ns = env ? atoi( env ) : 0;
+        if (peek_delay_ns < 0) peek_delay_ns = 0;
+        if (peek_delay_ns) ERR( "PEEKDELAY armed: %d ns per empty peek\n", peek_delay_ns );
+    }
+    if (!peek_delay_ns) return;
+    clock_gettime( CLOCK_MONOTONIC_RAW, &ts );
+    deadline = (long long)ts.tv_sec * 1000000000LL + ts.tv_nsec + peek_delay_ns;
+    do clock_gettime( CLOCK_MONOTONIC_RAW, &ts );
+    while ((long long)ts.tv_sec * 1000000000LL + ts.tv_nsec < deadline);
+}
+
+#define PEEK_PROBE_DECL     struct peek_probe peek_probe_state
+#define PEEK_PROBE_ENTRY()  peek_probe_entry( &peek_probe_state, hwnd, first, last, flags )
+#define PEEK_PROBE_EXIT(r)  peek_probe_exit( &peek_probe_state, r )
+#define PEEK_DELAY()        peek_delay_inject()
+#else
+#define PEEK_PROBE_DECL     do {} while (0)
+#define PEEK_PROBE_ENTRY()  do {} while (0)
+#define PEEK_PROBE_EXIT(r)  do {} while (0)
+#define PEEK_DELAY()        do {} while (0)
+#endif
+
 /***********************************************************************
  *           NtUserPeekMessage  (win32u.@)
  */
@@ -3564,8 +3819,10 @@ BOOL WINAPI NtUserPeekMessage( MSG *msg_out, HWND hwnd, UINT first, UINT last, U
     struct peek_message_filter filter = {.hwnd = hwnd, .first = first, .last = last, .flags = flags};
     MSG msg;
     int ret;
+    PEEK_PROBE_DECL;
 
     user_check_not_lock();
+    PEEK_PROBE_ENTRY();
     check_for_driver_events();
 
     if ((ret = peek_message( &msg, &filter )) <= 0)
@@ -3587,6 +3844,8 @@ BOOL WINAPI NtUserPeekMessage( MSG *msg_out, HWND hwnd, UINT first, UINT last, U
             NtYieldExecution();
             KeUserDispatchCallback( &params.dispatch, sizeof(params), &ret_ptr, &ret_len );
         }
+        PEEK_PROBE_EXIT( FALSE );
+        PEEK_DELAY();
         return FALSE;
     }
 
@@ -3599,9 +3858,11 @@ BOOL WINAPI NtUserPeekMessage( MSG *msg_out, HWND hwnd, UINT first, UINT last, U
     if (!msg_out)
     {
         RtlSetLastWin32Error( ERROR_NOACCESS );
+        PEEK_PROBE_EXIT( FALSE );
         return FALSE;
     }
     *msg_out = msg;
+    PEEK_PROBE_EXIT( TRUE );
     return TRUE;
 }
 
