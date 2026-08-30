@@ -585,11 +585,34 @@ expected the engine to ask for `\Processor(*)\...` and be defeated by
 `PdhExpandWildCardPathW` being a stub. **It never calls that function.** The
 stub is real but irrelevant here.
 
-**Two live hypotheses, neither confirmed:**
+**Two live hypotheses. The first is now MEASURED at the PDH layer:**
 
-1. *PDH.* An empty per-core utilisation array, later indexed. Test: run with
-   `WINEDEBUG=+pdh` and read which counter path `PdhAddEnglishCounterW` is
-   actually given and what it returns. Cheap, one run.
+1. *PDH — the gap is real and fully characterised.* `WINEDEBUG=+pdh`, run
+   `20260830-160905`: the engine opens one query and then asks for **176
+   per-processor counters**, `\Processor(0)\% Processor Time` through
+   `\Processor(175)\% Processor Time` — one per logical CPU — and **never
+   asks for `_Total`**.
+
+   Wine's `dlls/pdh` counter table contains exactly two entries, and the only
+   processor one is `\Processor(_Total)\% Processor Time` (whose collector
+   returns a literal `500000 /* FIXME */`). **There are no per-instance
+   processor counters at all**, so all 176 adds fail with
+   `PDH_CSTATUS_NO_COUNTER` and the engine logs "No performance data
+   available".
+
+   This retroactively explains why the processor-group cap did nothing: at 64
+   cores the game asks for 64 counters instead of 176, and **every one of them
+   fails either way**. The cap changed the count, not the outcome.
+
+   **The fix is a Wine fix, not a port fix**, and it is well scoped: add
+   per-instance `\Processor(N)\% Processor Time` sources backed by real data.
+   `NtQuerySystemInformation(SystemProcessorPerformanceInformation)` is already
+   implemented and carries exactly the per-CPU times needed. This would benefit
+   any title that reads per-core utilisation, not only this one.
+
+   **Still NOT established:** that the empty array is what throws. The run that
+   captured the PDH evidence exited `rc=3` before reaching the exception, so
+   the last link — empty container, later indexed — remains inference.
 2. *PlayFab.* Sign-in enters `DoingSignIn` and the log records no subsequent
    state transition; the throw follows about 20 seconds later, which has the
    shape of a network timeout leaving an empty user/entitlement container.
