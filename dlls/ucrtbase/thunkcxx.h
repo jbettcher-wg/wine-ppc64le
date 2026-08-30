@@ -26,9 +26,20 @@
  *     `FORWARD _CxxThrowException guestcrt._CxxThrowException`, which
  *     bypasses this header (and the oracle) entirely and resolves to real
  *     x86-64 code in dlls/guestcrt/cxxthrow.c.
- *   __CxxFrameHandler3 -- same reasoning, still an actual hole: nobody has
- *     written the guest-side personality that a FORWARD would point at
- *     (guest-cxx-eh-plan.md's Session B/C).
+ *   __CxxFrameHandler3 (and __CxxFrameHandler/__CxxFrameHandler2, which this
+ *     module's own .spec forwards to it) -- same reasoning as
+ *     _CxxThrowException above, and no longer a plain hole either: MEASURED
+ *     2026-08-30, no free FH3 exists in any staged or shippable builtin
+ *     (winedump -j export on every module actually staged into a Quake II
+ *     prefix -- vcruntime140, vcruntime140_1, msvcp140 -- shows none of
+ *     them export it, and msvcrt.thunks/msvcr100.thunks/msvcr120.thunks
+ *     each separately confirm this port has never built any real msvcrt/CRT
+ *     family module as a guest PE).  `dlls/guestcrt/cxxhandler3.c` now
+ *     provides real x86-64 personality code (the FuncInfo-table decoder,
+ *     ported from dlls/msvcrt/except.c with the scope cuts its own banner
+ *     names), and ucrtbase.thunks carries `FORWARD __CxxFrameHandler3
+ *     guestcrt.__CxxFrameHandler3` (and the /2 and plain names) the same
+ *     way it already does for _CxxThrowException.
  *   __unDNameEx -- takes caller-supplied malloc/free FUNCTION POINTERS, which
  *     from a guest are guest code; its only known wanter is the game-shipped
  *     dbghelp.dll that the builtin thunk serves anyway.

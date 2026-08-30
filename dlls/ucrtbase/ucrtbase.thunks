@@ -405,6 +405,44 @@ FORWARD __processing_throw             guestcrt.__processing_throw
 # other four rows exist to avoid, not merely a missing feature.  Moved beside
 # its siblings for the same reason they moved: one logical field, one side.
 FORWARD __uncaught_exception           guestcrt.__uncaught_exception
+
+# ---------------------------------------------------------------------------
+# The 2026-08-30 Quake II triage: __CxxFrameHandler3 stops being a hole
+# ---------------------------------------------------------------------------
+# MEASURED: launching quake2ex_steam.exe, PlayFabMultiplayerWin.dll (its
+# PlayFab multiplayer SDK, an AMD64 PE) statically imports
+# VCRUNTIME140.__CxxFrameHandler3 and died on the sentinel this module's own
+# hole produced (find_forwarded_export: "function not found for forward
+# 'ucrtbase.__CxxFrameHandler3'").  Checked first, per this file's own
+# doctrine of preferring a forward over new code: no free FH3 exists.
+# winedump -j export on every module actually staged into the run prefix's
+# sysx8664 (vcruntime140, vcruntime140_1, msvcp140 -- all three "This is a
+# Wine builtin DLL", i.e. this port's own build) shows none of them export
+# __CxxFrameHandler3; msvcrt.thunks/msvcr100.thunks/msvcr120.thunks each
+# separately confirm this port has never built any real msvcrt/CRT-family
+# module as a guest PE; and no genuine Microsoft CRT redistributable (which
+# DOES carry real FH3 code) is staged into this port's own prefix layout --
+# only into the unrelated Steam Proton compatdata this run never reads.
+#
+# dlls/guestcrt/cxxhandler3.c now provides the personality as real guest
+# x86-64 code (the same reasoning as _CxxThrowException/__CxxRegisterException
+# Object above: it decodes FuncInfo, an image-relative table, and calls guest
+# funclets through guest function pointers -- ppc64 code cannot do either
+# without becoming the exact landmine those forwards already refuse).  This
+# module's own .spec forwards __CxxFrameHandler and __CxxFrameHandler2 to
+# __CxxFrameHandler3 internally, so all three route to the same guest code.
+#
+# Named scope cuts (see cxxhandler3.c's own banner for the full argument):
+# a guest RtlLookupFunctionEntry call is sidestepped via
+# DISPATCHER_CONTEXT::FunctionEntry (guest-cxx-eh-plan.md section 6.3's own
+# suggested fallback); _set_se_translator is not implemented (identical to
+# upstream's behaviour on a thread that never installed one); an exception
+# escaping a catch handler inherits the consolidate mechanism's own
+# already-named limit (dlls/ntdll/signal_ppc64.c guest_consolidate_callback's
+# banner), not a new one.
+FORWARD __CxxFrameHandler  guestcrt.__CxxFrameHandler
+FORWARD __CxxFrameHandler2 guestcrt.__CxxFrameHandler2
+FORWARD __CxxFrameHandler3 guestcrt.__CxxFrameHandler3
 _CreateFrameInfo                0x00000E02  2  int   msvcrt.h:147
 _FindAndUnlinkFrame             0x00000E03  1  void  msvcrt.h:154
 _IsExceptionObjectToBeDestroyed 0x00000E04  1  int   msvcrt.h:155

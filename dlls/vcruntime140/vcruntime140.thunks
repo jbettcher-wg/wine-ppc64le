@@ -42,8 +42,12 @@ FROM-SPEC auto
 #                                     BOOL CDECL (CRITICAL_SECTION*, DWORD,
 #                                     DWORD).  BOOL is int class.
 #
-# __CxxFrameHandler3/4 ARE DELIBERATELY LEFT HOLES, and must stay one.  They
-# are not an API the guest calls; each is the LANGUAGE PERSONALITY ROUTINE
+# __CxxFrameHandler3/4 WERE DELIBERATELY LEFT HOLES here on 2026-08-17 --
+# UPDATE 2026-08-30: FH3 no longer is one, see the dated row near the end of
+# this file; FH4 still is, on purpose (guest-cxx-eh-plan.md Session B, not
+# done).  The reasoning below is unchanged for whichever one is still a hole
+# at any given moment: neither is an API the guest calls; each is the
+# LANGUAGE PERSONALITY ROUTINE
 # named by the guest image's own .pdata/UNWIND_INFO, invoked BY the unwinder
 # with that image's exception and context records and expected to walk that
 # image's funclet tables and resume in its code.  Thunking either would send
@@ -63,10 +67,11 @@ FROM-SPEC auto
 # 2026-08-22 for setjmp/longjmp, commit b9553bf3403) means a register- or
 # stack-contract export can be REAL x86-64 code in a guestpe-built module,
 # reached by an ordinary PE forwarder the guest loader follows itself -- see
-# the 2026-08-29 triage below.  __CxxFrameHandler3/4 stay refused not because
-# no vehicle exists, but because nobody has written the guest-side FH3/FH4
-# personality that would go behind it; the day one exists, it forwards here
-# exactly the way _CxxThrowException now does.
+# the 2026-08-29 triage below.  __CxxFrameHandler3/4 stayed refused not
+# because no vehicle existed, but because nobody had written the guest-side
+# FH3/FH4 personality that would go behind it; FH3's now exists (2026-08-30,
+# see the dated row near the end of this file) and forwards here exactly the
+# way _CxxThrowException does.  FH4's does not yet.
 INCLUDE-DIR   ../msvcrt
 PROBE-EXTRA   msvcrt.h        # _purecall
 
@@ -194,3 +199,24 @@ FORWARD __DestructExceptionObject      ucrtbase.__DestructExceptionObject
 FORWARD __current_exception            ucrtbase.__current_exception
 FORWARD __current_exception_context    ucrtbase.__current_exception_context
 FORWARD __processing_throw             ucrtbase.__processing_throw
+
+# ---------------------------------------------------------------------------
+# The 2026-08-30 Quake II triage: __CxxFrameHandler3/4 stop both being holes
+# ---------------------------------------------------------------------------
+# The header comment above ("__CxxFrameHandler3/4 ARE DELIBERATELY LEFT
+# HOLES, and must stay one") is now half-stale, same shape as every other
+# correction in this file: right about trap-thunking, overtaken by a FORWARD
+# once the guest personality exists.  FH4 is still a hole here on purpose
+# (guest-cxx-eh-plan.md Session B, not done) -- but PlayFabMultiplayerWin.dll,
+# quake2ex_steam.exe's PlayFab multiplayer SDK, statically imports
+# VCRUNTIME140.__CxxFrameHandler3 and hit this module's hole directly
+# (find_forwarded_export: "function not found for forward
+# 'ucrtbase.__CxxFrameHandler3'", MEASURED 2026-08-30).  Checked first: no
+# free FH3 exists in any staged or shippable builtin (see ucrtbase.thunks'
+# matching row for the full measurement).  dlls/guestcrt/cxxhandler3.c now
+# provides it as real guest x86-64 code, along this module's own spec hop
+# (vcruntime140.spec:17-19 already forward __CxxFrameHandler/2/3 to the
+# ucrtbase namesakes, the same shape _CxxThrowException above already uses).
+FORWARD __CxxFrameHandler  ucrtbase.__CxxFrameHandler
+FORWARD __CxxFrameHandler2 ucrtbase.__CxxFrameHandler2
+FORWARD __CxxFrameHandler3 ucrtbase.__CxxFrameHandler3

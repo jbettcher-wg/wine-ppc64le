@@ -13,3 +13,6 @@ EXPORTS
     __current_exception_context
     __processing_throw
     __uncaught_exception
+    __CxxFrameHandler
+    __CxxFrameHandler2
+    __CxxFrameHandler3

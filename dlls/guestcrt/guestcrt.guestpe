@@ -57,3 +57,4 @@ DEF      guestcrt.def
 SOURCE   setjmp.c
 SOURCE   cxxthrow.c
 SOURCE   exceptobj.c
+SOURCE   cxxhandler3.c
