@@ -428,9 +428,29 @@ behaving exactly as designed; it is the port that answers it wrongly.
 
 ### The 32-bit refusals — Half-Life 2, FreeInfantry, Styx Win32
 
-All three are PE32/i386 and all three produce the **byte-identical** refusal.
-This port has no 32-bit guest and cannot acquire one by accident; the entry
-here is evidence for that work item, not a wall anyone can knock down.
+> **[SUPERSEDED IN PART, 2026-08-30.] Two things below are no longer true.**
+>
+> First, **this port does have a 32-bit guest now** — Dex reached real gameplay
+> on it on 2026-08-28. The i386 lane is not a work item any more; specific
+> marshal surfaces on it are.
+>
+> Second, and more importantly for anyone planning work from this section:
+> **the Half-Life 2 family and Portal are not Windows builds on this machine.**
+> Checked with `file(1)` on 2026-08-30 — appids 220, 340, 380, 420 and 400 all
+> install `hl2_linux`, an **ELF 32-bit i386** binary, and ship their own
+> `bin/libdxvk_d3d9.so`. There is no `.exe` anywhere in those directories. They
+> never reach Wine's `d3d9.dll` at all; they would run through the emulator's
+> ELF path against Valve's own bundled DXVK. The `hl2.exe` cited below was a
+> Windows install that is no longer what Steam has put on disk.
+>
+> **Portal 2 (appid 620) is the exception** and the only installed PE32 Source
+> title: `portal2.exe`, with a Linux build beside it. So D3D9 marshal work on
+> the i386 lane gates exactly ONE installed title, not six. Plan accordingly —
+> an earlier framing of this as a six-title unlock was wrong, and was corrected
+> only because someone ran `file` instead of counting directories.
+
+All three were PE32/i386 and all three produced the **byte-identical** refusal
+at the time this was written.
 
 Verbatim, for each of `hl2.exe`, `FreeInfantry.exe` and
 `Styx/Binaries/Win32/StyxGame.exe`:

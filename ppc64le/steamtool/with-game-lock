@@ -14,7 +14,16 @@
 # game to exit -- which is the part that matters, because the contention window
 # is the RUN, not the launch.
 #
-#   usage:  with-game-lock [--timeout SEC] -- <command> [args...]
+#   usage:  with-game-lock [--timeout SEC] [--run-timeout SEC] -- <command> ...
+#
+# --run-timeout defaults to 1800 and exists because a title that has ALREADY
+# FAILED may never exit.  Quake II prints
+#     Standard exception caught in kexPlatformApp::Main: index
+# and then hangs indefinitely; twice it sat holding this lock -- once for 22
+# minutes, once for 39 -- with five other agents queued behind it, and both
+# times a human had to SIGTERM it by hand.  A caller who forgets to wrap its
+# own command should not be able to stall everyone else, so the wrapper does
+# it.  Pass --run-timeout 0 to opt out deliberately.
 #
 # Exits 75 (EX_TEMPFAIL) if the lock could not be taken in time, so a caller can
 # tell "busy, try later" from "your command failed".
@@ -22,11 +31,13 @@ set -u
 
 LOCK=${GAME_LOCK:-$HOME/.local/share/wine-ppc64le/.game-launch.lock}
 TIMEOUT=1800
+RUN_TIMEOUT=${RUN_TIMEOUT:-1800}
 IDLE_GRACE=${IDLE_GRACE:-600}
 
 while [ $# -gt 0 ]; do
     case $1 in
     --timeout) TIMEOUT=${2:?--timeout needs seconds}; shift 2 ;;
+    --run-timeout) RUN_TIMEOUT=${2:?--run-timeout needs seconds}; shift 2 ;;
     --) shift; break ;;
     -*) echo "with-game-lock: unknown option $1" >&2; exit 2 ;;
     *) break ;;
@@ -57,8 +68,18 @@ while pgrep -x GameThread >/dev/null \
     sleep 10
 done
 
-"$@"
-rc=$?
+# timeout sends SIGTERM (never SIGKILL -- a hard kill mid-GPU-submission has
+# wedged this GPU and needed a reboot).  -k would escalate to SIGKILL, so it is
+# deliberately NOT passed here; a title that ignores SIGTERM is reported, not
+# forced.
+if [ "$RUN_TIMEOUT" -gt 0 ] 2>/dev/null; then
+    timeout --signal=TERM "$RUN_TIMEOUT" "$@"
+    rc=$?
+    [ "$rc" -eq 124 ] && echo "with-game-lock: command exceeded ${RUN_TIMEOUT}s and was SIGTERMed" >&2
+else
+    "$@"
+    rc=$?
+fi
 
 # Do not release until our own game is gone, or the next holder inherits it.
 #
