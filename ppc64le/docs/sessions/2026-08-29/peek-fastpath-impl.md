@@ -186,16 +186,13 @@ Contents:
   probe in the fast lane AND the trap-only lane (the differential half),
   and requires per-shape STARVED under sabotage / GOT under sabotage+kill.
 
-Validation state, honestly: `spec2thunk --spec user32.thunks` dry-run to
-`/tmp/peekgate/user32-test.dll` assembles, `spec2thunk-check --body trap`
-passes including 8q (fast-body head + fallback-jmp contract; the two FAILs
-are dry-run naming artifacts), and the emitted body was disassembled and
-read against the predicate.  **The probe suite has never executed** — no
-DLL carrying the generalized body has ever run.  If this branch is ever
-landed: run the full extended gate (positive, differential, sabotage,
-kill), then §A.6.5's in-game TRAP_STATS + manual input validation.  Do not
-skip the sabotage legs; they are what prove the guest body, not the trap,
-answers each shape.
+Validation state at the time the branch was cut: dry-run assembled and
+checker-passed only, probe suite unrun.  **Superseded the same afternoon —
+the full suite has now executed and passed; see §8.**  (The branch commit
+message predates that run and still says "never executed"; this document is
+the current record.)  Still outstanding before a landing: §A.6.5's manual
+in-game input validation (owner: menu + rebind a key + drive) — the
+benchmark is non-interactive and proves rendering liveness, not input.
 
 ## 6. Sniff test around the message path
 
@@ -255,3 +252,132 @@ cd ppc64le/steamtool && WINE_PPC64LE_PEEK_SHAPE=200 WINE_PPC64LE_PEEK_DELAY_NS=2
   ./run-native --name cp2077 --appid 1091500 ".../Cyberpunk2077.exe" -skipStartScreen -benchmark
 # floors from frames.csv, never from the summary's min/max fps fields
 ```
+
+---
+
+# Follow-ups, 2026-08-30 afternoon (coordinator-directed)
+
+## 8. The parked branch's proof obligations, executed
+
+The generalized `user32.dll` was built from the branch through the build
+system (branch `spec2thunk` checked out, `make
+dlls/user32/x86_64-windows/user32.dll`, body verified by disassembly:
+`btrq $0,%r10` follows the fallback, where the narrow body has
+`testq %rdx,%rdx`), the suite was run against it via run-native in the
+probe prefix, and the narrow body was then rebuilt and byte-verified back
+in place.  Results, all [MEASURED] today:
+
+| run | env | result |
+|---|---|---|
+| peek_fastpath.c (old 5-layer gate) | — | 5/5 PASS, fastness 30 ns/poll |
+| peek_shapes.c full suite, fast lane | — | 15/15 PASS |
+| peek_shapes.c full suite, trap-only lane | `NO_PEEK_BYPASS=1` | 15/15 PASS (differential half: same invariants, fast path off) |
+| starve mode, clean | — | 5/5 GOT (positive control of the starve harness itself) |
+| starve mode | `PEEK_SABOTAGE=1` | **5/5 STARVED** — null, ranged, thread-hwnd, PM_QS_POSTMESSAGE all starve, and the storm shape's cross-thread `SendMessageTimeoutW` times out: every admitted shape is answered by the guest body, not the trap |
+| starve mode | `PEEK_SABOTAGE=1` + `NO_PEEK_BYPASS=1` | 5/5 GOT — the kill switch lifts exactly the starvation the sabotage caused |
+| **full suite under sabotage** | `PEEK_SABOTAGE=1` | **exit 11, 11 loud FAILs**: every delivery leg fails, every no-swallow leg reports the message GONE, the sent leg reports "the deadlock class, live", the fuzz reports 0 of 5000 serials.  The suite can go red, and goes red for precisely the failure modes it exists to catch. |
+
+In-game, one benchmark leg (L3-GEN below) with the generalized body:
+completed normally (1127 frames, avg 16.4 fps — within today's variance
+band, no fps claim), `NtUserPeekMessage` trapping at **46.9k/s vs 613.0k/s**
+on the narrow body under identical conditions (−92.3%) — the §A.6.5
+TRAP_STATS crater, delivered.  The residual is the designed heartbeat: at a
+1/256 budget it implies the spin now polls ~12M/s guest-side, the
+iterate-faster outcome the elasticity measurement predicted.
+
+**Would I land it now?**  Yes, with one named gap: everything mechanical is
+proven — per-shape delivery, no-leak, no-swallow, sent-message liveness on
+the exact storm shape, differential exactly-once fuzz in both lanes,
+per-shape sabotage starvation, kill-switch recovery, suite-goes-red, and a
+clean in-game leg with the predicted syscall crater.  What is missing is
+§A.6.5's **manual input validation** (menu, rebind a key, drive) — the
+benchmark is non-interactive, and input death is this design's failure
+mode 2; nothing I can run unattended proves a human can still type.  Land
+it behind that one owner-run check, plus: fold this validation record into
+the branch commit message (it predates the run), and port the winstation.c
+comment rewording that was dropped from the main line.  There is no
+*performance* reason to land it on Cyberpunk (see §9) — the case is
+CPU-composition and the different-engine future the design anticipated.
+
+## 9. The CPU ledger: what the fast path and the PM_NOYIELD fix actually buy
+
+Three ledger legs, same build of win32u (PM_NOYIELD fix present, see
+below), TRAP_STATS armed in all three (same ~6% perturbation, deltas
+unbiased), /proc CPU + ctx-switch sampling at 5 s cadence, ibmpowernv
+chip power averaged over the run.  Every leg verified complete
+(1100–1231 frames, plausible fps).  Frametimes across today's legs span a
+~19% band (floors 32.0–48.5 ms) — the documented variance — which is
+exactly why this ledger is counted in syscalls and CPU seconds, not ms:
+
+| | L1-PRE (upstream yield) | L2-FIX (PM_NOYIELD honored) | L3-GEN (+ fast path) |
+|---|---:|---:|---:|
+| `PeekMessageW` trap+syscall pairs | 304.1k/s | 613.0k/s | **46.9k/s** |
+| total crossings (flythrough window) | 1.868M/s | 2.881M/s | **1.162M/s** |
+| `NtCallbackReturn` | 702.6k/s | 1048.9k/s | 474.2k/s |
+| GameThread stime (full run) | **44.1 s** | 3.2 s | 3.0 s |
+| GameThread total CPU (full run, ~126 s wall) | 116.6 s | 107.8 s | 116.5 s |
+| process total CPU | 839.7 s | 844.3 s | 851.5 s |
+| voluntary ctx switches | 2786/s | 3248/s | 2845/s |
+| chip0 avg power | 66.1 W | 60.7 W | 65.9 W |
+| floor / median ms (for completeness, not for claims) | 34.9 / 63.1 | 32.0 / 51.1 | 36.3 / 58.7 |
+
+(The `NtCallbackReturn` row is the port's trap-return, and the identity
+`NtCallbackReturn = flat + com` holds to the last count in all three legs
+— 702.6 = 459.9 + 242.8 and so on.  It is NOT the yield callbacks; the
+yield's cost shows up as GameThread *kernel time*.)
+
+Readings, in order of importance:
+
+1. **The elastic spin re-spends every saved cycle.**  GameThread total CPU
+   is ~116 s in L1 and L3 alike; the process total is flat.  Honoring
+   PM_NOYIELD made each empty peek ~2x cheaper — and the loop responded by
+   iterating 2x more (304k → 613k peeks/s), driving total crossings UP
+   54%.  The fast path then absorbed those iterations guest-side
+   (613k → 46.9k trapped).  **Neither change frees CPU on this game, and
+   the "saves processing time" framing is wrong for any workload whose
+   poll loop is elastic** — the loop converts savings into iterations.
+   What a fast serve buys an elastic caller is latency (the flag flip is
+   seen ~0.7 us sooner) and kernel-churn reduction, not cycles.
+2. **What IS eliminated, per second: ~1.7M kernel crossings.**  L2→L3:
+   total crossings 2.881M/s → 1.162M/s (−60%); vs the pre-fix baseline
+   L1→L3: −38%, with the peek pairs specifically −92% and ~65M syscalls
+   eliminated over one ~2-minute benchmark.  Kernel entries at that rate
+   are TLB/cache/branch-predictor churn shared with every other thread on
+   the core pair; the relief is real but its downstream value on sibling
+   threads is unmeasured here (labeled: inferred, not measured).
+3. **The PM_NOYIELD fix's own line: 41 CPU-seconds of kernel time per run.**
+   GameThread stime 44.1 s → 3.2 s.  That is the sched_yield work the
+   game asked Wine not to do, gone.  (It reappeared as user-time spin —
+   see reading 1 — but kernel time is the scheduler's overhead, priced on
+   every core, and its elimination is unconditional.)
+4. **Power: no measurable difference** (66.1 / 60.7 / 65.9 W chip0; the
+   L2 dip tracks that leg's lighter frames, not the mechanism; n=1 per
+   cell, labeled inconclusive).  A spin at ~12M user-space polls/s runs
+   the core as hot as a syscall storm does.
+
+Bottom line for the owner's question: the fast path eliminates ~0.5–1.7M
+kernel crossings a second and nearly all of the peek storm's syscalls, but
+on Cyberpunk it saves **zero net CPU and zero net power**, because the
+elastic spin immediately re-spends the savings on more polling.  The
+mechanisms' real payoff stays where the design left it: an engine whose
+message pump is on the critical path (f·λ over the bar) gets the ~12 ms/frame
+class of win; an elastic caller gets only cleaner kernels.  Both changes are
+strictly-better semantics at essentially zero risk — but neither is a
+Cyberpunk fps or power lever, and the ledger now says so with numbers.
+
+## 10. PM_NOYIELD, landed (commit df16abf26b2)
+
+`NtUserPeekMessage`'s empty path ran Wine's idle-courtesy block — two
+`KeUserDispatchCallback` thunk-lock round trips around an
+`NtYieldExecution` — unconditionally.  VERIFIED upstream does the same
+(`git show master:dlls/win32u/message.c`, identical block), so this was a
+Wine-wide dropped flag, not a port regression; Wine even honors the same
+flag a few lines up (the WM_TIMER idle-event set in `peek_message`).  The
+fix gates the block on `!(flags & PM_NOYIELD)`; other arches keep upstream
+behavior; `WINE_PPC64LE_PM_NOYIELD_IGNORE=1` restores it on ppc64le.
+Ledger effect: reading 3 above (−41 s kernel time/run); elastic caveat:
+reading 1.  Gate: all five peek_fastpath.c layers pass (its polls do not
+carry PM_NOYIELD, so the yield path stays exercised); the storm shape is
+covered by the branch suite.  Upstreaming the same gate (with the
+env-knob rationale dropped) may be worth a wine-devel patch — upstream
+pays only a sched_yield, but it is still a syscall the app declined.
