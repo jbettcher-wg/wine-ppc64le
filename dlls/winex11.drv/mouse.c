@@ -374,11 +374,27 @@ static BOOL grab_clipping_window( const RECT *clip )
     Window clip_window;
     HCURSOR cursor;
     POINT pos;
+    int grab_status;
 
     /* don't clip in the desktop process */
     if (NtUserGetWindowThread( NtUserGetDesktopWindow(), NULL ) == GetCurrentThreadId()) return TRUE;
     /* don't clip the cursor if the X input focus is on another process window */
-    if (!is_current_process_focused()) return TRUE;
+    if (!is_current_process_focused())
+    {
+        /* This is the only refusal in this function that used to say nothing --
+         * the two below both WARN.  It returns TRUE, so the caller sees success
+         * while no clipping happened, and a caller that believes it is clipped
+         * gets no relative motion: mouselook dies while buttons keep working,
+         * because button events are delivered whether or not the pointer is
+         * confined.  Under a compositor whose focus tracking disagrees with X's
+         * (measured here: mouselook survives a borderless launch and dies for
+         * the rest of the session after a few window switches), this branch is
+         * where that divergence becomes invisible.  TRACE rather than WARN: it
+         * is legitimately taken whenever the user is in another window. */
+        TRACE( "not clipping to %s: this process does not have the X input focus\n",
+               wine_dbgstr_rect(clip) );
+        return TRUE;
+    }
 
     if (!data) return FALSE;
     if (!(clip_window = init_clip_window())) return TRUE;
@@ -408,10 +424,18 @@ static BOOL grab_clipping_window( const RECT *clip )
         clip->right < clip_rect.right || clip->bottom < clip_rect.bottom)
         data->warp_serial = NextRequest( data->display );
 
-    if (!XGrabPointer( data->display, clip_window, False,
+    /* A failed grab leaves clipping_cursor FALSE and used to say nothing at all,
+     * which looks identical to the focus refusal above and to a working clip
+     * that simply never warps.  Name it: without the pointer confined to
+     * clip_window there is no warp and so no relative motion, while buttons
+     * still arrive normally. */
+    if (!(grab_status = XGrabPointer( data->display, clip_window, False,
                        PointerMotionMask | ButtonPressMask | ButtonReleaseMask,
-                       GrabModeAsync, GrabModeAsync, clip_window, None, CurrentTime ))
+                       GrabModeAsync, GrabModeAsync, clip_window, None, CurrentTime )))
         clipping_cursor = TRUE;
+    else
+        WARN( "XGrabPointer on the clip window failed (%d); the cursor is NOT clipped, "
+              "so relative motion will not work in this window\n", grab_status );
 
     SERVER_START_REQ( set_cursor )
     {
