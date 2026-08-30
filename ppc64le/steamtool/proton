@@ -687,7 +687,22 @@ seed_prereq_markers
 # supported way to see what a run looks like without it.
 
 helper_pid=
+presence_pid=
+# Its own function, and called BEFORE the wineserver wait below, not only from
+# the EXIT trap.  "wineserver -w" waits for every process in the prefix, and
+# the publisher is one -- leave it running and the launcher waits for a process
+# whose only job was to outlast a game that is already gone.
+presence_stop() {
+    if [ -n "${presence_pid:-}" ]; then
+        say "stopping the steam presence publisher (pid $presence_pid)"
+        kill "$presence_pid" 2>/dev/null
+        wait "$presence_pid" 2>/dev/null
+        presence_pid=
+    fi
+}
+
 bridge_stop() {
+    presence_stop
     if [ -n "$helper_pid" ]; then
         say "stopping the steam bridge helper (pid $helper_pid)"
         kill "$helper_pid" 2>/dev/null
@@ -696,6 +711,63 @@ bridge_stop() {
     fi
 }
 trap 'bridge_stop' EXIT INT TERM
+
+# THE WINDOWS-SIDE "STEAM IS RUNNING" OBJECTS.  A title wrapped in Valve's
+# SteamStub -- its PE entry point sits in a .bind section -- asks, before it
+# jumps to the real entry point, whether a Steam client is present in this
+# session, by opening two named kernel objects:
+#
+#     Local\SteamStart_SharedMemLock   (event)
+#     Local\SteamStart_SharedMemFile   (section)
+#
+# On Windows steam.exe publishes them; under Proton, Proton's steam.exe does.
+# Nothing on this port did, so the stub concluded Steam was not running, put
+# up an MB_ICONERROR box and called TerminateProcess(-1, 0x33): the rc=51 that
+# killed Oblivion Remastered and Frostpunk 2.  [MEASURED 2026-08-30, both
+# titles' shipping .exe have a .bind entry point; the OpenEventA /
+# OpenFileMappingA pair and the rc=51 are in the oblivion run log of that day.]
+#
+# It is a SEPARATE PROCESS, started before the game, because the stub runs at
+# the entry point and picks its own moment to load steam_api64.dll -- anything
+# published from inside the game process is published at an ordering the game
+# controls, and this one cannot lose that race.
+#
+# It runs only from here, i.e. only when bridge_start() got the helper up,
+# which happens only when the helper loaded the user's real running Steam
+# client library.  No client, no presence: the objects say something true or
+# they are not published at all.
+presence_start() {
+    presence=$src/ppc64le/steamapi/presence/steampresence.exe
+    if [ ! -f "$presence" ]; then
+        say "building the steam presence publisher"
+        if ! "$src/ppc64le/steamapi/presence/build-presence.sh" >/dev/null 2>&1; then
+            say "presence build FAILED; a SteamStub title will say Steam is not running"
+            return 1
+        fi
+    fi
+
+    presence_log=$compat/steampresence-$$.log
+    "$wine" "$presence" >"$presence_log" 2>&1 &
+    presence_pid=$!
+
+    # Wait for it to say it published, rather than sleeping a guess.  A guest
+    # process on this port takes a moment to come up through the emulator, and
+    # publishing AFTER the game has already probed is the same as not
+    # publishing at all.
+    n=0
+    while [ $n -lt 300 ]; do
+        grep -q 'holding' "$presence_log" 2>/dev/null && break
+        kill -0 "$presence_pid" 2>/dev/null || { presence_pid=; break; }
+        n=$((n + 1))
+        sleep 0.1
+    done
+    if [ -z "${presence_pid:-}" ] || ! grep -q 'holding' "$presence_log" 2>/dev/null; then
+        say "the steam presence publisher did not come up; see $presence_log"
+        return 1
+    fi
+    say "steam presence published (pid $presence_pid, log $presence_log)"
+    return 0
+}
 
 bridge_start() {
     helper=$src/ppc64le/steamapi/helper/steamhelper
@@ -760,6 +832,11 @@ bridge_start() {
     else
         say "WARNING: no services.exe pid found; steam_api will say Steam is not running"
     fi
+    # The SteamStub liveness objects.  After the registry, because a title
+    # that reads both wants the registry to already be right, and before the
+    # game, which is the whole point.  A failure here is not fatal: a title
+    # with no stub does not care, and one with a stub will say so loudly.
+    presence_start || say "continuing without the SteamStub liveness objects"
     # Deliberately NOT written: SteamClientDll (the 32-bit name).  There is no
     # 32-bit guest steamclient here, and naming a DLL that does not exist would
     # move a 32-bit game's failure from "no value" to "load failed" without
@@ -925,13 +1002,16 @@ run|runinprefix)
     $numa_run "$wine" "$@"
     rc=$?
     say "game exited rc=$rc"
+    presence_stop
     exit $rc
     ;;
 waitforexitandrun)
     say "run $numa_run $wine $*"
     $numa_run "$wine" "$@"
     rc=$?
-    say "game exited rc=$rc; waiting for wineserver"
+    say "game exited rc=$rc"
+    presence_stop
+    say "waiting for wineserver"
     "$wineserver" -w
     say "wineserver gone"
     exit $rc
