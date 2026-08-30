@@ -235,3 +235,87 @@ sentinel.
 titles" premise was wrong.** Oblivion is behind the SteamStub liveness probe.
 Frostpunk 2 was behind a missing guest `imagehlp`, and only after that is it
 even in a position to meet the stub.
+
+## Measured: the objects are NECESSARY and NOT SUFFICIENT
+
+**Oblivion, 16:10, `WINEDEBUG=warn+module,+seh`, presence publisher confirmed
+holding.** Still rc=51 in 12 s — but the stub gets measurably further, and the
+trace says exactly how far.
+
+Before (09:07, no objects), the whole probe was two calls and then the box:
+
+    OpenEventA( 0x00100000, FALSE, name )        -> NULL
+    OpenFileMappingA( 0x2, FALSE, name )         -> NULL
+    LoadLibraryA/GetProcAddress -> MessageBoxA -> TerminateProcess(-1, 0x33)
+
+After (16:10, objects published) it is five, and two of them had never appeared
+in any run of this title:
+
+    OpenEventA( SYNCHRONIZE, FALSE, "Local\SteamStart_SharedMemLock" )   -> 0x48
+    OpenFileMappingA( FILE_MAP_WRITE, FALSE, "Local\SteamStart_SharedMemFile" ) -> 0x4C
+    WaitForSingleObject( 0x48, 0x1388 /* 5000 ms */ )                   <-- NEW
+    MapViewOfFile( 0x4C, FILE_MAP_WRITE, 0, 0, 0 )                      <-- NEW
+    LoadLibraryA/GetProcAddress -> MessageBoxA -> TerminateProcess(-1, 0x33)
+
+Both handles are non-NULL and are passed straight back in, so **the objects are
+visible to the game**: right namespace, right session, right wineserver, no
+lifetime race. That is independently confirmed without a game — launching
+`steampresence.exe --probe` through `run-native` itself, i.e. exactly the path
+a title takes, prints `probe: PRESENT` with `MapViewOfFile(FILE_MAP_WRITE) OK`.
+
+So the stub takes the lock, maps the section, reads it, and rejects what it
+finds. It reads **within the first page** — the section is one page and a read
+past it would have faulted rather than reached `MessageBoxA` — so this is not a
+size or an access-mask problem. It is the **contents**.
+
+### Where that stops, and why it stops there
+
+The contents are Valve's `CSharedMemStream`, and the strings in the Steam
+install name what the reader is checking:
+
+    pSharedMemFile->m_nLockState == k_EMasterStateAvailable
+    !m_pSharedMemDRM->m_nLockState
+    Size on connection to existing CSharedMemStream doesn't match actual: %s, %u, %u
+    Timed out waiting for lock in CSharedMemStream::BLockMemoryForWrite
+
+`m_pSharedMemDRM` is the name of the thing. Filling that page so the check
+concludes "verified" is not publishing a liveness signal any more; it is
+standing in for the DRM counterpart and reproducing the state it would have
+written. **That is the DRM check itself, and this port does not do that.** The
+line held here is the one the tree already holds elsewhere: a wrong header read
+as a right one is a silent wrong answer, and the answer this one would be
+giving is a licence verdict.
+
+Nor is there an honest local source for it. Valve's own 64-bit Windows
+`steamclient64.dll` (26 MB, PE32+, in the Steam install) is the module that
+carries `Local\SteamStart_SharedMemFile`, `%s%s_SharedMemFile` and the whole
+`CSharedMemStream` family -- i.e. **on Windows it is the Steam client library
+itself that publishes and services this**. On this port that DLL cannot be
+loaded at all; that is the entire reason `dlls/steamclient64` + the
+`ppc64le/steamapi/helper` bridge exist. And the client that IS running here is
+Linux Steam under `fastppcx86`, which is not a Windows process and publishes
+nothing in any prefix. Proton does not fill the gap either: no file anywhere in
+the Proton tree contains the string.
+
+### What that leaves
+
+* The two objects are a real and necessary part of the mechanism, they are now
+  published honestly and only when a client is genuinely reachable, and they
+  move the stub from "cannot find Steam" to "found Steam, checked its shared
+  state". Keep them.
+* Getting a SteamStub title to first frame additionally needs the DRM shared
+  memory to say the right thing, and that is not something to synthesise.
+* `dlls/imagehlp` was a real, separate, unrelated fix and stands on its own:
+  Frostpunk 2 went from dying in `loader_init` at 26 s to running 428 s and
+  reaching the stub.
+
+### Civilization VI
+
+`civilizationvi.exe` and `civilizationvi_dx12.exe` both have a `.bind` entry
+point, and Civ VI exits rc=51 with the publisher confirmed holding — the same
+code, from the same `TerminateProcess(-1, 0x33)`. That is consistent with the
+same stub and the same content check, but it is **not traced**: the Civ VI runs
+were `warn+module` only and carry no `seh` records, so nothing here proves the
+caller. A single `WINEDEBUG=warn+module,+seh` run of that title would settle it
+in about a minute, and is the cheapest confirmation available for anyone who
+wants it.
