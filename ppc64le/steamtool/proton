@@ -780,8 +780,13 @@ presence_start() {
     # process on this port takes a moment to come up through the emulator, and
     # publishing AFTER the game has already probed is the same as not
     # publishing at all.
+    # 120s, not 30: a guest process comes up through the emulator, and this
+    # one is racing a machine that is about to start a game.  Waiting longer
+    # costs a slower launch; not waiting long enough costs the whole run,
+    # because a title that probed before the objects existed is a title that
+    # died for the reason this function exists to remove.
     n=0
-    while [ $n -lt 300 ]; do
+    while [ $n -lt 1200 ]; do
         grep -q 'holding' "$presence_log" 2>/dev/null && break
         kill -0 "$presence_pid" 2>/dev/null || { presence_pid=; break; }
         n=$((n + 1))
