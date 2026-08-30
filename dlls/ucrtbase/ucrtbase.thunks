@@ -494,6 +494,40 @@ tmpnam_s                        0x00000E05  2  int   ucrtbase.spec:2549
 _wtmpnam_s                      0x00000E06  2  int   ucrtbase.spec:2140
 _seh_filter_exe                 0x00000E07  2  int   ucrtbase.spec:1883
 
+# Six more of the same downgrade, from the 2026-08-30 ahead-of-time sweep.
+# import_chain.py over every installed title's static graph named these as the
+# whole non-MSVCP140 ucrtbase surface still missing; the generator refused each
+# with "no declaration found in Wine headers", and grep confirms none of the
+# six is declared anywhere under include/ (_strtol_l appears in tchar.h only as
+# a macro, not a prototype).  So there is no header to PROBE-EXTRA and the
+# .spec is the only pin available.
+#
+# The <int|void> column is the same unchecked human assertion as above, and is
+# justified here against the implementation each forwards to so the claim can
+# be rechecked:
+#
+#   __initialize_lconv_for_unsigned_char
+#                   ucrtbase.spec:95 aliases it to __lconv_init, and
+#                   dlls/msvcrt/locale.c:1012 is int CDECL __lconv_init(void).
+#                   The alias is why the arity is zero.
+#   _get_dstbias    dlls/msvcrt/time.c:825  -- int CDECL (int *).
+#   _get_timezone   dlls/msvcrt/time.c:1853 -- int CDECL (LONG *).
+#   _strtol_l       dlls/msvcrt/string.c:1787 -- __msvcrt_long CDECL
+#                   (const char *, char **, int, _locale_t).  __msvcrt_long is
+#                   32-bit and integer class, so 'int' is the right column.
+#   mbsrtowcs_s     dlls/msvcrt/mbcs.c:3461 -- int CDECL (size_t *, wchar_t *,
+#                   size_t, const char **, size_t, mbstate_t *).
+#   wcsrtombs_s     dlls/msvcrt/wcs.c:782 -- int CDECL, mirror of the above.
+#
+# Every argument is integer or pointer class, so none of these is blocked by
+# the shape limit that stops _cabs and the AlphaBlend family.
+__initialize_lconv_for_unsigned_char  0x00000E08  0  int   ucrtbase.spec:95
+_get_dstbias                          0x00000E09  1  int   ucrtbase.spec:367
+_get_timezone                         0x00000E0A  1  int   ucrtbase.spec:382
+_strtol_l                             0x00000E0B  4  int   ucrtbase.spec:1961
+mbsrtowcs_s                           0x00000E0C  6  int   ucrtbase.spec:2424
+wcsrtombs_s                           0x00000E0D  6  int   ucrtbase.spec:2582
+
 # LEFT OPEN, MEASURED RATHER THAN ASSUMED: _open.
 #
 # corecrt_io.h:133 declares `int __cdecl _open(const char*,int,...)` and

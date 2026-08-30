@@ -9,3 +9,14 @@
 # module's own .spec.
 DLL setupapi.dll
 FROM-SPEC auto
+
+# The module's first .spec-location downgrade, from the 2026-08-30
+# ahead-of-time sweep (import_chain.py over every installed title).  Oblivion
+# Remastered imports SetupGetInfDriverStoreLocationW statically; the generator
+# refuses it as "no declaration found in Wine headers" and the name is indeed
+# declared nowhere under include/, so the .spec is the only pin available.
+#
+# Return kind justified against the implementation: dlls/setupapi/query.c:691
+# is BOOL WINAPI.  Arity six, from setupapi.spec's own
+# (wstr ptr wstr ptr long ptr); every argument is pointer or integer class.
+SetupGetInfDriverStoreLocationW  0x00000C01  6  int   setupapi.spec:443

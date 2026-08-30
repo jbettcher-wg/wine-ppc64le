@@ -181,6 +181,22 @@ lstrcmpiW                 0x00000B07  2  int   winbase.h:2390
 wine_get_unix_file_name   0x00000B08  1  int   winbase.h:2510
 wine_get_dos_file_name    0x00000B09  1  int   winbase.h:2511
 
+# Two more .spec-location downgrades, from the 2026-08-30 ahead-of-time sweep
+# (import_chain.py across every installed title's static import graph).  Both
+# are refused as "no declaration found in Wine headers", and neither name
+# appears anywhere under include/ -- kernel32.spec forwards them with -import
+# and kernelbase carries the code, which is a shape no header in this tree
+# declares.  Frostpunk 2 and Oblivion Remastered both import both.
+#
+# Return kinds justified against the implementations, both BOOL:
+#   GetProcessHandleCount      dlls/kernelbase/process.c:900
+#   GetThreadIdealProcessorEx  dlls/kernelbase/thread.c:309
+# Arities come from kernel32.spec's own (long ptr), and both arguments are
+# integer/pointer class, so neither is blocked by the by-value shape limit
+# that refuses SetConsoleScreenBufferSize's COORD.
+GetProcessHandleCount     0x00000B0A  2  int   kernel32.spec:805
+GetThreadIdealProcessorEx 0x00000B0B  2  int   kernel32.spec:882
+
 # Guest threads.  lpStartAddress is passed through UNWRAPPED on purpose: the
 # thread-start funnel (RtlUserThreadStart -> thread_start_is_guest_code) owns
 # thread starts, and wrapping it here too would be the double interception the
