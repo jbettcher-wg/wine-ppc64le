@@ -53,3 +53,21 @@ FROM-SPEC auto
 # and unrelated gap.)  None of this is in scope for the psapi PROBE-DEFINE
 # fix; left as found.
 PROBE-EXTRA   winldap.h
+
+# ---------------------------------------------------------------------------
+# The 2026-08-30 Civilization VI triage: ordinal 301, ber_free
+# ---------------------------------------------------------------------------
+# EOSSDK-Win64-Shipping.dll imports WLDAP32 ordinal 301 BY ORDINAL -- the one
+# number in the sixteen listed above that FROM-SPEC auto still refused, as
+# "no declaration found in Wine headers".  The comment above is right that
+# winldap.h is the missing header for the ldap_* family, but ber_free is not
+# in winldap.h at all: it is declared in include/winber.h:29,
+#
+#     void CDECL ber_free( BerElement *, int );
+#
+# a flat prototype the oracle can read.  Its siblings (ber_alloc_t, ber_init,
+# ber_bvfree, ber_first_element, ber_next_element, ber_peek_tag, ber_scanf,
+# ber_printf, ber_flatten) come along with the same one line, which is worth
+# having: an application that walks a BER element uses several of them and
+# would otherwise take a sentinel on the second call instead of the first.
+PROBE-EXTRA winber.h

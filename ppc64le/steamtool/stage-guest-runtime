@@ -1,0 +1,178 @@
+#!/bin/sh
+#
+# stage-guest-runtime -- put REAL x86-64 Wine builtins where a guest can load
+#                        them, for the modules this port cannot thunk.
+#
+#   stage-guest-runtime <prefix> [module.dll ...]
+#
+# WHY THIS EXISTS, AND WHY IT IS A SEPARATE FILE.
+#
+# A handful of Wine modules are C++ ABIs: msvcp100, msvcp120, msvcp140 and
+# their kind export MSVC-mangled member functions, vtable data symbols
+# (??_7ios_base@std@@6B@) and data constants (?_BADOFF@std@@3_JB).  The thunk
+# machinery is a FLAT C surface by construction -- spec2thunk resolves each
+# export against a clang-readable prototype -- so it can serve none of that,
+# and dlls/msvcp140/msvcp140.thunks honestly emits almost nothing.  Translating
+# the MSVC C++ ABI is what this port decided not to do.
+#
+# The answer, already taken for msvcp100 (Styx) and msvcp120 (The Witcher 3),
+# is to run a REAL x86-64 build of the module as a guest module under the
+# emulator.  Nothing is downloaded and nothing is redistributed: the file comes
+# off this disk, out of a Proton installation the user already has, and it is
+# WINE'S OWN implementation -- the same source this tree compiles for ppc64,
+# just built for x86-64.  ("Wine builtin DLL" is in its DOS stub; see the
+# msvcp100 banner in ./proton.)
+#
+# sysx8664 RATHER THAN system32, and the distinction is load-bearing.
+# find_dll_file()'s guest branch searches the machine's own system directory
+# FIRST, then builtins, then the ordinary load path.  A module with no builtin
+# competing with it (mfc140u) is fine in system32, which is on the load path; a
+# module that HAS one is never reached there, so it must go in the guest
+# machine's own system directory.  No load-order override is wanted or correct:
+# `msvcp140=n` means LO_NATIVE, which makes load_builtin refuse a Wine builtin
+# outright -- and these files ARE Wine builtins.
+#
+# WHERE THE FILES COME FROM, and this is the change from the msvcp100 block in
+# ./proton.  That block reads $STEAM_COMPAT_DATA_PATH/pfx/drive_c/windows/
+# system32 -- the app's own Proton PREFIX -- which only has the module if the
+# user provisioned that prefix with protontricks first.  Civilization VI
+# (appid 289070) has no such prefix, and neither does most of the library.
+# Proton's own DIST tree always does:
+#
+#   .../steamapps/common/Proton*/files/lib*/wine/x86_64-windows/<module>.dll
+#
+# so that is searched too, newest install first, with the app's prefix still
+# preferred when it exists (a user who deliberately provisioned Microsoft's
+# real redistributable into a prefix meant it).
+#
+# WHAT MACHINE IS THAT PE?  Staging exists to put an x86-64 module where a
+# guest can load it, so staging anything else is worse than staging nothing:
+# the file lands with the right NAME and the wrong INSTRUCTION SET, and the
+# guest gets a module it cannot execute instead of an honest "absent".  Every
+# candidate is machine-checked before it is copied -- the same check, and for
+# the same measured reason, as ./proton's pe_machine(): on 2026-08-22 the
+# msvcp100 block was found to have been copying this port's own NATIVE ppc64
+# builtin (machine 0x1f3) into sysx8664, because $foreign and $sys32 had
+# resolved to the same directory.
+#
+# BEFORE YOU ADD A MODULE TO THE DEFAULT LIST: check that every one of its
+# imports is already served by this tree's guest thunks.  A staged module is a
+# guest PE like any other and its own imports bind through the same surface.
+# This is not hypothetical -- Proton's x86-64 msvcr100.dll imports Wine's
+# INTERNAL ntdll helpers (__wine_dbg_header), which the guest ntdll thunk does
+# not publish, so staging it produces a sentinel fault in its own PROCESS_ATTACH
+# instead of a working module.  msvcp140 and vcruntime140 were checked this way
+# on 2026-08-30: 97 kernel32, 1 ntdll (_vsnprintf), 82 ucrtbase and 12
+# vcruntime140 imports between them, all served, none missing.
+#
+# Idempotent: a module already present in sysx8664 is left alone, so a prefix
+# keeps whatever a user deliberately put there.
+set -u
+
+prefix=${1:-}
+[ -n "$prefix" ] || { echo "usage: stage-guest-runtime <prefix> [module.dll ...]" >&2; exit 2; }
+shift
+
+# The default list is the set this port cannot thunk AND has verified staging
+# for.  msvcp100 stays in ./proton's own block for now -- it has a different
+# source rule (its app prefix) and its own long-form justification there.
+#
+# vcruntime140 IS NOT HERE, and that is a decision rather than an oversight.
+# It is thunkable: this tree's dlls/vcruntime140/vcruntime140.thunks serves it,
+# and forwards the whole C++ exception personality (_CxxThrowException,
+# __CxxFrameHandler/2/3, the exception-record accessors) through ucrtbase into
+# dlls/guestcrt's real guest x86-64 code.  Staging over that would replace a
+# load-bearing subsystem to gain six RTTI entry points; those six are served as
+# FORWARD lines in that .thunks file instead (2026-08-30).
+if [ $# -gt 0 ]; then modules="$*"; else modules="msvcp140.dll"; fi
+
+sysx8664=$prefix/drive_c/windows/sysx8664
+
+# e_lfanew is a LE u32 at 0x3c; Machine is a LE u16 at e_lfanew+4.  Assembled
+# from bytes rather than read as a word so the answer does not depend on the
+# host's endianness -- this is a ppc64le box reading a little-endian PE, and
+# the two agreeing is a coincidence not to lean on.
+pe_machine() {
+    _off=$(od -An -tu4 -j60 -N4 "$1" 2>/dev/null | tr -d ' \n')
+    case ${_off:-x} in ''|*[!0-9]*) return 1 ;; esac
+    _b=$(od -An -tx1 -j$((_off + 4)) -N2 "$1" 2>/dev/null | tr -d ' \n')
+    [ ${#_b} -eq 4 ] || return 1
+    printf '%s%s\n' "$(printf %s "$_b" | cut -c3-4)" "$(printf %s "$_b" | cut -c1-2)"
+}
+
+# Search order: the app's own Proton prefix first (a deliberate provisioning
+# beats a distribution default), then every Proton dist tree on the disk,
+# newest mtime first.  STEAM_COMPAT_DATA_PATH is set by Steam and by
+# ./run-native; a launch without it simply searches one place fewer.
+# ONE PATH PER LINE, and every consumer reads it with `while IFS= read -r`.
+# "Proton - Experimental" has spaces in it, so `for c in $(candidates ...)`
+# splits one real path into three unusable ones -- which is exactly how the
+# first version of this script reported "nothing to stage" on a machine with
+# three Proton installations sitting right there.
+candidates() {
+    _m=$1
+    [ -n "${STEAM_COMPAT_DATA_PATH:-}" ] &&
+        printf '%s\n' "$STEAM_COMPAT_DATA_PATH/pfx/drive_c/windows/system32/$_m"
+    # Both spellings of the Steam root, deduplicated by real path: on most
+    # installs ~/.steam/steam is a symlink to ~/.local/share/Steam and
+    # searching it twice would double every candidate.
+    _seen=
+    for _r in "${STEAM_ROOT:-$HOME/.local/share/Steam}" "$HOME/.steam/steam"; do
+        _root=$(cd "$_r" 2>/dev/null && pwd -P) || continue
+        case " $_seen " in *" $_root "*) continue ;; esac
+        _seen="$_seen $_root"
+        [ -d "$_root/steamapps/common" ] || continue
+        # lib/ on newer Proton, lib64/ on older; -maxdepth keeps this off the
+        # rest of a large library.  Newest install first, so a machine with
+        # several Protons stages from the one most likely to match the rest
+        # of the runtime.
+        find "$_root/steamapps/common" -maxdepth 6 \
+             -path '*/wine/x86_64-windows/*' -name "$_m" \
+             -printf '%T@\t%p\n' 2>/dev/null
+    done | sort -rn | cut -f2-
+}
+
+staged=0 kept=0 missing=
+for dll in $modules; do
+    if [ -f "$sysx8664/$dll" ]; then
+        kept=$((kept + 1))
+        continue
+    fi
+    src=$(candidates "$dll" | while IFS= read -r c; do
+        [ -f "$c" ] || continue
+        [ "$(pe_machine "$c")" = "8664" ] || continue
+        printf '%s\n' "$c"
+        break
+    done)
+    if [ -z "$src" ]; then
+        missing="$missing $dll"
+        continue
+    fi
+    mkdir -p "$sysx8664" 2>/dev/null
+    # Copy to a dot-name and rename, so a concurrent guest never sees a
+    # half-written PE at the real name.
+    if cp -f "$src" "$sysx8664/.$dll.tmp" 2>/dev/null &&
+       chmod u+w "$sysx8664/.$dll.tmp" 2>/dev/null &&
+       mv -f "$sysx8664/.$dll.tmp" "$sysx8664/$dll" 2>/dev/null; then
+        echo "stage-guest-runtime: staged $dll from $src"
+        staged=$((staged + 1))
+    else
+        rm -f "$sysx8664/.$dll.tmp" 2>/dev/null
+        echo "stage-guest-runtime: could not copy $dll from $src" >&2
+        missing="$missing $dll"
+    fi
+done
+
+[ "$kept" -gt 0 ] && echo "stage-guest-runtime: $kept module(s) already in $sysx8664"
+
+if [ -n "$missing" ]; then
+    echo "stage-guest-runtime: no x86-64 build to stage for:$missing" >&2
+    echo "  A game built against that runtime will bind a per-symbol sentinel for" >&2
+    echo "  every std:: name it imports, because this tree's thunk for it has no" >&2
+    echo "  exports -- the MSVC C++ ABI is not a flat surface and is refused" >&2
+    echo "  honestly rather than guessed.  Install Proton (any version) or" >&2
+    echo "  provision a prefix for this app with protontricks.  Nothing is" >&2
+    echo "  downloaded here." >&2
+fi
+
+exit 0

@@ -553,6 +553,32 @@ if [ -n "$cpp_missing" ]; then
     say "  again.  Nothing is downloaded here."
 fi
 
+# ------------------------------------- Microsoft's VC++ 2015+ C++ runtime --
+#
+# The block above stages msvcp100 for Styx; this stages msvcp140 for every
+# title built with VS2015 or later, which is most of the modern library.  Same
+# reason exactly -- msvcp140 is a C++ ABI, the thunk surface is flat C, and
+# dlls/msvcp140/msvcp140.thunks therefore emits almost nothing -- and the same
+# answer: run a REAL x86-64 Wine build of the module as a guest module.
+#
+# Kept in ./stage-guest-runtime rather than written out here, because its
+# SOURCE rule is different and better: the msvcp100 block above can only read
+# the app's own Proton prefix, which most titles do not have (Civilization VI,
+# appid 289070, has none), while that script also searches every Proton
+# installation's own dist tree -- which any machine with Proton has.  It does
+# the same PE-machine check before every copy, for the same measured reason.
+#
+# vcruntime140 is deliberately NOT staged with it.  This tree's own
+# vcruntime140 thunk forwards the entire C++ exception personality
+# (_CxxThrowException, __CxxFrameHandler/2/3, the exception-record accessors)
+# to ucrtbase and on into dlls/guestcrt's real guest x86-64 code; replacing
+# that module wholesale would swap out a load-bearing subsystem to gain six
+# RTTI entry points.  Those six are served properly instead, as FORWARD lines
+# in dlls/vcruntime140/vcruntime140.thunks -- see its 2026-08-30 banner.
+if [ -x "$selfdir/stage-guest-runtime" ]; then
+    "$selfdir/stage-guest-runtime" "$prefix" 2>&1 | while IFS= read -r l; do say "$l"; done
+fi
+
 # ---------------------------------------------------- prerequisite markers --
 #
 # A GAME'S OWN INSTALLER CHAIN, AND THE ONE STAGE OF IT THAT CANNOT SUCCEED.

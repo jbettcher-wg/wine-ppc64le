@@ -446,3 +446,90 @@ FORWARD __CxxFrameHandler3 guestcrt.__CxxFrameHandler3
 _CreateFrameInfo                0x00000E02  2  int   msvcrt.h:147
 _FindAndUnlinkFrame             0x00000E03  1  void  msvcrt.h:154
 _IsExceptionObjectToBeDestroyed 0x00000E04  1  int   msvcrt.h:155
+
+# ---------------------------------------------------------------------------
+# The 2026-08-30 Civilization VI triage: the UCRT holes EOSSDK falls into
+# ---------------------------------------------------------------------------
+# Civ VI's loader dies inside Epic's EOSSDK-Win64-Shipping.dll, on the FIRST
+# unresolved import that module actually calls at PROCESS_ATTACH:
+#
+#   err:seh:dispatch_guest_exception guest called through a wild pointer:
+#     00000000DEAD0047 ... from EOSSDK-Win64-Shipping.dll+35af79
+#
+# 0xDEAD0047 is the 71st sentinel of the run, and with warn+module on it names
+# itself: api-ms-win-crt-heap-l1-1-0.dll._get_heap_handle.  That apiset has no
+# module of its own in this tree -- ntdll's apiset table resolves it to
+# ucrtbase.dll -- so the hole is HERE, and six more of the run's sentinels are
+# ucrtbase holes too (_heapchk, _ftime64, tmpnam_s, _seh_filter_exe, _open,
+# and _invoke_watson, which is a different case and is left open below).
+#
+# Four of them are pure translation-unit gaps, not ABI problems.  Wine declares
+# them as ordinary flat prototypes; the headers that hold those prototypes were
+# simply not in the oracle's TU, so FROM-SPEC auto answered "no declaration
+# found in Wine headers" for every one:
+#
+#   malloc.h      _get_heap_handle (line 65), _heapchk (59).  corecrt_malloc.h
+#                 is already in the TU -- that is where malloc/free resolve
+#                 from -- but the heap-diagnostic half of the surface lives in
+#                 the malloc.h wrapper, which was not.
+#   sys/timeb.h   _ftime64 (line 58), and its _ftime64_s/_o_ sibling rows.
+#
+# Both are real clang-checked declarations.  Nothing below them is asserted.
+PROBE-EXTRA   malloc.h        # _get_heap_handle, _heapchk
+PROBE-EXTRA   sys/timeb.h     # _ftime64, _ftime64_s
+
+# The .spec-location downgrade, for the three Wine declares in NO header.  A
+# .spec pins the arity and the argument classes but carries no return type, so
+# the <int|void> column is an unchecked human assertion; each is justified
+# here against the implementation it forwards to, named so the claim can be
+# rechecked:
+#
+#   tmpnam_s        dlls/msvcrt/file.c:5093 -- int CDECL (char *, size_t).
+#   _wtmpnam_s      dlls/msvcrt/file.c:5167 -- int CDECL (wchar_t *, size_t).
+#   _seh_filter_exe ucrtbase.spec:1883 aliases it to _XcptFilter, and
+#                   dlls/msvcrt/except.c:736 is
+#                   int CDECL _XcptFilter(NTSTATUS, PEXCEPTION_POINTERS).
+#                   The .spec's own alias column is why the arity is two.
+tmpnam_s                        0x00000E05  2  int   ucrtbase.spec:2549
+_wtmpnam_s                      0x00000E06  2  int   ucrtbase.spec:2140
+_seh_filter_exe                 0x00000E07  2  int   ucrtbase.spec:1883
+
+# LEFT OPEN, MEASURED RATHER THAN ASSUMED: _open.
+#
+# corecrt_io.h:133 declares `int __cdecl _open(const char*,int,...)` and
+# dlls/msvcrt/file.c:2654 implements it as `int WINAPIV _open(const char*,
+# int, ...)`, so the oracle refuses it as varargs.  The .spec-location
+# downgrade used for the three rows above does NOT rescue it, and the tool
+# says why in as many words:
+#
+#   _open  refused  ucrtbase.spec:1847 is `@ varargs`; a variadic must be
+#   cited to a header and carry variadic=<v-variant> in the thunk spec, the
+#   .spec arity fallback cannot describe one
+#
+# That guard is right and was not worked around.  The tail of _open is one
+# optional int, `pmode`, read by a single va_arg that runs only when the
+# caller set _O_CREAT -- so a three-argument call WOULD be ABI-correct on both
+# sides (MS-x64 puts the third integer in R8 whether or not the caller
+# supplied it; ELFv2 starts the variadic tail in r5, where a prototyped third
+# argument sits too).  But "would be correct" is exactly the reasoning the
+# variadic= column exists to stop being done in a comment, and _open has no
+# v-form to name: there is no _vopen in Wine or in the UCRT.
+#
+# Closing it is a two-part change, recorded here so it is not rediscovered:
+# add a non-variadic `_open_v(const char *, int, va_list)` (or reuse
+# _sopen_dispatch, dlls/msvcrt/file.c:2605, which is already flat and takes
+# the mode as an ordinary argument) and then `_open ... variadic=<that>`.
+# EOSSDK-Win64-Shipping.dll and civilizationvi.exe both import _open; whether
+# either CALLS it is the thing to measure before spending that change.
+
+# LEFT OPEN, DELIBERATELY: _invoke_watson.
+#
+# ucrtbase.spec:433 is `@ stub _invoke_watson` -- Wine has no implementation at
+# all, and the report says so ("skipped -- stub, Wine has no implementation to
+# call") rather than refusing a signature.  There is nothing to thunk to.  A
+# guest that reaches it is on the CRT's terminal path anyway (_invoke_watson is
+# what the UCRT calls to hand a fatal parameter violation to Windows Error
+# Reporting and never returns), so a sentinel fault there and a stub that
+# raises ERROR_CALL_NOT_IMPLEMENTED end the process equally.  Recorded here so
+# the next reader does not spend time on it: closing it means implementing it
+# in dlls/msvcrt, not adding a row.

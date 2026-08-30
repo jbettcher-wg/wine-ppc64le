@@ -7,3 +7,16 @@
 # per-symbol sentinel -- loadability first, surface closes from the data.
 DLL advapi32.dll
 FROM-SPEC auto
+
+# ---------------------------------------------------------------------------
+# The 2026-08-30 Civilization VI triage
+# ---------------------------------------------------------------------------
+# Epic's EOSSDK-Win64-Shipping.dll -- the module Civ VI's loader dies in --
+# imports the four Credential Manager entry points, and FROM-SPEC auto refused
+# every one of them as "no declaration found in Wine headers".  The
+# declarations exist (include/wincred.h:260 CredFree, :269 CredReadW, and the
+# CredWriteW/CredDeleteW siblings); wincred.h is simply not in the oracle's
+# default translation unit, the same gap winldap.h had in wldap32.thunks.
+#
+# One header, four real clang-checked signatures -- no assertion columns.
+PROBE-EXTRA wincred.h

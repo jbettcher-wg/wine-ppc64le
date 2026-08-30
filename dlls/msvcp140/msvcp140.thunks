@@ -20,3 +20,33 @@ FROM-SPEC auto
 # documented downgrade, where the <int|void> column is an unchecked human
 # assertion.  "void" is that implementation's own return type.
 _Mtx_init_in_situ             0x00000E01  2  void  msvcp140.spec:3682
+
+# ---------------------------------------------------------------------------
+# The 2026-08-30 Civilization VI triage: THIS FILE IS NOT THE ANSWER FOR CIV VI
+# ---------------------------------------------------------------------------
+# Recorded here because this is where the next reader will look.
+#
+# Civ VI's run binds 258 per-symbol sentinels across 144 distinct names, and
+# 132 of those 144 are MSVCP140 or VCRUNTIME140.  The MSVCP140 half is not
+# fixable here and no row should be added for it: the names are MSVC-mangled
+# member functions (??6?$basic_ostream@DU?$char_traits@D@std@@@std@@QEAAAEAV01@H@Z
+# and ~110 more), plus VTABLE DATA (??_7ios_base@std@@6B@,
+# ??_7?$basic_ios@DU?$char_traits@D@std@@@std@@6B@) and a DATA CONSTANT
+# (?_BADOFF@std@@3_JB).  A trap stub is a function; there is no arity or return
+# type to assert for a vtable, and no amount of .spec-location downgrade makes
+# one, so even a perfect oracle would refuse them.
+#
+# The answer is the one msvcp100 and msvcp120 already take: stage a REAL
+# x86-64 build of the module into the prefix's C:\windows\sysx8664 and let it
+# run as a guest module under the emulator.  ppc64le/steamtool/stage-guest-runtime
+# does that now for every launch, sourcing the file from any Proton
+# installation's own dist tree rather than from an app prefix the title may not
+# have.  Verified before shipping it: all 97 kernel32, 1 ntdll, 82 ucrtbase and
+# 12 vcruntime140 imports of that module are served by this tree's guest
+# thunks, so unlike the msvcr100 attempt it does not die in its own
+# PROCESS_ATTACH.  (One of the twelve, __uncaught_exception, was a hole until
+# that same pass -- see dlls/vcruntime140/vcruntime140.thunks.)
+#
+# The VCRUNTIME140 half IS fixable here-adjacent and was fixed properly rather
+# than staged over; see that file's 2026-08-30 banner for why replacing the
+# module wholesale would have cost the guest C++ exception personality.

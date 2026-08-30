@@ -220,3 +220,61 @@ FORWARD __processing_throw             ucrtbase.__processing_throw
 FORWARD __CxxFrameHandler  ucrtbase.__CxxFrameHandler
 FORWARD __CxxFrameHandler2 ucrtbase.__CxxFrameHandler2
 FORWARD __CxxFrameHandler3 ucrtbase.__CxxFrameHandler3
+
+# ---------------------------------------------------------------------------
+# The 2026-08-30 Civilization VI triage: RTTI, and one overlooked accessor
+# ---------------------------------------------------------------------------
+# Four of Civ VI's five modules take a sentinel on this module's RTTI surface:
+# EOSSDK-Win64-Shipping.dll and Localization_FinalRelease.dll each bind
+# __RTtypeid, __RTDynamicCast, __std_type_info_name and __std_type_info_compare
+# (0xDEAD0042..0045 and 0xDEAD0087..008A of the 2026-08-30 run),
+# HavokScript_FinalRelease.dll binds __std_exception_destroy and
+# __std_exception_copy, and civilizationvi.exe itself binds
+# __std_type_info_compare.  All six were refused here as "no declaration found
+# in Wine headers".
+#
+# They are not a new problem and they need no new mechanism.  vcruntime140.spec
+# forwards every one of them to the ucrtbase namesake --
+#
+#   30 @ cdecl __RTDynamicCast(ptr long ptr ptr long) ucrtbase.__RTDynamicCast
+#   31 @ cdecl __RTtypeid(ptr)                        ucrtbase.__RTtypeid
+#   40 @ cdecl __std_exception_copy(ptr ptr)          ucrtbase.__std_exception_copy
+#   41 @ cdecl __std_exception_destroy(ptr)           ucrtbase.__std_exception_destroy
+#   43 @ cdecl __std_type_info_compare(ptr ptr)       ucrtbase.__std_type_info_compare
+#   46 @ cdecl __std_type_info_name(ptr ptr)          ucrtbase.__std_type_info_name
+#
+# -- and ucrtbase.thunks ALREADY EMITS ALL SIX, as real clang-checked
+# signatures off this port's own thunkcxx.h (lines 87, 88, 93, 94, 95, 98).
+# So the fix is the module's own spec hop, exactly the shape _CxxThrowException
+# and __CxxFrameHandler3 above already use, and nothing is asserted here that
+# ucrtbase.thunks has not already had checked.
+#
+# WHY A FORWARD RATHER THAN `PROBE-EXTRA thunkcxx.h`, which would also work:
+# a forward is what the .spec says is true, it costs no second trap stub, and
+# it keeps ONE implementation of each name reachable from both modules.  RTTI
+# is identity-bearing -- __std_type_info_name caches the demangled name on a
+# process-wide SLIST that __std_type_info_destroy_list frees at teardown -- so
+# two independently-dispatched copies of it is exactly the kind of split the
+# __current_exception block above refuses for the same reason.
+FORWARD __RTtypeid               ucrtbase.__RTtypeid
+FORWARD __RTDynamicCast          ucrtbase.__RTDynamicCast
+FORWARD __std_type_info_name     ucrtbase.__std_type_info_name
+FORWARD __std_type_info_compare  ucrtbase.__std_type_info_compare
+FORWARD __std_exception_copy     ucrtbase.__std_exception_copy
+FORWARD __std_exception_destroy  ucrtbase.__std_exception_destroy
+
+# __uncaught_exception, an omission in the __current_exception block above
+# rather than a decision.  vcruntime140.spec:51 forwards it to ucrtbase like
+# its three siblings at lines 199-201, ucrtbase.thunks forwards it on to
+# guestcrt.__uncaught_exception (the guest-side exception record), and it was
+# simply not listed when those three were.  It is not academic: the x86-64
+# msvcp140.dll this port stages into sysx8664 imports __uncaught_exception
+# from THIS module, and it is the ONLY one of that module's twelve
+# vcruntime140 imports this build did not serve (measured 2026-08-30, against
+# the import table of Proton's msvcp140.dll).
+#
+# __uncaught_exceptionS (plural, vcruntime140.spec:52) is deliberately NOT
+# added: its .spec line carries no forward, so it is implemented in THIS
+# module, and forwarding it to ucrtbase would be a claim about which
+# implementation runs that the .spec does not make.  It stays a hole.
+FORWARD __uncaught_exception     ucrtbase.__uncaught_exception
