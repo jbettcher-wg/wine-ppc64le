@@ -230,6 +230,7 @@ static void update_relative_valuators( XIAnyClassInfo **classes, int num_classes
 {
     struct x11drv_thread_data *thread_data = x11drv_thread_data();
     XIValuatorClassInfo *valuator;
+    int num_classes_total = num_classes;
 
     thread_data->x_valuator.number = -1;
     thread_data->y_valuator.number = -1;
@@ -238,12 +239,89 @@ static void update_relative_valuators( XIAnyClassInfo **classes, int num_classes
     {
         valuator = (XIValuatorClassInfo *)classes[num_classes];
         if (classes[num_classes]->type != XIValuatorClass) continue;
+        /* Say what the server actually offered, not just whether we liked it.
+         * Everything below turns on mode == XIModeRelative: an absolute
+         * valuator is silently skipped, both axes then come out unset, and
+         * every RawMotion is discarded for the life of this thread_data --
+         * which presents as "buttons work, mouselook is dead", since button
+         * events never pass through here.  Under a compositor whose Xwayland
+         * reports axes as absolute when no pointer lock is active, this is
+         * where that fact enters Wine, and it was invisible. */
+        TRACE( "valuator %d: mode %s, min %f, max %f, resolution %d\n",
+               valuator->number,
+               valuator->mode == XIModeRelative ? "RELATIVE" :
+               valuator->mode == XIModeAbsolute ? "absolute" : "unknown",
+               valuator->min, valuator->max, valuator->resolution );
         if (valuator->number == 0 && valuator->mode == XIModeRelative) thread_data->x_valuator = *valuator;
         if (valuator->number == 1 && valuator->mode == XIModeRelative) thread_data->y_valuator = *valuator;
     }
 
+    /* XWAYLAND: the master pointer's X/Y axes are ABSOLUTE, and its raw motion
+     * is relative anyway.
+     *
+     * MEASURED 2026-08-29 on cosmic-comp + Xwayland 24.1.13, with a Wine-free
+     * X11 client (probes/relmotion.c) so nothing here was in the loop:
+     *
+     *     axis 0: mode=absolute min=0.0 max=65535.0
+     *     axis 1: mode=absolute min=0.0 max=65535.0
+     *     axis 2: mode=RELATIVE min=-1.0 max=-1.0      (scroll)
+     *     axis 3: mode=RELATIVE min=-1.0 max=-1.0      (scroll)
+     *
+     * and simultaneously 8031 XI_RawMotion events, ALL 8031 carrying real
+     * deltas -- raw=(+1,-3), raw=(+2,-5) -- with valuators.values holding the
+     * same deltas scaled by pointer acceleration (a constant 3.5 here), NOT
+     * screen positions.  A successful XGrabPointer did not change the modes.
+     *
+     * That is correct for Xwayland: the master pointer's axes really are
+     * screen coordinates, and relative motion rides in the raw values fed from
+     * the Wayland relative-pointer protocol.  But the loop above only accepts
+     * an axis whose mode is XIModeRelative, so both axes came out unset and
+     * map_raw_event_coords() discarded every event at its `number < 0` gate --
+     * while the deltas it wanted sat in the event it was throwing away.
+     *
+     * That is the whole of a mouselook wedge that survived five fix attempts,
+     * a compositor patch and a session restart: buttons kept working because
+     * button events never pass through here, and only look died.  It
+     * reproduces identically under stock emulated Proton, which is what
+     * finally ruled this port out as the cause.
+     *
+     * So: if no axis claimed to be relative, take axes 0 and 1 anyway and give
+     * them the relative convention (max <= min), which makes the scale in
+     * map_raw_event_coords() come out 1 -- correct, because values[] holds
+     * deltas.  Scaling them by screen/(max-min) would divide by ~17 here.
+     *
+     * The fallback is deliberately conditional on finding NO relative X/Y: on
+     * a real X server a relative pointer reports relative axes and this never
+     * runs.  The cost of being wrong is a device whose absolute axes really do
+     * carry positions being read as deltas, which is the pre-existing
+     * behaviour for any such device that also reports relative axes. */
     if (thread_data->x_valuator.number < 0 || thread_data->y_valuator.number < 0)
-        WARN( "X/Y axis valuators not found, ignoring RawMotion events\n" );
+    {
+        int n = num_classes_total;
+
+        while (n--)
+        {
+            valuator = (XIValuatorClassInfo *)classes[n];
+            if (classes[n]->type != XIValuatorClass) continue;
+            if (valuator->number != 0 && valuator->number != 1) continue;
+            if (valuator->mode != XIModeAbsolute) continue;
+            if (valuator->number == 0) thread_data->x_valuator = *valuator;
+            else                       thread_data->y_valuator = *valuator;
+            /* the relative spelling, so map_raw_event_coords() scales by 1 */
+            if (valuator->number == 0) thread_data->x_valuator.min = thread_data->x_valuator.max = -1;
+            else                       thread_data->y_valuator.min = thread_data->y_valuator.max = -1;
+        }
+
+        if (thread_data->x_valuator.number >= 0 && thread_data->y_valuator.number >= 0)
+            TRACE( "no XIModeRelative axis; using absolute axes 0/1 for raw deltas "
+                   "(the Xwayland shape)\n" );
+    }
+
+    if (thread_data->x_valuator.number < 0 || thread_data->y_valuator.number < 0)
+        WARN( "X/Y axis valuators not found (no axis reported XIModeRelative, and no "
+              "absolute axis 0/1 to fall back on, in %d classes); ignoring RawMotion "
+              "events -- mouselook will not work, buttons still will\n",
+              num_classes_total );
 
     thread_data->x_valuator.value = 0;
     thread_data->y_valuator.value = 0;
