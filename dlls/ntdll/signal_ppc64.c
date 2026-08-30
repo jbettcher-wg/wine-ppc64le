@@ -462,6 +462,52 @@ static void report_invalid_frame( ULONG64 frame )
              "reserve %Ix\n", info.AllocationBase, (SIZE_T)info.RegionSize,
              NtCurrentTeb()->DeallocationStack,
              (SIZE_T)((char *)tib->StackBase - (char *)NtCurrentTeb()->DeallocationStack) );
+
+    /* AND WHAT THE PORT'S OWN RUN-LEVEL BOOKKEEPING SAYS, because the two
+     * questions "is the frame in the stack the TEB names" and "does the TEB
+     * agree with the run this thread is actually on" are different questions,
+     * and the first ERR above can only ask the first one.
+     *
+     * emu_guest_teb_stack (dlls/ntdll/unix/loader.c) is what a fiber switch
+     * writes to and what emu_teb_stack_switch() copies into the TEB every
+     * time guest code resumes; unixcall_emu_fiber_stack's QUERY op reads it
+     * back without disturbing it.  If it AGREES with the TEB (below) and the
+     * frame is still rejected, the bookkeeping itself is stale -- something
+     * upstream of here (a switch, a run's entry/exit) failed to update BOTH
+     * copies together, and the fault is not in this dispatcher at all.  If it
+     * DISAGREES with the TEB, something wrote Tib.StackBase/StackLimit
+     * directly without going through emu_teb_stack_switch(), which is a
+     * narrower, more findable bug.  HasFiberData says whether a Fiber API was
+     * even in use on this thread at the time -- FALSE would rule fibers out
+     * for this occurrence outright, the way a debugger's first question
+     * ("were you on a fiber?") cannot currently be answered from a log alone.
+     *
+     * A guest-side [MEASURED] callout awaits the NEXT run this fires on:
+     * as of 2026-08-29 no synthetic probe (same-thread fiber fault,
+     * cross-thread fiber theft, a fiber switch performed from inside a
+     * nested/native-invoked run, a hand-rolled RSP swap with no Fiber API at
+     * all, and a recursive vectored-handler exception storm) reproduces this
+     * report at all -- every one of them reaches the ordinary "unhandled at
+     * guest level; re-raising natively" report instead.  This block exists so
+     * that if Cyberpunk 2077's own job system trips it again, the log says
+     * which of the two questions above is the one with the surprising
+     * answer, instead of requiring a live debugger session to find out. */
+    {
+        struct emu_fiber_params fiber_stack = { EMU_FIBER_QUERY };
+
+        if (!WINE_UNIX_CALL( unix_emu_fiber_stack, &fiber_stack ) && fiber_stack.base)
+            ERR( "  the port's own run bookkeeping says base %p limit %p dealloc %p, "
+                 "which %s the TEB above; this thread %s fiber data (Tib.FiberData %p)\n",
+                 fiber_stack.base, fiber_stack.limit, fiber_stack.dealloc,
+                 (fiber_stack.base == tib->StackBase && fiber_stack.limit == tib->StackLimit &&
+                  fiber_stack.dealloc == NtCurrentTeb()->DeallocationStack) ? "AGREES WITH" : "DISAGREES WITH",
+                 NtCurrentTeb()->HasFiberData ? "HAS" : "has no",
+                 NtCurrentTeb()->Tib.FiberData );
+        else
+            ERR( "  the port's own run bookkeeping has no guest stack recorded "
+                 "(no guest run is active on this thread); this thread %s fiber data\n",
+                 NtCurrentTeb()->HasFiberData ? "HAS" : "has no" );
+    }
 }
 
 static DWORD call_unwind_handler( EXCEPTION_RECORD *rec, ULONG_PTR frame,
@@ -716,6 +762,49 @@ void WINAPI KiUserExceptionDispatcher( EXCEPTION_RECORD *rec, CONTEXT *context )
      * for the contract, not for work it does today. */
     if (pWow64PrepareForException) pWow64PrepareForException( rec, context );
 
+    /* WHICH STACK the interrupted code was on, BEFORE dispatch is even
+     * attempted and for EVERY exception code, not only EXCEPTION_ACCESS_
+     * VIOLATION.
+     *
+     * [MEASURED] 2026-08-29, Cyberpunk 2077 (Steam): this dispatcher used to
+     * ask that question only inside the access-violation arm below, on the
+     * theory that a fault taken with sp off the Win32 stack would always be
+     * one this port's own report_guest_access_violation()/emu_trap_dispatch
+     * machinery had already named.  It is not: this run reached
+     * KiUserExceptionDispatcher with an exception code that never went
+     * through that arm at all, and the FIRST anyone learned the interrupted
+     * sp was not on this thread's registered stack was three ERR lines
+     * later, inside call_seh_handlers/report_invalid_frame, phrased only as
+     * "invalid frame X (limit-base)" -- true, but it does not say WHY, and by
+     * then the process is already on its way to NtTerminateProcess.
+     *
+     * call_user_exception_dispatcher builds the dispatcher's frame on
+     * context->Gpr1, and call_seh_handlers then validates every unwound
+     * frame against the TEB's Win32 bounds -- so a fault taken while the
+     * emulator's JIT is running on some OTHER native stack (its own
+     * dispatch/trampoline stack, not the Win32 one this thread was given)
+     * produces a Gpr1 that can never walk to a valid frame, for ANY
+     * exception code the host signal handler turns into one of these.  This
+     * is that same question, asked immediately and unconditionally, so the
+     * answer is on record before the walk that depends on it fails. */
+    {
+        static LONG stack_reported;
+
+        if (InterlockedIncrement( &stack_reported ) <= 8)
+        {
+            NT_TIB *tib = (NT_TIB *)NtCurrentTeb();
+            BOOL on_win32_stack = ((char *)context->Gpr1 >= (char *)tib->StackLimit &&
+                                   (char *)context->Gpr1 <  (char *)tib->StackBase);
+
+            ERR( "KiUserExceptionDispatcher: code=%08x interrupted sp=%p is on the %s "
+                 "stack (TEB %p-%p)%s\n", (UINT)rec->ExceptionCode,
+                 (void *)(ULONG_PTR)context->Gpr1, on_win32_stack ? "WIN32" : "UNIX/other",
+                 tib->StackLimit, tib->StackBase,
+                 on_win32_stack ? "" : " -- this looks like a fault inside the emulator's "
+                 "own execution, not a Windows exception; the walk below is expected to fail" );
+        }
+    }
+
     /* WHAT AN ACCESS VIOLATION WAS ACTUALLY TOUCHING.
      *
      * The guest's own crash reporter cannot be trusted for this -- DOOM's
@@ -731,26 +820,8 @@ void WINAPI KiUserExceptionDispatcher( EXCEPTION_RECORD *rec, CONTEXT *context )
     {
         static LONG reported;
 
-        if (InterlockedIncrement( &reported ) <= 8)
-        {
-            NT_TIB *tib = (NT_TIB *)NtCurrentTeb();
-            BOOL on_win32_stack = ((char *)context->Gpr1 >= (char *)tib->StackLimit &&
-                                   (char *)context->Gpr1 <  (char *)tib->StackBase);
-
-            /* WHICH STACK the interrupted code was on.  call_user_exception_
-             * dispatcher builds the dispatcher's frame on context->Gpr1, and
-             * call_seh_handlers then validates every unwound frame against the
-             * TEB's Win32 bounds -- so a fault taken while the emulator is on
-             * the unix stack produces frames that can never be valid.  Saying
-             * so here distinguishes "the guest handled it" from "it could not
-             * be delivered at all". */
-            ERR( "  interrupted sp=%p is on the %s stack (TEB %p-%p)\n",
-                 (void *)(ULONG_PTR)context->Gpr1,
-                 on_win32_stack ? "WIN32" : "UNIX/other",
-                 tib->StackLimit, tib->StackBase );
-        }
         report_native_pc_in_guest_image( rec, context );
-        if (reported <= 8)
+        if (InterlockedIncrement( &reported ) <= 8)
             ERR( "access violation at %p: %s %p (info[0]=%Ix info[1]=%Ix)\n",
                  rec->ExceptionAddress,
                  rec->ExceptionInformation[0] == 0 ? "reading" :
