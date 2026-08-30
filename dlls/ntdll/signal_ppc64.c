@@ -5700,6 +5700,63 @@ static BOOL guest_cb_owns( const void *fn )
     return FALSE;
 }
 
+/* -> the guest target of the pool stub at fn, or NULL if fn is not the base
+ * address of a live stub.  Interior pointers return NULL deliberately: the
+ * pool only ever hands out stub BASES, so anything else is not ours.  Callers
+ * hold the loader lock, as every reader and writer of the pool does. */
+static void *guest_cb_target( const void *fn )
+{
+    UINT b;
+
+    for (b = 0; b < guest_cb_blocks; b++)
+    {
+        const struct guest_callback_stub *base = guest_cb_block[b];
+        UINT used = (b + 1 == guest_cb_blocks) ? guest_cb_count : GUEST_CB_BLOCK;
+
+        if (fn >= (const void *)base && fn < (const void *)(base + used))
+        {
+            SIZE_T off = (const char *)fn - (const char *)base;
+            if (off % sizeof(*base)) return NULL;
+            return base[off / sizeof(*base)].guest_fn;
+        }
+    }
+    return NULL;
+}
+
+/* The inverse of wrap_guest_wndproc, for WNDPROC values travelling INTO the
+ * guest: a pool stub goes back as the guest function it dispatches to, and
+ * everything else -- native procs, win32u winproc handles, values that were
+ * never wrapped -- passes through untouched.  Idempotent against the wrap
+ * (re-wrapping the unwrapped pointer finds the same stub in the pool), so a
+ * value can cross the boundary any number of times in either direction.
+ *
+ * WHY THIS EXISTS -- measured, Quake II rerelease, 2026-08-30.  Its SDL2
+ * subclasses the way SDL has always done: WIN_SetupWindowData reads
+ * GetWindowLongPtrW(GWLP_WNDPROC) back and compares it against its own
+ * WIN_WindowProc; only on a MISMATCH does it store the value as "previous
+ * proc" and subclass.  On Windows the read-back is the raw pointer it
+ * registered and the comparison matches.  On this port the read-back was the
+ * pool stub, the comparison missed, and SDL chained to a "previous proc"
+ * that dispatches straight back into WIN_WindowProc: every message recursed
+ * stub->proc->CallWindowProc(stub) 224 crossings deep until the kernel-stack
+ * floor check killed the callback (c0000001, 113 times), and the game exited
+ * through its own error path (rc=3).  The old comment here dismissed the
+ * read-back-and-compare idiom as one "no correct program does" -- SDL does,
+ * in every program that links it, and it is correct on Windows whenever the
+ * registration and the read are the same flavor. */
+static void *unwrap_guest_wndproc( void *fn )
+{
+    void *target;
+    ULONG_PTR magic;
+
+    if (!fn || ((ULONG_PTR)fn >> 16) == 0xffff) return fn;
+    LdrLockLoaderLock( 0, NULL, &magic );
+    target = guest_cb_target( fn );
+    LdrUnlockLoaderLock( 0, magic );
+    if (target) TRACE( "wndproc stub %p unwraps to guest %p\n", fn, target );
+    return target ? target : fn;
+}
+
 /* One row per guest callback TARGET, which is what the pool's own identity is
  * keyed on too (one stub per target/width/arity).  Named by the guest module
  * and offset rather than by the API that registered it: the registering export
@@ -6343,14 +6400,21 @@ static void wrap_thunk_callback_args( ULONG_PTR *a, UINT argc, UINT mask, UINT w
  *      new -- which is the point of saying so here rather than adding a row
  *      nothing has ever exercised.
  *
- * WHAT NATIVE CODE READS BACK.  GetWindowLongPtr( GWLP_WNDPROC ) and
- * GetClassLongPtr( GCLP_WNDPROC ) return what was SET, which on this port is
- * the trampoline.  That is the accepted answer: from user32's point of view the
- * trampoline IS the window procedure, it is what a subsequent CallWindowProc
- * must invoke, and it is idempotent through every path here.  A guest comparing
- * a read-back WNDPROC against its own function address will see them differ --
- * true on Windows too whenever an A/W mismatch turns the value into a winproc
- * handle, which is why no correct program does that comparison.
+ * WHAT EACH SIDE READS BACK.  NATIVE code reading GWLP_WNDPROC sees the
+ * trampoline, which from user32's point of view IS the window procedure --
+ * correct, native must be able to call what it reads.  The GUEST reading it
+ * back through GetWindowLongPtrA/W, or receiving it as SetWindowLongPtr's
+ * previous-value return, gets the pool stub UNWRAPPED to the guest function
+ * it stands for (emu_GetWindowLongPtr, and the setter's return path): what a
+ * guest registered is what a guest reads back, exactly as on Windows.  An
+ * earlier revision of this comment declared the trampoline-visible answer
+ * accepted and the read-back-and-compare idiom one "no correct program
+ * does" -- and then Quake II's SDL2 did precisely that comparison, missed,
+ * subclassed a window with its own procedure as its own "previous", and
+ * recursed to kernel-stack exhaustion on the first message.  See
+ * unwrap_guest_wndproc for the full mechanism.  GetClassLongPtr(
+ * GCLP_WNDPROC ) still returns the trampoline to a guest: nothing in the
+ * corpus reads it, and the row belongs beside these two when something does.
  */
 struct emu_wndclass
 {
@@ -6443,11 +6507,38 @@ static ULONG_PTR emu_SetWindowLongPtr( const ULONG_PTR *a, void *native )
      * does it this way, it belongs here beside GWLP_WNDPROC. */
     if ((int)(LONG)a[1] == EMU_GWLP_WNDPROC)
     {
+        ULONG_PTR prev;
+
         value = (ULONG_PTR)wrap_guest_wndproc( (void *)a[2] );
-        TRACE( "SetWindowLongPtr(%p, GWLP_WNDPROC): %p -> %p\n",
-               (void *)a[0], (void *)a[2], (void *)value );
+        prev = ((ULONG_PTR (*)( ULONG_PTR, ULONG_PTR, ULONG_PTR ))native)( a[0], a[1], value );
+        /* the previous procedure travels back INTO the guest: a pool stub
+         * must go back as the guest function it stands for, or a subclasser
+         * that compares (SDL) or chains (everything) sees our plumbing --
+         * see unwrap_guest_wndproc for the measured failure */
+        prev = (ULONG_PTR)unwrap_guest_wndproc( (void *)prev );
+        TRACE( "SetWindowLongPtr(%p, GWLP_WNDPROC): %p -> %p, prev %p\n",
+               (void *)a[0], (void *)a[2], (void *)value, (void *)prev );
+        return prev;
     }
     return ((ULONG_PTR (*)( ULONG_PTR, ULONG_PTR, ULONG_PTR ))native)( a[0], a[1], value );
+}
+
+static ULONG_PTR emu_GetWindowLongPtr( const ULONG_PTR *a, void *native )
+{
+    ULONG_PTR value;
+
+    if (!native) return 0;
+    value = ((ULONG_PTR (*)( ULONG_PTR, ULONG_PTR ))native)( a[0], a[1] );
+    /* only the one index, same as the setter: everything else is data */
+    if ((int)(LONG)a[1] == EMU_GWLP_WNDPROC)
+    {
+        ULONG_PTR unwrapped = (ULONG_PTR)unwrap_guest_wndproc( (void *)value );
+        if (unwrapped != value)
+            TRACE( "GetWindowLongPtr(%p, GWLP_WNDPROC): %p -> guest %p\n",
+                   (void *)a[0], (void *)value, (void *)unwrapped );
+        value = unwrapped;
+    }
+    return value;
 }
 
 static ULONG_PTR emu_CallWindowProc( const ULONG_PTR *a, void *native )
@@ -7175,6 +7266,8 @@ static const struct thunk_override thunk_overrides[] =
     { L"user32.dll", "RegisterClassExW",   1, emu_RegisterClassEx },
     { L"user32.dll", "SetWindowLongPtrA",  3, emu_SetWindowLongPtr },
     { L"user32.dll", "SetWindowLongPtrW",  3, emu_SetWindowLongPtr },
+    { L"user32.dll", "GetWindowLongPtrA",  2, emu_GetWindowLongPtr },
+    { L"user32.dll", "GetWindowLongPtrW",  2, emu_GetWindowLongPtr },
     { L"user32.dll", "CallWindowProcA",    5, emu_CallWindowProc },
     { L"user32.dll", "CallWindowProcW",    5, emu_CallWindowProc },
     /* The same class reached by argument position, so a plain mask serves --
