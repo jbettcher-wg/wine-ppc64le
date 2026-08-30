@@ -121,6 +121,47 @@ mid-GPU-submission.**  Doing both wedged the GPU: amdgpu job timeout, ASIC
 reset that did not come back, reboot required.  If a run must be stopped, stop
 the launcher and let the game exit.
 
+## The mouse wedge, and how to reproduce it in two minutes
+
+**Mouselook works in BORDERLESS, then dies after a few window switches, and
+never comes back for the rest of the session.**  [MEASURED 2026-08-29, DOOM
+(2016) on the native lane.]  Fullscreen never worked at all; borderless works
+until focus churns.
+
+That asymmetry is the whole diagnosis.  Borderless does not take the
+exclusive-fullscreen path, so it never does the ClipCursor + warp-recenter
+dance -- which is why it works at first.  What kills it is focus churn:
+cosmic-comp's periodic `update_pointer_focus` (src/shell/focus/mod.rs) yanks
+pointer focus on any surface-stack change with no check for an ACTIVE pointer
+constraint; the pinned smithay then deactivates the game's pointer lock on
+`leave` and drops the pending cursor hint; a stale hint lands at the clip
+corner (0,0); and from then on `new_constraint`'s `is_under` test can never
+pass again.  Wedged for the session.
+
+**The reproducer, which is the point of this entry:**
+
+1. Launch a title borderless (DOOM: `+r_fullscreen 0`).
+2. Confirm mouselook works.  It will.
+3. Alt-tab away and back two or three times.
+4. Mouselook is dead, and stays dead until the game is restarted.
+
+Two minutes, no guesswork about the trigger.  Every earlier round of this cost
+a game session just to find out what set it off.
+
+**A patch exists and is INSUFFICIENT.**  cosmic-comp was rebuilt locally with a
+two-hunk backport (guard `update_pointer_focus` against active constraints;
+apply the pending hint before explicit deactivation) and the wedge still
+happens -- because an explicit focus change still legitimately deactivates the
+lock, and the guard only covers the PERIODIC path.  Upstream has no fix:
+pop-os/cosmic-comp#2050 closed as a duplicate of cosmic-epoch#1817, still open.
+Xwayland 24.1.13 does not implement `wp_pointer_warp_v1` (only the lock/hint
+emulator) and the MR adding it is unmerged, so that route is closed too.
+
+Wine is NOT the cause: every commit touching `winex11.drv/mouse.c`,
+`win32u/rawinput.c`, `win32u/input.c` and `server/queue.c` in this fork's range
+is upstream-authored, and upstream has not fixed the absolute-valuator gate
+either (zero commits, checked to wine-11.16).
+
 ## Reading a failure
 
 **A "frozen" game may be a CRASHED game whose crash path wedged.**  [MEASURED]
