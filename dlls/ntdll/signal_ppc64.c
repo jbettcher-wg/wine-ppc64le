@@ -5723,6 +5723,38 @@ static void *guest_cb_target( const void *fn )
     return NULL;
 }
 
+/* The general inverse of wrap_guest_callback[_ex], for ANY pool stub
+ * travelling INTO the guest through a plain "SET returns the previous one"
+ * registration point: a stub goes back as the guest function it dispatches
+ * to, and a native function, a never-wrapped value, or NULL passes through
+ * untouched.  Idempotent against the wrap in both directions, for the same
+ * reason unwrap_guest_wndproc below is.
+ *
+ * WHY THIS EXISTS BESIDE unwrap_guest_wndproc -- audited, 2026-08-30
+ * (ppc64le/docs/sessions/2026-08-29/pointer-identity-audit.md), after the
+ * WNDPROC fix (see unwrap_guest_wndproc) made the shape of the bug obvious:
+ * ANY registration API that hands back "the one you replaced" is a
+ * save-and-compare or save-and-chain candidate, not just window procedures.
+ * SetUnhandledExceptionFilter is the textbook case -- comparing or chaining
+ * the previous filter is documented, ordinary practice -- and
+ * mmioInstallIOProc's MMIO_FINDPROC/MMIO_REMOVEPROC modes and
+ * _set_new_handler's save-and-restore share the exact shape.  A WNDPROC
+ * additionally has to let win32u's 0xffff00nn handles and native procs
+ * through unexamined by guest_cb_target, which is what makes
+ * unwrap_guest_wndproc a thin wrapper around this rather than a duplicate of
+ * it. */
+static void *unwrap_guest_cb( void *fn )
+{
+    void *target;
+    ULONG_PTR magic;
+
+    if (!fn) return fn;
+    LdrLockLoaderLock( 0, NULL, &magic );
+    target = guest_cb_target( fn );
+    LdrUnlockLoaderLock( 0, magic );
+    return target ? target : fn;
+}
+
 /* The inverse of wrap_guest_wndproc, for WNDPROC values travelling INTO the
  * guest: a pool stub goes back as the guest function it dispatches to, and
  * everything else -- native procs, win32u winproc handles, values that were
@@ -5743,18 +5775,17 @@ static void *guest_cb_target( const void *fn )
  * through its own error path (rc=3).  The old comment here dismissed the
  * read-back-and-compare idiom as one "no correct program does" -- SDL does,
  * in every program that links it, and it is correct on Windows whenever the
- * registration and the read are the same flavor. */
+ * registration and the read are the same flavor.  See unwrap_guest_cb above
+ * for the same fix applied to the other registration points the follow-up
+ * audit found in the same shape. */
 static void *unwrap_guest_wndproc( void *fn )
 {
     void *target;
-    ULONG_PTR magic;
 
     if (!fn || ((ULONG_PTR)fn >> 16) == 0xffff) return fn;
-    LdrLockLoaderLock( 0, NULL, &magic );
-    target = guest_cb_target( fn );
-    LdrUnlockLoaderLock( 0, magic );
-    if (target) TRACE( "wndproc stub %p unwraps to guest %p\n", fn, target );
-    return target ? target : fn;
+    target = unwrap_guest_cb( fn );
+    if (target != fn) TRACE( "wndproc stub %p unwraps to guest %p\n", fn, target );
+    return target;
 }
 
 /* One row per guest callback TARGET, which is what the pool's own identity is
@@ -6553,6 +6584,78 @@ static ULONG_PTR emu_CallWindowProc( const ULONG_PTR *a, void *native )
         ( proc, a[1], a[2], a[3], a[4] );
 }
 
+/* GCLP_WNDPROC: the class-level analogue of GWLP_WNDPROC, found by the
+ * pointer-identity audit (ppc64le/docs/sessions/2026-08-29/
+ * pointer-identity-audit.md) rather than by a title exercising it -- exactly
+ * the position the WNDPROC row itself was in until Quake II's SDL2 did.
+ * RegisterClass/RegisterClassEx above already wrap a class's lpfnWndProc, so
+ * GetClassLongPtr( GCLP_WNDPROC ) was returning the pool stub to the guest
+ * unexamined, the same shape of miss for a title that superclasses its OWN
+ * class (or another guest module's) by index rather than by
+ * GetClassInfo(Ex).  Same fix, same function: unwrap_guest_wndproc. */
+#define EMU_GCLP_WNDPROC  (-24)
+
+static ULONG_PTR emu_GetClassLongPtr( const ULONG_PTR *a, void *native )
+{
+    ULONG_PTR value;
+
+    if (!native) return 0;
+    value = ((ULONG_PTR (*)( ULONG_PTR, ULONG_PTR ))native)( a[0], a[1] );
+    if ((int)(LONG)a[1] == EMU_GCLP_WNDPROC)
+    {
+        ULONG_PTR unwrapped = (ULONG_PTR)unwrap_guest_wndproc( (void *)value );
+        if (unwrapped != value)
+            TRACE( "GetClassLongPtr(%p, GCLP_WNDPROC): %p -> guest %p\n",
+                   (void *)a[0], (void *)value, (void *)unwrapped );
+        value = unwrapped;
+    }
+    return value;
+}
+
+/* The struct-shaped route to the same field: GetClassInfo(Ex) fills in a
+ * WNDCLASS(EX) whose lpfnWndProc is the class's, which is wrapped for the
+ * identical reason GetClassLongPtr's is -- a title superclassing a class
+ * registered by its own (or another guest) module reads this back and may
+ * compare it before deciding whether to chain.  Only touched on success:
+ * GetClassInfoEx fails without writing the struct at all when cbSize is
+ * wrong, and touching lpfnWndProc first would read past what native wrote
+ * (or, worse, past what it left alone). */
+static ULONG_PTR emu_GetClassInfo( const ULONG_PTR *a, void *native )
+{
+    ULONG_PTR ret;
+    struct emu_wndclass *out = (struct emu_wndclass *)a[2];
+
+    if (!native) return 0;
+    ret = ((ULONG_PTR (*)( ULONG_PTR, ULONG_PTR, ULONG_PTR ))native)( a[0], a[1], a[2] );
+    if (ret && out)
+    {
+        void *unwrapped = unwrap_guest_wndproc( out->lpfnWndProc );
+        if (unwrapped != out->lpfnWndProc)
+            TRACE( "GetClassInfo(%p): wndproc %p -> guest %p\n",
+                   out, out->lpfnWndProc, unwrapped );
+        out->lpfnWndProc = unwrapped;
+    }
+    return ret;
+}
+
+static ULONG_PTR emu_GetClassInfoEx( const ULONG_PTR *a, void *native )
+{
+    ULONG_PTR ret;
+    struct emu_wndclassex *out = (struct emu_wndclassex *)a[2];
+
+    if (!native) return 0;
+    ret = ((ULONG_PTR (*)( ULONG_PTR, ULONG_PTR, ULONG_PTR ))native)( a[0], a[1], a[2] );
+    if (ret && out)
+    {
+        void *unwrapped = unwrap_guest_wndproc( out->lpfnWndProc );
+        if (unwrapped != out->lpfnWndProc)
+            TRACE( "GetClassInfoEx(%p): wndproc %p -> guest %p\n",
+                   out, out->lpfnWndProc, unwrapped );
+        out->lpfnWndProc = unwrapped;
+    }
+    return ret;
+}
+
 /***********************************************************************
  *           guest fibers
  *
@@ -6937,6 +7040,73 @@ static ULONG_PTR emu_winmm_open5( const ULONG_PTR *a, void *native )
                             ULONG_PTR ))native)( a[0], a[1], cb, a[3], a[4] );
 }
 
+/* SET-returns-the-previous-one registrations, found by the pointer-identity
+ * audit (ppc64le/docs/sessions/2026-08-29/pointer-identity-audit.md) that
+ * followed the WNDPROC fix.  Each of these used to be a plain cb_mask row --
+ * wrap the incoming callback, hand the raw native return straight back --
+ * which is exactly the WNDPROC bug's shape transplanted onto a different
+ * API: the "previous" value handed back to the guest was OUR pool stub, not
+ * what the guest itself registered, so a guest that COMPARES it (rather than
+ * just calling it) takes the wrong branch.
+ *
+ * SetUnhandledExceptionFilter is the highest-risk of the three: saving the
+ * previous filter and comparing or chaining it --
+ *
+ *     LPTOP_LEVEL_EXCEPTION_FILTER old = SetUnhandledExceptionFilter( mine );
+ *     if (old != mine) g_prev = old;   // avoid re-chaining to ourselves
+ *
+ * -- is documented, ordinary practice (crash-reporting libraries installing
+ * exactly once, or chaining to whatever filter came before), not the
+ * "no correct program does that" case this port has already been wrong
+ * about once.  mmioInstallIOProc's MMIO_FINDPROC/MMIO_REMOVEPROC modes and
+ * _set_new_handler's save-and-restore share the identical shape; the RETURN
+ * has to be unwrap_guest_cb'd for the same reason across all three. */
+static ULONG_PTR emu_SetUnhandledExceptionFilter( const ULONG_PTR *a, void *native )
+{
+    ULONG_PTR wrapped, prev;
+
+    if (!native) return 0;
+    wrapped = (ULONG_PTR)wrap_guest_callback( (void *)a[0] );
+    prev = ((ULONG_PTR (*)( ULONG_PTR ))native)( wrapped );
+    prev = (ULONG_PTR)unwrap_guest_cb( (void *)prev );
+    TRACE( "SetUnhandledExceptionFilter(%p -> %p): prev %p\n",
+           (void *)a[0], (void *)wrapped, (void *)prev );
+    return prev;
+}
+
+/* mmioInstallIOProc(A/W): MMIO_INSTALLPROC returns the argument handed in
+ * (already correct, wrapped or not, because it is the SAME value both
+ * sides just agreed on), but MMIO_FINDPROC and MMIO_REMOVEPROC return
+ * whatever is STORED for the fourCC -- our pool stub, if a guest installed
+ * it -- straight from dlls/winmm/mmio.c's IOProcList.  The callback itself
+ * is LPMMIOPROC, four arguments returning LRESULT, hence wide=TRUE. */
+static ULONG_PTR emu_mmioInstallIOProc( const ULONG_PTR *a, void *native )
+{
+    ULONG_PTR wrapped, prev;
+
+    if (!native) return 0;
+    wrapped = (ULONG_PTR)wrap_guest_callback_ex( (void *)a[1], TRUE, 4 );
+    prev = ((ULONG_PTR (*)( ULONG_PTR, ULONG_PTR, ULONG_PTR ))native)( a[0], wrapped, a[2] );
+    prev = (ULONG_PTR)unwrap_guest_cb( (void *)prev );
+    TRACE( "mmioInstallIOProc(%08x, %p -> %p, %#x): prev %p\n",
+           (UINT)a[0], (void *)a[1], (void *)wrapped, (UINT)a[2], (void *)prev );
+    return prev;
+}
+
+/* msvcr100's _set_new_handler: the C++ new-handler, `int (*)(size_t)`.  Same
+ * save-and-restore shape as the two above; see the row's old comment (kept
+ * below, in the table) for why this one is reached at all. */
+static ULONG_PTR emu_set_new_handler( const ULONG_PTR *a, void *native )
+{
+    ULONG_PTR wrapped, prev;
+
+    if (!native) return 0;
+    wrapped = (ULONG_PTR)wrap_guest_callback( (void *)a[0] );
+    prev = ((ULONG_PTR (*)( ULONG_PTR ))native)( wrapped );
+    prev = (ULONG_PTR)unwrap_guest_cb( (void *)prev );
+    return prev;
+}
+
 
 static const struct thunk_override thunk_overrides[] =
 {
@@ -6988,18 +7158,26 @@ static const struct thunk_override thunk_overrides[] =
     { L"msvcr100.dll", "_onexit",           1, emu_onexit },
     { L"msvcr120.dll", "_onexit",           1, emu_onexit },
     /* The C++ new-handler, `int (*)(size_t)`, which native operator new calls
-     * when an allocation fails.  A plain cb_mask row rather than a handler,
-     * and the shape it shares with SetUnhandledExceptionFilter below is the
-     * reason: both are a SET rather than a queue, and both RETURN THE ONE
-     * THEY REPLACED, so the guest's save-and-restore idiom
+     * when an allocation fails.  The shape it shares with
+     * SetUnhandledExceptionFilter is the reason it gets its own handler
+     * function rather than a plain cb_mask row: both are a SET rather than a
+     * queue, and both RETURN THE ONE THEY REPLACED, so the guest's
+     * save-and-restore idiom
      *
      *     _PNH old = _set_new_handler( mine );  ...  _set_new_handler( old );
      *
-     * hands our trampoline back in -- which wrap_guest_callback recognises and
-     * returns unchanged, the idempotence case documented there.  A guest that
-     * CALLS the returned pointer instead of restoring it would run ppc64 bytes
-     * as x86-64; that is the same accepted limit the exception-filter row has
-     * carried, and no corpus title does it.
+     * hands our trampoline back in.  Restoring it is fine either way --
+     * wrap_guest_callback re-wraps an already-wrapped value idempotently --
+     * but the pointer-identity audit
+     * (ppc64le/docs/sessions/2026-08-29/pointer-identity-audit.md) found
+     * that an EARLIER revision of this comment stopped there and called a
+     * guest CALLING or COMPARING the returned value instead "the same
+     * accepted limit the exception-filter row has carried" -- the exact
+     * reasoning that turned out wrong for GWLP_WNDPROC's read-back
+     * (dlls/ntdll/signal_ppc64.c's unwrap_guest_wndproc banner).  Fixed the
+     * same way: emu_set_new_handler unwraps the previous value before it
+     * reaches the guest, so both the call idiom and any comparison idiom see
+     * exactly what they registered.
      *
      * Why it needs a row at all: dlls/msvcrt/heap.c keeps the pointer in a
      * LOCK_HEAP'd global and calls it from operator new's failure path, so an
@@ -7009,7 +7187,7 @@ static const struct thunk_override thunk_overrides[] =
      * up (see dlls/msvcr100/msvcr100.thunks), so any guest carrying the VC++
      * 2010 C++ runtime reaches it.  One argument, `int` back: the default
      * four-slot, sign-extended-32-bit trampoline is the right one. */
-    { L"msvcr100.dll", "?_set_new_handler@@YAP6AH_K@ZP6AH0@Z@Z", 1, NULL, 1u << 0 },
+    { L"msvcr100.dll", "?_set_new_handler@@YAP6AH_K@ZP6AH0@Z@Z", 1, emu_set_new_handler },
     { L"kernel32.dll", "ExitThread",        1, emu_ExitThread },
     { L"kernelbase.dll", "ExitThread",      1, emu_ExitThread },
     /* native->guest WITH identity: these thunks receive a guest function
@@ -7050,9 +7228,12 @@ static const struct thunk_override thunk_overrides[] =
     { L"winmm.dll", "mixerOpen",       5, emu_winmm_open5 },
     /* every winetest registers a top-level exception filter; SEH dispatch
      * calling a guest filter natively was an illegal-instruction storm ending
-     * in a stack overflow, which buried the REAL failure under it */
-    { L"kernel32.dll",   "SetUnhandledExceptionFilter", 1, NULL, 1u << 0 },
-    { L"kernelbase.dll", "SetUnhandledExceptionFilter", 1, NULL, 1u << 0 },
+     * in a stack overflow, which buried the REAL failure under it.  A
+     * handler function rather than a plain cb_mask row since the PREVIOUS
+     * filter this returns to the guest must be unwrapped too -- see
+     * emu_SetUnhandledExceptionFilter and the pointer-identity audit. */
+    { L"kernel32.dll",   "SetUnhandledExceptionFilter", 1, emu_SetUnhandledExceptionFilter },
+    { L"kernelbase.dll", "SetUnhandledExceptionFilter", 1, emu_SetUnhandledExceptionFilter },
     /* Fiber-local storage destructors.  Every MSVC CRT allocates one FLS slot
      * for its per-thread data and hands FlsAlloc the function that frees it
      * (UCRT's __acrt_freefls), so this row is reached by ANY guest built with
@@ -7268,6 +7449,14 @@ static const struct thunk_override thunk_overrides[] =
     { L"user32.dll", "SetWindowLongPtrW",  3, emu_SetWindowLongPtr },
     { L"user32.dll", "GetWindowLongPtrA",  2, emu_GetWindowLongPtr },
     { L"user32.dll", "GetWindowLongPtrW",  2, emu_GetWindowLongPtr },
+    /* the class-level analogues, added by the pointer-identity audit -- see
+     * the banner above emu_GetClassLongPtr */
+    { L"user32.dll", "GetClassLongPtrA",   2, emu_GetClassLongPtr },
+    { L"user32.dll", "GetClassLongPtrW",   2, emu_GetClassLongPtr },
+    { L"user32.dll", "GetClassInfoA",      3, emu_GetClassInfo },
+    { L"user32.dll", "GetClassInfoW",      3, emu_GetClassInfo },
+    { L"user32.dll", "GetClassInfoExA",    3, emu_GetClassInfoEx },
+    { L"user32.dll", "GetClassInfoExW",    3, emu_GetClassInfoEx },
     { L"user32.dll", "CallWindowProcA",    5, emu_CallWindowProc },
     { L"user32.dll", "CallWindowProcW",    5, emu_CallWindowProc },
     /* The same class reached by argument position, so a plain mask serves --
@@ -7640,8 +7829,12 @@ static const struct thunk_override thunk_overrides[] =
     { L"vcruntime140.dll", "_set_purecall_handler",              1, NULL, 1u << 0,             0,          0 },
 
     { L"winmm.dll", "mciSetYieldProc",                    3, NULL, 1u << 1,             0,          0 },
-    { L"winmm.dll", "mmioInstallIOProcA",                 3, NULL, 1u << 1,             1u << 1,    0 },
-    { L"winmm.dll", "mmioInstallIOProcW",                 3, NULL, 1u << 1,             1u << 1,    0 },
+    /* A handler function rather than the plain cb_mask row this used to be:
+     * MMIO_FINDPROC and MMIO_REMOVEPROC return whatever is stored for the
+     * fourCC, which is our pool stub when a guest installed it -- see
+     * emu_mmioInstallIOProc and the pointer-identity audit. */
+    { L"winmm.dll", "mmioInstallIOProcA",                 3, emu_mmioInstallIOProc },
+    { L"winmm.dll", "mmioInstallIOProcW",                 3, emu_mmioInstallIOProc },
 
     { L"ws2_32.dll", "GetAddrInfoExW",                    10, NULL, 1u << 8,             0,          0 },
     { L"ws2_32.dll", "WSAAccept",                          5, NULL, 1u << 3,             0,          8 },
