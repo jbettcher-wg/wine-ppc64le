@@ -119,6 +119,192 @@ __attribute__((visibility("hidden"))) __thread TEB *ppc64_unix_teb
     __attribute__((tls_model("initial-exec")));
 
 
+/* ISA 3.0 fast path for the VMX halves of __wine_syscall_dispatcher's
+ * FP/VMX save (entry, unconditional) and restore (exit, gated on
+ * frame->restore_flags & CONTEXT_VECTOR) blocks, with a POWER8-legal
+ * fallback.  Two macros below expand to two DIFFERENT instruction
+ * sequences that write/read IDENTICAL register state -- only the encoding
+ * changes.  See ppc64le/docs/sessions/2026-08-29/fpvmx-save-gate.md for why
+ * the save itself can never be made conditional (it stays unconditional
+ * either way); this only changes how it is encoded.
+ *
+ *   - ISA 3.0 (POWER9+) has stxv/lxv, a DQ-form (immediate-displacement)
+ *     128-bit VSX store/load.  v0-v31 alias vsr32-vsr63, so each register
+ *     is one instruction, addressed directly by its frame offset -- no
+ *     index register needed.
+ *   - Every earlier ISA, including this port's POWER8 floor, only has
+ *     stvx/lvx: an X-form (indexed-only) AltiVec store/load with no
+ *     immediate-displacement form, so every register after the first also
+ *     costs a trailing addi to bump the index register.  This is exactly
+ *     the sequence already in the tree before this change.
+ *
+ * Gated at COMPILE time on _ARCH_PWR9, which GCC defines exactly when
+ * -mcpu=power9 (or later) is passed, and does not define otherwise --
+ * verified directly against this project's own toolchain, not assumed:
+ * `echo | gcc -dM -E -mcpu=power9 -` defines _ARCH_PWR9; the identical
+ * command with -mcpu=power8 does not, on the same gcc.  A plain `make` in
+ * this tree passes no -mcpu flag at all (dlls/ntdll/Makefile's CFLAGS is
+ * literally "-g -O2"), so it inherits the toolchain's own default target --
+ * on this project's Arch Linux POWER toolchain that default is POWER8
+ * (`echo | gcc -dM -E -` defines _ARCH_PWR8, not _ARCH_PWR9). That means a
+ * co-developer's ordinary build already lands on the POWER8-legal branch
+ * with no extra flag, no source change, and no per-syscall cost for a
+ * feature check that would never flip while the binary runs -- exactly
+ * "binaries are compiled for the machine that runs them" with nothing
+ * added to prove it at runtime.  The owner's local POWER9-tuned build
+ * opts into the fast path with `make CFLAGS="-g -O2 -mcpu=power9"`.
+ *
+ * No runtime dispatch: the task this served on (see the tree's own session
+ * log) tried a getauxval(AT_HWCAP2)-checked runtime branch first, kept
+ * behind a WINE_PPC64LE_FORCE_POWER8_VMX env var so the POWER8 path could
+ * still be exercised on this project's one POWER9 machine. That worked but
+ * added a load+compare+branch to the hottest crossing in the system for a
+ * decision that is fixed for the binary's entire life -- worse than the
+ * thing being optimized away. Testing both encodings on hardware that is
+ * only ever one of them does not need a runtime flag: rebuilding with a
+ * different CFLAGS (above) puts either encoding in the binary at zero
+ * steady-state cost, which is what actually ships. */
+#ifdef _ARCH_PWR9
+# define __ASM_VMX_SAVE_NONVOLATILE \
+    "stxv 52, 0x390(31)\n\t" \
+    "stxv 53, 0x3a0(31)\n\t" \
+    "stxv 54, 0x3b0(31)\n\t" \
+    "stxv 55, 0x3c0(31)\n\t" \
+    "stxv 56, 0x3d0(31)\n\t" \
+    "stxv 57, 0x3e0(31)\n\t" \
+    "stxv 58, 0x3f0(31)\n\t" \
+    "stxv 59, 0x400(31)\n\t" \
+    "stxv 60, 0x410(31)\n\t" \
+    "stxv 61, 0x420(31)\n\t" \
+    "stxv 62, 0x430(31)\n\t" \
+    "stxv 63, 0x440(31)\n\t"
+# define __ASM_VMX_RESTORE_ALL \
+    "lxv 32, 0x250(31)\n\t" \
+    "lxv 33, 0x260(31)\n\t" \
+    "lxv 34, 0x270(31)\n\t" \
+    "lxv 35, 0x280(31)\n\t" \
+    "lxv 36, 0x290(31)\n\t" \
+    "lxv 37, 0x2a0(31)\n\t" \
+    "lxv 38, 0x2b0(31)\n\t" \
+    "lxv 39, 0x2c0(31)\n\t" \
+    "lxv 40, 0x2d0(31)\n\t" \
+    "lxv 41, 0x2e0(31)\n\t" \
+    "lxv 42, 0x2f0(31)\n\t" \
+    "lxv 43, 0x300(31)\n\t" \
+    "lxv 44, 0x310(31)\n\t" \
+    "lxv 45, 0x320(31)\n\t" \
+    "lxv 46, 0x330(31)\n\t" \
+    "lxv 47, 0x340(31)\n\t" \
+    "lxv 48, 0x350(31)\n\t" \
+    "lxv 49, 0x360(31)\n\t" \
+    "lxv 50, 0x370(31)\n\t" \
+    "lxv 51, 0x380(31)\n\t" \
+    "lxv 52, 0x390(31)\n\t" \
+    "lxv 53, 0x3a0(31)\n\t" \
+    "lxv 54, 0x3b0(31)\n\t" \
+    "lxv 55, 0x3c0(31)\n\t" \
+    "lxv 56, 0x3d0(31)\n\t" \
+    "lxv 57, 0x3e0(31)\n\t" \
+    "lxv 58, 0x3f0(31)\n\t" \
+    "lxv 59, 0x400(31)\n\t" \
+    "lxv 60, 0x410(31)\n\t" \
+    "lxv 61, 0x420(31)\n\t" \
+    "lxv 62, 0x430(31)\n\t" \
+    "lxv 63, 0x440(31)\n\t"
+#else
+# define __ASM_VMX_SAVE_NONVOLATILE \
+    "li 11, 0x390\n\t" \
+    "stvx 20, 31, 11\n\t" \
+    "addi 11, 11, 16\n\t" \
+    "stvx 21, 31, 11\n\t" \
+    "addi 11, 11, 16\n\t" \
+    "stvx 22, 31, 11\n\t" \
+    "addi 11, 11, 16\n\t" \
+    "stvx 23, 31, 11\n\t" \
+    "addi 11, 11, 16\n\t" \
+    "stvx 24, 31, 11\n\t" \
+    "addi 11, 11, 16\n\t" \
+    "stvx 25, 31, 11\n\t" \
+    "addi 11, 11, 16\n\t" \
+    "stvx 26, 31, 11\n\t" \
+    "addi 11, 11, 16\n\t" \
+    "stvx 27, 31, 11\n\t" \
+    "addi 11, 11, 16\n\t" \
+    "stvx 28, 31, 11\n\t" \
+    "addi 11, 11, 16\n\t" \
+    "stvx 29, 31, 11\n\t" \
+    "addi 11, 11, 16\n\t" \
+    "stvx 30, 31, 11\n\t" \
+    "addi 11, 11, 16\n\t" \
+    "stvx 31, 31, 11\n\t"
+# define __ASM_VMX_RESTORE_ALL \
+    "li 15, 0x250\n\t" \
+    "lvx 0, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 1, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 2, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 3, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 4, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 5, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 6, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 7, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 8, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 9, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 10, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 11, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 12, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 13, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 14, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 15, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 16, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 17, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 18, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 19, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 20, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 21, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 22, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 23, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 24, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 25, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 26, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 27, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 28, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 29, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 30, 31, 15\n\t" \
+    "addi 15, 15, 16\n\t" \
+    "lvx 31, 31, 15\n\t"
+#endif
+
+
 /* stack layout when calling KiUserExceptionDispatcher.
  *
  * The first 96 bytes are the ELFv2 linkage and parameter save area that the
@@ -2331,32 +2517,12 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                     * replaced the caller's f31 with the FPSCR on every syscall. */
                    "mffs 0\n\t"
                    "stfd 0, 0x128(31)\n\t"
-                   /* non-volatile VRs; stvx needs an index register, and r11 is
-                    * free now that the syscall id is in the frame */
-                   "li 11, 0x390\n\t"               /* 0x250 + 20*16 */
-                   "stvx 20, 31, 11\n\t"
-                   "addi 11, 11, 16\n\t"
-                   "stvx 21, 31, 11\n\t"
-                   "addi 11, 11, 16\n\t"
-                   "stvx 22, 31, 11\n\t"
-                   "addi 11, 11, 16\n\t"
-                   "stvx 23, 31, 11\n\t"
-                   "addi 11, 11, 16\n\t"
-                   "stvx 24, 31, 11\n\t"
-                   "addi 11, 11, 16\n\t"
-                   "stvx 25, 31, 11\n\t"
-                   "addi 11, 11, 16\n\t"
-                   "stvx 26, 31, 11\n\t"
-                   "addi 11, 11, 16\n\t"
-                   "stvx 27, 31, 11\n\t"
-                   "addi 11, 11, 16\n\t"
-                   "stvx 28, 31, 11\n\t"
-                   "addi 11, 11, 16\n\t"
-                   "stvx 29, 31, 11\n\t"
-                   "addi 11, 11, 16\n\t"
-                   "stvx 30, 31, 11\n\t"
-                   "addi 11, 11, 16\n\t"
-                   "stvx 31, 31, 11\n\t"
+                   /* non-volatile VRs -- ISA 3.0 fast path / POWER8 fallback,
+                    * selected at compile time; see __ASM_VMX_SAVE_NONVOLATILE's
+                    * definition above for the full reasoning.  r11 is free now
+                    * that the syscall id is in the frame, whichever path is
+                    * compiled in. */
+                   __ASM_VMX_SAVE_NONVOLATILE
                    /* switch to the kernel stack: the frame sits at the top of it */
                    "ld 0, 0x008(31)\n\t"
                    "addi 1, 31, -0x60\n\t"
@@ -2469,70 +2635,14 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    "lfd 31, 0x248(31)\n"
                    "5:\tandi. 0, 14, 16\n\t"        /* CONTEXT_VECTOR */
                    "beq 6f\n\t"
-                   "li 15, 0x250\n\t"
-                   "lvx 0, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 1, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 2, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 3, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 4, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 5, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 6, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 7, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 8, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 9, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 10, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 11, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 12, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 13, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 14, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 15, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 16, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 17, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 18, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 19, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 20, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 21, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 22, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 23, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 24, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 25, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 26, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 27, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 28, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 29, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 30, 31, 15\n\t"
-                   "addi 15, 15, 16\n\t"
-                   "lvx 31, 31, 15\n"
+                   /* ISA 3.0 fast path / POWER8 fallback, selected at compile
+                    * time -- see __ASM_VMX_RESTORE_ALL's definition above.
+                    * Restore reloads all 32 (not just the 12 non-volatile
+                    * ones the save writes): NtSetContextThread's
+                    * CONTEXT_VECTOR arm memcpy's a full 32-register array,
+                    * so a caller that set v0-v19 explicitly must see them
+                    * restored too.  r15 is free here either way. */
+                   __ASM_VMX_RESTORE_ALL
                    "6:\tandi. 0, 14, 2\n\t"         /* CONTEXT_INTEGER */
                    "beq 7f\n\t"
                    "ld 3, 0x018(31)\n\t"
