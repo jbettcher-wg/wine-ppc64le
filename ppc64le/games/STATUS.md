@@ -1049,6 +1049,32 @@ The build is warning-free.
 > later call it, so a row without a matching callback-interception entry would
 > be worse than the hole.
 >
+> **THE TITLE ITSELF, MEASURED** (run `20260830-155652`, the full launcher path
+> through `with-game-lock`): **`loader_init` completes.** No sentinel fault, no
+> wild pointer, no `c0000135`/`c000007b` anywhere in the run.
+> `civilizationvi.exe`, `bink2w64.dll` and `EOSSDK-Win64-Shipping.dll` all map
+> and initialise; the guest JIT starts (the `fexbridge` banner lines); the main
+> thread gets through COM, `NtQuerySystemInformation` and WS2_32 init, and a
+> second thread (`0138`) spawns and probes display drivers.  Exactly **two**
+> imports in the whole run bind sentinels -- `_invoke_watson` and `_open`, each
+> bound twice (once for the exe, once for EOSSDK) -- and **neither is called**.
+>
+> `rc=143` is SIGTERM from this run's own `timeout -k 10 300`, **not a crash**:
+> the game was still alive when the budget expired.  Compare the previous state,
+> `rc=5` inside two minutes with the process dead in the loader.
+>
+> **How far past the loader is NOT yet established, and this is the honest
+> limit of the measurement.** After thread `0138` logs `Failed to load module
+> L"winemac.drv"` (benign -- the macOS driver, absent on Linux) the log goes
+> silent for the remaining ~4 minutes: 142 lines total, and **no D3D11, DXGI,
+> DXVK, Vulkan or window-creation line ever appears**.  That is consistent with
+> two very different things -- Civ VI's long startup database build running
+> slowly under emulation, or a block in early display/COM init -- and 300s of
+> silence does not separate them.  A 900s re-run with a `%CPU`/`wchan` sampler
+> (a spin and a block look nothing alike) is queued behind four other agents'
+> titles; whoever reads this next should check
+> `~/.local/share/wine-ppc64le/civ6-sample.out` before assuming either.
+
 > **The class, carried forward:** this is handoff #7's lesson one level up.
 > #7 was a module reached only through `LoadLibrary` and therefore invisible to
 > `check-import-chain.sh`. This one was visible the whole time — the log named
