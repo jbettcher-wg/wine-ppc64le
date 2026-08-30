@@ -1199,6 +1199,37 @@ struct map_bounce
                                 first cut re-asked GetType+GetDesc on every
                                 Map -- two host calls per dynamic-buffer
                                 update, every frame [the Dex perf pass] */
+    /* the WRITE-mode flush copies the whole subresource into whatever host
+     * buffer DXVK handed back for THIS map -- unavoidable in general,
+     * because the guest wrote into a shadow the host never sees.  But a
+     * Map(WRITE_DISCARD)/Unmap pair that rewrites bytes IDENTICAL to what
+     * this SAME host buffer already holds (a static UI element remapped
+     * every frame out of habit, not because it changed) has nothing to
+     * give the host that isn't already there, and the flush -- a write
+     * into uncached/write-combined host-visible memory, the expensive
+     * side of the pair -- can be skipped outright [the Dex perf pass,
+     * part 2: measured cause of the 4 MiB memcpy dominating the render
+     * thread].
+     *
+     * DXVK renames a WRITE_DISCARD resource's backing to avoid stalling
+     * the GPU, so host_ptr rotates between (measured) exactly two
+     * addresses for a hot dynamic texture.  A single "last thing we sent"
+     * shadow would be WRONG here: buffer A's last content says nothing
+     * about whether buffer B -- the one DXVK just handed back -- already
+     * holds it, and skipping on that basis leaves B's stale (or plain
+     * uninitialized) bytes live for the GPU to read.  So the shadow is
+     * cached PER DESTINATION -- a handful of small slots, linear-searched
+     * by host_ptr, each remembering the bytes last flushed into that
+     * exact buffer -- and a flush is only ever skipped against the slot
+     * for the buffer being written THIS time. */
+    struct map_bounce_shadow
+    {
+        void *host_ptr;      /* which host buffer this describes, NULL == free */
+        void *data;
+        SIZE_T cap;
+        SIZE_T size;          /* 0 == does not describe a valid flush */
+    } shadows[4];
+    UINT shadow_next;         /* round-robin slot to evict when all four are live */
 };
 
 static CRITICAL_SECTION bounce_cs;
@@ -1338,6 +1369,18 @@ static UINT64 hand32_map( void *host, UINT slot, I386_CONTEXT *ctx )
             NtFreeVirtualMemory( NtCurrentProcess(), &b->low, &zero, MEM_RELEASE );
             b->low = NULL;
             b->cap = 0;
+            /* every cached shadow describes a flush at the OLD size; a
+             * resize means a new subresource geometry, so none of them
+             * can be trusted any more */
+            {
+                UINT i;
+                for (i = 0; i < ARRAY_SIZE(b->shadows); i++)
+                {
+                    if (b->shadows[i].data)
+                        RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, b->shadows[i].data );
+                    memset( &b->shadows[i], 0, sizeof(b->shadows[i]) );
+                }
+            }
         }
         if (!b)
         {
@@ -1363,6 +1406,7 @@ static UINT64 hand32_map( void *host, UINT slot, I386_CONTEXT *ctx )
                 b->cap = cap;
             }
         }
+
         if (!b || !b->low)
         {
             RtlLeaveCriticalSection( &bounce_cs );
@@ -1405,8 +1449,56 @@ static UINT64 hand32_unmap( void *host, UINT slot, I386_CONTEXT *ctx )
         if (b->res_host == res_host && b->sub == sub) break;
     if (b && b->host_ptr)
     {
-        /* every WRITE mode (2, 3, 4, 5) flushes the guest's bytes back */
-        if (b->maptype != 1) memcpy( b->host_ptr, b->low, b->size );
+        /* every WRITE mode (2, 3, 4, 5) flushes the guest's bytes back --
+         * unless the destination host buffer THIS map cycle landed on
+         * already holds these exact bytes, per its own shadow slot (see
+         * the big comment on struct map_bounce). */
+        if (b->maptype != 1)
+        {
+            struct map_bounce_shadow *sh = NULL;
+            UINT i;
+            BOOL identical;
+
+            for (i = 0; i < ARRAY_SIZE(b->shadows); i++)
+                if (b->shadows[i].host_ptr == b->host_ptr) { sh = &b->shadows[i]; break; }
+
+            identical = sh && sh->size == b->size && !memcmp( b->low, sh->data, b->size );
+
+            if (!identical)
+            {
+                memcpy( b->host_ptr, b->low, b->size );
+
+                if (!sh)
+                {
+                    /* claim this destination a slot -- round-robin once
+                     * all four are in use by distinct host buffers, which
+                     * is generous next to the two DXVK has shown so far */
+                    sh = &b->shadows[b->shadow_next];
+                    b->shadow_next = (b->shadow_next + 1) % ARRAY_SIZE(b->shadows);
+                    sh->host_ptr = b->host_ptr;
+                    sh->size = 0;
+                }
+                if (sh->cap < b->size)
+                {
+                    /* the shadow is host-side bookkeeping only (compared
+                     * against, never handed to the guest), so a plain
+                     * process-heap allocation is fine -- no need for the
+                     * guest-legal low-2GiB arena b->low requires */
+                    void *mem = sh->data
+                        ? RtlReAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, sh->data, b->size )
+                        : RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, b->size );
+                    if (mem) { sh->data = mem; sh->cap = b->size; }
+                    else sh->cap = 0;
+                }
+                if (sh->cap >= b->size)
+                {
+                    memcpy( sh->data, b->low, b->size );
+                    sh->size = b->size;
+                }
+                else
+                    sh->size = 0;   /* allocation failed: never claim a match */
+            }
+        }
         b->host_ptr = NULL;
     }
     RtlLeaveCriticalSection( &bounce_cs );
