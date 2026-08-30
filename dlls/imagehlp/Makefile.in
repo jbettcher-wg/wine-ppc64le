@@ -4,6 +4,7 @@ IMPORTLIB = imagehlp
 DELAYIMPORTS = dbghelp
 
 SOURCES = \
+	imagehlp.thunks \
 	access.c \
 	imagehlp_main.c \
 	integrity.c \

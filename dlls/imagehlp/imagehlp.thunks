@@ -1,0 +1,29 @@
+# AMD64 thunk export spec -- imagehlp.dll.
+#
+# From the 2026-08-30 Frostpunk 2 triage.  Frostpunk2-Win64-Shipping.exe
+# STATICALLY imports three entry points from this module --
+# ImageEnumerateCertificates, ImageGetCertificateHeader and
+# ImageGetCertificateData, the Authenticode certificate-directory readers a
+# UE build uses to look at its own signature -- and this module had no guest
+# thunk at all.  The loader therefore found the native ppc64 builtin,
+# correctly refused to splice it into a guest call, and reported c000007b:
+#
+#   warn:module:load_dll Failed to load module L"imagehlp.dll"; status=c000007b
+#   err:module:import_dll Loading library imagehlp.dll (which is needed by
+#       L"...\Frostpunk2-Win64-Shipping.exe") failed (error c000007b).
+#   err:module:loader_init Importing dlls for L"...exe" failed, status c0000135
+#
+# That is a STATIC import, so it kills the process in the loader, before the
+# PE entry point runs -- which is why Frostpunk 2 never reached the SteamStub
+# liveness probe that Oblivion Remastered dies at, and why the two titles were
+# not in fact behind the same wall.  Same shape as wintrust.thunks (2026-08-17)
+# and the same fix.
+DLL imagehlp.dll
+FROM-SPEC auto
+
+# imagehlp.h is not in the oracle's default translation unit, so without this
+# every export is refused as "no declaration in any Wine header" -- measured
+# 95 of 98 refused before this line.  The three Frostpunk 2 wants are declared
+# at include/imagehlp.h:830-832 and are all-scalar/pointer, i.e. exactly the
+# shape a trap thunk marshals.
+PROBE-EXTRA imagehlp.h
