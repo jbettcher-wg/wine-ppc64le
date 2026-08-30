@@ -880,8 +880,14 @@ bridge_start() {
     # shared buffer that callers WRITE to and block on.  Software that finds
     # nothing falls back; software that finds the objects will try to USE
     # them, and an empty stream can send it down a path it never takes when
-    # Steam is simply absent.  Portal 2 is the suspect case: it stopped
-    # loading engine.dll and the 14 Source modules after this landed.
+    # Steam is simply absent.  That risk is the reason for the default; it is
+    # NOT a measured regression.  Portal 2 was suspected of exactly this and
+    # was CLEARED: a one-variable bisect on 2026-08-30 (16:14 off, 16:15 on,
+    # nothing else changed) produced two runs whose logs differ only in this
+    # script's own presence lines and the environment echo -- same modules,
+    # same stop after filesystem_stdio.dll, same rc=1 with the publisher off.
+    # Portal 2 regressed between 12:28 and 16:10 for some other reason;
+    # portal2.exe is machine 0x014c, i386, which this publisher never touches.
     #
     # So: opt in per title, in appconfig/<appid>.env, once that title is
     # measured to be better with it.  Every other launch pays nothing.

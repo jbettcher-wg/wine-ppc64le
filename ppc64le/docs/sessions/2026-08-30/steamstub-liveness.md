@@ -319,3 +319,47 @@ were `warn+module` only and carry no `seh` records, so nothing here proves the
 caller. A single `WINEDEBUG=warn+module,+seh` run of that title would settle it
 in about a minute, and is the cheapest confirmation available for anyone who
 wants it.
+
+## Portal 2: suspected, bisected, cleared
+
+The publisher was suspected of regressing Portal 2 -- it stopped loading
+`engine.dll` and fourteen other Source modules somewhere between 12:28 and
+16:10, dying right after `filesystem_stdio.dll`, and this was the one change in
+that window that touches Steam init.
+
+**It is not this.** A one-variable bisect, 16:14 and 16:15, nothing else
+changed between them:
+
+    leg A  WINE_PPC64LE_STEAM_PRESENCE=0   ->  rc=1, stops after filesystem_stdio.dll
+    leg B  WINE_PPC64LE_STEAM_PRESENCE=1   ->  rc=1, stops after filesystem_stdio.dll
+
+Normalised (thread ids, pids, timestamps, ports), the two logs differ in
+exactly four lines: the environment echo of the variable itself, twice, and
+this script's own "presence publisher off" versus "presence published" and
+"stopping the steam presence publisher". Every module load, the missing
+`engine.dll`, and the exit code are identical. With the publisher off, Portal 2
+fails in precisely the same place.
+
+Worth noting for whoever picks the regression up: **`portal2.exe` is machine
+0x014c, i386.** The presence publisher is a guest x86-64 process and the
+objects it creates are the two the SteamStub asks for; nothing in it is
+arch-specific, but nothing in it is in the i386 lane either. The window
+12:28-16:10 also contains the i386/d3d9 work, a thunks pass, an ntdll VMX
+change, and the `stage-guest-runtime` block that now stages msvcp140 and
+concrt140 into `sysx8664` on every launch.
+
+## Straight answers
+
+* **Has any title got PAST the liveness probe because of this?** No. Publishing
+  the objects and satisfying the probe are different claims, and only the first
+  is true. Oblivion is still rc=51, Civ VI is still rc=51. What is true and
+  measurable is that the probe now fails two calls later and for a different
+  reason, and that difference is what identifies the remaining gap.
+* **Is the Portal 2 regression this?** No -- bisected on one variable, above.
+* **Can publishing zeroed objects be worse than publishing nothing?** Not
+  demonstrated, but it is a real risk and it is why the default is off. These
+  names are a `CSharedMemStream`: a lock event plus a buffer that callers take,
+  map and write. Something that finds nothing falls back to a path it is built
+  to handle; something that finds an empty stream is in a state the real client
+  never presents. Portal 2 was the shape of that argument and it did not hold
+  up, so this stays a stated risk and not a finding.
