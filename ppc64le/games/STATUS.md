@@ -1063,17 +1063,40 @@ The build is warning-free.
 > the game was still alive when the budget expired.  Compare the previous state,
 > `rc=5` inside two minutes with the process dead in the loader.
 >
-> **How far past the loader is NOT yet established, and this is the honest
-> limit of the measurement.** After thread `0138` logs `Failed to load module
-> L"winemac.drv"` (benign -- the macOS driver, absent on Linux) the log goes
-> silent for the remaining ~4 minutes: 142 lines total, and **no D3D11, DXGI,
-> DXVK, Vulkan or window-creation line ever appears**.  That is consistent with
-> two very different things -- Civ VI's long startup database build running
-> slowly under emulation, or a block in early display/COM init -- and 300s of
-> silence does not separate them.  A 900s re-run with a `%CPU`/`wchan` sampler
-> (a spin and a block look nothing alike) is queued behind four other agents'
-> titles; whoever reads this next should check
-> `~/.local/share/wine-ppc64le/civ6-sample.out` before assuming either.
+> **THE NEW WALL, NAMED** (runs `160951` and `161227`, the second with
+> `+loaddll`).  **All seven of the title's own modules load, every one of them
+> as a real x86-64 guest PE:**
+>
+> ```
+> civilizationvi.exe   steam_api64.dll   EOSSDK-Win64-Shipping.dll
+> DatabaseDLL_FinalRelease.dll   Localization_FinalRelease.dll
+> HavokScript_FinalRelease.dll   bink2w64.dll
+> ```
+>
+> The main thread completes COM (`combase`/`coml2`/`ole32`/`oleaut32`/
+> `actxprxy`), a second thread loads **`winex11.drv` and `uxtheme.dll`** -- so
+> display init is fine; the `winemac.drv` `c0000135` in the log is Wine probing
+> the macOS driver on Linux and is benign -- and **the game then exits `rc=51`
+> of its own accord, about 60 seconds in**, with no fault, no sentinel and no
+> unhandled exception anywhere in the run.
+>
+> It never creates `Documents\My Games\Sid Meier's Civilization VI\Logs`, so
+> it dies before its own logging starts and has nothing to say for itself.
+>
+> **The reading, stated as a hypothesis and not as a result:** `steam_api64.dll`
+> is loaded and the only thing between "every module initialised" and "clean
+> early exit with a nonzero code" is Steamworks.  Civ VI exits rather than
+> continues when `SteamAPI_Init` fails, and this port has no real Steam client
+> behind the bridge.  That is the **Steam liveness** work another agent owns
+> (`ppc64le/steamapi`), which is why this pass stopped here rather than
+> guessing at it.  What would settle it in one run: `+loaddll` plus a channel
+> that shows the Steamworks entry points being called, or a breakpoint on
+> `steam_api64.SteamAPI_Init`'s return.
+>
+> Two earlier observations that a reader should NOT carry forward: the 300s run
+> ended `rc=143`, which was that run's own `timeout` and not the game; and the
+> log going quiet for four minutes looked like a hang but was not -- with a
+> shorter budget the same build exits on its own in a minute.
 
 > **The class, carried forward:** this is handoff #7's lesson one level up.
 > #7 was a module reached only through `LoadLibrary` and therefore invisible to
