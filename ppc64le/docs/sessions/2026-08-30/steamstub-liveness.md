@@ -168,3 +168,25 @@ guest builtins are served straight out of the build tree. So the stub's
 the stub carried on to the object probe regardless, so it is not obviously
 fatal, but it is the next thing to look at if the objects turn out not to be
 enough.
+
+## Who else this is in front of
+
+Scanning every `.exe` under `steamapps/common` for a PE entry point that lands
+in a `.bind` section — the SteamStub tell — finds five binaries across four
+installed titles:
+
+    Quake 2/quake2.exe
+    Frostpunk2/Frostpunk2/Binaries/Win64/Frostpunk2-Win64-Shipping.exe
+    Oblivion Remastered/OblivionRemastered/Binaries/Win64/OblivionRemastered-Win64-Shipping.exe
+    Sid Meier's Civilization VI/steamassets/base/binaries/win64steam/civilizationvi.exe
+    Sid Meier's Civilization VI/steamassets/base/binaries/win64steam/civilizationvi_dx12.exe
+
+So this is not a two-title fix by construction. Two caveats, both measured:
+
+* **Quake 2 is launched here through `rerelease/quake2ex_steam.exe`, which is
+  not stubbed**, so the port has never met the stub on that title. `quake2.exe`
+  in the game root is.
+* **Civ VI is not dying at this wall.** Its recent runs exit rc=0 and rc=5, not
+  rc=51, so whatever blocks it (the EOSSDK import work) is somewhere else. The
+  stub being present does not mean the stub is the current wall — only that a
+  title cannot get past it without these objects.
