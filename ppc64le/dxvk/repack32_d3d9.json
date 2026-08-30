@@ -1,0 +1,82 @@
+{
+ "divergent": {
+  "D3DADAPTER_IDENTIFIER9": {
+   "out_unsafe": false,
+   "size32": 1100,
+   "size64": 1104
+  },
+  "D3DCONTENTPROTECTIONCAPS": {
+   "out_unsafe": false,
+   "size32": 36,
+   "size64": 40
+  },
+  "D3DDEVICE_CREATION_PARAMETERS": {
+   "out_unsafe": false,
+   "size32": 16,
+   "size64": 24
+  },
+  "D3DLOCKED_BOX": {
+   "out_unsafe": true,
+   "size32": 12,
+   "size64": 16
+  },
+  "D3DLOCKED_RECT": {
+   "out_unsafe": true,
+   "size32": 8,
+   "size64": 16
+  },
+  "D3DMEMORYPRESSURE": {
+   "out_unsafe": false,
+   "size32": 20,
+   "size64": 24
+  },
+  "D3DPRESENTSTATS": {
+   "out_unsafe": false,
+   "size32": 28,
+   "size64": 32
+  },
+  "D3DPRESENT_PARAMETERS": {
+   "out_unsafe": false,
+   "size32": 56,
+   "size64": 64
+  }
+ },
+ "identical": [
+  "D3DBOX",
+  "D3DCAPS9",
+  "D3DCLIPSTATUS9",
+  "D3DCOLORVALUE",
+  "D3DDEVINFO_D3D9BANDWIDTHTIMINGS",
+  "D3DDEVINFO_D3D9CACHEUTILIZATION",
+  "D3DDEVINFO_D3D9INTERFACETIMINGS",
+  "D3DDEVINFO_D3D9PIPELINETIMINGS",
+  "D3DDEVINFO_D3D9STAGETIMINGS",
+  "D3DDEVINFO_D3DVERTEXSTATS",
+  "D3DDEVINFO_RESOURCEMANAGER",
+  "D3DDEVINFO_VCACHE",
+  "D3DDISPLAYMODE",
+  "D3DDISPLAYMODEEX",
+  "D3DDISPLAYMODEFILTER",
+  "D3DGAMMARAMP",
+  "D3DINDEXBUFFER_DESC",
+  "D3DLIGHT9",
+  "D3DLINEPATTERN",
+  "D3DMATERIAL9",
+  "D3DMATRIX",
+  "D3DOVERLAYCAPS",
+  "D3DPSHADERCAPS2_0",
+  "D3DRANGE",
+  "D3DRASTER_STATUS",
+  "D3DRECT",
+  "D3DRECTPATCH_INFO",
+  "D3DRESOURCESTATS",
+  "D3DSURFACE_DESC",
+  "D3DTRIPATCH_INFO",
+  "D3DVECTOR",
+  "D3DVERTEXBUFFER_DESC",
+  "D3DVERTEXELEMENT9",
+  "D3DVIEWPORT9",
+  "D3DVOLUME_DESC",
+  "D3DVSHADERCAPS2_0"
+ ]
+}

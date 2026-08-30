@@ -98,6 +98,44 @@ FIELD_RE = re.compile(r'^\s*(\d+) \|   (\S.*?)\s+(\w+)(\[\d+\])?\s*$')
 SIZE_RE = re.compile(r'^\s*\| \[sizeof=(\d+), align=(\d+)\]')
 
 
+TYPEDEF_OPEN_RE = re.compile(r'\btypedef\s+(struct|union|enum)\s+(\w+)?\s*\{')
+
+
+def harvest_typedefs(text):
+    """-> [(kind, tag, typedef_name)] for every `typedef struct TAG {...} N;`.
+
+    Why this exists: clang's record dump names a record by its TAG, and the
+    two spellings are only the same by convention.  The d3d11/dxgi headers
+    happen to write `typedef struct D3D11_FOO { ... } D3D11_FOO;` -- tag and
+    typedef identical -- so indexing the dump by tag and looking it up by
+    typedef name worked there by luck.  d3d9.h's dialect does not: its tags
+    are `_D3DPRESENT_PARAMETERS_`, `_D3DCAPS9`, `_D3DLOCKED_RECT`.  Every one
+    of those lookups missed, `measured` silently dropped the whole surface,
+    and the generator reported "0 of 94 aggregates diverge" -- a clean-looking
+    run over nothing at all.  D3DPRESENT_PARAMETERS carries an HWND and DOES
+    diverge, so that clean run was a lie of exactly the kind this file's
+    docstring promises not to tell.  [MEASURED 2026-08-30]
+
+    Brace-matched rather than regexed closed, because D3DMATRIX nests an
+    anonymous union inside an anonymous struct and no fixed-depth pattern
+    survives that.
+    """
+    out = []
+    for m in TYPEDEF_OPEN_RE.finditer(text):
+        depth, i, n = 1, m.end(), len(text)
+        while i < n and depth:
+            c = text[i]
+            if c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+            i += 1
+        tail = re.match(r'\s*(\w+)\s*[,;]', text[i:])
+        if tail:
+            out.append((m.group(1), m.group(2), tail.group(1)))
+    return out
+
+
 class Aggregate:
     def __init__(self, name):
         self.name = name
@@ -187,6 +225,16 @@ def main():
                          'generated TU includes.')
     ap.add_argument('--match', default=r'D3D11_|DXGI_',
                     help='regex an aggregate name must match to be considered')
+    ap.add_argument('--exclude', default=None,
+                    help='regex over aggregate NAMES to drop from the harvest '
+                         'after --match.  The harvest is a text scan and does '
+                         'not run the preprocessor, so a typedef sitting '
+                         'inside an #if 0 block is harvested and then fails '
+                         'to compile -- d3d9types.h has exactly one, '
+                         'D3DORDERTYPE, dead since D3D8.  Every exclusion has '
+                         'to be spelled out on the command line, in the tree, '
+                         'with a reason; the generator still refuses to drop '
+                         'anything on its own.')
     ap.add_argument('--wine-include', required=True,
                     help='the build tree include dir (widl-generated headers)')
     ap.add_argument('--out', required=True)
@@ -201,21 +249,38 @@ def main():
     includes = [args.wine_include, os.path.join(args.wine_include, 'msvcrt')]
     defines = ['-D_UCRT']
     match = re.compile(args.match)
+    exclude = re.compile(args.exclude) if args.exclude else None
 
     with tempfile.TemporaryDirectory() as td:
         # A TU that includes the surface and instantiates every aggregate the
         # headers typedef, so clang lays all of them out.
         scan = re.compile(args.scan)
         names, scanned = set(), []
+        record_kind = {}   # name -> 'struct'/'union'; enums are not records
+        tag_of = {}        # name -> the struct TAG clang dumps it under
         for fn in sorted(os.listdir(args.wine_include)):
             if not scan.match(fn):
                 continue
             scanned.append(fn)
             text = open(os.path.join(args.wine_include, fn),
                         errors='replace').read()
-            for m in re.finditer(r'\}\s*(\w+)\s*;', text):
+            # `} NAME;` and `} NAME, *LPNAME;` alike -- d3d9types.h writes the
+            # second form for 20-odd types including D3DVERTEXELEMENT9, and a
+            # pattern anchored on the semicolon harvests none of them.
+            for m in re.finditer(r'\}\s*(\w+)\s*[,;]', text):
                 if match.search(m.group(1)):
+                    if exclude and exclude.search(m.group(1)):
+                        continue
                     names.add(m.group(1))
+            for kind, tag, name in harvest_typedefs(text):
+                if not match.search(name):
+                    continue
+                if exclude and exclude.search(name):
+                    continue
+                if kind in ('struct', 'union'):
+                    record_kind[name] = kind
+                    if tag:
+                        tag_of[name] = tag
         names = sorted(names)
         if not names:
             sys.exit('gen_repack32: --scan %r matched no aggregate names'
@@ -242,6 +307,15 @@ def main():
         a64 = dump_layouts(tu, args.guest64, includes, defines)
         a32 = dump_layouts(tu, args.guest32, includes, defines)
 
+        # clang indexed those by struct TAG.  Publish each record under its
+        # TYPEDEF name as well, which is the only spelling a signature ever
+        # uses.  See harvest_typedefs' docstring for what the missing alias
+        # cost on the d3d9 surface.
+        for aggs in (a64, a32):
+            for nm, tg in tag_of.items():
+                if nm not in aggs and tg in aggs:
+                    aggs[nm] = aggs[tg]
+
         # Every measured aggregate's field widths, on both targets.  The
         # sizes are needed for MORE than the repack bodies: the divergence
         # test itself must see them, because a pointer member can land at
@@ -253,6 +327,20 @@ def main():
         measured = [n for n in names if a64.get(n) and a32.get(n)
                     and [f[2] for f in a64[n].fields] ==
                         [f[2] for f in a32[n].fields]]
+        # A harvested name that the headers declare as a RECORD and that came
+        # back unmeasured is a hole in the audit, not a detail: gen_winecom
+        # keys its per-slot i386 struct check on this roster, and a type
+        # absent from both lists is one it will refuse -- or, worse, one a
+        # caller assumes was checked.  Enums are legitimately unmeasurable
+        # and are not counted.  Fail loudly rather than emit a short roster.
+        lost = sorted(n for n in names
+                      if n in record_kind and n not in measured)
+        if lost:
+            sys.exit('gen_repack32: %d harvested RECORD(s) were never '
+                     'measured on both targets -- the roster would be '
+                     'silently short.  Usually a tag/typedef spelling this '
+                     'file does not alias yet:\n  %s'
+                     % (len(lost), '\n  '.join(lost)))
         pairs = [(n, f[2]) for n in measured for f in a64[n].fields]
         if not pairs:
             print('gen_repack32: no measurable aggregates; nothing to emit')
@@ -423,6 +511,64 @@ HEADER = '''/* GENERATED by ppc64le/thunks/gen_repack32.py -- do not edit.
 #pragma once
 
 #include <string.h>
+
+/* ------------------------------------------- pointer-width SCALAR pointees
+ *
+ * Not an aggregate, and emitted unconditionally because it is a property of
+ * the two ABIs rather than of any header: a parameter declared `HANDLE *h`
+ * (or SIZE_T *, ULONG_PTR *, HMODULE * ...) points at a cell that is FOUR
+ * bytes in the guest and EIGHT in the native callee.  Passing that guest
+ * pointer through raw makes the callee read eight bytes of a four-byte cell
+ * and, worse, write eight over it -- four bytes of the guest's own stack
+ * frame or heap block, silently.
+ *
+ * D3D9 is where this stopped being theoretical: `HANDLE *pSharedHandle` is
+ * the last parameter of EVERY resource creator -- CreateTexture,
+ * CreateVertexBuffer, CreateIndexBuffer, CreateRenderTarget,
+ * CreateDepthStencilSurface, CreateCubeTexture, CreateVolumeTexture,
+ * CreateOffscreenPlainSurface and the three *Ex twins -- nineteen rows, i.e.
+ * every way a D3D9 title can allocate anything.  [MEASURED 2026-08-30]
+ *
+ * THE NARROWING IS THE HONEST PART.  Going up (IN) is a zero-extend and
+ * cannot lose.  Coming down (OUT) can: a handle whose high half is set does
+ * not fit the guest's cell.  It is NOT clamped -- a clamped handle names a
+ * different object, which is worse than none -- so the loss is reported and
+ * the cell is zeroed, which is what "no shared handle" means to every caller
+ * of these methods.  In practice DXVK's d3d9 answers pSharedHandle only for
+ * shared resources and NT handles are 32-bit values, so this is a tripwire
+ * rather than a path anything is expected to take.
+ */
+#ifndef WINE_REPACK32_PTRWIDTH_DEFINED
+#define WINE_REPACK32_PTRWIDTH_DEFINED
+/* Defined in libs/winecom, which every consumer of this header already
+ * imports.  Declared here rather than included from a Wine header, because
+ * this file deliberately pulls in nothing but <string.h>. */
+extern void wine_repack32_ptrwidth_lost( unsigned long long v );
+
+static inline void wine_repack32_PTRWIDTH( void *dst, const void *src32 )
+{
+    unsigned int lo;
+    memcpy( &lo, src32, 4 );
+    *(unsigned long long *)dst = (unsigned long long)lo;
+}
+static inline void wine_repack64_PTRWIDTH( void *dst32, const void *src )
+{
+    unsigned long long v = *(const unsigned long long *)src;
+    unsigned int lo = (unsigned int)v;
+
+    if (v >> 32)
+    {
+        static int logged;
+        if (!logged)
+        {
+            logged = 1;
+            wine_repack32_ptrwidth_lost( v );
+        }
+        lo = 0;
+    }
+    memcpy( dst32, &lo, 4 );
+}
+#endif
 '''
 
 

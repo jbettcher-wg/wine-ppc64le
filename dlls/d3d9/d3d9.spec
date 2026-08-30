@@ -41,3 +41,10 @@
 # (ppc64le/vkd3d/check-ordinal-imports.sh).  Asked of the NATIVE
 # module by ntdll when the crossing sink interns a COM slot row.
 @ stdcall __wine_com_slot_name(long long ptr ptr)
+
+# The i386 twin of __wine_com_dispatch, appended after it for the same
+# no-renumbering reason.  ntdll's 32-bit trap dispatcher calls THIS one; the
+# CONTEXT it hands over is an I386_CONTEXT and the stdcall pop belongs to
+# libs/winecom, not to the caller.  See dlls/d3d11/d3d11.spec, which grew the
+# same pair when the D3D11 surface opened its 32-bit lane.
+@ stdcall __wine_com_dispatch32(long long ptr)

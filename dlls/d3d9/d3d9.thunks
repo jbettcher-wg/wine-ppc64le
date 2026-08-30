@@ -28,6 +28,20 @@ DLL       d3d9.dll
 FROM-SPEC auto
 COM-JSON  ../../ppc64le/dxvk/interfaces_d3d9.json
 
+# GUEST-MACHINE: read dlls/d3d11/d3d11.thunks' banner on this first -- the
+# reason a module opts in rather than getting an i386 half by default is the
+# same one, and it is written out there.
+#
+# D3D9 has to opt in for a stronger reason than D3D11 did: D3D9 is a 32-BIT-ERA
+# API and the Windows binaries that use it are overwhelmingly PE32.  On this
+# machine the whole Source catalogue is -- portal2.exe is PE32 i386 [MEASURED
+# 2026-08-30, `file`].  Without this line the i386 build of this module is the
+# #else arm of main.c, every export raising the unimplemented-function
+# exception, which is the honest refusal it was written to be and is also a
+# hard floor for every D3D9 title.
+GUEST-MACHINE x86_64
+GUEST-MACHINE i386
+
 GUEST-IMPL Direct3DCreate9   __wine_guest_Direct3DCreate9
 GUEST-IMPL Direct3DCreate9Ex __wine_guest_Direct3DCreate9Ex
 
@@ -51,6 +65,7 @@ INCLUDE-DIR ../../ppc64le/dxvk
 # Internal names, kept out of the guest export list entirely; see
 # dlls/d3d11/d3d11.thunks.
 EXCLUDE __wine_com_dispatch
+EXCLUDE __wine_com_dispatch32
 EXCLUDE __wine_com_slot_name
 EXCLUDE __wine_guest_Direct3DCreate9
 EXCLUDE __wine_guest_Direct3DCreate9Ex

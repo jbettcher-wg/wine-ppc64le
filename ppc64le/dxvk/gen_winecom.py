@@ -869,7 +869,8 @@ SAFE_POINTEE = frozenset(
     """void char BYTE UINT8 UCHAR USHORT UINT16 SHORT INT16 UINT INT
        DWORD ULONG LONG BOOL WINBOOL FLOAT float GUID IID UINT64 INT64
        ULONGLONG LONGLONG DOUBLE double LARGE_INTEGER RECT POINT SIZE
-       LUID SECURITY_ATTRIBUTES D3D11_RECT D3D10_RECT""".split())
+       LUID SECURITY_ATTRIBUTES D3D11_RECT D3D10_RECT
+       PALETTEENTRY""".split())
 
 # Divergent-struct parameters that are ARRAYS, with the by-value parameter
 # holding the element count.  Keyed by (Interface::Method, parameter name);
@@ -900,7 +901,41 @@ STRUCT_SPECIAL = {
 # each one be confirmed here rather than silently defaulted to scalar.
 CONFIRMED_SCALAR = {
     ("IDXGISwapChain1::Present1", "pPresentParameters"),
+
+    # D3D9.  Plural by spelling, singular by API: each of these writes ONE
+    # record.  Read out of d3d9.h's own declarations rather than inferred
+    # from the name.  Note what is deliberately NOT here --
+    # IDirect3D9::CreateDevice's pPresentationParameters really IS an array,
+    # one element per adapter in a multi-head group, and it needs no ruling
+    # because that row is hand-written on both lanes.
+    ("IDirect3DDevice9::GetCreationParameters", "pParameters"),
+    ("IDirect3DDevice9Ex::GetCreationParameters", "pParameters"),
+    ("IDirect3DSwapChain9::GetPresentParameters", "pPresentationParameters"),
+    ("IDirect3DSwapChain9Ex::GetPresentParameters", "pPresentationParameters"),
+    ("IDirect3DSwapChain9Ex::GetPresentStats", "stats"),
 }
+
+# Pointee types that are POINTER-WIDTH SCALARS: four guest bytes, eight
+# native ones.  These are not aggregates, so no layout roster measures them
+# and no generated struct repack exists -- but the divergence is real and it
+# is the same one, so they get the fixed widening rep gen_repack32.py always
+# emits (wine_repack32_PTRWIDTH / wine_repack64_PTRWIDTH).  Read that
+# function's banner for what the OUT direction does when a value will not
+# fit, and why it reports none rather than a truncated one.
+#
+# HANDLE is what forced this: `HANDLE *pSharedHandle` closes the parameter
+# list of every D3D9 resource creator, nineteen rows, so without a rep for it
+# a 32-bit D3D9 title cannot allocate a texture, a vertex buffer, an index
+# buffer or a render target.  [MEASURED 2026-08-30, gen_winecom --report on
+# the d3d9 surface: 19 of 33 i386-only refusals were this one type.]
+#
+# SIGNED pointer-width scalars are deliberately absent, for the reason
+# gen_repack32.py's SIGNED_PTR_TYPES gives: the widening rep zero-extends,
+# and a sign-extending one is a different function that nothing needs yet.
+PTRWIDTH_REP = "@PTRWIDTH"
+PTRWIDTH_POINTEE = frozenset(
+    """HANDLE HGLOBAL HLOCAL HMODULE HINSTANCE
+       SIZE_T ULONG_PTR UINT_PTR DWORD_PTR""".split())
 
 _audit_tripwire = []
 
@@ -921,17 +956,50 @@ def audit_i386(key, s, cls, layouts, byval_ok):
         if cls[i] not in (CA["PASS"], CA["RET_PTR"]):
             continue        # interface/riid/event machinery: width-safe
         base = p.base
+        # A DOUBLE pointer that reached here is not an interface -- classify()
+        # already took IFACE_IN, PPV_OUT and RIID out of the running -- so it
+        # is a cell the host reads or writes a POINTER through.  That cell is
+        # eight bytes native and FOUR in the guest, so the native call reads
+        # four bytes of neighbouring guest memory, or writes four bytes over
+        # it, and the guest then dereferences half an address.  No amount of
+        # struct auditing sees this, because the pointee's own layout is fine.
+        #
+        # [MEASURED 2026-08-30] The hole was live: `void **ppbData`, the
+        # answer to IDirect3DVertexBuffer9::Lock and IDirect3DIndexBuffer9::
+        # Lock, is CA_PASS by way of VOID_PP_IS_MEMORY, and `void` is in
+        # SAFE_POINTEE -- so both rows published I386_STRUCTS_OK and would
+        # have let DXVK write eight bytes into a four-byte guest cell on the
+        # first vertex buffer any 32-bit D3D9 title locked.  ID3D10Buffer::Map
+        # has the same shape one API up.  Refusing by name is the honest
+        # answer until a hand32 walker hands back a BELOW-4-GIB address, which
+        # is the same bounce D3DLOCKED_RECT needs and the same one
+        # dlls/d3d11/main.c already built for ID3D11DeviceContext::Map.
+        if p.stars > 1:
+            return None, ("parameter `%s` is a cell the host fills with a "
+                          "POINTER, and a 32-bit guest's cell is four bytes "
+                          "wide -- the native side would read or write eight. "
+                          "A hand32 walker with a below-4GiB answer must "
+                          "serve this row" % p.raw)
         if base in SAFE_POINTEE or base in byval_ok:
             continue        # scalar or enum pointee: identical bytes
         if base in layouts["identical"]:
             continue
+        if base in PTRWIDTH_POINTEE:
+            if p.stars > 1:
+                return None, ("parameter `%s` is a pointer to pointers of the "
+                              "pointer-width scalar %s; no rep describes that "
+                              "shape" % (p.raw, base))
+            db = 1 if "const" in p.raw.split() else 2
+            if cls[i] == CA["RET_PTR"]:
+                db = 2
+            reps.append((i, None, db, PTRWIDTH_REP))
+            continue
         if base not in layouts["divergent"]:
             return None, ("parameter `%s` points at %s, which the i386 "
                           "layout roster never audited" % (p.raw, base))
-        if p.stars > 1:
-            return None, ("parameter `%s` is a pointer to pointers of the "
-                          "divergent %s; no rep describes that shape"
-                          % (p.raw, base))
+        # (the old "pointer to pointers of the divergent X" refusal lived
+        # here; every stars > 1 parameter is now refused further up, for a
+        # reason that does not depend on the pointee diverging at all)
         mkey = (key, p.name)
         if mkey in STRUCT_SPECIAL:
             return None, ("`%s` is an array of the divergent %s whose "
@@ -1337,12 +1405,16 @@ def generate(roster, prefix, header_dir=HEADERS, surface=None,
                 rname = "reps_%s_%d" % (n, s["slot"])
                 ents = []
                 for pi, ci, db, ty in reps:
+                    if ty == PTRWIDTH_REP:
+                        s64, s32, fn = 8, 4, "PTRWIDTH"
+                    else:
+                        s64 = layouts["divergent"][ty]["size64"]
+                        s32 = layouts["divergent"][ty]["size32"]
+                        fn = ty
                     ents.append("{ %d, %s, %d, %d, %d, wine_repack32_%s,"
                                 " wine_repack64_%s }"
                                 % (pi, "0xff" if ci is None else str(ci), db,
-                                   layouts["divergent"][ty]["size64"],
-                                   layouts["divergent"][ty]["size32"],
-                                   ty, ty))
+                                   s64, s32, fn, fn))
                 decls.append("static const struct winecom_rep %s[] =\n"
                              "    { %s };" % (rname, ",\n      ".join(ents)))
                 repn = len(reps)
@@ -1549,7 +1621,7 @@ def main():
             if len(uniq) > 8:
                 print("          ... and %d more distinct method(s)"
                       % (len(uniq) - 8))
-        print("\nflat exports refused in dlls/%s/main.c:" % prefix)
+        print("\nflat exports refused in dlls/%s/main.c:" % args.prefix)
         for k, v in sorted(surface["flat"].items()):
             print("  %s\n    %s" % (k, v))
 

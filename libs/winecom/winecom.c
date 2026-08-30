@@ -2960,3 +2960,24 @@ NTSTATUS winecom_dispatch32( UINT iface, UINT slot, I386_CONTEXT *ctx )
     pop_frame32( ctx, pop_bytes );
     return STATUS_SUCCESS;
 }
+
+/* ------------------------------------------------ pointer-width narrowing
+ *
+ * The one reporting hook the generated 32<->64 repack header needs.  That
+ * header (ppc64le/thunks/gen_repack32.py) deliberately includes nothing but
+ * <string.h> so that a marshalling module can consume it without pulling in
+ * any D3D header, which leaves it no way to say anything.  Every consumer of
+ * it imports this library, so the saying happens here.
+ *
+ * Called at most once per module, from wine_repack64_PTRWIDTH, when a
+ * pointer-width OUT value will not fit the guest's four-byte cell.  The rep
+ * has already written zero: a truncated handle names a DIFFERENT object,
+ * which is worse than none, and "none" is a value every caller of these
+ * methods already handles.
+ */
+void wine_repack32_ptrwidth_lost( unsigned long long v )
+{
+    ERR( "a pointer-width OUT parameter answered %#llx, whose high half a "
+         "32-bit guest cell cannot hold; reported NONE rather than a "
+         "truncated value that would name a different object\n", v );
+}
