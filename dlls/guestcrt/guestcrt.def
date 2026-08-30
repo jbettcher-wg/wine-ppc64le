@@ -6,3 +6,9 @@ EXPORTS
     __intrinsic_setjmp
     longjmp
     _CxxThrowException
+    __CxxRegisterExceptionObject
+    __CxxUnregisterExceptionObject
+    __DestructExceptionObject
+    __current_exception
+    __current_exception_context
+    __processing_throw

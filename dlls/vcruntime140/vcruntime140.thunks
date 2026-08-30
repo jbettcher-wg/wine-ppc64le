@@ -166,6 +166,31 @@ FORWARD __C_specific_handler ucrtbase.__C_specific_handler
 # claim was made in ucrtbase.thunks and dlls/guestcrt/cxxthrow.c's banner --
 # but this module carried the same live trap regardless, undocumented.
 # EXCLUDE below makes it a real, diagnosable refusal.
-EXCLUDE __CxxRegisterExceptionObject
-EXCLUDE __CxxUnregisterExceptionObject
-EXCLUDE __DestructExceptionObject
+# SUPERSEDED, 2026-08-29 (later the same day): the EXCLUDEs became FORWARDs.
+# The refusal was right about the mechanism and wrong about the destination:
+# these are not unservable, they just cannot be served NATIVELY.  Cyberpunk's
+# 20:14 run measured the chain -- the game imports __CxxFrameHandler4 from
+# VCRUNTIME140_1, the prefix's staged vcruntime140_1.dll is a Wine builtin
+# carrying REAL guest x86-64 FH4 code (winedump: it exports exactly
+# __CxxFrameHandler4, __NLG_Dispatch2, __NLG_Return2), and that FH4 called
+# vcruntime140.__CxxRegisterExceptionObject and died on sentinel 0xDEAD0005
+# from VCRUNTIME140_1.dll+20bb.  So the catch side already exists as guest
+# code; only the per-thread exception state it keeps was missing.
+# dlls/guestcrt/exceptobj.c now provides it, and these forward there the same
+# way _CxxThrowException above does -- along this module's own spec hops
+# (vcruntime140.spec:22-24 already name the ucrtbase namesakes).
+FORWARD __CxxRegisterExceptionObject   ucrtbase.__CxxRegisterExceptionObject
+FORWARD __CxxUnregisterExceptionObject ucrtbase.__CxxUnregisterExceptionObject
+FORWARD __DestructExceptionObject      ucrtbase.__DestructExceptionObject
+
+# The two flat accessors go the same way, and MUST: they hand back POINTERS
+# into the per-thread exception record that the three above read and write.
+# Leaving these as native traps while the three became guest code would split
+# one structure across two machines -- guest writers, native readers, and an
+# FH4 dereferencing an exception record nobody filled in.  MSVCP140.dll
+# imports __current_exception and __processing_throw from THIS module
+# (measured with winedump -j import), so this hop is load-bearing, not
+# defensive.  See dlls/guestcrt/exceptobj.c's banner for the full argument.
+FORWARD __current_exception            ucrtbase.__current_exception
+FORWARD __current_exception_context    ucrtbase.__current_exception_context
+FORWARD __processing_throw             ucrtbase.__processing_throw

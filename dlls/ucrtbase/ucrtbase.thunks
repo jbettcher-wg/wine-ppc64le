@@ -365,11 +365,32 @@ FORWARD longjmp            guestcrt.longjmp
 FORWARD _CxxThrowException   guestcrt._CxxThrowException
 FORWARD __C_specific_handler ntdll.__C_specific_handler
 
-EXCLUDE __CxxRegisterExceptionObject
-EXCLUDE __CxxUnregisterExceptionObject
-EXCLUDE __DestructExceptionObject
-
-__processing_throw              0x00000E01  0  int   msvcrt.h:161
+# SUPERSEDED, 2026-08-29 (later the same day): EXCLUDE -> FORWARD, and
+# __processing_throw's trap row deleted with them.  See
+# dlls/vcruntime140/vcruntime140.thunks for the measurement that forced this
+# (a real guest FH4 in the staged vcruntime140_1 calling in and hitting
+# sentinel 0xDEAD0005), and dlls/guestcrt/exceptobj.c for why all five names
+# have to live on the SAME side of the guest/native line: they are five views
+# of one per-thread record.  __current_exception() literally returns
+# &data->exc_record, which __CxxRegisterExceptionObject writes -- so a native
+# accessor beside a guest writer hands FH4 a pointer into thread data that
+# nobody updated.  That is a silent wrong answer during unwind, strictly
+# worse than the sentinel it replaces.
+#
+# The comment above about _CreateFrameInfo/_FindAndUnlinkFrame is now
+# HALF-STALE and deliberately left in place: its reasoning ("only link and
+# unlink a node in a list rooted in native thread-local data ... a trap is
+# the right answer") holds for a NATIVE caller and no longer describes the
+# guest path, where exceptobj.c keeps its own list.  Nothing in any staged
+# guest module imports those three (checked: VCRUNTIME140_1 and MSVCP140
+# import neither), so their trap rows stay correct today; the day a guest
+# module imports one directly, it needs an EXCLUDE, not a trap.
+FORWARD __CxxRegisterExceptionObject   guestcrt.__CxxRegisterExceptionObject
+FORWARD __CxxUnregisterExceptionObject guestcrt.__CxxUnregisterExceptionObject
+FORWARD __DestructExceptionObject      guestcrt.__DestructExceptionObject
+FORWARD __current_exception            guestcrt.__current_exception
+FORWARD __current_exception_context    guestcrt.__current_exception_context
+FORWARD __processing_throw             guestcrt.__processing_throw
 _CreateFrameInfo                0x00000E02  2  int   msvcrt.h:147
 _FindAndUnlinkFrame             0x00000E03  1  void  msvcrt.h:154
 _IsExceptionObjectToBeDestroyed 0x00000E04  1  int   msvcrt.h:155
