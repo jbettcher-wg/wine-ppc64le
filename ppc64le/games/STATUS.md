@@ -1116,6 +1116,16 @@ The build is warning-free.
 > that shows the Steamworks entry points being called, or a breakpoint on
 > `steam_api64.SteamAPI_Init`'s return.
 >
+> **STATED AS A NEGATIVE, because it removes the most obvious suspect:** the
+> SteamStub liveness objects are **neither cause nor cure** here.  Runs
+> `160951` and `161227` had the presence publisher ACTIVE; run `161516` ran
+> with it OFF (`steam presence publisher off` in the log, after that mechanism
+> became opt-in).  **Byte for byte the same outcome** -- `rc=51`, the same
+> seven modules, the same stop point after `winex11.drv`/`uxtheme.dll`.  So
+> whatever Civ VI is refusing, publishing or withholding
+> `Local\SteamStart_SharedMem*` does not move it, and the Portal 2 regression
+> that made those objects opt-in does not reproduce on this title either.
+>
 > Two earlier observations that a reader should NOT carry forward: the 300s run
 > ended `rc=143`, which was that run's own `timeout` and not the game; and the
 > log going quiet for four minutes looked like a hang but was not -- with a
