@@ -45,6 +45,24 @@ while [ $# -gt 0 ]; do
 done
 [ $# -gt 0 ] || { echo "usage: with-game-lock [--timeout SEC] -- <command> [args...]" >&2; exit 2; }
 
+# Automation must not put modal boxes on the user's desktop.  A failing title
+# raises one per launch and waits for a human; on 2026-08-30 the user sat back
+# down to roughly a dozen of them, from agent launches they had not asked for,
+# and NO run log contained any of their text -- so the only record of what the
+# titles were complaining about was the user having read them off the screen.
+#
+# WINE_PPC64LE_NO_DIALOGS makes user32 answer the default button and log the
+# caption and text at ERR instead (dlls/user32/msgbox.c).  proton already sets
+# it for its background pre-step but not for the real launch, which is the case
+# that reaches a screen.
+#
+# Set HERE rather than in run-native or proton deliberately: this wrapper is
+# the automation boundary.  A human launching a title by hand does not go
+# through it and keeps their dialogs, which is right -- a real prompt should be
+# answerable.  An explicit setting from the caller always wins.
+: "${WINE_PPC64LE_NO_DIALOGS:=1}"
+export WINE_PPC64LE_NO_DIALOGS
+
 mkdir -p "$(dirname "$LOCK")"
 exec 9>"$LOCK"
 
@@ -81,6 +99,31 @@ else
     rc=$?
 fi
 
+# Reap the prefix before releasing.  A run that ends -- cleanly, by timeout, or
+# by SIGTERM -- leaves its wineserver and a full set of prefix daemons behind:
+# services.exe, winedevice.exe, plugplay.exe, rpcss.exe, svchost.exe, and two
+# explorer.exe.  Nothing here reaped them, and on 2026-08-30 that had
+# accumulated to EIGHTY-TWO processes across twelve prefixes over two days,
+# which is how the user noticed something was wrong.
+#
+# `wineserver -k` is the right tool and the reason matters: killing the
+# wineserver PID directly -- which is what was done by hand that day -- leaves
+# its children reparented to init with no server to talk to, and winedevice.exe
+# then ignores SIGTERM because it is blocked waiting on the server that just
+# vanished.  Clearing those took SIGKILL.  Asking the server to shut down
+# instead makes the children exit on their own.
+#
+# Only ever runs while this lock is held and no game is up, so it cannot reap a
+# prefix somebody else is using.
+reap_prefixes() {
+    command -v wineserver >/dev/null 2>&1 || return 0
+    pgrep -x GameThread >/dev/null && return 0
+    for _pfx in "${WINE_PPC64LE_COMPAT_ROOT:-$HOME/.local/share/wine-ppc64le}"/*/pfx; do
+        [ -d "$_pfx" ] || continue
+        WINEPREFIX=$_pfx wineserver -k 2>/dev/null
+    done
+}
+
 # Do not release until our own game is gone, or the next holder inherits it.
 #
 # Match the SAME set of processes the entry check does.  This loop originally
@@ -96,4 +139,5 @@ while pgrep -x GameThread >/dev/null \
     [ $((SECONDS-t0)) -ge "$IDLE_GRACE" ] && break
     sleep 10
 done
+reap_prefixes
 exit $rc

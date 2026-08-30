@@ -596,6 +596,30 @@ INT WINAPI MessageBoxIndirectW( LPMSGBOXPARAMSW msgbox )
     struct ThreadWindows threadWindows;
 
     if (msgbox_answer_unattended( msgbox, &ret )) return ret;
+    /* A message box is the clearest statement a game ever makes about why it
+     * failed, and until now this port threw it away: the box was only visible
+     * in a log if that run happened to have WINEDEBUG=+seh on, which almost
+     * none do.  On 2026-08-30 the user watched roughly a dozen boxes appear on
+     * the desktop and no run log contained any of their text, so the only
+     * record of what several titles were complaining about was the user's
+     * memory of reading them.
+     *
+     * ERR, not WARN or TRACE, and deliberately so.  ERR is on by default, so
+     * this lands in every run log with no environment set.  A modal box means
+     * the title has stopped and is waiting for a human -- unconditionally
+     * worth a line.
+     *
+     * Placed AFTER msgbox_answer_unattended(), which already logs its own
+     * line (with the answer it gave) when WINE_PPC64LE_NO_DIALOGS is set.
+     * This covers the other half -- the box that is actually DISPLAYED --
+     * so every box produces exactly one log line in either mode.  Both
+     * strings are %s-safe here: this is the W entry, and the A entry
+     * converts and calls in. */
+    ERR( "message box: caption=%s text=%s style=%#x%s\n",
+         debugstr_w(msgbox->lpszCaption), debugstr_w(msgbox->lpszText),
+         (unsigned int)msgbox->dwStyle,
+         (msgbox->dwStyle & MB_TASKMODAL) ? " TASKMODAL" : "" );
+
 
     if (!(hRes = FindResourceExW(user32_module, (LPWSTR)RT_DIALOG, L"MSGBOX", msgbox->dwLanguageId)))
     {
