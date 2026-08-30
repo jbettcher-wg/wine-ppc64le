@@ -1,0 +1,78 @@
+#!/bin/bash
+# with-game-lock -- serialise game launches across concurrent agents.
+#
+# WHY THIS EXISTS.  Only one title can hold the foreground on this box, and a
+# second launch into the same prefix does not fail cleanly -- it contends.  On
+# 2026-08-30 two benchmark loops overlapped: the second one's "wait for the game
+# to appear" latched onto the FIRST one's already-running process, saw it exit,
+# declared its own leg finished before that leg had finished loading, and
+# launched again on top of itself.  Two games, one prefix, both numbers
+# worthless, and ~20 minutes of machine time burned.
+#
+# So: take the lock, and do not start while any game is still up.  The lock is
+# advisory (flock) and covers the whole command, including the wait for the
+# game to exit -- which is the part that matters, because the contention window
+# is the RUN, not the launch.
+#
+#   usage:  with-game-lock [--timeout SEC] -- <command> [args...]
+#
+# Exits 75 (EX_TEMPFAIL) if the lock could not be taken in time, so a caller can
+# tell "busy, try later" from "your command failed".
+set -u
+
+LOCK=${GAME_LOCK:-$HOME/.local/share/wine-ppc64le/.game-launch.lock}
+TIMEOUT=1800
+IDLE_GRACE=${IDLE_GRACE:-600}
+
+while [ $# -gt 0 ]; do
+    case $1 in
+    --timeout) TIMEOUT=${2:?--timeout needs seconds}; shift 2 ;;
+    --) shift; break ;;
+    -*) echo "with-game-lock: unknown option $1" >&2; exit 2 ;;
+    *) break ;;
+    esac
+done
+[ $# -gt 0 ] || { echo "usage: with-game-lock [--timeout SEC] -- <command> [args...]" >&2; exit 2; }
+
+mkdir -p "$(dirname "$LOCK")"
+exec 9>"$LOCK"
+
+if ! flock -w "$TIMEOUT" 9; then
+    echo "with-game-lock: another agent has held the game lock for ${TIMEOUT}s; not launching" >&2
+    exit 75
+fi
+
+# Holding the lock is necessary but not sufficient: a previous holder may have
+# died without reaping its game, or the owner may be playing something by hand.
+# Refuse to stack on top of a live title either way.
+t0=$SECONDS
+while pgrep -x GameThread >/dev/null \
+   || pgrep -f "steamtool/proton waitforexitandrun" >/dev/null; do
+    if [ $((SECONDS-t0)) -ge "$IDLE_GRACE" ]; then
+        echo "with-game-lock: a game is STILL running after ${IDLE_GRACE}s with the lock held;" >&2
+        echo "  something is wrong -- not launching.  Do NOT SIGKILL it; report instead." >&2
+        pgrep -a -x GameThread >&2
+        exit 75
+    fi
+    sleep 10
+done
+
+"$@"
+rc=$?
+
+# Do not release until our own game is gone, or the next holder inherits it.
+#
+# Match the SAME set of processes the entry check does.  This loop originally
+# watched only GameThread, which is a name Cyberpunk and the UE titles happen
+# to use -- Quake II's process is `quake2ex_steam.exe`, so a Quake II run that
+# printed its fatal exception and then failed to exit was invisible here.  It
+# held the lock for 22 minutes with four other agents queued behind it, and
+# needed a hand SIGTERM to clear.  Watch the launcher too: it is game-agnostic
+# and it is what `run-native` actually waits on.
+t0=$SECONDS
+while pgrep -x GameThread >/dev/null \
+   || pgrep -f "steamtool/proton waitforexitandrun" >/dev/null; do
+    [ $((SECONDS-t0)) -ge "$IDLE_GRACE" ] && break
+    sleep 10
+done
+exit $rc
