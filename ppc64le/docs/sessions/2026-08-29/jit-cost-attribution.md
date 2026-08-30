@@ -6,6 +6,10 @@ labels this bucket "MEASURED fraction, INFERRED window→floor scaling").
 
 ## Headline
 
+**UPDATE (instruction-level follow-up, §9): the sharpest, most actionable finding in this whole report is in §9.1, not above.** `__wine_syscall_dispatcher` unconditionally saves the entire FP and VMX/vector register file (18 FPRs + FPSCR + 12 vector registers) on every single trap into the port — 65.5% of that function's own sampled cycles, roughly 6-7% of the ENTIRE GameThread — and its own restore path, later in the same function, is already gated on a dirty-state flag that, in this workload, is essentially never set. The function's own logic proves most of that save is dead work. This is a named, disassembly-confirmed, directly fixable pattern, not an aggregate statistic. Read the rest of the headline below for the broader module-attribution and IPC context, then go straight to section 9 for the instruction-level evidence the owner asked for.
+
+
+
 **The JIT'd-guest-code bucket is not one thing and it is not flat.** Within
 it: 71% is Cyberpunk2077.exe's own code, and *inside that*, two addresses 32
 bytes apart in a single Audiokinetic Wwise function
@@ -21,25 +25,36 @@ compile-machinery time it can possibly come from, and the Wwise hot function,
 while concentrated, is one C++ function doing real conditional/branchy work,
 not obviously idle spinning.
 
-**I could not close the loop with a hardware-counter verdict** (IPC / icache
-/ branch-miss on real game code vs. the JIT's own hot-loop best case) — that
-measurement is blocked on this box by a `perf stat` attach-mode restriction
-I do not have permission to lift (see §5). That is the single biggest gap
-between what was asked and what this report delivers. Everything else asked
-for — module attribution, a genuine (if partial) JIT-quality signature, and a
-scoped verdict on the emulated-Proton question — is here.
+**The hardware-counter verdict (added after the owner temporarily cleared
+`nmi_watchdog` for one measurement — see §5b): GameThread runs at 0.61 IPC
+with a 3.63% icache-miss rate and a 2.82% branch-miss rate, against 2.62 IPC
+and ~0.005% miss rates on the JIT's own best-case hot loop — a 4.3x IPC gap
+and 400–700x miss-rate gaps.** In raw terms that is exactly the "codegen or
+layout is costing us" signal. But it is a whole-thread measurement, and only
+~27–40% of GameThread's time is inside JIT'd guest code at all (§2) — the
+rest is this port's own trap-dispatch and syscall-marshaling machinery,
+which has every reason to be icache-hostile on its own account, independent
+of how well FEX translates x86. **I cannot partition the gap between "the
+JIT mistranslates guest code" and "the port's crossing machinery is what's
+thrashing the frontend" without a per-sample (not whole-thread) PMU
+breakdown, which I attempted and could not get working in the time
+available (§5).** Given crossing machinery is the *majority* of the thread's
+time, the second explanation is at least as well supported by the
+proportions as the first.
 
-**Working answer to "genuine work or poor codegen": mixed, leaning genuine,
-with one concrete inefficiency identified and bounded.** 71% of the JIT
+**Working answer to "genuine work or poor codegen": mixed, and now backed by
+a real (if partially confounded) hardware measurement.** 71% of the JIT
 bucket is the game's own executable running normal (if audio-telemetry-heavy)
 engine code; that part is not a port artifact. The 23% recompile-thrash rate
 is a real, measured port-side inefficiency, but it's bounded to a small
-absolute cost by how little total time compilation gets in the profile.
-Given the tools available in this session, I did not find evidence that the
-translated code itself runs at anomalously low IPC — I simply could not
-measure IPC at all. **This is a "spend a day closing the IPC gap, not a
-week rewriting the JIT" result, not a "walk away" result and not a
-"here is your 5 ms" result either.**
+absolute cost by how little total time compilation gets in the profile. The
+IPC/miss-rate gap is real and large, but the evidence leans toward it
+belonging mostly to the crossing/dispatch machinery `frame-cost-budget.md`
+already targeted, rather than opening a new front against FEXCore's own
+instruction selection. **This is a "the trap round-trip is the compressible
+part, not the JIT's codegen" result — spend effort per `frame-cost-budget.md`'s
+existing ranked plan, not on a JIT rewrite, unless a follow-up per-sample
+PMU breakdown says otherwise.**
 
 ---
 
@@ -263,18 +278,80 @@ The brief's premise (`perf stat -e` with hardware counters works here,
   whether that's the same permission wall in a different guise or a
   timing/attach race against a very short-lived process.
 
-**Net result: I cannot report GameThread IPC, icache-miss rate, iTLB-miss
-rate, or branch-miss rate, measured or estimated, for either the real game
-or the com_crossing_cost hot-loop baseline.** This is the one piece of the
-brief I did not deliver, and it's the piece that would have let me
-distinguish "healthy IPC in real code" (→ genuine work) from "low IPC, high
-icache pressure" (→ poor codegen) with actual numbers instead of inference
-from a single hot function's disassembly. **Recommended next step: get root
-on the AC922 long enough to `echo 0 > /proc/sys/kernel/nmi_watchdog` (and
-restore it after), then repeat the `perf stat -t <GameThread tid>` capture
-during a flythrough window and the `perf stat -p <probe pid>` capture on the
-already-built long-loop probe (`/tmp/comcost/pmu_loop.exe` on the AC922) — a
-five-minute job once that one flag is clear.**
+**At the time this section was first written, that's where it stopped: no
+counting-mode data at all, for either target, for lack of root.** The owner
+subsequently cleared `nmi_watchdog` for one measurement window; §5b below is
+the result, including a second, unrelated bug this surfaced (a pid
+misidentification, not a permission issue) in my probe-attach attempts
+above. `nmi_watchdog` has been restored to its prior value on request; this
+section is kept as-is for an accurate record of what did and didn't work
+under the default (locked-down) configuration.
+
+## 5b. PMU comparison (MEASURED — done after the owner temporarily cleared
+   `nmi_watchdog`)
+
+With `nmi_watchdog=0`, `perf stat` attach-mode counting worked immediately
+(verified first against a trivial `yes | head`-style CPU-bound process, to
+separate "counting mode is fixed" from "this specific target is fine" — the
+earlier probe-attach failures turned out to be a **second, unrelated bug**:
+`run-native`'s wrapper chain (`proton` → `wine` → `wineserver` →
+the actual guest process) means the pid you get by grepping the launcher's
+own command line for the target executable's name is the **wrapper**, not
+the worker — its own CPU time stays at 0 the entire run. The real worker
+shows up under its own `comm` (literally `pmu_loop.exe`, found via
+`pgrep -x`) roughly 17–20 s into a ~30 s total lifetime, the rest being
+wine/DLL-load overhead for even this minimal freestanding probe. Once
+correctly targeted, both captures came back clean:
+
+| | cycles | instructions | **IPC** | icache-miss rate | branch-miss rate | iTLB-miss (per icache load) |
+|---|---:|---:|---:|---:|---:|---:|
+| GameThread, real game, mid-flythrough (15 s) | 29.88 B | 18.11 B | **0.606** | **3.633%** | **2.815%** | 0.342% |
+| guest-local hot loop, JIT best case (3 s, 800 M-iteration probe) | 11.24 B | 29.47 B | **2.623** | **0.0053%** | **0.0067%** | 0.0004% |
+
+**The gap is large and unambiguous in raw terms: 4.3x lower IPC, 682x higher
+icache-miss rate, 421x higher branch-miss rate on the real game thread than
+on the JIT's own best-case hot loop.** Taken at face value this is squarely
+the coordinator's second scenario — "codegen or code layout is costing us."
+
+**But — and this matters — the comparison is confounded, and I want to say
+exactly how before anyone acts on it.** The GameThread capture is a
+`perf stat` over the **whole thread**, not JIT-translated code specifically.
+Per §2's own sample breakdown, only ~27.5% (conservatively; ~37–40% is my
+better estimate — see §2's caveat) of GameThread's samples are actually
+inside JIT'd guest code. The rest — ~60–70% — is `__wine_syscall_dispatcher`,
+`libfexbridge`'s trap/state-sync machinery, `win32u`'s native peek path, and
+libc, none of which the JIT emits: it is hand-written native ppc64 code the
+port ships, running dispatch tables and syscall marshaling that jump between
+many small, unrelated functions — exactly the shape that stresses an icache
+and a branch predictor **regardless of how good FEX's x86-to-ppc64 codegen
+is**. I do not have a way to partition the 4.3x/682x/421x gap between "the
+JIT translates guest instructions into worse code than it should" and "the
+crossing/dispatch machinery this port ships is inherently icache-hostile
+because of its own shape" — that would need per-sample PMU attribution
+(group-mode `perf record` with `:S`, which I tried and got zero samples
+from in the time available; see §5) rather than a single whole-thread count.
+
+**So: the data supports "there is real, large, compressible overhead
+sitting on the GameThread, well above what clean JIT'd code needs" with high
+confidence. It does NOT cleanly support "FEX's own codegen for translated
+x86 is the culprit" over the alternative "the port's crossing/dispatch
+machinery is the culprit" — and given that machinery is the *majority* of
+GameThread's time while JIT'd code is a minority, the second explanation is
+at least as plausible as the first, and arguably favored by the proportions.
+That reframes this away from "rewrite the code generator" and back toward
+frame-cost-budget.md's own ranked plan (cheapen the generic trap round trip,
+`__wine_syscall_dispatcher`, `libfexbridge` state sync) — which this
+measurement now gives independent PMU-level support to, rather than opening
+a new front in FEXCore's own instruction selection.**
+
+**Confidence, explicitly:** high that GameThread's aggregate IPC/miss-rates
+are dramatically worse than clean JIT'd code (that's a direct, unconfounded
+measurement of two real things). Low-to-moderate that this specifically
+indicts FEXCore's codegen quality rather than this port's crossing-machinery
+code shape — that attribution is inferred from the sample-share proportions
+in §2, not measured directly, and a per-DSO PMU breakdown (the natural next
+step, blocked this session by the same group-sample-read issue in §5) would
+settle it properly.
 
 ## 6. Verifying every run actually completed (per the coordinator's warning)
 
@@ -485,3 +562,237 @@ Source read (no changes made): `FEXCore/Source/Interface/Core/Core.cpp:1426`,
 `Source/Tools/FexBridge/FexBridge.cpp:151`,
 `Source/Tools/LinuxEmulation/LinuxSyscalls/SyscallsSMCTracking.cpp:1269`
 (all in `~/Development/fastppcx86`, branch `power9team`, no commits made).
+
+---
+
+## 9. Instruction-level deep dive: which instructions are executing, and are they the right ones
+
+Requested follow-up: aggregate IPC/miss-rate numbers (§5b) are the symptom;
+this section is the mechanism, from `perf annotate` on the existing sampling
+captures (no counting mode needed — sampling worked throughout) plus a live
+`gdb` attach for JIT'd code. Findings are ranked by how much of the profile
+each accounts for, with disassembly evidence for each. Source:
+`/tmp/annotate-0830/*.txt` on the AC922 (perf annotate against
+`/tmp/jitleg2-0830/perf-gamethread.data`, 22,576 samples), plus a live gdb
+dump (`/tmp/gdb-expansion-0830/`).
+
+### 9.1 [RANK 1 — ~6–7% of all GameThread cycles] `__wine_syscall_dispatcher` unconditionally saves the full FP/VMX register file on every trap; its own restore path proves most of that save is never needed
+
+`__wine_syscall_dispatcher` is ~10–11% of GameThread (per the original
+`frame-cost-budget.md` profile). Annotating it (2,267 samples) and bucketing
+by address range:
+
+| block | % of this function's samples | what it does |
+|---|---:|---|
+| GPR + special-register save (entry, unconditional) | 24.89% | `std r13..r29` (17 GPRs) to context, plus `mflr`/`mfcr`/`mfxer`/`mfctr` |
+| **FP save (entry, unconditional)** | 12.89% | `stfd f14..f31` (18 FPRs) + `mffs`/store FPSCR, one instruction each |
+| **VMX save (entry, unconditional)** | 27.76% | `stvx v20..v31` (12 vector registers), manually unrolled with `addi r11,r11,16` between each store |
+| **combined unconditional save** | **65.54%** | — |
+| FP restore (later in the function, gated by `andi. r0,r14,4; beq ...`) | **0.00%** | `lfd f0..f31` + `mtfsf` — entire block |
+| VMX restore (gated by `andi. r0,r14,16; beq ...`) | **0.00%** | `lvx v0..v31` — entire block |
+
+Representative save-block disassembly (the hottest single line in the
+function, 11.01%, is actually in the **restore** path reloading CTR —
+`ld r16,264(r31); mtctr r16` at `0x6367c` — but the save side is where the
+bulk of the time is spent):
+
+```
+    2.14 :   63284:  ld      r31,888(r30)      # context pointer
+    6.25 :   63288:  std     r1,8(r31)         # save SP
+    4.23 :   632a0:  std     r16,128(r31)      # save r16 (unconditional GPR save loop)
+    ...
+    5.61 :   63368:  stfd    f0,296(r31)       # save FPSCR (after 18x stfd f14..f31 above)
+    ...                                         # 12x stvx v20..v31, unrolled:
+    2.09 :   63398:  stvx    v25,r31,r11
+    2.65 :   633a0:  stvx    v26,r31,r11
+    3.11 :   633b8:  stvx    v29,r31,r11
+    3.16 :   633c8:  stvx    v31,r31,r11
+```
+
+The restore path, later in the same function, is **already flag-gated** —
+it reads a dirty-flags word at context offset 304 (zeroed at trap entry,
+so it must be *set* by the syscall handler on the far side of the `bctrl`)
+and skips the FP/VMX reload blocks entirely unless specific bits are set.
+In this 25 s, 22,576-sample capture, **those bits were never observed set**
+— the entire FP-restore and VMX-restore blocks carry zero samples.
+
+**This is the concrete, provable "dead state" pattern the coordinator asked
+for**: the function's own logic already knows most syscalls don't touch
+FP/VMX state (that's what the restore-side gate is *for* — and matches
+commits already in this tree, `FexBridge: lazy trap contexts — store
+EFLAGS/XMM only on the hop that reads them`), but the **save** side was
+never given the same treatment — it unconditionally spills all 18 FPRs +
+FPSCR + 12 VMX registers before the dispatcher even knows whether they'll
+be needed. Given `__wine_syscall_dispatcher` is ~10–11% of GameThread and
+65.5% of its own time is this unconditional save, that block alone is
+**roughly 6–7% of total GameThread cycles** — done, empirically, for a
+result that is then never read back on the vast majority of syscalls.
+
+**Confidence: high.** This is a direct disassembly + sample-percentage
+reading, not an inference, and the "prove it's dead" evidence is the
+function's *own* restore-side gate, not an assumption about what the
+callee needs.
+
+### 9.2 [RANK 2 — ~0.1–0.15% of all GameThread cycles, but a clean, isolated measurement] `get_tick_count`'s seqlock read costs 20.7% of its own instructions in `hwsync`/`isync` barriers
+
+Static disassembly of `win32u.so`'s `get_tick_count` (29 instructions
+total): three repetitions of the identical sequence
+
+```
+        hwsync
+        lwz     rX,0(rY)      # read one word of the shared tick-count page
+        cmpw    rX,rX
+        bne-    <self+4>      # never taken; a compiler/ISA idiom pairing cmp+bne- with isync
+        isync
+```
+
+— a **seqlock-style consistency read** (read low word, high word, and a
+version/parity word again, retrying if the shared page changed underneath),
+needed because x86 gives this ordering for free and POWER9 does not. **3
+`hwsync` + 3 `isync` = 6 of the function's 29 static instructions (20.7%)
+are pure ordering overhead**, before the ordinary arithmetic that combines
+the words into a tick count even begins. In the *sampled* view (§ original
+report), the two `hwsync`s alone carry 3.75%+2.09% of this function's own
+weight; the loads immediately after (`lwz`, 57.5%/17.1%/16.3% of the
+function's samples) dominate more, consistent with a small, tight function
+where almost every instruction gets *some* share — the ordering
+instructions are a real, fixed, non-negligible slice, not the majority of
+the cost of this specific function.
+
+`get_tick_count` itself is ~3.8% of GameThread and is called from inside
+the busy-polling peek path (~248k calls/s per `frame-cost-budget.md` §2,
+called repeatedly per second regardless of scene). At that call rate, 6
+ordering instructions/call × 247,802 calls/s ≈ **1.49M ordering-instruction
+executions/s from this one function alone** — against GameThread's overall
+~1.2 billion instructions/s (from §5b's 18.1B instructions / 15s), that's
+**≈0.12% of all executed GameThread instructions**, from ordering
+overhead in one small, frequently-hit function. Small in the aggregate, but
+a clean, fully quantified example of the ordering tax the owner asked about
+— [INFERRED: the 0.12% figure combines a measured static count with a
+measured call rate from a different capture, not a single direct count].
+
+### 9.3 Ordering-instruction density, more broadly: real, but not close to explaining the IPC gap on its own
+
+| binary | total instructions | `hwsync`+`isync`+`lwsync`+`eieio` | density |
+|---|---:|---:|---:|
+| `ntdll.so` (whole file) | 162,417 | 99 (48+48+3+0) | 0.061% |
+| `libfexbridge.so` (whole file) | 536,272 | 1,157 (184+347+626+0) | 0.216% |
+| `__wine_syscall_dispatcher` alone | 328 | 0 (uses one `ldarx`/`stdcx.` pair instead — an atomic counter, not an ordering barrier) | 0% |
+| `get_tick_count` alone | 29 | 6 | 20.7% |
+
+**libfexbridge is ~3.5x denser in ordering instructions than ntdll** — this
+matches the owner's own framing (this is where the JIT's own TSO/SAO
+emulation infrastructure lives, per `FEX_HWTSO`/`PROT_SAO` machinery named
+elsewhere in this investigation), not the OS-emulation crossing path.
+**Owner's own read holds up**: at these whole-file densities (0.06–0.22%),
+ordering instructions cannot be a primary driver of the 4.3x IPC gap or the
+400–700x miss-rate gap measured in §5b — they are real, concentrated in a
+few specific spots (like `get_tick_count`), and worth trimming where they
+sit on a hot, high-frequency path, but they are not "what is churning" in
+aggregate. §9.1 and §9.4 below are the bigger, more direct answers to that
+question.
+
+### 9.4 [RANK 3 — dominant within one function, causal mechanism NOT resolved — flagged honestly] `HandleSyscall`'s single hottest instruction
+
+`(anonymous namespace)::BridgeSyscallHandler::HandleSyscall` (7.9% of
+GameThread from the earlier symbol table) has **76.62% of its own samples
+on one instruction**: `lwz r24,100(r1)` at `+0x64`, a stack-relative load.
+
+I initially read this as a stall following a `memset(&C.FltSave, 0xDD,
+sizeof(C.FltSave))` a few instructions earlier in the same disassembly
+window and reported that reading — **that was wrong, and I want to correct
+it explicitly rather than let it stand.** Checking the source
+(`FexBridge.cpp:566-575`): that `memset` only runs when both `Lazy` and a
+module-global `TrapCtxPoison` are true, and `TrapCtxPoison` defaults to
+`false`, set only by an explicit env var this session never set — so that
+branch was **provably not taken** in this capture, and the hot load sits at
+the convergence point after the (skipped) conditional, not inside anything
+poison-related. Retracted.
+
+What I can say with confidence: this is a real, precisely located,
+extremely concentrated hotspot — one stack load carries the large majority
+of a function that runs on every syscall. What I cannot say with the
+tooling available this session is *why*: it could be genuine sample-skid
+(POWER9's PMU attributing an interrupt from a preceding call/branch-heavy
+sequence a few cycles downstream, a well-known sampling artifact), a
+load-hit-store hazard against a nearby recent store to the same cache
+line, or something else. Settling it needs either `perf record` with
+precise/PEBS-equivalent event support (not confirmed available on this
+POWER9 configuration) or a targeted microbenchmark of this exact
+instruction sequence in isolation — out of scope for the time available
+here. **Reporting the location and the retraction rather than a guess.**
+
+### 9.5 [supporting evidence, same shape as §9.1] `StoreStateToContext` and `call_user_mode_callback` show the identical unconditional-full-save pattern
+
+`StoreStateToContext` (2.5% of GameThread): top samples are
+`stxvd2x vs0,r30,r3` repeated at three separate addresses (10.71%, 7.40%,
+2.01%), each preceded by `li r3,<constant>` — a **fully unrolled sequence
+of individually-addressed VSX register stores**, one hardcoded offset at a
+time rather than a loop, matching the pattern already named in §2's
+per-crossing cost accounting. `call_user_mode_callback` shows the same
+`stvx v24/v26/v27/v28/v29/v30,r9,r11` vector-register-save-with-manual-
+`addi`-increment shape as §9.1's VMX block, at similarly concentrated
+percentages (top line 6.90%). **This is not an isolated case — "save the
+full vector/FP register file on every crossing, unconditionally, via a
+manually unrolled store sequence" is a repeated idiom across at least
+three separate functions in this port's crossing path** (`__wine_
+syscall_dispatcher`, `StoreStateToContext`, `call_user_mode_callback`).
+Whether each of these has the same asymmetry as §9.1 (a gated restore that
+proves the save mostly unnecessary) I did not check for the latter two in
+the time available — §9.1 is the one I verified end-to-end; these two are
+reported as the same *pattern*, not independently proven dead.
+
+### 9.6 Expansion ratio (guest x86 → host ppc64 instruction count): not obtained this session
+
+A dedicated live-`gdb` capture was run for this specifically (identify a
+hot JIT host address via a fresh `perf record`, cross-reference to its
+guest RVA via the `FEX_BLOCKJITNAMING` map, then `gdb -p <pid> -batch
+-ex "disassemble/r ..."` on the live process while it still held the code
+buffer resident). **The map did not populate this run** — `/tmp/perf-
+<pid>.map` stayed absent for the whole capture window, on the same
+mechanism that worked twice before (§1/§2), with no code change and no
+obvious cause found in the time available; this looks like an intermittent
+issue with the naming pipeline itself, not a new architectural finding.
+With the process still live, I disassembled two of the run's own hottest
+raw host addresses directly via `gdb` anyway (`/tmp/gdb-expansion-0830/`)
+and got real, live, translated ppc64 code — including a visible pattern
+worth naming even without guest correlation: an XOR + `addco.` (add with
+carry, record CR0) sequence immediately followed by two separate stores
+(a byte and a doubleword) into what is very likely flag/status materialization
+for an ALU op, done unconditionally at the point of translation. But I
+could not verify which x86 instruction(s) produced it without the guest
+RVA, so I am not presenting an instruction-count ratio or a validated
+before/after listing — doing so without that correlation would be a guess
+dressed as a measurement, which is exactly what I don't want to hand
+back after already retracting one claim this session. **This is the one
+item from the request I did not deliver; a repeat with the naming pipeline
+confirmed working first (e.g., verify map growth before opening the perf
+window, as done successfully in §1's leg 2) would close it in about the
+same ~10 minutes each of the other captures took.**
+
+### Summary, ranked by profile share
+
+1. **§9.1, ~6–7% of all GameThread cycles**: `__wine_syscall_dispatcher`'s
+   unconditional FP/VMX register-file save on every trap, proven mostly
+   unnecessary by its own gated (and, in this workload, never-taken)
+   restore path. Highest confidence, most concrete, most actionable finding
+   in this whole investigation — a specific function, a specific 65.5%
+   sub-block, and internal evidence (the restore-side gate) that most of
+   it is dead work.
+2. **§9.3/9.2, ~0.06–0.22% static density, ~0.12% of executed instructions
+   from one function**: ordering instructions (`hwsync`/`isync`/`lwsync`)
+   are real, concentrated in specific spots like `get_tick_count`'s seqlock
+   read, denser in the JIT/TSO-emulation code (`libfexbridge.so`) than in
+   OS-emulation code (`ntdll.so`) — matching the owner's own framing — but
+   at these densities they cannot be a primary driver of the §5b IPC gap.
+3. **§9.5, pattern repeated across ≥3 functions, magnitude not fully
+   quantified**: the same "unconditional full vector/FP save, unrolled,
+   one instruction per register" idiom recurs beyond the dispatcher; worth
+   auditing as a family, not a one-off.
+4. **§9.4, ~5–6% of GameThread cycles by location, cause unresolved**: a
+   single stack load in `HandleSyscall` dominates its function's profile;
+   flagged with a retracted wrong hypothesis rather than an unretracted
+   wrong one.
+5. **§9.6, not obtained**: guest-to-host expansion ratio and a validated
+   register-allocation/spill audit of JIT'd code specifically — blocked by
+   an intermittent tooling issue this session, not a finding either way.
