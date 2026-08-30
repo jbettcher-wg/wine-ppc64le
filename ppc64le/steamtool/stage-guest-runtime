@@ -84,7 +84,26 @@ shift
 # dlls/guestcrt's real guest x86-64 code.  Staging over that would replace a
 # load-bearing subsystem to gain six RTTI entry points; those six are served as
 # FORWARD lines in that .thunks file instead (2026-08-30).
-if [ $# -gt 0 ]; then modules="$*"; else modules="msvcp140.dll"; fi
+#
+# concrt140 rides along with msvcp140 and is not optional decoration.  Wine's
+# msvcp140 DllMain (dlls/msvcp90/msvcp_main.c, init_cxx_funcs at :267) does
+# `LoadLibraryA("concrt140.dll")` for _MSVCP_VER >= 140 and pulls
+# Context::IsCurrentTaskCollectionCanceling out of it; with the module absent
+# that pointer is NULL and any std:: path that consults it calls through zero.
+# [MEASURED 2026-08-30] every Civ VI probe run logged
+#
+#   warn:module:load_dll Failed to load module L"concrt140.dll"; status=c000007b
+#   fixme:msvcp:init_cxx_funcs concrt140.dll not loaded
+#
+# -- c000007b being the loader correctly refusing to splice this tree's NATIVE
+# ppc64 concrt140 into a guest call, since dlls/concrt140 has no .thunks and
+# cannot have a useful one (Concurrency:: is another mangled C++ ABI).  It is
+# survivable at load time -- EOSSDK, DatabaseDLL and Localization all loaded
+# clean with it missing -- so this is closing a latent hole, not a crash.
+# Checked the same way as msvcp140 before adding: 36 kernel32, 3 ntdll
+# (RtlWaitOnAddress, RtlWakeAddressSingle, _vsnprintf) and 19 ucrtbase
+# imports, all served by this tree's guest thunks.
+if [ $# -gt 0 ]; then modules="$*"; else modules="msvcp140.dll concrt140.dll"; fi
 
 sysx8664=$prefix/drive_c/windows/sysx8664
 

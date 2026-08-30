@@ -50,3 +50,31 @@ _Mtx_init_in_situ             0x00000E01  2  void  msvcp140.spec:3682
 # The VCRUNTIME140 half IS fixable here-adjacent and was fixed properly rather
 # than staged over; see that file's 2026-08-30 banner for why replacing the
 # module wholesale would have cost the guest C++ exception personality.
+#
+# TWO THINGS THE STAGED MODULE STILL ASKS FOR AND DOES NOT GET, both measured
+# on 2026-08-30 and both non-fatal at load (EOSSDK, DatabaseDLL_FinalRelease
+# and Localization_FinalRelease all loaded clean with both missing):
+#
+#   concrt140.dll -- msvcp140's DllMain LoadLibraryA's it (dlls/msvcp90/
+#       msvcp_main.c, init_cxx_funcs at :267) and pulls
+#       Context::IsCurrentTaskCollectionCanceling out of it.  It logged
+#       `load_dll Failed to load module L"concrt140.dll"; status=c000007b`
+#       -- the loader refusing this tree's native ppc64 builtin for a guest
+#       call, since Concurrency:: is another mangled C++ ABI with no useful
+#       thunk.  CLOSED: stage-guest-runtime stages it too, and its 36
+#       kernel32 / 3 ntdll / 19 ucrtbase imports are all served.
+#
+#   ucrtbase._set_new_handler -- GetProcAddress'd by the same function, and
+#       STILL ABSENT ON PURPOSE.  spec2thunk refuses it because its return is
+#       a function pointer, not because of the argument; the .spec-location
+#       downgrade would get past that.  What must not be got past is the
+#       ARGUMENT: it is a guest `int (__cdecl *)(size_t)` handed to native
+#       code that will later call it, so an ordinary row would leave native
+#       ppc64 doing `bctrl` on a guest address.  That is what the callback
+#       rows in dlls/msvcr100/msvcr100.thunks and the registration-
+#       interception table in dlls/ntdll/signal_ppc64.c exist to prevent, and
+#       closing this means a row in BOTH plus a line in
+#       ppc64le/seh/check-crt-callbacks.sh.  Until then, absent is the safe
+#       state: msvcp140 stores NULL and only a game that actually calls
+#       std::set_new_handler is affected, whereas a naive row would corrupt
+#       any game that does.
