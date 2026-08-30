@@ -3811,6 +3811,23 @@ static void peek_delay_inject(void)
 #define PEEK_DELAY()        do {} while (0)
 #endif
 
+#ifdef __powerpc64__
+static BOOL peek_noyield_ignored(void)
+{
+    static int ignore = -1;
+    if (ignore < 0)
+    {
+        const char *env = getenv( "WINE_PPC64LE_PM_NOYIELD_IGNORE" );
+        ignore = env && env[0] == '1';
+        if (ignore) ERR( "PM_NOYIELD is being IGNORED (upstream behavior) by request\n" );
+    }
+    return ignore;
+}
+#else
+/* other arches keep upstream behavior: the empty-peek yield is unconditional */
+static BOOL peek_noyield_ignored(void) { return TRUE; }
+#endif
+
 /***********************************************************************
  *           NtUserPeekMessage  (win32u.@)
  */
@@ -3829,20 +3846,36 @@ BOOL WINAPI NtUserPeekMessage( MSG *msg_out, HWND hwnd, UINT first, UINT last, U
     {
         if (!ret)
         {
-            struct thunk_lock_params params = {.dispatch.callback = thunk_lock_callback};
-            void *ret_ptr;
-            ULONG ret_len;
-
             flush_window_surfaces( TRUE );
 
-            if (!KeUserDispatchCallback( &params.dispatch, sizeof(params), &ret_ptr, &ret_len ) &&
-                ret_len == sizeof(params.locks))
+            /* The yield below is Wine's kindness to cooperative busy loops,
+             * not a Windows PeekMessage contract -- and PM_NOYIELD is the
+             * caller saying "do not go idle on my behalf".  Upstream ignores
+             * the flag here (while honoring it for the idle event in
+             * peek_message); on x86 that costs a sched_yield.  On this port
+             * the thunk-lock dance around the yield is TWO KeUserDispatch-
+             * Callback round trips into the guest -- each a full crossing --
+             * and [MEASURED 2026-08-30, WINE_PPC64LE_PEEK_SHAPE capture]
+             * Cyberpunk 2077 makes ~300k empty PM_NOYIELD peeks a second,
+             * every one paying all three.  So honor the flag.  The peeks
+             * are an elastic spin (see ppc64le/docs/sessions/2026-08-29/
+             * peek-fastpath-impl.md): this buys CPU, not frames.
+             * WINE_PPC64LE_PM_NOYIELD_IGNORE=1 restores upstream behavior. */
+            if (!(flags & PM_NOYIELD) || peek_noyield_ignored())
             {
-                params.locks = *(DWORD *)ret_ptr;
-                params.restore = TRUE;
+                struct thunk_lock_params params = {.dispatch.callback = thunk_lock_callback};
+                void *ret_ptr;
+                ULONG ret_len;
+
+                if (!KeUserDispatchCallback( &params.dispatch, sizeof(params), &ret_ptr, &ret_len ) &&
+                    ret_len == sizeof(params.locks))
+                {
+                    params.locks = *(DWORD *)ret_ptr;
+                    params.restore = TRUE;
+                }
+                NtYieldExecution();
+                KeUserDispatchCallback( &params.dispatch, sizeof(params), &ret_ptr, &ret_len );
             }
-            NtYieldExecution();
-            KeUserDispatchCallback( &params.dispatch, sizeof(params), &ret_ptr, &ret_len );
         }
         PEEK_PROBE_EXIT( FALSE );
         PEEK_DELAY();
