@@ -980,11 +980,15 @@ static UINT64 hand32_d3d9_set_npatch_mode( void *host, UINT slot, I386_CONTEXT *
  * work here, and guessing at it would corrupt exactly the buffers this is
  * meant to protect.  So: correct or loud, and the loudness names the wall.
  *
- * [UNVERIFIED as of 2026-08-30] Whether DXVK's d3d9 actually maps below
- * 4 GiB on this host is not known -- the D3D11 lane found it went both ways.
- * If it does, these rows work as they stand; if it does not, the ERR below
- * fires on the first lock and the bounce is required.  The log tells which,
- * on the first run, which is why it is written this way round. */
+ * [MEASURED 2026-08-30] It does not fit.  ppc64le/dxvk/probes/d3d9_smoke.c
+ * built as an i386 PE and run under this port reaches step 7 and gets
+ * `IDirect3DSurface9::LockRect answered 00003FFF141FC000` -- so DXVK's d3d9
+ * maps its system-memory surfaces high on this host and THE BOUNCE IS
+ * REQUIRED, not optional.  That is the next wall on this lane and the
+ * refusal above is what names it.  Everything before it in that probe
+ * passes: Direct3DCreate9, CreateDevice, CreateRenderTarget,
+ * SetRenderTarget, Clear, CreateOffscreenPlainSurface, GetRenderTargetData.
+ * ppc64le/dxvk/run-d3d9-smoke32.sh reproduces the run. */
 
 /* D3DLOCKED_RECT and D3DLOCKED_BOX, spelled here for the same reason
  * d3d9_present_parameters is: this module includes no D3D9 header.  The
