@@ -106,7 +106,7 @@ HeapAlloc                 0x0000A110  3  int   winbase.h:1967
 HeapFree                  0x0000F4EE  3  int   winbase.h:1966
 # 8 arguments: four in registers, four at [RSP + 8 + i*8].
 WideCharToMultiByte       0x0000B2C0  8  int   winnls.h:997
-WriteConsoleW             0x0000C025  5  int   consoleapi.h:87
+WriteConsoleW             0x0000C025  5  int   consoleapi.h:90
 WriteFile                 0x0000F11E  5  int   winbase.h:2364
 
 # ---------------------------------------------------------------------------
