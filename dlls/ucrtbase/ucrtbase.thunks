@@ -391,6 +391,20 @@ FORWARD __DestructExceptionObject      guestcrt.__DestructExceptionObject
 FORWARD __current_exception            guestcrt.__current_exception
 FORWARD __current_exception_context    guestcrt.__current_exception_context
 FORWARD __processing_throw             guestcrt.__processing_throw
+
+# __uncaught_exception reads the same processing_throw field __processing_
+# throw() above hands out a pointer to -- it carries no pointer ABI of its
+# own, just a plain BOOL return, which is exactly why it was easy to leave
+# behind: it had no EXCLUDE and no FORWARD, so it fell through to an ordinary
+# native trap, sentinel 0xDEAD0003, imported by MSVCP140.dll directly from
+# this module (winedump -j import), unlike __current_exception and
+# __processing_throw which MSVCP140 reaches through vcruntime140's forwarder
+# chain instead.  A native trap here returns a NATIVE thread's
+# processing_throw, which is always FALSE for a guest throw in flight -- a
+# live exception reported as none, the silent-wrong-answer class this file's
+# other four rows exist to avoid, not merely a missing feature.  Moved beside
+# its siblings for the same reason they moved: one logical field, one side.
+FORWARD __uncaught_exception           guestcrt.__uncaught_exception
 _CreateFrameInfo                0x00000E02  2  int   msvcrt.h:147
 _FindAndUnlinkFrame             0x00000E03  1  void  msvcrt.h:154
 _IsExceptionObjectToBeDestroyed 0x00000E04  1  int   msvcrt.h:155

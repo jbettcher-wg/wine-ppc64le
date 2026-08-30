@@ -12,3 +12,4 @@ EXPORTS
     __current_exception
     __current_exception_context
     __processing_throw
+    __uncaught_exception

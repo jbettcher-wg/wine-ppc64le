@@ -360,3 +360,27 @@ int * __cdecl __processing_throw( void )
     if (!state) return NULL;
     return &state->processing_throw;
 }
+
+/***********************************************************************
+ *		__uncaught_exception
+ *
+ * The sixth view of the same per-thread record, not the five the banner
+ * above counts -- and left out of that count on purpose: this one reads
+ * processing_throw rather than exposing a pointer into it, so it carries no
+ * ABI weight of its own and needed no design discussion, only a forward.
+ * dlls/msvcrt/except.c's own native __uncaught_exception is the reference:
+ * `return data->processing_throw != 0`.  A guest FH4/__CxxThrowException on
+ * this side sets processing_throw through *__processing_throw() above, so
+ * reading it back HERE, in the same guest module, is the same rule the other
+ * five follow -- serve it guest-side or hand a caller a native copy of state
+ * a guest write never reaches.  A NULL state (Fls not yet materialised on
+ * this thread) means no guest throw has ever touched this thread's record,
+ * which is a plain FALSE, not a refusal: nothing is uncaught on a thread
+ * that has thrown nothing. */
+BOOL __cdecl __uncaught_exception( void )
+{
+    struct exc_state *state = get_exc_state();
+
+    if (!state) return FALSE;
+    return state->processing_throw != 0;
+}
