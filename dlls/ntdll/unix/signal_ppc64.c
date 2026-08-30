@@ -1295,6 +1295,63 @@ NTSTATUS KeUserModeCallback( ULONG id, const void *args, ULONG len, void **ret_p
  * frame->gpr[1] is the Win32 stack pointer this thread had when it made the
  * unix call the emulator is running inside; everything below it is free.
  */
+
+/***********************************************************************
+ *           emu_crossing_dump
+ *
+ * Name the recursion.  Prints the OPEN crossings on struct
+ * thread_data::crossing_log -- the ones pushed and not yet popped, i.e.
+ * exactly what is still standing on the kernel stack right now -- outermost
+ * first, so that whatever pair (or larger cycle) of guest RIPs is calling
+ * itself without bound is the pattern repeating down the dump: TRAP is this
+ * thread inside the PE dispatcher FOR that RIP, REVERSE is this thread
+ * inside a run of guest code that started AT some RIP, and an unbounded
+ * mutual recursion between a native routine and a guest callback shows up
+ * as the same TRAP/REVERSE pair (or short cycle of pairs) repeating for as
+ * far back as the log reaches.
+ *
+ * Deliberately NOT a log of every crossing that ever happened: an
+ * append-only history is mostly ordinary traffic that already returned and
+ * freed its stack, and says nothing about what is unreturned when the guard
+ * fires.  [MEASURED] on DOOM (2016), 2026-08-29: the append-only first cut
+ * of this function showed 31 TRAPs and 1 REVERSE out of the last 32 of
+ * 60,155 lifetime crossings -- not a chain, just recent ordinary calls.
+ * crossing_depth is the number actually open; that is the number that
+ * matters here.
+ *
+ * Only ever called from the guard below, immediately before it fails, so
+ * the deepest entry is always the crossing that failed the check.
+ */
+static void emu_crossing_dump( const struct thread_data *data )
+{
+    unsigned int depth = data->crossing_depth;
+    unsigned int n = depth < EMU_CROSSING_LOG_SIZE ? depth : EMU_CROSSING_LOG_SIZE;
+    unsigned int i;
+
+    if (!depth)
+    {
+        ERR( "no crossings open on this thread -- the guest<->native crossing "
+             "stack is empty, so this exhaustion did not come from the crossing "
+             "recursion it instruments; look elsewhere for what is using the "
+             "kernel stack\n" );
+        return;
+    }
+    ERR( "%u guest<->native crossing%s open on this thread right now "
+         "(peak %u since the thread started), showing the innermost %u, "
+         "outermost first: TRAP = guest->native (inside the PE dispatcher), "
+         "REVERSE = native->guest (inside a run of guest code)\n",
+         depth, depth == 1 ? "" : "s", data->crossing_peak, n );
+    for (i = 0; i < n; i++)
+    {
+        unsigned int level = depth - n + i;
+        unsigned int idx = level % EMU_CROSSING_LOG_SIZE;
+
+        ERR( "  depth %-6u %-7s guest rip=%p\n", level,
+             data->crossing_log[idx].kind == EMU_CROSSING_TRAP ? "TRAP" : "REVERSE",
+             (void *)data->crossing_log[idx].rip );
+    }
+}
+
 NTSTATUS call_emu_trap_dispatcher( void *func, void *ctx )
 {
     static int on_kernel_stack = -1;
@@ -1340,6 +1397,7 @@ NTSTATUS call_emu_trap_dispatcher( void *func, void *ctx )
              "callback-driven API nests them.\n",
              (long)((char *)&frame - (char *)get_kernel_stack( data )),
              (long)kernel_stack_size, (long)min_kernel_stack );
+        emu_crossing_dump( data );
         return STATUS_STACK_OVERFLOW;
     }
 

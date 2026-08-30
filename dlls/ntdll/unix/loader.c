@@ -1583,7 +1583,16 @@ static void emu_teb_stack_switch( const struct emu_teb_stack *in, struct emu_teb
 
 static int emu_trap_thunk( void *thread, void *ctx, void *user )
 {
+    struct thread_data *data = get_thread_data();
     NTSTATUS status;
+
+    /* Crossing log: this is the guest->native direction, pushed BEFORE
+     * call_emu_trap_dispatcher's own kernel-stack check runs, so the stack's
+     * innermost entry is always the crossing about to be checked --
+     * including the one that fails it.  Popped as soon as the dispatcher
+     * returns, a few lines down, because that is exactly when this crossing
+     * is no longer open.  See emu_crossing_push() in unix_private.h. */
+    emu_crossing_push( data, EMU_CROSSING_TRAP, ((const AMD64_CONTEXT *)ctx)->Rip );
 
     /* The register file the bridge handed us IS the guest's, at the trapping
      * instruction -- the whole marshalling layer is built on that.  Publish it
@@ -1599,6 +1608,7 @@ static int emu_trap_thunk( void *thread, void *ctx, void *user )
     /* everything below this line is native code on the native stack */
     emu_teb_stack_switch( &emu_native_teb_stack, NULL );
     status = call_emu_trap_dispatcher( p_emu_trap_dispatcher, ctx );
+    emu_crossing_pop( data );
     /* ...and back to the GUEST stack the run is on NOW, which is not always
      * the one this trap arrived on: a guest fiber switch happens inside the
      * trap and moves the run to another stack (unixcall_emu_fiber_stack).
@@ -1830,6 +1840,17 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
     pthread_once( &emu_hlt_once, emu_alloc_hlt_page );
     if (!emu_hlt_page) return STATUS_NO_MEMORY;
 
+    /* Crossing log: this is the native->guest direction -- every entry into
+     * guest code, the initial thread start included, goes through here (see
+     * ppc64le/cpu/CROSSINGS.md, "the native->guest direction is complete
+     * rather than sampled").  Pushed before the guest stack is even
+     * allocated, so a failure in that allocation still leaves the attempt on
+     * the stack (and is popped on that path too, below); popped for real at
+     * every other return from this function, since the whole point of a
+     * push/pop stack over a plain log is that it holds only what is still
+     * open -- see the comment above struct thread_data::crossing_log. */
+    emu_crossing_push( data, EMU_CROSSING_REVERSE, (ULONG_PTR)params->entry );
+
     /* The guest stack is sized by what THIS THREAD asked for, and the request
      * has already been recorded in a place this side can read: the thread's own
      * native stack.
@@ -1881,6 +1902,7 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
     {
         ERR( "cannot allocate a guest stack of %lu bytes, status %08x\n",
              (unsigned long)reserve_size, (UINT)status );
+        emu_crossing_pop( data );
         return status;
     }
     /* Traced because it is otherwise unobservable from outside the guest: the
@@ -2006,7 +2028,15 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
             exc.rec = &rec;
             exc.stack_base  = emu_guest_stack_base;
             exc.stack_limit = emu_guest_stack_limit;
+            /* Crossing log: also guest->native, same call_emu_trap_dispatcher,
+             * same kernel-stack cost as the trap path above -- a guest
+             * exception dispatch nesting into a recursion looks identical to
+             * the guard and must look identical here. Popped right after the
+             * call returns, on every one of its outcomes, same as the trap
+             * path in emu_trap_thunk(). */
+            emu_crossing_push( data, EMU_CROSSING_TRAP, ctx.Rip );
             status = call_emu_trap_dispatcher( params->exception_dispatcher, &exc );
+            emu_crossing_pop( data );
             if (status == STATUS_SUCCESS) continue;   /* handled: resume the edited CONTEXT */
             if (status != STATUS_EMU_GUEST_EXCEPTION)
                 ERR( "guest exception dispatch failed, status %08x\n", (UINT)status );
@@ -2069,6 +2099,7 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
         else
             NtFreeVirtualMemory( NtCurrentProcess(), &stack_addr, &free_size, MEM_RELEASE );
     }
+    emu_crossing_pop( data );
     return status;
 }
 

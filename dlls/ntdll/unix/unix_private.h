@@ -101,6 +101,44 @@ static inline BOOL is_arm64ec(void)
             main_image_info.Machine == IMAGE_FILE_MACHINE_AMD64);
 }
 
+/* ppc64le emulator: the chain of guest<->native CROSSINGS currently OPEN on
+ * this thread, in either direction -- a stack, not a history.  Each crossing
+ * is PUSHed when it starts and POPped when it returns, so at any moment
+ * crossing_log[0 .. crossing_depth-1] is exactly the nest of calls sitting on
+ * the kernel stack right now.  That is deliberate and was not the first cut:
+ * a plain append-only ring of the last N events records mostly ORDINARY
+ * traffic (every trap that already returned) and tells the exhaustion guard
+ * nothing about what is still standing when it fires.  [MEASURED] on DOOM
+ * (2016) tonight (2026-08-29): an append-only ring's last 32 entries out of
+ * 60,155 lifetime crossings were 31 TRAPs and 1 REVERSE -- useless, because
+ * thousands of those TRAPs had already returned and freed their stack before
+ * the ring even wrapped again.  The depth-indexed stack fixes that: it can
+ * only ever hold what is unreturned, which is what the guard needs named.
+ *
+ * call_emu_trap_dispatcher's kernel-stack exhaustion guard (signal_ppc64.c)
+ * used to be able to detect a runaway crossing recursion but not name it --
+ * the whole point of this file's own stated discipline that a refusal must
+ * name itself.  Pushed/popped at the three places a crossing happens
+ * (emu_trap_thunk and the exception-dispatch call in emu_run_loop for the
+ * guest->native direction, emu_run_loop's own entry for the native->guest
+ * direction; all three in unix/loader.c); read only by the guard above, on
+ * the one thread that owns the stack, so no lock.
+ *
+ * EMU_CROSSING_LOG_SIZE bounds how much of a very deep chain is kept: past
+ * that many open crossings the array wraps and only the INNERMOST
+ * EMU_CROSSING_LOG_SIZE survive -- which is exactly the end of the chain
+ * that is about to exhaust the stack, so wrapping loses outer context, not
+ * the finding. */
+#define EMU_CROSSING_LOG_SIZE 64
+#define EMU_CROSSING_TRAP     1   /* guest -> native: a trap entered the PE dispatcher */
+#define EMU_CROSSING_REVERSE  2   /* native -> guest: emu_run_loop about to run guest code */
+
+struct emu_crossing_entry
+{
+    unsigned char kind;   /* EMU_CROSSING_TRAP or EMU_CROSSING_REVERSE */
+    ULONG_PTR     rip;    /* guest RIP at the crossing */
+};
+
 /* per-thread data for the Unix side, stored at the bottom of the signal stack */
 
 struct thread_data
@@ -149,6 +187,13 @@ struct thread_data
      * FAULT/ENDED, whose source frame does not outlive the run loop. */
     const AMD64_CONTEXT *emu_guest_ctx_ptr;
     AMD64_CONTEXT emu_guest_ctx;
+    /* the crossing stack described above the struct: crossing_depth open
+     * crossings, most recently pushed at index (crossing_depth-1) % SIZE;
+     * crossing_peak is the deepest this thread's stack has ever reached, kept
+     * only to head the dump ("N open now, M at the deepest point"). */
+    struct emu_crossing_entry crossing_log[EMU_CROSSING_LOG_SIZE];
+    UINT         crossing_depth;
+    UINT         crossing_peak;
     struct list  entry;             /* entry in TEB list */
     char         debug_info[0x800]; /* debug_info structure */
     char         signal_stack[];    /* signal stack */
@@ -531,6 +576,30 @@ static inline void ascii_to_unicode( WCHAR *dst, const char *src, size_t len )
 static inline void *get_kernel_stack( struct thread_data *data )
 {
     return data->signal_stack + signal_stack_size;
+}
+
+/* push one guest<->native crossing onto this thread's open-crossing stack;
+ * see the comment above struct thread_data::crossing_log.  Pair with
+ * emu_crossing_pop() at every path out of the crossing, including early
+ * returns.  data may be NULL on a thread that has none yet (there is no
+ * earlier crossing to have caused that, so there is nothing useful to
+ * record either); a no-op then. */
+static inline void emu_crossing_push( struct thread_data *data, int kind, ULONG_PTR rip )
+{
+    unsigned int i;
+
+    if (!data) return;
+    i = data->crossing_depth % EMU_CROSSING_LOG_SIZE;
+    data->crossing_log[i].kind = kind;
+    data->crossing_log[i].rip  = rip;
+    data->crossing_depth++;
+    if (data->crossing_depth > data->crossing_peak) data->crossing_peak = data->crossing_depth;
+}
+
+/* pop the crossing emu_crossing_push() most recently pushed on this thread. */
+static inline void emu_crossing_pop( struct thread_data *data )
+{
+    if (data && data->crossing_depth) data->crossing_depth--;
 }
 
 static inline struct teb_data *get_teb_data( struct thread_data *data )
