@@ -867,7 +867,29 @@ bridge_start() {
     # that reads both wants the registry to already be right, and before the
     # game, which is the whole point.  A failure here is not fatal: a title
     # with no stub does not care, and one with a stub will say so loudly.
-    presence_start || say "continuing without the SteamStub liveness objects"
+    # OFF BY DEFAULT, and it has to earn its way back on.  [MEASURED
+    # 2026-08-30] These objects are necessary but NOT sufficient: with them
+    # published, Oblivion's stub stops failing at OpenEventA and instead takes
+    # the lock (WaitForSingleObject, 5 s) and maps the section
+    # (MapViewOfFile, FILE_MAP_WRITE) -- and then still refuses, because it
+    # reads Valve's CSharedMemStream contents out of the page and a zeroed
+    # page is not a valid one.  No title has been shown to get PAST the probe.
+    #
+    # And an empty channel can be worse than no channel.  What these two names
+    # denote is not a flag, it is a CSharedMemStream -- a lock event plus a
+    # shared buffer that callers WRITE to and block on.  Software that finds
+    # nothing falls back; software that finds the objects will try to USE
+    # them, and an empty stream can send it down a path it never takes when
+    # Steam is simply absent.  Portal 2 is the suspect case: it stopped
+    # loading engine.dll and the 14 Source modules after this landed.
+    #
+    # So: opt in per title, in appconfig/<appid>.env, once that title is
+    # measured to be better with it.  Every other launch pays nothing.
+    if [ "${WINE_PPC64LE_STEAM_PRESENCE:-0}" = 1 ]; then
+        presence_start || say "continuing without the SteamStub liveness objects"
+    else
+        say "steam presence publisher off (WINE_PPC64LE_STEAM_PRESENCE=1 turns it on)"
+    fi
     # Deliberately NOT written: SteamClientDll (the 32-bit name).  There is no
     # 32-bit guest steamclient here, and naming a DLL that does not exist would
     # move a 32-bit game's failure from "no value" to "load failed" without
