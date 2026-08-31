@@ -1048,6 +1048,14 @@ static UINT (*p_fexbridge_hwtso_refused)( ULONGLONG start, ULONGLONG length );
  * simply stays eager, and emu_ctx_lazy_mask stays 0. */
 static UINT (*p_fexbridge_declare_trap_ctx)( UINT lazy_mask );
 static int  (*p_fexbridge_ctx_materialize)( void *thread, void *ctx, UINT flags );
+/* ABI 6, optional the same way: the zero-copy trap view.  Absent means every
+ * trap marshals a CONTEXT through the bridge, which is exactly the ABI 5
+ * contract.  view_pull/view_push are the cold-path CONTEXT bridge for view
+ * callbacks (fexbridge.h has the group semantics). */
+static void (*p_fexbridge_set_trap_view_handler)( int (*cb)( void *thread, void *view, void *user ),
+                                                  void *user );
+static int  (*p_fexbridge_view_pull)( void *thread, void *amd64_ctx, UINT flags );
+static int  (*p_fexbridge_view_push)( void *thread, const void *amd64_ctx, UINT flags );
 
 /* fexbridge_run results and CONTEXT flags, mirrored from fexbridge.h (the
  * header is not vendored into the tree; the values are ABI). */
@@ -1182,6 +1190,12 @@ static void emu_load_bridge(void)
      * eagerly complete, which is exactly the old contract */
     p_fexbridge_declare_trap_ctx = dlsym( so, "fexbridge_declare_trap_ctx" );
     p_fexbridge_ctx_materialize  = dlsym( so, "fexbridge_ctx_materialize" );
+    /* ABI 6, optional: an older bridge simply has no view protocol and every
+     * trap keeps marshalling a CONTEXT.  The minimum-ABI check above is a
+     * floor, not a pin, so an ABI 6 bridge passes it unchanged. */
+    p_fexbridge_set_trap_view_handler = dlsym( so, "fexbridge_set_trap_view_handler" );
+    p_fexbridge_view_pull             = dlsym( so, "fexbridge_view_pull" );
+    p_fexbridge_view_push             = dlsym( so, "fexbridge_view_push" );
     /* ABI 4: the 32-bit (WoW64) lane.  Resolved unconditionally like the
      * rest; their absence is diagnosed where the 32-bit lane starts, not
      * here, so a 64-bit-only bridge keeps serving the AMD64 lane exactly as
@@ -1581,7 +1595,7 @@ static void emu_teb_stack_switch( const struct emu_teb_stack *in, struct emu_teb
     teb->DeallocationStack = in->dealloc;
 }
 
-static int emu_trap_thunk( void *thread, void *ctx, void *user )
+static NTSTATUS emu_trap_dispatch_common( AMD64_CONTEXT *ctx )
 {
     struct thread_data *data = get_thread_data();
     NTSTATUS status;
@@ -1592,10 +1606,13 @@ static int emu_trap_thunk( void *thread, void *ctx, void *user )
      * including the one that fails it.  Popped as soon as the dispatcher
      * returns, a few lines down, because that is exactly when this crossing
      * is no longer open.  See emu_crossing_push() in unix_private.h. */
-    emu_crossing_push( data, EMU_CROSSING_TRAP, ((const AMD64_CONTEXT *)ctx)->Rip );
+    emu_crossing_push( data, EMU_CROSSING_TRAP, ctx->Rip );
 
-    /* The register file the bridge handed us IS the guest's, at the trapping
-     * instruction -- the whole marshalling layer is built on that.  Publish it
+    /* The register file in `ctx` IS the guest's, at the trapping instruction
+     * -- the whole marshalling layer is built on that.  Under the CONTEXT
+     * protocol it is the bridge's own trap frame; under the view protocol it
+     * is emu_trap_view_thunk's shell, filled from the live file moments ago.
+     * Both are live for exactly as long as the TRAP state stands.  Publish it
      * for the duration of the native call, so a debugger looking at a thread
      * that is inside a Wine API sees where the guest is rather than where the
      * emulator is.  Nothing is saved here: a nested run started from inside
@@ -1636,6 +1653,105 @@ static int emu_trap_thunk( void *thread, void *ctx, void *user )
              "the run will end with no handler having consumed the trap\n",
              (UINT)status );
     }
+    return status;
+}
+
+static int emu_trap_thunk( void *thread, void *ctx, void *user )
+{
+    /* FEXBRIDGE_TRAP_CONTINUE / _EXIT */
+    return emu_trap_dispatch_common( ctx ) ? 1 : 0;
+}
+
+/* mirror of FEXBRIDGE_TRAP_VIEW (fexbridge.h, bridge ABI 6; the header is
+ * not vendored, the layout is ABI): pointers into the live guest register
+ * file, valid only until the callback returns.  gregs holds the 16 GPRs in
+ * x86 encoding order -- RAX,RCX,RDX,RBX,RSP,RBP,RSI,RDI,R8..R15. */
+struct emu_trap_view
+{
+    UINT64 *gregs;
+    UINT64 *rip;
+    UINT    reserved[4];
+};
+
+/* The shell copies in emu_trap_view_thunk depend on the AMD64 CONTEXT's GPR
+ * block being the very array shape the view exposes: Rax..R15 contiguous in
+ * x86 encoding order, Rip directly after R15.  Pinned so a header change
+ * breaks the build, not the guest. */
+C_ASSERT( offsetof(AMD64_CONTEXT, Rax) == 0x78 );
+C_ASSERT( offsetof(AMD64_CONTEXT, Rcx) == 0x80 );
+C_ASSERT( offsetof(AMD64_CONTEXT, Rdx) == 0x88 );
+C_ASSERT( offsetof(AMD64_CONTEXT, Rsp) == 0x78 + 4 * 8 );
+C_ASSERT( offsetof(AMD64_CONTEXT, R8)  == 0x78 + 8 * 8 );
+C_ASSERT( offsetof(AMD64_CONTEXT, R15) == 0x78 + 15 * 8 );
+C_ASSERT( offsetof(AMD64_CONTEXT, Rip) == 0xf8 );
+
+/* FEXBRIDGE_CTX_POISON=1, sampled once at view registration (outside signal
+ * context): the bridge cannot poison a CONTEXT it never builds, so the view
+ * thunk carries the negative control itself -- the same patterns the bridge
+ * writes, so the check-lazy-ctx sabotage stays byte-exact on this protocol. */
+static int emu_trap_view_poison;
+
+static int emu_trap_view_thunk( void *thread, void *view_ptr, void *user )
+{
+    struct emu_trap_view *view = view_ptr;
+    AMD64_CONTEXT shell;    /* deliberately NOT zeroed: only the groups named
+                             * by ContextFlags carry values, which is exactly
+                             * the claim an ABI 5 lazy trap CONTEXT makes --
+                             * its EFLAGS/FP bytes are unfilled too, and the
+                             * poison lever below is what catches a consumer
+                             * that reads them without materializing. */
+    UINT push_flags = 0;
+    NTSTATUS status;
+
+    /* One shape, one copy: the C_ASSERT chain above pins &shell.Rax as a
+     * UINT64[16] in view->gregs order. */
+    memcpy( &shell.Rax, view->gregs, 16 * sizeof(UINT64) );
+    shell.Rip = *view->rip;
+    /* Dr0-Dr7 are zeroed even though no lazy group names them: the bridge's
+     * CONTEXT protocol handed out a zero-initialized frame, so a debugger --
+     * or a DRM reading CONTEXT_DEBUG_REGISTERS to look for hardware
+     * breakpoints -- has always seen zeros here.  Stack garbage in Dr7 reads
+     * as armed breakpoints; six stores keep the observable contract. */
+    shell.Dr0 = shell.Dr1 = shell.Dr2 = shell.Dr3 = shell.Dr6 = shell.Dr7 = 0;
+    shell.ContextFlags = EMU_CTX_CONTROL | EMU_CTX_INTEGER |
+                         EMU_CTX_LAZY_EFLAGS | EMU_CTX_LAZY_FLOAT;
+    shell.P2Home = 0;  /* the bridge's materialize parks its EFLAGS baseline
+                        * here; unused on this path, kept deterministic */
+    if (emu_trap_view_poison)
+    {
+        shell.EFlags = 0xDEADF1A6u;
+        shell.MxCsr  = 0xDEADF1A6u;
+        memset( &shell.FltSave, 0xDD, sizeof(shell.FltSave) );
+    }
+
+    status = emu_trap_dispatch_common( &shell );
+
+    /* Write-back, unconditional and on EVERY status: under the CONTEXT
+     * protocol the bridge's after-trap load applies the callback's CONTEXT
+     * whether the trap continued or ended the run, and this is that load's
+     * equivalent.  It is also what keeps NESTED runs correct with no new
+     * contract: a guest callback entered from inside this trap re-enters
+     * fexbridge_run, whose Nested block restores the raw flag forms and the
+     * whole FP file but NOT the GPRs/RIP the nested guest clobbered in
+     * CPUState -- under the CONTEXT protocol the outer values sat in the
+     * bridge's trap frame and its resume reinstated them; here they sit in
+     * this shell, and these stores are that reinstatement.  (The nested run
+     * itself went through unixcall_emu_run_entry, which saves and restores
+     * the published-context state around it; the shell is untouched by the
+     * nested run by construction -- it lives on this thunk's stack.) */
+    memcpy( view->gregs, &shell.Rax, 16 * sizeof(UINT64) );
+    *view->rip = shell.Rip;
+
+    /* EFLAGS/FP write-back only when the group was materialized -- the ABI 5
+     * rule ("writes to an unmaterialized group are IGNORED at resume")
+     * restated for the view.  A cleared lazy marker is the materialize
+     * receipt: fexbridge_ctx_materialize (and view_pull) clear 0x100/0x200
+     * as they fill.  Unmaterialized groups were never copied anywhere, so
+     * the live state is already the truth. */
+    if (!(shell.ContextFlags & 0x100u)) push_flags |= EMU_CTX_CONTROL;
+    if (!(shell.ContextFlags & 0x200u)) push_flags |= EMU_CTX_FLOATING_POINT;
+    if (push_flags) p_fexbridge_view_push( thread, &shell, push_flags );
+
     /* FEXBRIDGE_TRAP_CONTINUE / _EXIT */
     return status ? 1 : 0;
 }
@@ -2173,6 +2289,36 @@ static NTSTATUS unixcall_emu_run_entry( void *args )
                 else
                     emu_ctx_lazy_mask = p_fexbridge_declare_trap_ctx( EMU_CTX_LAZY_EFLAGS |
                                                                       EMU_CTX_LAZY_FLOAT );
+            }
+            /* Bridge ABI 6: the zero-copy trap view.  Registered ALONGSIDE
+             * the CONTEXT handler above, never instead of it -- the CONTEXT
+             * handler is the landing spot for both kill switches (this
+             * side's WINE_PPC64LE_NO_TRAP_VIEW=1 and the bridge's
+             * FEXBRIDGE_EAGER_CTX=1 veto) and for any bridge without the
+             * protocol.  Gated on the lazy grant: the view is definitionally
+             * lazy (no CONTEXT is built to be eager IN), so an eager world
+             * -- WINEEMUNOLAZYCTX=1, FEXBRIDGE_EAGER_CTX=1, or an ABI 5
+             * bridge -- keeps the CONTEXT protocol wholesale.  64-bit lane
+             * only by construction: this registration happens in the 64-bit
+             * run entry, which a 32-bit-guest process never reaches (its
+             * bounded emu32 runs register no trap handler at all). */
+            if (emu_ctx_lazy_mask && p_fexbridge_set_trap_view_handler &&
+                p_fexbridge_view_pull && p_fexbridge_view_push)
+            {
+                const char *str = getenv( "WINE_PPC64LE_NO_TRAP_VIEW" );
+                if (str && *str == '1')
+                    ERR( "WINE_PPC64LE_NO_TRAP_VIEW: traps stay on the CONTEXT "
+                         "protocol; the zero-copy view is off\n" );
+                else
+                {
+                    const char *poison = getenv( "FEXBRIDGE_CTX_POISON" );
+                    emu_trap_view_poison = (poison && *poison == '1');
+                    p_fexbridge_set_trap_view_handler( emu_trap_view_thunk, NULL );
+                    /* unconditional stderr, bridge-banner style ("lazy trap
+                     * contexts live"): once per process, and the line the
+                     * check-lazy-ctx view leg asserts on. */
+                    fprintf( stderr, "wine-emu: trap view live: zero-copy crossings (bridge ABI 6)\n" );
+                }
             }
         }
         else if (p_emu_trap_dispatcher != params->trap_dispatcher)
