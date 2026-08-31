@@ -52,6 +52,7 @@ Honest, and in progress.
 | `vulkan-1` guest thunks | **252 exports, 0 refused** |
 | System COM for guests | **works** — `ppc64le/syscom/check-com-smoke.sh`, 21/21, native and guest byte-identical |
 | The Steam client for guests | **reaches it** — `ppc64le/steamapi/check-steam-bridge.sh`; a guest gets a real `ISteamClient` and the real client library answers |
+| Steam for a **32-bit** guest | **reaches the client** — `dlls/steamclient` (the vendored lsteamclient built for i386) plus a second bridge helper against `sdk32`. The x86_64 lane is proven end to end (`CreateSteamPipe` returns through the helper into the real client); both widths pass `ppc64le/steamapi/probe-interface.sh --level 4`. Frame magic carries the pointer width, so a mismatched pair refuses out loud |
 | Launching **from** Steam | **has a gate** — `ppc64le/steamtool/check-launch-smoke.sh`, including the `legacycompat` pre-step that used to hang the launch |
 | The guest thunk boundary | **lock-free** — the RIP→target cache answers without taking the loader lock |
 | Debugging a guest | **works** — `winedbg` attaches, shows the guest's registers, stack, disassembly and backtrace; `ppc64le/winedbg/check-guest-debug.sh` |
@@ -63,8 +64,10 @@ Honest, and in progress.
 | Running a **32-bit** PE | **works** — real Wine WoW64, the embedded emulator as the CPU backend; `ppc64le/wow64/check-wow64-smoke.sh` |
 | Processor topology | **all cores** — sparse CPU and NUMA numbering, real processor groups; `ppc64le/cpu/check-cpu-topology.sh` |
 | `mfmediaengine`, `evr`, `wmvcore` | **surface built, unexercised** — same roster, same instance; no title has driven one, and `ppc64le/mf/README.md` says so |
-| **Commercial games** | **three play** — DOOM (2016), Cyberpunk 2077, The Witcher 3; `ppc64le/games/STATUS.md` is the per-title board |
-| Graphics for a **32-bit** guest | **not yet** — the i386 half of the dxvk thunk surface builds, but a call traps and nothing answers; `ppc64le/NEXT.md` item 2 |
+| **Commercial games** | **four play** — DOOM (2016), Cyberpunk 2077, The Witcher 3, and *Dex* on the 32-bit lane. Portal 2 reaches its own resolution change; Civ VI clears `loader_init` and stops at Valve's SteamStub. `ppc64le/games/STATUS.md` is the per-title board |
+| A title's own **error dialogs** | **logged** — `dlls/user32/msgbox.c` records every message box at ERR, and `with-game-lock` answers them instead of leaving one on a live desktop. Two walls were found within hours of this existing, after a day of guessing at both |
+| D3D11 for a **32-bit** guest | **works** — the full i386 dxvk lane; *Dex* (PE32, Unity) renders its menu at 55 fps and PLAYS. `ppc64le/dxvk/check-d3d11-smoke32.sh`, byte-identical to the native run |
+| D3D9 for a **32-bit** guest | **works** — 21 interfaces, 497 slots, i386-only refusals 33 → 5; `ppc64le/dxvk/run-d3d9-smoke32.sh` 17/17 with zero unnamed refusals, and DXVK's above-4GiB mappings bounced below 4 GiB with block-compressed pitch derived from DXVK's own arithmetic, not guessed. Passed its first real title: Portal 2 drives a `D3D9DeviceEx::ResetSwapChain` from 1280×720 to 2560×1440 |
 
 `ntdll` cannot be a PE and never will be: its TEB lives in an initial-exec
 `__thread`, and a PE image has nowhere to put a static TLS block. It is built as
@@ -72,6 +75,41 @@ an ELF builtin deliberately, not as a stepping stone.
 
 Nothing here is stubbed silently: anything incomplete is recorded as incomplete
 in the design notes.
+
+## Performance: what is known, and what is already dead
+
+The uncomfortable measurement first, because planning from anything else wastes
+time. **Cyberpunk 2077 runs 2.17x faster under full emulation (Proton) than on
+this native port** — same machine, same GPU, same driver, same day, identical
+settings: 36.41 fps against 16.78, floors 18.78 ms against 35.90. **DOOM (2016)
+is at parity between the two lanes.** So the deficit is not "emulation is slow";
+it is specific, and it is ours.
+
+The frame floor is 34-38 ms and is *scene-independent*, which is the signature
+of a fixed per-frame cost rather than a rendering one. vkd3d+RADV translation
+itself is 0.3 ms of that — 0.9% — so making the graphics translation faster has
+no headroom.
+
+**Do not re-run these. They are dead, with evidence:**
+
+| eliminated | how |
+|---|---|
+| SMT 2 vs 4, NUMA pinning, POWER9 `-mcpu` rebuild, command-list batching, JIT instruction selection, spin detection, AVX on/off | twelve experiments, all inside a 15.90-17.47 fps / 34.03-38.15 ms band. For most of them nothing proved the knob had engaged |
+| Synchronisation overhead, from the inside | an ntsync userspace fast path was **built** (kernel `mmap` + Wine atomic path, `ppc64le/kernel/ntsync-fastpath/`). It is *verifiably taken* and the floor does not move: acquire hit rate 8.8%, release still needs the wake ioctl 99.5% of the time, **under 5% of syscalls removable**. These semaphores are a handoff, not a counter — the consumer is already blocked when the producer releases, so the syscall **is** the scheduling operation |
+| Synchronisation overhead, from the outside | **DOOM is 94.2% ntsync at 129,493 ioctls/sec — more sync-dominated and more syscalls per second than Cyberpunk (90.8%, 88,224/sec) — while running several times faster and at parity.** A title cannot be the fast one because it makes more syscalls |
+
+The full census is `ppc64le/docs/sessions/2026-08-30/ntsync-ioctl-census.md`.
+
+**What is left:** the graphics API path. Cyberpunk is D3D12 and 2.17x behind;
+DOOM is Vulkan and at parity; everything else about them is the same. The
+working hypothesis is that D3D12's call density makes the guest->native crossing
+dominate where Vulkan's coarse submission does not. Measured crossing costs are
+544 ns flat, 793 ns for a COM trap+dispatch, 6.5 ns const-cached and 6.6 ns
+guest-local, with a claimed ~54,800 crossings per frame — **note that 54,800 x
+1 us exceeds the whole frame, so the count, the cost, or the attribution is
+wrong, and finding out which is itself worth doing.** This hypothesis is
+untested. It is the last one standing, which is a weaker position than it
+sounds: every other theory died the same way.
 
 ### Running x86-64 Windows binaries
 
