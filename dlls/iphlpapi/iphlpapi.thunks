@@ -21,3 +21,19 @@ PROBE-EXTRA   iphlpapi.h
 # declared only there.  Cyberpunk 2077's REDGalaxy64.dll imports both --
 # GOG Galaxy pings its endpoints -- and got sentinels.
 PROBE-EXTRA   icmpapi.h
+
+# netioapi.h, for the NET_LUID / MIB_IF_ROW2 surface.  Valve's own Windows
+# steamclient64.dll imports ConvertInterfaceGuidToLuid (iphlpapi.spec:16,
+# declared netioapi.h:260) and GetIfEntry2 (spec:91, netioapi.h:276) --
+# Steam enumerates network interfaces at startup.  Both are ordinary
+# declarations Wine already implements; neither header above pulls netioapi.h
+# in, so the oracle answered "no declaration in any Wine header" for the pair
+# and they were the only iphlpapi holes in that DLL.
+#
+# [MEASURED 2026-08-30] import_chain.py over
+# ~/.local/share/Steam/steamclient64.dll: 476 imports, 3 holes, two of them
+# these.  That matters because staging Valve's real steamclient into a native
+# prefix -- which is how Proton satisfies the SteamStub, and how Civ VI and
+# Oblivion Remastered would get past "Application load error 3:..." -- needs
+# the DLL to actually load first.
+PROBE-EXTRA   netioapi.h

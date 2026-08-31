@@ -23,3 +23,18 @@ FROM-SPEC auto
 # not integer-extended by either ABI.  The returned char* is a native
 # per-thread buffer in the shared address space, readable by the guest as-is.
 inet_ntoa                 0x00001E7A  1  int   ws2_32.spec:12
+
+# The third hole in Valve's steamclient64.dll, and the last one.  WSASendMsg
+# is Wine-implemented -- dlls/ws2_32/socket.c:1205 is
+# `int WINAPI WSASendMsg( SOCKET, LPWSAMSG, DWORD, LPDWORD, LPWSAOVERLAPPED,
+# LPWSAOVERLAPPED_COMPLETION_ROUTINE )` -- but it is declared in NO Wine
+# header, so FROM-SPEC auto refuses it the same way it refused the nine names
+# closed earlier today.  The .spec is therefore the only pin available and the
+# <int|void> column is the usual unchecked human assertion, justified here
+# against that implementation, named so it can be rechecked.
+#
+# Arity six, from ws2_32.spec:111 (`long ptr long ptr ptr ptr`).  Every
+# argument is integer or pointer class -- a SOCKET is a handle-width integer
+# and the rest are pointers -- so unlike inet_ntoa above there is no by-value
+# aggregate question here at all.
+WSASendMsg                0x00001E7B  6  int   ws2_32.spec:111
