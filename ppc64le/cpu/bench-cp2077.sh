@@ -28,6 +28,13 @@ LEGS=${1:-3}
 TAG=${2:-run}
 HERE=$(cd "$(dirname "$0")" && pwd)
 LOG=${LOG:-$HERE/bench-cp2077-results.txt}
+
+# Per-leg launcher output goes to a scratch directory, NOT $HOME.  A day of
+# runs left 32 loose files and 250 MB in the owner's home directory before
+# anyone noticed; the results file above is the durable artefact and lives in
+# the tree, everything else is transient.
+SCRATCH=${SCRATCH:-$HOME/Games/wine-ppc64le-stuff/logs}
+mkdir -p "$SCRATCH"
 LEG_TIMEOUT=${LEG_TIMEOUT:-1500}     # seconds before a leg is abandoned
 IDLE_TIMEOUT=${IDLE_TIMEOUT:-600}    # seconds to wait for the box to go quiet
 
@@ -68,7 +75,7 @@ for leg in $(seq 1 "$LEGS"); do
     newest_before=$(ls -t "$RESULTS" 2>/dev/null | head -1)
 
     ( cd "$TOOL" && setsid ./run-native --name cp2077 --appid 1091500 "$EXE" -skipStartScreen -benchmark ) \
-        > "$HOME/bench-cp2077-$TAG-$leg.out" 2>&1 < /dev/null &
+        > "$SCRATCH/bench-cp2077-$TAG-$leg.out" 2>&1 < /dev/null &
     launcher=$!
 
     t0=$SECONDS
