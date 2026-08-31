@@ -434,8 +434,25 @@ behaving exactly as designed; it is the port that answers it wrongly.
 > on it on 2026-08-28. The i386 lane is not a work item any more; specific
 > marshal surfaces on it are.
 >
-> Second, and more importantly for anyone planning work from this section:
-> **the Half-Life 2 family and Portal are not Windows builds on this machine.**
+> **[CORRECTED AGAIN 2026-08-30, later the same day — read this before the
+> paragraph below, which is misleading on its own.]** The measurement below is
+> accurate about what was on disk and WRONG about what it means. Those titles
+> are not Linux-only: **Steam installs the Linux depot and drops the Windows one
+> unless a Proton compatibility tool is forced for the title.** Forcing a tool
+> downloads the Windows binaries — confirmed by doing it, for Half-Life 2 (which
+> then began downloading Windows binaries), for Portal 2 (whose Windows depot
+> Steam had deleted at 17:42:44 that day, 51 files), and for Civ VI (6.8 GB).
+>
+> So the D3D9 i386 marshal work gates **six** installed titles after all, not
+> one, once their Windows depots are present. Both of the earlier framings in
+> this section were wrong in opposite directions, and the lesson is the same
+> either way: **`file` the exe and its DLLs and confirm PE rather than ELF
+> before drawing any conclusion about a title**, because a native-lane run
+> against a Linux-only install does not look like missing content, it looks
+> like a port bug.
+>
+> Second, and true only of what was on disk at the time:
+> **the Half-Life 2 family and Portal were not Windows builds on this machine.**
 > Checked with `file(1)` on 2026-08-30 — appids 220, 340, 380, 420 and 400 all
 > install `hl2_linux`, an **ELF 32-bit i386** binary, and ship their own
 > `bin/libdxvk_d3d9.so`. There is no `.exe` anywhere in those directories. They
