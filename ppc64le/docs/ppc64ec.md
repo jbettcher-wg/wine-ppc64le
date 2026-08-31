@@ -23,12 +23,12 @@ separately abandonable:
   stub RIPs compile to a host-call transition instead of a trap.  The
   trap tax disappears for every export at once — flat, COM, i386 —
   without writing another line of hand-verified guest x86.
-* **Step C (typed transitions, 2–3 weeks in spec2thunk + dispatch):**
-  per-export signature descriptors let the transition read float/vector
-  arguments straight out of the guest XMM file.  The entire
-  refused-FP-shape class (float by value, x87 returns, >64-bit returns)
-  stops being refused, and the `FP_SHAPE_*` hand machinery stops
-  growing.
+* **Step C (typed transitions, 2–3 weeks in gen_winecom + dispatch):**
+  give the COM lane the typed FP descriptors the flat lane already has,
+  so float-bearing COM slots stop being named refusals served by hand
+  walkers.  The `FP_SHAPE_*` hand machinery stops growing, and the
+  leftover shapes (x87 returns, struct-by-value, >64-bit returns) get
+  their path.
 
 What we deliberately do **not** build is the part of ARM64EC that made it
 a multi-year Microsoft project: the single shared stack, the hybrid PE
@@ -271,19 +271,22 @@ already zero-crossing), the call journal (retire if flat), and the
 device journal question dissolves — CreateCBV at ~100 ns/call needs no
 batching, no replay, no ordering argument, no GPU hang.
 
-### Step C — typed transitions: delete the FP refusal class
+### Step C — typed transitions: delete what's left of the FP refusal class
 
-spec2thunk's oracle already reads every signature with clang; it
-currently *refuses* what the trap protocol can't carry (float/vector by
-value, >64-bit returns — spec2thunk header, "REFUSED, never described").
-Give `__wine_thunk_info` v5 a typed descriptor (int/FP class per slot,
-return class), and the transition handler reads FP args from the guest
-XMM file (SRAFPR v0–v15) into ELFv2 f1…f13 and writes FP returns back.
-The refused classes become ordinary rows; `hand_clear_dsv` /
-`FP_SHAPE_*` / the x87-return gap (GetResourceMinLOD) stop being
-hand-built one crash at a time.  This is the coverage payoff — arguably
-worth more than the nanoseconds, because it closes a *class* the same
-way the sub-word ABI extension did.
+Correction to the first draft of this page: the FLAT lane already
+serves FP — spec2thunk's oracle emits `fp=` descriptors (mask, single
+bits, return class) and the dispatcher has `marshal_thunk_args_fp` /
+`call_native_thunk_fp`.  What is still refused, and what step C closes:
+the **COM lane's FP-by-value slots** (the `hand_clear_dsv` /
+`FP_SHAPE_*` class — gen_winecom has no fp words, so every
+float-bearing COM slot is a named refusal until someone hand-writes
+it), FP past the XMM3/stack boundary, FP-with-variadic, struct-by-value
+and >64-bit returns, and the x87-return path the i386 lane needs.
+Giving gen_winecom the same typed descriptors the flat lane already
+carries — and the view/transition handler the FP read/write path — is
+the coverage payoff: it closes the remaining class the same way the
+sub-word ABI extension did, instead of hand-building one slot per
+crash.
 
 ### Parked (rung 3) — do not build until a title demands it
 
