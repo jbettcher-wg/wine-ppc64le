@@ -1,0 +1,62 @@
+;
+; steamclient.def -- the guest i386 export table for steamclient.dll.
+;
+; The same list, and the same ordinals, as ../steamclient64/steamclient64.def:
+; Proton ships one lsteamclient.spec for both widths and the export NAMES are
+; identical and undecorated in both of its built DLLs (measured with
+; llvm-readobj on Proton-Power9's own i386-windows and x86_64-windows builds).
+; It is a separate file only because a .def carries the module's own name on
+; its LIBRARY line, and this one is steamclient.dll.
+;
+; Ordinals are copied from Proton's proton/lsteamclient.spec, which is
+; itself the export layout the real Valve steamclient64.dll has (see that
+; file's own header comment).  Only its "cdecl" entries are listed here.
+; Its "stub" entries -- the overwhelming majority of the spec, covering
+; interfaces and GameOverlayRenderer entry points this port does not
+; implement -- are deliberately left OUT of this table, not exported as
+; stubs: a probe for one of them should fail the way an absent export
+; fails (GetProcAddress returns NULL, dlopen-style lazy binding never
+; touches it), not the way a present-but-broken one fails.
+;
+; The spec's one remaining cdecl entry, steamclient_init_registry, is
+; marked "-private" there.  Wine's own winebuild treats FLAG_PRIVATE
+; exports as present in the binary but absent from the export table (see
+; is_private handling in tools/winebuild/spec32.c); simply not listing it
+; here has the same effect, so it is not in this table either.
+;
+; The four __wine_steamrpc_* entries are not in Proton's spec at all -- they
+; are this port's own, driven by ppc64le/steamapi/check-steam-bridge.sh: the
+; marshaller self-test, the synthetic-callback hook that lets the gate prove
+; callback delivery with no Steam client, the DOS<->unix path probe, and the
+; deliberate buffer overrun that proves the helper's red zone catches a
+; too-small marshal descriptor instead of dying of it.  They
+; are exported (rather than built into a separate test-only DLL) so that the
+; gate exercises the same binary that ships, not a look-alike.  A game cannot
+; reach any of them by accident: nothing in Steamworks has these names, and
+; the two that talk to the helper do nothing until called.
+;
+; Copyright 2026 the ppc64le port authors
+;
+; This library is free software; you can redistribute it and/or modify it
+; under the terms of the GNU Lesser General Public License as published by
+; the Free Software Foundation; either version 2.1 of the License, or (at
+; your option) any later version.
+;
+LIBRARY steamclient.dll
+EXPORTS
+Breakpad_SteamMiniDumpInit @1
+Breakpad_SteamSetAppID @2
+Breakpad_SteamSetSteamID @3
+Breakpad_SteamWriteMiniDumpSetComment @4
+Breakpad_SteamWriteMiniDumpUsingExceptionInfoWithBuildId @5
+CreateInterface @6
+Steam_BGetCallback @8
+Steam_FreeLastCallback @15
+Steam_GetAPICallResult @30
+Steam_ReleaseThreadLocalMemory @35
+Steam_IsKnownInterface
+Steam_NotifyMissingInterface
+__wine_steamrpc_selftest
+__wine_steamrpc_inject
+__wine_steamrpc_pathtest
+__wine_steamrpc_overrun

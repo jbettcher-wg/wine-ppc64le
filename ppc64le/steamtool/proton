@@ -703,7 +703,8 @@ seed_prereq_markers
 #     is the game itself -- so steamclient64.dll writes it from its own
 #     DllMain, which is Proton's steam_helper trick minus the helper .exe.
 #
-# SteamClientDll64 is a BARE NAME, not the absolute path Windows would have.
+# SteamClientDll64 and SteamClientDll are BARE NAMES, not the absolute paths
+# Windows would have.
 # The port's guest loader refuses a path outright (load_guest_library in
 # dlls/ntdll/signal_ppc64.c: "a guest namespace has no files, so a path means
 # nothing") and resolves a bare name through the AMD64 search order, which
@@ -843,11 +844,18 @@ bridge_start() {
 
     "$wine" reg add 'HKCU\Software\Valve\Steam\ActiveProcess' /v SteamClientDll64 \
         /t REG_SZ /d 'steamclient64.dll' /f >/dev/null 2>&1
+    # ...and the 32-bit one.  A PE32 title's own steam_api.dll reads
+    # SteamClientDll, never SteamClientDll64 -- the two names are Steam's own
+    # 32/64 split, both present in a real install -- so a 32-bit title finds
+    # nothing at all if only the 64-bit value is written.  dlls/steamclient
+    # builds the module that answers it.
+    "$wine" reg add 'HKCU\Software\Valve\Steam\ActiveProcess' /v SteamClientDll \
+        /t REG_SZ /d 'steamclient.dll' /f >/dev/null 2>&1
     "$wine" reg add 'HKCU\Software\Valve\Steam\ActiveProcess' /v Universe \
         /t REG_SZ /d 'Public' /f >/dev/null 2>&1
     "$wine" reg add 'HKCU\Software\Valve\Steam' /v SteamPath \
         /t REG_SZ /d 'C:\Program Files (x86)\Steam' /f >/dev/null 2>&1
-    say "wrote ActiveProcess\\SteamClientDll64=steamclient64.dll"
+    say "wrote ActiveProcess\\SteamClientDll64=steamclient64.dll, SteamClientDll=steamclient.dll"
     # steam_api reads ActiveProcess\PID and checks it names a LIVE process
     # before it will load any client DLL at all -- Proton's steam.exe helper
     # writes its own pid.  There is no helper exe here, so name the prefix's
@@ -896,10 +904,18 @@ bridge_start() {
     else
         say "steam presence publisher off (WINE_PPC64LE_STEAM_PRESENCE=1 turns it on)"
     fi
-    # Deliberately NOT written: SteamClientDll (the 32-bit name).  There is no
-    # 32-bit guest steamclient here, and naming a DLL that does not exist would
-    # move a 32-bit game's failure from "no value" to "load failed" without
-    # making it work.
+    # SteamClientDll (the 32-bit name) IS written now, above.  It used to be
+    # deliberately omitted because there was no 32-bit guest steamclient and
+    # naming a DLL that does not exist only moves a game's failure from "no
+    # value" to "load failed".  dlls/steamclient now builds one, and it loads
+    # and binds (ppc64le/games/probe-dllload.sh --machine i386 steamclient.dll).
+    # What it still cannot do is reach a Steam client: the bridge helper is an
+    # x86-64 program and a frame is the params struct's own bytes, so the
+    # pointer widths have to match -- see the magic in
+    # dlls/steamclient64/steamrpc_wire.h, which makes that pairing refuse
+    # loudly rather than answer with garbage.  A 32-bit title therefore gets a
+    # clean SteamAPI_Init failure, which is what it already gets outside Steam,
+    # instead of dying in its loader.
     return 0
 }
 

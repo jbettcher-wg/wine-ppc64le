@@ -20,9 +20,12 @@
  * a caller-supplied count), which is why the helper never has to parse a
  * Steamworks signature.
  *
- * BOTH ENDS ARE x86-64 and both compile the same pack(1) params structs, so
- * the blob is byte-identical on the wire with no conversion.  The port's
- * native ppc64le side never looks inside a frame; it only carries bytes.
+ * BOTH ENDS HAVE THE SAME POINTER WIDTH and both compile the same pack(1)
+ * params structs, so the blob is byte-identical on the wire with no
+ * conversion.  The port's native ppc64le side never looks inside a frame; it
+ * only carries bytes.  Same width is a real precondition rather than an
+ * observation -- see the magic below, which encodes it so that a mismatched
+ * pair refuses instead of misreading.
  *
  * Copyright 2026 the ppc64le port authors
  *
@@ -37,8 +40,33 @@
 
 #include <stdint.h>
 
+/* THE MAGIC CARRIES THE POINTER WIDTH, and it has to.
+ *
+ * A frame is the params struct's own bytes: "both ends compile the same
+ * pack(1) structs" above is only true while both ends have the same pointer
+ * size, because every pointer field in a params struct moves every field
+ * after it.  A 32-bit guest DLL therefore cannot be served by the x86-64
+ * helper -- it needs an i386 one, built from the same vendored unix half
+ * against Steam's own 32-bit steamclient.so, exactly as Proton ships
+ * i386-unix/lsteamclient.so beside its 64-bit build.
+ *
+ * Until that helper exists, the failure mode that matters is the SILENT one:
+ * a 32-bit client connecting to a 64-bit helper would hand it a params blob
+ * it would read with the wrong offsets and answer with confident garbage.
+ * So the width is in the magic.  The helper already validates the magic
+ * before it reads a single length (steamhelper.c's frame loop), so a
+ * mismatched pair refuses the connection and says so, with no change needed
+ * on the helper side and no possibility of a wrong answer.  When the i386
+ * helper is built, it compiles this header for i386 and gets the matching
+ * value for free.
+ */
+#ifdef __i386__
+#define STEAMRPC_REQ_MAGIC  0x33524353u   /* 'S','C','R','3' -- 32-bit lane */
+#define STEAMRPC_REP_MAGIC  0x33504353u   /* 'S','C','P','3' */
+#else
 #define STEAMRPC_REQ_MAGIC  0x31524353u   /* 'S','C','R','1' */
 #define STEAMRPC_REP_MAGIC  0x31504353u   /* 'S','C','P','1' */
+#endif
 #define STEAMRPC_HELLO      0x304c4853u   /* 'S','H','L','0' */
 
 /* direction of a marshalled pointer field */

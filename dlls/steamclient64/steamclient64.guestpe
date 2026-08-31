@@ -22,7 +22,10 @@
 # output_source_guestpe() is the only code that reads this file; see its
 # header comment for the make-dependency side of this contract.
 #
-# Six keywords, one per line, "KEYWORD value".  A line whose first
+# Eight keywords, one per line, "KEYWORD value".  This file uses six of
+# them; the other two -- SRCDIR and GUEST-MACHINE -- exist for the 32-bit
+# sibling, dlls/steamclient, which compiles THESE sources for i386 out of one
+# copy.  See that file for what they mean and why it is a separate module.  A line whose first
 # non-blank character is '#' is a comment, and blank lines are ignored --
 # this file is never scanned for C-style #include/#pragma the way an
 # ordinary source is (the .guestpe extension is absent from makedep.c's
@@ -44,6 +47,13 @@
 #            becomes a real Makefile prerequisite of steamclient64.dll, so
 #            touching it -- steamrpc.c, say -- rebuilds the DLL.  This is
 #            the "add a source, add a line, no makedep change" contract.
+#   SRCDIR   module-relative directory that SOURCE and GLOB resolve
+#            against, and that supplies the compiler's -I paths.  Unused
+#            here: this module's sources are its own.
+#   GUEST-MACHINE
+#            the guest machine to build for, spelled as the .thunks files
+#            spell it.  Absent -- as here -- a .guestpe file builds for
+#            x86_64 only; see guestpe_machine_default in tools/makedep.c.
 #   GLOB     a shell glob of sources, module-relative, expanded by
 #            tools/guestpe/guestpe AT BUILD TIME rather than by makedep.
 #            NOT individually tracked: make cannot depend on a filename it

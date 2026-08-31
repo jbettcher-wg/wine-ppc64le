@@ -1487,6 +1487,7 @@ enable_srvsvc
 enable_sspicli
 enable_stdole2_tlb
 enable_stdole32_tlb
+enable_steamclient
 enable_steamclient64
 enable_sti
 enable_strmdll
@@ -23330,6 +23331,7 @@ wine_fn_config_makefile dlls/srvsvc enable_srvsvc
 wine_fn_config_makefile dlls/sspicli enable_sspicli
 wine_fn_config_makefile dlls/stdole2.tlb enable_stdole2_tlb
 wine_fn_config_makefile dlls/stdole32.tlb enable_stdole32_tlb
+wine_fn_config_makefile dlls/steamclient enable_steamclient
 wine_fn_config_makefile dlls/steamclient64 enable_steamclient64
 wine_fn_config_makefile dlls/sti enable_sti
 wine_fn_config_makefile dlls/sti/tests enable_tests

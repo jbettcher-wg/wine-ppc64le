@@ -3,7 +3,7 @@
 # probe-dllload.sh -- build and run ppc64le/games/dllload_probe.c against one
 #                     guest DLL, headless, without taking the game lock.
 #
-#   probe-dllload.sh [--dir GAMEDIR] [--proc EXPORT] <module>
+#   probe-dllload.sh [--machine i386|x86_64] [--dir GAMEDIR] [--proc EXPORT] <module>
 #
 # NOT a check-*.sh, deliberately: nothing here raises a dialog, nothing needs
 # the display, and it is a diagnostic rather than a gate.  It runs a guest
@@ -31,9 +31,11 @@ build=${WINE_PPC64LE_TREE:-$src/../wine-build}
 dir=
 proc=
 name=probe
+machine=x86_64
 
 while [ $# -gt 0 ]; do
     case $1 in
+    --machine) machine=${2:?--machine needs x86_64 or i386}; shift 2 ;;
     --dir)  dir=${2:?--dir needs a directory}; shift 2 ;;
     --proc) proc=${2:?--proc needs an export name}; shift 2 ;;
     --name) name=${2:?--name needs a value}; shift 2 ;;
@@ -44,19 +46,36 @@ while [ $# -gt 0 ]; do
 done
 
 module=${1:-}
-[ -n "$module" ] || { echo "usage: probe-dllload.sh [--dir GAMEDIR] [--proc EXPORT] [--name PREFIX] <module>" >&2; exit 2; }
+[ -n "$module" ] || { echo "usage: probe-dllload.sh [--machine i386|x86_64] [--dir GAMEDIR] [--proc EXPORT] [--name PREFIX] <module>" >&2; exit 2; }
+
+case $machine in
+x86_64|i386) ;;
+*) echo "probe-dllload.sh: --machine must be x86_64 or i386" >&2; exit 2 ;;
+esac
 
 out=${PROBE_OUT:-$build/ppc64le-probes}
 mkdir -p "$out" || { echo "probe-dllload.sh: cannot create $out" >&2; exit 1; }
 
 INCL="-I$build/include -I$src/include -I$src/include/msvcrt"
-clang -target x86_64-windows-gnu -nostdlibinc $INCL -D_MSVCR_VER=0 \
-    -Wall -O1 -fno-builtin -g -c -o "$out/dllload_probe.o" "$here/dllload_probe.c" \
+
+# The x86-64 lane links straight against the kernel32 THUNK dll's export
+# table: there is no import library for that arch, and none is needed because
+# nothing on x86-64 is name-decorated.  The i386 lane cannot do that -- its
+# kernel32 is Wine's real i386 PE builtin, whose exports are undecorated while
+# a stdcall call site wants _Name@N -- so the winebuild import library is what
+# binds there.  Same split, same reason, as tools/guestpe/guestpe's link step.
+case $machine in
+x86_64) kern32="$build/dlls/kernel32/x86_64-windows/kernel32.dll" ;;
+i386)   kern32="$build/dlls/kernel32/i386-windows/libkernel32.a" ;;
+esac
+exe=$out/dllload_probe_$machine.exe
+
+clang -target $machine-windows-gnu -nostdlibinc $INCL -D_MSVCR_VER=0 \
+    -Wall -O1 -fno-builtin -g -c -o "$out/dllload_probe_$machine.o" "$here/dllload_probe.c" \
     || { echo "probe-dllload.sh: guest probe compile failed" >&2; exit 1; }
-clang -target x86_64-windows-gnu -fuse-ld=lld -nostdlib \
+clang -target $machine-windows-gnu -fuse-ld=lld -nostdlib \
     -Wl,--entry=dllload_probe_entry -Wl,--subsystem,console \
-    -o "$out/dllload_probe.exe" "$out/dllload_probe.o" \
-    "$build/dlls/kernel32/x86_64-windows/kernel32.dll" \
+    -o "$exe" "$out/dllload_probe_$machine.o" "$kern32" \
     || { echo "probe-dllload.sh: guest probe link failed" >&2; exit 1; }
 
 DLLLOAD_PROBE_FILE=$module
@@ -66,5 +85,5 @@ export DLLLOAD_PROBE_FILE
 WINEDEBUG=${WINEDEBUG:-warn+module}
 export WINEDEBUG
 
-echo "probe-dllload.sh: $out/dllload_probe.exe -> $module"
-exec "$tool/run-native" --name "$name" "$out/dllload_probe.exe"
+echo "probe-dllload.sh: $exe -> $module"
+exec "$tool/run-native" --name "$name" "$exe"

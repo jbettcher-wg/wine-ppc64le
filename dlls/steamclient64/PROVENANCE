@@ -30,8 +30,8 @@ tree:
     steamclient64.guestpe  the build-lane control file
 
 
-Why the vendored tree is used TWICE
------------------------------------
+Why the vendored tree is used THREE TIMES
+-----------------------------------------
 
 Proton's lsteamclient has two halves either side of a `WINE_UNIX_CALL`
 boundary, and this port compiles them for two different machines:
@@ -47,9 +47,21 @@ boundary, and this port compiles them for two different machines:
     executable, because the real `~/.steam/sdk64/steamclient.so` is an x86-64
     SysV ELF that native ppc64le Wine cannot load.
 
+  * the PE half is compiled a SECOND time, for i386, as the guest
+    `steamclient.dll` -- the name a 32-bit game's own `steam_api.dll` asks
+    for.  That build lives in `dlls/steamclient`, which is two files
+    (a .guestpe and a .def) pointing back here; there is no second copy of
+    any source.  Proton does the same thing, shipping i386-windows and
+    x86_64-windows builds of one tree, which is why nothing under `proton/`
+    needed a 32-bit edit: the width-dependent parts are already behind its
+    own `#ifdef __i386__`.
+
 Both halves are otherwise Proton's code doing Proton's work.  Only the
 boundary between them moved -- from a call within one process to a socket
-between two.
+between two.  NOTE that the i386 PE half has no unix half to talk to yet: the
+helper is an x86-64 program and a frame is the params struct's own bytes, so
+serving 32-bit games for real needs an i386 helper against Steam's own 32-bit
+steamclient.so, exactly as Proton ships i386-unix/lsteamclient.so.
 
 
 The three edits to vendored files

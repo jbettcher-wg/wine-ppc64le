@@ -3746,9 +3746,11 @@ struct guestpe_info
 {
     const char *entry;         /* PE entry point symbol */
     const char *def;           /* module-relative path to the .def file */
+    const char *srcdir;        /* SRCDIR: where SOURCE/GLOB actually resolve */
     struct strarray imports;   /* guest thunk DLLs to link against, by base name */
-    struct strarray sources;   /* module-relative .c files, tracked individually */
-    struct strarray globs;     /* module-relative glob patterns, expanded at build time */
+    struct strarray sources;   /* SRCDIR-relative .c files, tracked individually */
+    struct strarray globs;     /* SRCDIR-relative glob patterns, expanded at build time */
+    struct strarray machines;  /* GUEST-MACHINE <arch>, one per line; empty = x86_64 */
 };
 
 /*******************************************************************
@@ -3762,7 +3764,8 @@ struct guestpe_info
  */
 static struct guestpe_info read_guestpe_file( const char *filename )
 {
-    struct guestpe_info info = { NULL, NULL, empty_strarray, empty_strarray, empty_strarray };
+    struct guestpe_info info = { NULL, NULL, NULL, empty_strarray, empty_strarray,
+                                 empty_strarray, empty_strarray };
     FILE *file;
     char *buffer;
 
@@ -3783,6 +3786,8 @@ static struct guestpe_info read_guestpe_file( const char *filename )
 
         if (!strcmp( keyword, "ENTRY" )) info.entry = xstrdup( value );
         else if (!strcmp( keyword, "DEF" )) info.def = xstrdup( value );
+        else if (!strcmp( keyword, "SRCDIR" )) info.srcdir = xstrdup( value );
+        else if (!strcmp( keyword, "GUEST-MACHINE" )) strarray_add( &info.machines, xstrdup( value ));
         else if (!strcmp( keyword, "IMPORT" )) strarray_add( &info.imports, xstrdup( value ));
         else if (!strcmp( keyword, "SOURCE" )) strarray_add( &info.sources, xstrdup( value ));
         else if (!strcmp( keyword, "GLOB" )) strarray_add( &info.globs, xstrdup( value ));
@@ -3796,6 +3801,11 @@ static struct guestpe_info read_guestpe_file( const char *filename )
     return info;
 }
 
+
+/* Which guest machines a .guestpe file serves.  Same opt-in rule and the same
+ * reason as thunk_machine_default above: x86-64 unless the file says otherwise.
+ * dlls/steamclient/steamclient.guestpe is the one file that says otherwise. */
+static const char * const guestpe_machine_default[] = { "x86_64" };
 
 /*******************************************************************
  *         output_source_guestpe
@@ -3821,46 +3831,75 @@ static struct guestpe_info read_guestpe_file( const char *filename )
  */
 static void output_source_guestpe( struct makefile *make, struct incl_file *source, const char *obj )
 {
-    const char *dir = "x86_64-windows";
     struct guestpe_info info = read_guestpe_file( source->filename );
-    const char *name = strmake( "%s/%s.dll", dir, obj );
     const char *def_path = src_dir_path( make, info.def );
-    const char *objdir = obj_dir_path( make, strmake( "%s/%s.guestpe-obj", dir, obj ));
-    struct strarray import_args = empty_strarray;
-    unsigned int i;
+    /* SRCDIR lets one module compile another module's sources, which is how
+     * the i386 dlls/steamclient and the x86-64 dlls/steamclient64 come out of
+     * ONE copy of Proton's vendored PE half.  The 32-bit half cannot simply be
+     * a second output of the steamclient64 makefile: find_builtin_dll() serves
+     * <build>/dlls/<NAME>/<arch>/<NAME>.dll, so the module that answers a
+     * 32-bit game's LoadLibraryA("steamclient.dll") has to BE dlls/steamclient. */
+    const char *srcdir = info.srcdir ? src_dir_path( make, info.srcdir ) : src_dir_path( make, "" );
+    struct strarray machines = info.machines;
+    unsigned int i, m;
 
     if (make->disabled[0]) return;
 
-    strarray_add( &make->all_targets[0], name );
-    install_data_file( make, strmake( "%s.dll", obj ), name,
-                       strmake( "$(libdir)/wine/%s", dir ), NULL );
+    if (!machines.count)
+        for (m = 0; m < ARRAY_SIZE(guestpe_machine_default); m++)
+            strarray_add( &machines, guestpe_machine_default[m] );
 
-    output( "%s:", obj_dir_path( make, name ));
-    output_filename( source->filename );
-    output_filename( guestpe );
-    output_filename( def_path );
-    STRARRAY_FOR_EACH( src, &info.sources ) output_filename( src_dir_path( make, src ));
-    for (i = 0; i < info.imports.count; i++)
+    for (m = 0; m < machines.count; m++)
     {
-        const char *imp = info.imports.str[i];
-        struct makefile *submake = find_importlib_module( imp );
-        const char *imp_path;
+        const char *machine = machines.str[m];
+        int is_i386 = !strcmp( machine, "i386" );
+        const char *dir = strmake( "%s-windows", machine );
+        const char *name = strmake( "%s/%s.dll", dir, obj );
+        const char *objdir = obj_dir_path( make, strmake( "%s/%s.guestpe-obj", dir, obj ));
+        struct strarray import_args = empty_strarray;
 
-        if (!submake) fatal_error( "%s: IMPORT %s: no dlls/%s guest thunk module\n",
-                                    source->filename, imp, imp );
-        imp_path = obj_dir_path( submake, strmake( "%s/%s.dll", dir, imp ));
-        output_filename( imp_path );
-        strarray_add( &import_args, strmake( "--import=%s=%s", imp, imp_path ));
+        strarray_add( &make->all_targets[0], name );
+        install_data_file( make, strmake( "%s.dll", obj ), name,
+                           strmake( "$(libdir)/wine/%s", dir ), NULL );
+
+        output( "%s:", obj_dir_path( make, name ));
+        output_filename( source->filename );
+        output_filename( guestpe );
+        output_filename( def_path );
+        STRARRAY_FOR_EACH( src, &info.sources )
+            output_filename( info.srcdir ? strmake( "%s/%s", srcdir, src )
+                                         : src_dir_path( make, src ));
+        for (i = 0; i < info.imports.count; i++)
+        {
+            const char *imp = info.imports.str[i];
+            struct makefile *submake = find_importlib_module( imp );
+            const char *imp_path;
+
+            if (!submake) fatal_error( "%s: IMPORT %s: no dlls/%s module\n",
+                                        source->filename, imp, imp );
+            /* On x86-64 an import is a guest THUNK DLL and lld reads its export
+             * table directly.  On i386 there is no thunk: the import is Wine's
+             * own i386 PE builtin, whose exports are undecorated while a stdcall
+             * call site wants _Name@N.  So the winebuild-generated import
+             * library is what gets linked there -- and it is the right make
+             * prerequisite too, changing exactly when that module's spec does. */
+            imp_path = is_i386 ? obj_dir_path( submake, strmake( "%s/lib%s.a", dir, imp ))
+                               : obj_dir_path( submake, strmake( "%s/%s.dll", dir, imp ));
+            output_filename( imp_path );
+            strarray_add( &import_args, strmake( "--import=%s=%s", imp, imp_path ));
+        }
+        output( " | include/all\n" );
+
+        output( "\t%s%s --out $@ --entry %s --def %s --topdir %s --moduledir %s"
+                " --machine %s --objdir %s",
+                cmd_prefix( "GUESTPE" ), guestpe, info.entry, def_path,
+                root_src_dir_path( "" ), src_dir_path( make, "" ), machine, objdir );
+        if (info.srcdir) output_filename( strmake( "--srcdir=%s", srcdir ));
+        STRARRAY_FOR_EACH( src, &info.sources ) output_filename( strmake( "--source=%s", src ));
+        STRARRAY_FOR_EACH( g, &info.globs ) output_filename( strmake( "--glob=%s", g ));
+        output_filenames( import_args );
+        output( "\n" );
     }
-    output( " | include/all\n" );
-
-    output( "\t%s%s --out $@ --entry %s --def %s --topdir %s --moduledir %s --objdir %s",
-            cmd_prefix( "GUESTPE" ), guestpe, info.entry, def_path,
-            root_src_dir_path( "" ), src_dir_path( make, "" ), objdir );
-    STRARRAY_FOR_EACH( src, &info.sources ) output_filename( strmake( "--source=%s", src ));
-    STRARRAY_FOR_EACH( g, &info.globs ) output_filename( strmake( "--glob=%s", g ));
-    output_filenames( import_args );
-    output( "\n" );
 }
 
 

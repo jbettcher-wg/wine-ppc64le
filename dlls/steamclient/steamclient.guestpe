@@ -1,0 +1,71 @@
+# steamclient.guestpe -- declarative source list for the guest i386
+# steamclient.dll: the 32-bit half of the Steam surface.
+#
+# WHY THIS IS A SECOND MODULE AND NOT A SECOND MACHINE OF steamclient64.
+# A 32-bit Steam game does not load "steamclient64.dll".  Valve's own
+# steam_api.dll asks for "steamclient.dll" -- the two names are Steam's own
+# 32/64 split and both exist in a real Steam install -- and this port's guest
+# loader resolves a builtin by DIRECTORY NAME: find_builtin_dll() in
+# dlls/ntdll/unix/loader.c builds <build_dir>/dlls/<name>/<arch>/<name>.dll
+# out of the bare name it was handed.  So the module that answers has to be
+# spelled dlls/steamclient, and an i386-windows/ output of the steamclient64
+# makefile would sit at a path nothing will ever look at.  The same reasoning,
+# from the other end, is written up in steamclient64.guestpe's own header.
+#
+# There is exactly ONE copy of the sources.  SRCDIR points every SOURCE and
+# GLOB line below at ../steamclient64, so the two DLLs are the same vendored
+# Proton PE half compiled twice -- which is what Proton itself does (it ships
+# i386-windows/lsteamclient.dll and x86_64-windows/lsteamclient.dll from one
+# tree) and is why nothing under proton/ needed a 32-bit edit: the width-
+# dependent parts of that code are already behind its own #ifdef __i386__.
+#
+# The keyword reference lives in ../steamclient64/steamclient64.guestpe.  Two
+# keywords are used here that it does not use:
+#
+#   SRCDIR         module-relative directory that SOURCE and GLOB resolve
+#                  against, and that supplies the compiler's -I paths.
+#   GUEST-MACHINE  the guest machine to build for, spelled exactly as the
+#                  .thunks files spell it.  Absent, a .guestpe file builds for
+#                  x86_64 only; see guestpe_machine_default in tools/makedep.c.
+#
+# WHAT THIS DLL CAN AND CANNOT DO TODAY, stated here so nobody has to find out
+# by running a game.  It loads, and its imports bind against Wine's real i386
+# PE builtins.  Its calls to the Steam bridge do NOT reach a Steam client: the
+# bridge helper (ppc64le/steamapi/helper) is an x86-64 program, and a frame is
+# the params struct's own bytes, so a 32-bit client and a 64-bit helper cannot
+# speak to each other -- see the magic in ../steamclient64/steamrpc_wire.h,
+# which encodes the pointer width so that pairing refuses out loud instead of
+# misreading.  Until an i386 helper exists beside the x86-64 one (Proton ships
+# both: i386-unix/lsteamclient.so against Steam's own 32-bit steamclient.so),
+# every method here returns STEAMRPC_STATUS_NO_HELPER, which is exactly what a
+# game launched outside Steam already gets on the 64-bit lane, and which
+# Proton's own code is written to survive.
+
+DLL      steamclient.dll
+ENTRY    DllMain
+DEF      steamclient.def
+
+SRCDIR   ../steamclient64
+GUEST-MACHINE i386
+
+IMPORT   kernel32
+IMPORT   msvcrt
+IMPORT   ntdll
+IMPORT   user32
+IMPORT   ws2_32
+IMPORT   advapi32
+
+# Proton's own PE-side entry points and interface-independent glue.
+SOURCE   proton/steamclient_main.c
+SOURCE   proton/steamclient_generated.c
+SOURCE   proton/steam_input_manual.c
+SOURCE   proton/steam_matchmaking_manual.c
+SOURCE   proton/steam_networking_manual.c
+
+# This port's half of the bridge to the native Steam client.
+SOURCE   steamrpc.c
+SOURCE   steamrpc_generated.c
+SOURCE   steamrpc_chkstk.c
+
+# The 39 generated per-interface wrappers.
+GLOB     proton/winISteam*.c

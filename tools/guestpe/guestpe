@@ -74,7 +74,13 @@ def main():
     ap.add_argument("--topdir", required=True,
                      help="build/source tree root -- supplies -I<topdir>/include etc.")
     ap.add_argument("--moduledir", required=True,
-                     help="dlls/lsteamclient itself -- SOURCE/GLOB paths are relative to this")
+                     help="the module's own directory; SOURCE/GLOB paths are relative to this "
+                          "unless --srcdir moves them")
+    ap.add_argument("--srcdir", default=None, metavar="DIR",
+                     help="where the sources actually live, when a module builds another "
+                          "module's sources -- see the SRCDIR keyword in a .guestpe file")
+    ap.add_argument("--machine", default="x86_64", choices=("x86_64", "i386"),
+                     help="guest machine to build for (default x86_64)")
     ap.add_argument("--objdir", required=True, help="scratch directory for intermediate .o files")
     ap.add_argument("--source", action="append", default=[], metavar="RELPATH",
                      help="one module-relative .c source (repeatable)")
@@ -84,12 +90,14 @@ def main():
                      help="a guest thunk DLL to link against, name=path (repeatable)")
     args = ap.parse_args()
 
+    srcdir = args.srcdir or args.moduledir
+
     sources = list(args.source)
     for pattern in args.globs:
-        matches = sorted(glob.glob(os.path.join(args.moduledir, pattern)))
+        matches = sorted(glob.glob(os.path.join(srcdir, pattern)))
         if not matches:
-            sys.exit("guestpe: --glob %r matched nothing under %s" % (pattern, args.moduledir))
-        sources += [os.path.relpath(m, args.moduledir) for m in matches]
+            sys.exit("guestpe: --glob %r matched nothing under %s" % (pattern, srcdir))
+        sources += [os.path.relpath(m, srcdir) for m in matches]
 
     os.makedirs(args.objdir, exist_ok=True)
 
@@ -100,20 +108,31 @@ def main():
     # required because Wine's pshpack1.h/poppack.h nest inside Proton's own
     # (intentionally, and correctly) and clang warns about the nesting.
     compile_cmd = [
-        "clang", "-target", "x86_64-windows-gnu", "-nostdlibinc",
+        "clang", "-target", "%s-windows-gnu" % args.machine, "-nostdlibinc",
         "-I%s" % os.path.join(args.topdir, "include"),
         "-I%s" % os.path.join(args.topdir, "include", "msvcrt"),
-        "-I%s" % args.moduledir,
-        "-I%s" % os.path.join(args.moduledir, "proton"),
+        "-I%s" % srcdir,
+        "-I%s" % os.path.join(srcdir, "proton"),
         "-D_MSVCR_VER=0", "-D__WINESRC__",
     ]
+    # ONLY ON i386, and it is not cosmetic.  include/wine/asm.h decorates a
+    # symbol with a leading underscore for `__WINE_PE_BUILD && __i386__` and
+    # not otherwise, and Proton's cxx.h builds every interface vtable out of
+    # inline asm through that macro.  Without this the C side references
+    # _winISteamApps_..._vtable, the asm defines winISteamApps_..._vtable, and
+    # the link fails with ~500 undefined vtables (measured).  It is withheld
+    # from x86-64 rather than made unconditional because on that machine it
+    # would also switch on __ASM_SEH(), which would change the byte-for-byte
+    # recipe the x86-64 lane was measured with and buys nothing there.
+    if args.machine == "i386":
+        compile_cmd += ["-D__WINE_PE_BUILD"]
     # steamclient64 (the module this recipe was measured on) forces its
     # compatibility preamble into every translation unit; a module that does
     # not carry the header (dlls/guestcrt is the second guestpe user, and its
     # sources are self-contained) compiles without it.  Keyed on the file's
     # presence in --moduledir rather than a new keyword so steamclient64's
     # build command stays byte-for-byte the measured one.
-    if os.path.isfile(os.path.join(args.moduledir, "steamclient_guest.h")):
+    if os.path.isfile(os.path.join(srcdir, "steamclient_guest.h")):
         compile_cmd += ["-include", "steamclient_guest.h"]
     compile_cmd += [
         "-Wall", "-Wno-pragma-pack", "-O1", "-fno-builtin", "-g",
@@ -122,7 +141,7 @@ def main():
     objects = []
     for rel in sources:
         objpath = os.path.join(args.objdir, object_name(rel))
-        run(compile_cmd + ["-c", "-o", objpath, os.path.join(args.moduledir, rel)])
+        run(compile_cmd + ["-c", "-o", objpath, os.path.join(srcdir, rel)])
         objects.append(objpath)
 
     import_paths = []
@@ -131,10 +150,14 @@ def main():
             sys.exit("guestpe: --import %r is not NAME=PATH" % spec)
         import_paths.append(spec.split("=", 1)[1])
 
-    # lld links directly against the thunk DLLs' export tables below --  no
-    # import libraries needed, and none are built for this arch anyway.
+    # x86-64: lld links directly against the thunk DLLs' export tables, no
+    # import libraries needed and none are built for that arch anyway.
+    # i386: the imports are Wine's REAL i386 PE builtins, whose exports are
+    # undecorated while a stdcall call site wants _Name@N, so makedep hands
+    # over the winebuild-generated import libraries instead and the paths
+    # below are .a files.  Either way this tool only passes them through.
     link_cmd = [
-        "clang", "-target", "x86_64-windows-gnu", "-fuse-ld=lld",
+        "clang", "-target", "%s-windows-gnu" % args.machine, "-fuse-ld=lld",
         "-nostdlib", "-shared",
         "-Wl,--subsystem,windows", "-Wl,--entry=%s" % args.entry,
         "-o", args.out,
