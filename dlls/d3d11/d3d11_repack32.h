@@ -19,7 +19,71 @@
 
 #include <string.h>
 
+/* ------------------------------------------- pointer-width SCALAR pointees
+ *
+ * Not an aggregate, and emitted unconditionally because it is a property of
+ * the two ABIs rather than of any header: a parameter declared `HANDLE *h`
+ * (or SIZE_T *, ULONG_PTR *, HMODULE * ...) points at a cell that is FOUR
+ * bytes in the guest and EIGHT in the native callee.  Passing that guest
+ * pointer through raw makes the callee read eight bytes of a four-byte cell
+ * and, worse, write eight over it -- four bytes of the guest's own stack
+ * frame or heap block, silently.
+ *
+ * D3D9 is where this stopped being theoretical: `HANDLE *pSharedHandle` is
+ * the last parameter of EVERY resource creator -- CreateTexture,
+ * CreateVertexBuffer, CreateIndexBuffer, CreateRenderTarget,
+ * CreateDepthStencilSurface, CreateCubeTexture, CreateVolumeTexture,
+ * CreateOffscreenPlainSurface and the three *Ex twins -- nineteen rows, i.e.
+ * every way a D3D9 title can allocate anything.  [MEASURED 2026-08-30]
+ *
+ * THE NARROWING IS THE HONEST PART.  Going up (IN) is a zero-extend and
+ * cannot lose.  Coming down (OUT) can: a handle whose high half is set does
+ * not fit the guest's cell.  It is NOT clamped -- a clamped handle names a
+ * different object, which is worse than none -- so the loss is reported and
+ * the cell is zeroed, which is what "no shared handle" means to every caller
+ * of these methods.  In practice DXVK's d3d9 answers pSharedHandle only for
+ * shared resources and NT handles are 32-bit values, so this is a tripwire
+ * rather than a path anything is expected to take.
+ */
+#ifndef WINE_REPACK32_PTRWIDTH_DEFINED
+#define WINE_REPACK32_PTRWIDTH_DEFINED
+/* Defined in libs/winecom, which every consumer of this header already
+ * imports.  Declared here rather than included from a Wine header, because
+ * this file deliberately pulls in nothing but <string.h>. */
+extern void wine_repack32_ptrwidth_lost( unsigned long long v );
+
+static inline void wine_repack32_PTRWIDTH( void *dst, const void *src32 )
+{
+    unsigned int lo;
+    memcpy( &lo, src32, 4 );
+    *(unsigned long long *)dst = (unsigned long long)lo;
+}
+static inline void wine_repack64_PTRWIDTH( void *dst32, const void *src )
+{
+    unsigned long long v = *(const unsigned long long *)src;
+    unsigned int lo = (unsigned int)v;
+
+    if (v >> 32)
+    {
+        static int logged;
+        if (!logged)
+        {
+            logged = 1;
+            wine_repack32_ptrwidth_lost( v );
+        }
+        lo = 0;
+    }
+    memcpy( dst32, &lo, 4 );
+}
+#endif
+
 /* forward declarations: nested aggregates repack recursively */
+static inline void wine_repack32_D3D10_EFFECT_SHADER_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_EFFECT_SHADER_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D10_EFFECT_TYPE_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_EFFECT_TYPE_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D10_EFFECT_VARIABLE_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_EFFECT_VARIABLE_DESC( void *dst32, const void *src );
 static inline void wine_repack32_D3D10_INFO_QUEUE_FILTER( void *dst, const void *src32 );
 static inline void wine_repack64_D3D10_INFO_QUEUE_FILTER( void *dst32, const void *src );
 static inline void wine_repack32_D3D10_INFO_QUEUE_FILTER_DESC( void *dst, const void *src32 );
@@ -32,10 +96,26 @@ static inline void wine_repack32_D3D10_MAPPED_TEXTURE3D( void *dst, const void *
 static inline void wine_repack64_D3D10_MAPPED_TEXTURE3D( void *dst32, const void *src );
 static inline void wine_repack32_D3D10_MESSAGE( void *dst, const void *src32 );
 static inline void wine_repack64_D3D10_MESSAGE( void *dst32, const void *src );
+static inline void wine_repack32_D3D10_PASS_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_PASS_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D10_PASS_SHADER_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_PASS_SHADER_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D10_SHADER_BUFFER_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_SHADER_BUFFER_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D10_SHADER_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_SHADER_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D10_SHADER_INPUT_BIND_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_SHADER_INPUT_BIND_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D10_SHADER_VARIABLE_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_SHADER_VARIABLE_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D10_SIGNATURE_PARAMETER_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_SIGNATURE_PARAMETER_DESC( void *dst32, const void *src );
 static inline void wine_repack32_D3D10_SO_DECLARATION_ENTRY( void *dst, const void *src32 );
 static inline void wine_repack64_D3D10_SO_DECLARATION_ENTRY( void *dst32, const void *src );
 static inline void wine_repack32_D3D10_SUBRESOURCE_DATA( void *dst, const void *src32 );
 static inline void wine_repack64_D3D10_SUBRESOURCE_DATA( void *dst32, const void *src );
+static inline void wine_repack32_D3D10_TECHNIQUE_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D10_TECHNIQUE_DESC( void *dst32, const void *src );
 static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT( void *dst, const void *src32 );
 static inline void wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_ACCESSIBLE_ENCRYPTION_INPUT( void *dst32, const void *src );
 static inline void wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_CRYPTO_SESSION_INPUT( void *dst, const void *src32 );
@@ -56,6 +136,8 @@ static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPT
 static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_INPUT( void *dst32, const void *src );
 static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_OUTPUT( void *dst, const void *src32 );
 static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPTION_GUID_OUTPUT( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_OUTPUT( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_OUTPUT( void *dst32, const void *src );
 static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT( void *dst, const void *src32 );
 static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT( void *dst32, const void *src );
 static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_CRYPTO_SESSION_INPUT( void *dst, const void *src32 );
@@ -100,6 +182,20 @@ static inline void wine_repack32_D3D11_MAPPED_SUBRESOURCE( void *dst, const void
 static inline void wine_repack64_D3D11_MAPPED_SUBRESOURCE( void *dst32, const void *src );
 static inline void wine_repack32_D3D11_MESSAGE( void *dst, const void *src32 );
 static inline void wine_repack64_D3D11_MESSAGE( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_PARAMETER_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_PARAMETER_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_SHADER_BUFFER_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_SHADER_BUFFER_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_SHADER_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_SHADER_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_SHADER_INPUT_BIND_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_SHADER_INPUT_BIND_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_SHADER_TYPE_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_SHADER_TYPE_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_SHADER_VARIABLE_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_SHADER_VARIABLE_DESC( void *dst32, const void *src );
+static inline void wine_repack32_D3D11_SIGNATURE_PARAMETER_DESC( void *dst, const void *src32 );
+static inline void wine_repack64_D3D11_SIGNATURE_PARAMETER_DESC( void *dst32, const void *src );
 static inline void wine_repack32_D3D11_SO_DECLARATION_ENTRY( void *dst, const void *src32 );
 static inline void wine_repack64_D3D11_SO_DECLARATION_ENTRY( void *dst32, const void *src );
 static inline void wine_repack32_D3D11_SUBRESOURCE_DATA( void *dst, const void *src32 );
@@ -140,6 +236,79 @@ static inline void wine_repack32_DXGI_SHARED_RESOURCE( void *dst, const void *sr
 static inline void wine_repack64_DXGI_SHARED_RESOURCE( void *dst32, const void *src );
 static inline void wine_repack32_DXGI_SWAP_CHAIN_DESC( void *dst, const void *src32 );
 static inline void wine_repack64_DXGI_SWAP_CHAIN_DESC( void *dst32, const void *src );
+
+/* D3D10_EFFECT_SHADER_DESC: 48 bytes / align 8 on a 64-bit guest, 28 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_EFFECT_SHADER_DESC 28
+static inline void wine_repack32_D3D10_EFFECT_SHADER_DESC( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
+    *(unsigned long long *)((char *)dst + 16) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 8);
+    memcpy( (char *)dst + 24, (const char *)src32 + 12, 4 );
+    *(unsigned long long *)((char *)dst + 32) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 16);
+    memcpy( (char *)dst + 40, (const char *)src32 + 20, 4 );
+    memcpy( (char *)dst + 44, (const char *)src32 + 24, 4 );
+}
+static inline void wine_repack64_D3D10_EFFECT_SHADER_DESC( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
+    *(unsigned int *)((char *)dst32 + 8) = (unsigned int)*(const unsigned long long *)((const char *)src + 16);
+    memcpy( (char *)dst32 + 12, (const char *)src + 24, 4 );
+    *(unsigned int *)((char *)dst32 + 16) = (unsigned int)*(const unsigned long long *)((const char *)src + 32);
+    memcpy( (char *)dst32 + 20, (const char *)src + 40, 4 );
+    memcpy( (char *)dst32 + 24, (const char *)src + 44, 4 );
+}
+
+/* D3D10_EFFECT_TYPE_DESC: 48 bytes / align 8 on a 64-bit guest, 40 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_EFFECT_TYPE_DESC 40
+static inline void wine_repack32_D3D10_EFFECT_TYPE_DESC( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
+    memcpy( (char *)dst + 12, (const char *)src32 + 8, 4 );
+    memcpy( (char *)dst + 16, (const char *)src32 + 12, 4 );
+    memcpy( (char *)dst + 20, (const char *)src32 + 16, 4 );
+    memcpy( (char *)dst + 24, (const char *)src32 + 20, 4 );
+    memcpy( (char *)dst + 28, (const char *)src32 + 24, 4 );
+    memcpy( (char *)dst + 32, (const char *)src32 + 28, 4 );
+    memcpy( (char *)dst + 36, (const char *)src32 + 32, 4 );
+    memcpy( (char *)dst + 40, (const char *)src32 + 36, 4 );
+}
+static inline void wine_repack64_D3D10_EFFECT_TYPE_DESC( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
+    memcpy( (char *)dst32 + 8, (const char *)src + 12, 4 );
+    memcpy( (char *)dst32 + 12, (const char *)src + 16, 4 );
+    memcpy( (char *)dst32 + 16, (const char *)src + 20, 4 );
+    memcpy( (char *)dst32 + 20, (const char *)src + 24, 4 );
+    memcpy( (char *)dst32 + 24, (const char *)src + 28, 4 );
+    memcpy( (char *)dst32 + 28, (const char *)src + 32, 4 );
+    memcpy( (char *)dst32 + 32, (const char *)src + 36, 4 );
+    memcpy( (char *)dst32 + 36, (const char *)src + 40, 4 );
+}
+
+/* D3D10_EFFECT_VARIABLE_DESC: 32 bytes / align 8 on a 64-bit guest, 24 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_EFFECT_VARIABLE_DESC 24
+static inline void wine_repack32_D3D10_EFFECT_VARIABLE_DESC( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    *(unsigned long long *)((char *)dst + 8) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 4);
+    memcpy( (char *)dst + 16, (const char *)src32 + 8, 4 );
+    memcpy( (char *)dst + 20, (const char *)src32 + 12, 4 );
+    memcpy( (char *)dst + 24, (const char *)src32 + 16, 4 );
+    memcpy( (char *)dst + 28, (const char *)src32 + 20, 4 );
+}
+static inline void wine_repack64_D3D10_EFFECT_VARIABLE_DESC( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    *(unsigned int *)((char *)dst32 + 4) = (unsigned int)*(const unsigned long long *)((const char *)src + 8);
+    memcpy( (char *)dst32 + 8, (const char *)src + 16, 4 );
+    memcpy( (char *)dst32 + 12, (const char *)src + 20, 4 );
+    memcpy( (char *)dst32 + 16, (const char *)src + 24, 4 );
+    memcpy( (char *)dst32 + 20, (const char *)src + 28, 4 );
+}
 
 /* D3D10_INFO_QUEUE_FILTER: 96 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
 #define WINE_REPACK32_SIZE_D3D10_INFO_QUEUE_FILTER 48
@@ -245,6 +414,193 @@ static inline void wine_repack64_D3D10_MESSAGE( void *dst32, const void *src )
     { unsigned long long v = *(const unsigned long long *)((const char *)src + 24); *(unsigned int *)((char *)dst32 + 16) = v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }
 }
 
+/* D3D10_PASS_DESC: 56 bytes / align 8 on a 64-bit guest, 40 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_PASS_DESC 40
+static inline void wine_repack32_D3D10_PASS_DESC( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
+    *(unsigned long long *)((char *)dst + 16) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 8);
+    *(unsigned long long *)((char *)dst + 24) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 12);
+    memcpy( (char *)dst + 32, (const char *)src32 + 16, 4 );
+    memcpy( (char *)dst + 36, (const char *)src32 + 20, 4 );
+    memcpy( (char *)dst + 40, (const char *)src32 + 24, 16 );
+}
+static inline void wine_repack64_D3D10_PASS_DESC( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
+    *(unsigned int *)((char *)dst32 + 8) = (unsigned int)*(const unsigned long long *)((const char *)src + 16);
+    { unsigned long long v = *(const unsigned long long *)((const char *)src + 24); *(unsigned int *)((char *)dst32 + 12) = v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }
+    memcpy( (char *)dst32 + 16, (const char *)src + 32, 4 );
+    memcpy( (char *)dst32 + 20, (const char *)src + 36, 4 );
+    memcpy( (char *)dst32 + 24, (const char *)src + 40, 16 );
+}
+
+/* D3D10_PASS_SHADER_DESC: 16 bytes / align 8 on a 64-bit guest, 8 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_PASS_SHADER_DESC 8
+static inline void wine_repack32_D3D10_PASS_SHADER_DESC( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
+}
+static inline void wine_repack64_D3D10_PASS_SHADER_DESC( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
+}
+
+/* D3D10_SHADER_BUFFER_DESC: 24 bytes / align 8 on a 64-bit guest, 20 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_SHADER_BUFFER_DESC 20
+static inline void wine_repack32_D3D10_SHADER_BUFFER_DESC( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
+    memcpy( (char *)dst + 12, (const char *)src32 + 8, 4 );
+    memcpy( (char *)dst + 16, (const char *)src32 + 12, 4 );
+    memcpy( (char *)dst + 20, (const char *)src32 + 16, 4 );
+}
+static inline void wine_repack64_D3D10_SHADER_BUFFER_DESC( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
+    memcpy( (char *)dst32 + 8, (const char *)src + 12, 4 );
+    memcpy( (char *)dst32 + 12, (const char *)src + 16, 4 );
+    memcpy( (char *)dst32 + 16, (const char *)src + 20, 4 );
+}
+
+/* D3D10_SHADER_DESC: 120 bytes / align 8 on a 64-bit guest, 112 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_SHADER_DESC 112
+static inline void wine_repack32_D3D10_SHADER_DESC( void *dst, const void *src32 )
+{
+    memcpy( (char *)dst + 0, (const char *)src32 + 0, 4 );
+    *(unsigned long long *)((char *)dst + 8) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 4);
+    memcpy( (char *)dst + 16, (const char *)src32 + 8, 4 );
+    memcpy( (char *)dst + 20, (const char *)src32 + 12, 4 );
+    memcpy( (char *)dst + 24, (const char *)src32 + 16, 4 );
+    memcpy( (char *)dst + 28, (const char *)src32 + 20, 4 );
+    memcpy( (char *)dst + 32, (const char *)src32 + 24, 4 );
+    memcpy( (char *)dst + 36, (const char *)src32 + 28, 4 );
+    memcpy( (char *)dst + 40, (const char *)src32 + 32, 4 );
+    memcpy( (char *)dst + 44, (const char *)src32 + 36, 4 );
+    memcpy( (char *)dst + 48, (const char *)src32 + 40, 4 );
+    memcpy( (char *)dst + 52, (const char *)src32 + 44, 4 );
+    memcpy( (char *)dst + 56, (const char *)src32 + 48, 4 );
+    memcpy( (char *)dst + 60, (const char *)src32 + 52, 4 );
+    memcpy( (char *)dst + 64, (const char *)src32 + 56, 4 );
+    memcpy( (char *)dst + 68, (const char *)src32 + 60, 4 );
+    memcpy( (char *)dst + 72, (const char *)src32 + 64, 4 );
+    memcpy( (char *)dst + 76, (const char *)src32 + 68, 4 );
+    memcpy( (char *)dst + 80, (const char *)src32 + 72, 4 );
+    memcpy( (char *)dst + 84, (const char *)src32 + 76, 4 );
+    memcpy( (char *)dst + 88, (const char *)src32 + 80, 4 );
+    memcpy( (char *)dst + 92, (const char *)src32 + 84, 4 );
+    memcpy( (char *)dst + 96, (const char *)src32 + 88, 4 );
+    memcpy( (char *)dst + 100, (const char *)src32 + 92, 4 );
+    memcpy( (char *)dst + 104, (const char *)src32 + 96, 4 );
+    memcpy( (char *)dst + 108, (const char *)src32 + 100, 4 );
+    memcpy( (char *)dst + 112, (const char *)src32 + 104, 4 );
+    memcpy( (char *)dst + 116, (const char *)src32 + 108, 4 );
+}
+static inline void wine_repack64_D3D10_SHADER_DESC( void *dst32, const void *src )
+{
+    memcpy( (char *)dst32 + 0, (const char *)src + 0, 4 );
+    *(unsigned int *)((char *)dst32 + 4) = (unsigned int)*(const unsigned long long *)((const char *)src + 8);
+    memcpy( (char *)dst32 + 8, (const char *)src + 16, 4 );
+    memcpy( (char *)dst32 + 12, (const char *)src + 20, 4 );
+    memcpy( (char *)dst32 + 16, (const char *)src + 24, 4 );
+    memcpy( (char *)dst32 + 20, (const char *)src + 28, 4 );
+    memcpy( (char *)dst32 + 24, (const char *)src + 32, 4 );
+    memcpy( (char *)dst32 + 28, (const char *)src + 36, 4 );
+    memcpy( (char *)dst32 + 32, (const char *)src + 40, 4 );
+    memcpy( (char *)dst32 + 36, (const char *)src + 44, 4 );
+    memcpy( (char *)dst32 + 40, (const char *)src + 48, 4 );
+    memcpy( (char *)dst32 + 44, (const char *)src + 52, 4 );
+    memcpy( (char *)dst32 + 48, (const char *)src + 56, 4 );
+    memcpy( (char *)dst32 + 52, (const char *)src + 60, 4 );
+    memcpy( (char *)dst32 + 56, (const char *)src + 64, 4 );
+    memcpy( (char *)dst32 + 60, (const char *)src + 68, 4 );
+    memcpy( (char *)dst32 + 64, (const char *)src + 72, 4 );
+    memcpy( (char *)dst32 + 68, (const char *)src + 76, 4 );
+    memcpy( (char *)dst32 + 72, (const char *)src + 80, 4 );
+    memcpy( (char *)dst32 + 76, (const char *)src + 84, 4 );
+    memcpy( (char *)dst32 + 80, (const char *)src + 88, 4 );
+    memcpy( (char *)dst32 + 84, (const char *)src + 92, 4 );
+    memcpy( (char *)dst32 + 88, (const char *)src + 96, 4 );
+    memcpy( (char *)dst32 + 92, (const char *)src + 100, 4 );
+    memcpy( (char *)dst32 + 96, (const char *)src + 104, 4 );
+    memcpy( (char *)dst32 + 100, (const char *)src + 108, 4 );
+    memcpy( (char *)dst32 + 104, (const char *)src + 112, 4 );
+    memcpy( (char *)dst32 + 108, (const char *)src + 116, 4 );
+}
+
+/* D3D10_SHADER_INPUT_BIND_DESC: 40 bytes / align 8 on a 64-bit guest, 32 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_SHADER_INPUT_BIND_DESC 32
+static inline void wine_repack32_D3D10_SHADER_INPUT_BIND_DESC( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
+    memcpy( (char *)dst + 12, (const char *)src32 + 8, 4 );
+    memcpy( (char *)dst + 16, (const char *)src32 + 12, 4 );
+    memcpy( (char *)dst + 20, (const char *)src32 + 16, 4 );
+    memcpy( (char *)dst + 24, (const char *)src32 + 20, 4 );
+    memcpy( (char *)dst + 28, (const char *)src32 + 24, 4 );
+    memcpy( (char *)dst + 32, (const char *)src32 + 28, 4 );
+}
+static inline void wine_repack64_D3D10_SHADER_INPUT_BIND_DESC( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
+    memcpy( (char *)dst32 + 8, (const char *)src + 12, 4 );
+    memcpy( (char *)dst32 + 12, (const char *)src + 16, 4 );
+    memcpy( (char *)dst32 + 16, (const char *)src + 20, 4 );
+    memcpy( (char *)dst32 + 20, (const char *)src + 24, 4 );
+    memcpy( (char *)dst32 + 24, (const char *)src + 28, 4 );
+    memcpy( (char *)dst32 + 28, (const char *)src + 32, 4 );
+}
+
+/* D3D10_SHADER_VARIABLE_DESC: 32 bytes / align 8 on a 64-bit guest, 20 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_SHADER_VARIABLE_DESC 20
+static inline void wine_repack32_D3D10_SHADER_VARIABLE_DESC( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
+    memcpy( (char *)dst + 12, (const char *)src32 + 8, 4 );
+    memcpy( (char *)dst + 16, (const char *)src32 + 12, 4 );
+    *(unsigned long long *)((char *)dst + 24) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 16);
+}
+static inline void wine_repack64_D3D10_SHADER_VARIABLE_DESC( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
+    memcpy( (char *)dst32 + 8, (const char *)src + 12, 4 );
+    memcpy( (char *)dst32 + 12, (const char *)src + 16, 4 );
+    *(unsigned int *)((char *)dst32 + 16) = (unsigned int)*(const unsigned long long *)((const char *)src + 24);
+}
+
+/* D3D10_SIGNATURE_PARAMETER_DESC: 32 bytes / align 8 on a 64-bit guest, 24 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_SIGNATURE_PARAMETER_DESC 24
+static inline void wine_repack32_D3D10_SIGNATURE_PARAMETER_DESC( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
+    memcpy( (char *)dst + 12, (const char *)src32 + 8, 4 );
+    memcpy( (char *)dst + 16, (const char *)src32 + 12, 4 );
+    memcpy( (char *)dst + 20, (const char *)src32 + 16, 4 );
+    memcpy( (char *)dst + 24, (const char *)src32 + 20, 1 );
+    memcpy( (char *)dst + 25, (const char *)src32 + 21, 1 );
+}
+static inline void wine_repack64_D3D10_SIGNATURE_PARAMETER_DESC( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
+    memcpy( (char *)dst32 + 8, (const char *)src + 12, 4 );
+    memcpy( (char *)dst32 + 12, (const char *)src + 16, 4 );
+    memcpy( (char *)dst32 + 16, (const char *)src + 20, 4 );
+    memcpy( (char *)dst32 + 20, (const char *)src + 24, 1 );
+    memcpy( (char *)dst32 + 21, (const char *)src + 25, 1 );
+}
+
 /* D3D10_SO_DECLARATION_ENTRY: 16 bytes / align 8 on a 64-bit guest, 12 / 4 on i386 */
 #define WINE_REPACK32_SIZE_D3D10_SO_DECLARATION_ENTRY 12
 static inline void wine_repack32_D3D10_SO_DECLARATION_ENTRY( void *dst, const void *src32 )
@@ -273,6 +629,21 @@ static inline void wine_repack32_D3D10_SUBRESOURCE_DATA( void *dst, const void *
     memcpy( (char *)dst + 12, (const char *)src32 + 8, 4 );
 }
 static inline void wine_repack64_D3D10_SUBRESOURCE_DATA( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
+    memcpy( (char *)dst32 + 8, (const char *)src + 12, 4 );
+}
+
+/* D3D10_TECHNIQUE_DESC: 16 bytes / align 8 on a 64-bit guest, 12 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D10_TECHNIQUE_DESC 12
+static inline void wine_repack32_D3D10_TECHNIQUE_DESC( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
+    memcpy( (char *)dst + 12, (const char *)src32 + 8, 4 );
+}
+static inline void wine_repack64_D3D10_TECHNIQUE_DESC( void *dst32, const void *src )
 {
     *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
     memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
@@ -429,6 +800,23 @@ static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_ENCRYPT
     wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const char *)src + 0 );
     memcpy( (char *)dst32 + 44, (const char *)src + 48, 4 );
     memcpy( (char *)dst32 + 48, (const char *)src + 52, 16 );
+}
+
+/* D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_OUTPUT: 64 bytes / align 8 on a 64-bit guest, 56 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_OUTPUT 56
+static inline void wine_repack32_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_OUTPUT( void *dst, const void *src32 )
+{
+    wine_repack32_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst + 0, (const char *)src32 + 0 );
+    memcpy( (char *)dst + 48, (const char *)src32 + 44, 4 );
+    memcpy( (char *)dst + 52, (const char *)src32 + 48, 4 );
+    memcpy( (char *)dst + 56, (const char *)src32 + 52, 4 );
+}
+static inline void wine_repack64_D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_OUTPUT( void *dst32, const void *src )
+{
+    wine_repack64_D3D11_AUTHENTICATED_QUERY_OUTPUT( (char *)dst32 + 0, (const char *)src + 0 );
+    memcpy( (char *)dst32 + 44, (const char *)src + 48, 4 );
+    memcpy( (char *)dst32 + 48, (const char *)src + 52, 4 );
+    memcpy( (char *)dst32 + 52, (const char *)src + 56, 4 );
 }
 
 /* D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT: 56 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
@@ -777,6 +1165,247 @@ static inline void wine_repack64_D3D11_MESSAGE( void *dst32, const void *src )
     memcpy( (char *)dst32 + 8, (const char *)src + 8, 4 );
     *(unsigned int *)((char *)dst32 + 12) = (unsigned int)*(const unsigned long long *)((const char *)src + 16);
     { unsigned long long v = *(const unsigned long long *)((const char *)src + 24); *(unsigned int *)((char *)dst32 + 16) = v > 0xffffffffu ? 0xffffffffu : (unsigned int)v; }
+}
+
+/* D3D11_PARAMETER_DESC: 56 bytes / align 8 on a 64-bit guest, 48 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_PARAMETER_DESC 48
+static inline void wine_repack32_D3D11_PARAMETER_DESC( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    *(unsigned long long *)((char *)dst + 8) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 4);
+    memcpy( (char *)dst + 16, (const char *)src32 + 8, 4 );
+    memcpy( (char *)dst + 20, (const char *)src32 + 12, 4 );
+    memcpy( (char *)dst + 24, (const char *)src32 + 16, 4 );
+    memcpy( (char *)dst + 28, (const char *)src32 + 20, 4 );
+    memcpy( (char *)dst + 32, (const char *)src32 + 24, 4 );
+    memcpy( (char *)dst + 36, (const char *)src32 + 28, 4 );
+    memcpy( (char *)dst + 40, (const char *)src32 + 32, 4 );
+    memcpy( (char *)dst + 44, (const char *)src32 + 36, 4 );
+    memcpy( (char *)dst + 48, (const char *)src32 + 40, 4 );
+    memcpy( (char *)dst + 52, (const char *)src32 + 44, 4 );
+}
+static inline void wine_repack64_D3D11_PARAMETER_DESC( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    *(unsigned int *)((char *)dst32 + 4) = (unsigned int)*(const unsigned long long *)((const char *)src + 8);
+    memcpy( (char *)dst32 + 8, (const char *)src + 16, 4 );
+    memcpy( (char *)dst32 + 12, (const char *)src + 20, 4 );
+    memcpy( (char *)dst32 + 16, (const char *)src + 24, 4 );
+    memcpy( (char *)dst32 + 20, (const char *)src + 28, 4 );
+    memcpy( (char *)dst32 + 24, (const char *)src + 32, 4 );
+    memcpy( (char *)dst32 + 28, (const char *)src + 36, 4 );
+    memcpy( (char *)dst32 + 32, (const char *)src + 40, 4 );
+    memcpy( (char *)dst32 + 36, (const char *)src + 44, 4 );
+    memcpy( (char *)dst32 + 40, (const char *)src + 48, 4 );
+    memcpy( (char *)dst32 + 44, (const char *)src + 52, 4 );
+}
+
+/* D3D11_SHADER_BUFFER_DESC: 24 bytes / align 8 on a 64-bit guest, 20 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_SHADER_BUFFER_DESC 20
+static inline void wine_repack32_D3D11_SHADER_BUFFER_DESC( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
+    memcpy( (char *)dst + 12, (const char *)src32 + 8, 4 );
+    memcpy( (char *)dst + 16, (const char *)src32 + 12, 4 );
+    memcpy( (char *)dst + 20, (const char *)src32 + 16, 4 );
+}
+static inline void wine_repack64_D3D11_SHADER_BUFFER_DESC( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
+    memcpy( (char *)dst32 + 8, (const char *)src + 12, 4 );
+    memcpy( (char *)dst32 + 12, (const char *)src + 16, 4 );
+    memcpy( (char *)dst32 + 16, (const char *)src + 20, 4 );
+}
+
+/* D3D11_SHADER_DESC: 160 bytes / align 8 on a 64-bit guest, 152 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_SHADER_DESC 152
+static inline void wine_repack32_D3D11_SHADER_DESC( void *dst, const void *src32 )
+{
+    memcpy( (char *)dst + 0, (const char *)src32 + 0, 4 );
+    *(unsigned long long *)((char *)dst + 8) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 4);
+    memcpy( (char *)dst + 16, (const char *)src32 + 8, 4 );
+    memcpy( (char *)dst + 20, (const char *)src32 + 12, 4 );
+    memcpy( (char *)dst + 24, (const char *)src32 + 16, 4 );
+    memcpy( (char *)dst + 28, (const char *)src32 + 20, 4 );
+    memcpy( (char *)dst + 32, (const char *)src32 + 24, 4 );
+    memcpy( (char *)dst + 36, (const char *)src32 + 28, 4 );
+    memcpy( (char *)dst + 40, (const char *)src32 + 32, 4 );
+    memcpy( (char *)dst + 44, (const char *)src32 + 36, 4 );
+    memcpy( (char *)dst + 48, (const char *)src32 + 40, 4 );
+    memcpy( (char *)dst + 52, (const char *)src32 + 44, 4 );
+    memcpy( (char *)dst + 56, (const char *)src32 + 48, 4 );
+    memcpy( (char *)dst + 60, (const char *)src32 + 52, 4 );
+    memcpy( (char *)dst + 64, (const char *)src32 + 56, 4 );
+    memcpy( (char *)dst + 68, (const char *)src32 + 60, 4 );
+    memcpy( (char *)dst + 72, (const char *)src32 + 64, 4 );
+    memcpy( (char *)dst + 76, (const char *)src32 + 68, 4 );
+    memcpy( (char *)dst + 80, (const char *)src32 + 72, 4 );
+    memcpy( (char *)dst + 84, (const char *)src32 + 76, 4 );
+    memcpy( (char *)dst + 88, (const char *)src32 + 80, 4 );
+    memcpy( (char *)dst + 92, (const char *)src32 + 84, 4 );
+    memcpy( (char *)dst + 96, (const char *)src32 + 88, 4 );
+    memcpy( (char *)dst + 100, (const char *)src32 + 92, 4 );
+    memcpy( (char *)dst + 104, (const char *)src32 + 96, 4 );
+    memcpy( (char *)dst + 108, (const char *)src32 + 100, 4 );
+    memcpy( (char *)dst + 112, (const char *)src32 + 104, 4 );
+    memcpy( (char *)dst + 116, (const char *)src32 + 108, 4 );
+    memcpy( (char *)dst + 120, (const char *)src32 + 112, 4 );
+    memcpy( (char *)dst + 124, (const char *)src32 + 116, 4 );
+    memcpy( (char *)dst + 128, (const char *)src32 + 120, 4 );
+    memcpy( (char *)dst + 132, (const char *)src32 + 124, 4 );
+    memcpy( (char *)dst + 136, (const char *)src32 + 128, 4 );
+    memcpy( (char *)dst + 140, (const char *)src32 + 132, 4 );
+    memcpy( (char *)dst + 144, (const char *)src32 + 136, 4 );
+    memcpy( (char *)dst + 148, (const char *)src32 + 140, 4 );
+    memcpy( (char *)dst + 152, (const char *)src32 + 144, 4 );
+    memcpy( (char *)dst + 156, (const char *)src32 + 148, 4 );
+}
+static inline void wine_repack64_D3D11_SHADER_DESC( void *dst32, const void *src )
+{
+    memcpy( (char *)dst32 + 0, (const char *)src + 0, 4 );
+    *(unsigned int *)((char *)dst32 + 4) = (unsigned int)*(const unsigned long long *)((const char *)src + 8);
+    memcpy( (char *)dst32 + 8, (const char *)src + 16, 4 );
+    memcpy( (char *)dst32 + 12, (const char *)src + 20, 4 );
+    memcpy( (char *)dst32 + 16, (const char *)src + 24, 4 );
+    memcpy( (char *)dst32 + 20, (const char *)src + 28, 4 );
+    memcpy( (char *)dst32 + 24, (const char *)src + 32, 4 );
+    memcpy( (char *)dst32 + 28, (const char *)src + 36, 4 );
+    memcpy( (char *)dst32 + 32, (const char *)src + 40, 4 );
+    memcpy( (char *)dst32 + 36, (const char *)src + 44, 4 );
+    memcpy( (char *)dst32 + 40, (const char *)src + 48, 4 );
+    memcpy( (char *)dst32 + 44, (const char *)src + 52, 4 );
+    memcpy( (char *)dst32 + 48, (const char *)src + 56, 4 );
+    memcpy( (char *)dst32 + 52, (const char *)src + 60, 4 );
+    memcpy( (char *)dst32 + 56, (const char *)src + 64, 4 );
+    memcpy( (char *)dst32 + 60, (const char *)src + 68, 4 );
+    memcpy( (char *)dst32 + 64, (const char *)src + 72, 4 );
+    memcpy( (char *)dst32 + 68, (const char *)src + 76, 4 );
+    memcpy( (char *)dst32 + 72, (const char *)src + 80, 4 );
+    memcpy( (char *)dst32 + 76, (const char *)src + 84, 4 );
+    memcpy( (char *)dst32 + 80, (const char *)src + 88, 4 );
+    memcpy( (char *)dst32 + 84, (const char *)src + 92, 4 );
+    memcpy( (char *)dst32 + 88, (const char *)src + 96, 4 );
+    memcpy( (char *)dst32 + 92, (const char *)src + 100, 4 );
+    memcpy( (char *)dst32 + 96, (const char *)src + 104, 4 );
+    memcpy( (char *)dst32 + 100, (const char *)src + 108, 4 );
+    memcpy( (char *)dst32 + 104, (const char *)src + 112, 4 );
+    memcpy( (char *)dst32 + 108, (const char *)src + 116, 4 );
+    memcpy( (char *)dst32 + 112, (const char *)src + 120, 4 );
+    memcpy( (char *)dst32 + 116, (const char *)src + 124, 4 );
+    memcpy( (char *)dst32 + 120, (const char *)src + 128, 4 );
+    memcpy( (char *)dst32 + 124, (const char *)src + 132, 4 );
+    memcpy( (char *)dst32 + 128, (const char *)src + 136, 4 );
+    memcpy( (char *)dst32 + 132, (const char *)src + 140, 4 );
+    memcpy( (char *)dst32 + 136, (const char *)src + 144, 4 );
+    memcpy( (char *)dst32 + 140, (const char *)src + 148, 4 );
+    memcpy( (char *)dst32 + 144, (const char *)src + 152, 4 );
+    memcpy( (char *)dst32 + 148, (const char *)src + 156, 4 );
+}
+
+/* D3D11_SHADER_INPUT_BIND_DESC: 40 bytes / align 8 on a 64-bit guest, 32 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_SHADER_INPUT_BIND_DESC 32
+static inline void wine_repack32_D3D11_SHADER_INPUT_BIND_DESC( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
+    memcpy( (char *)dst + 12, (const char *)src32 + 8, 4 );
+    memcpy( (char *)dst + 16, (const char *)src32 + 12, 4 );
+    memcpy( (char *)dst + 20, (const char *)src32 + 16, 4 );
+    memcpy( (char *)dst + 24, (const char *)src32 + 20, 4 );
+    memcpy( (char *)dst + 28, (const char *)src32 + 24, 4 );
+    memcpy( (char *)dst + 32, (const char *)src32 + 28, 4 );
+}
+static inline void wine_repack64_D3D11_SHADER_INPUT_BIND_DESC( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
+    memcpy( (char *)dst32 + 8, (const char *)src + 12, 4 );
+    memcpy( (char *)dst32 + 12, (const char *)src + 16, 4 );
+    memcpy( (char *)dst32 + 16, (const char *)src + 20, 4 );
+    memcpy( (char *)dst32 + 20, (const char *)src + 24, 4 );
+    memcpy( (char *)dst32 + 24, (const char *)src + 28, 4 );
+    memcpy( (char *)dst32 + 28, (const char *)src + 32, 4 );
+}
+
+/* D3D11_SHADER_TYPE_DESC: 40 bytes / align 8 on a 64-bit guest, 32 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_SHADER_TYPE_DESC 32
+static inline void wine_repack32_D3D11_SHADER_TYPE_DESC( void *dst, const void *src32 )
+{
+    memcpy( (char *)dst + 0, (const char *)src32 + 0, 4 );
+    memcpy( (char *)dst + 4, (const char *)src32 + 4, 4 );
+    memcpy( (char *)dst + 8, (const char *)src32 + 8, 4 );
+    memcpy( (char *)dst + 12, (const char *)src32 + 12, 4 );
+    memcpy( (char *)dst + 16, (const char *)src32 + 16, 4 );
+    memcpy( (char *)dst + 20, (const char *)src32 + 20, 4 );
+    memcpy( (char *)dst + 24, (const char *)src32 + 24, 4 );
+    *(unsigned long long *)((char *)dst + 32) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 28);
+}
+static inline void wine_repack64_D3D11_SHADER_TYPE_DESC( void *dst32, const void *src )
+{
+    memcpy( (char *)dst32 + 0, (const char *)src + 0, 4 );
+    memcpy( (char *)dst32 + 4, (const char *)src + 4, 4 );
+    memcpy( (char *)dst32 + 8, (const char *)src + 8, 4 );
+    memcpy( (char *)dst32 + 12, (const char *)src + 12, 4 );
+    memcpy( (char *)dst32 + 16, (const char *)src + 16, 4 );
+    memcpy( (char *)dst32 + 20, (const char *)src + 20, 4 );
+    memcpy( (char *)dst32 + 24, (const char *)src + 24, 4 );
+    *(unsigned int *)((char *)dst32 + 28) = (unsigned int)*(const unsigned long long *)((const char *)src + 32);
+}
+
+/* D3D11_SHADER_VARIABLE_DESC: 48 bytes / align 8 on a 64-bit guest, 36 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_SHADER_VARIABLE_DESC 36
+static inline void wine_repack32_D3D11_SHADER_VARIABLE_DESC( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
+    memcpy( (char *)dst + 12, (const char *)src32 + 8, 4 );
+    memcpy( (char *)dst + 16, (const char *)src32 + 12, 4 );
+    *(unsigned long long *)((char *)dst + 24) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 16);
+    memcpy( (char *)dst + 32, (const char *)src32 + 20, 4 );
+    memcpy( (char *)dst + 36, (const char *)src32 + 24, 4 );
+    memcpy( (char *)dst + 40, (const char *)src32 + 28, 4 );
+    memcpy( (char *)dst + 44, (const char *)src32 + 32, 4 );
+}
+static inline void wine_repack64_D3D11_SHADER_VARIABLE_DESC( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
+    memcpy( (char *)dst32 + 8, (const char *)src + 12, 4 );
+    memcpy( (char *)dst32 + 12, (const char *)src + 16, 4 );
+    *(unsigned int *)((char *)dst32 + 16) = (unsigned int)*(const unsigned long long *)((const char *)src + 24);
+    memcpy( (char *)dst32 + 20, (const char *)src + 32, 4 );
+    memcpy( (char *)dst32 + 24, (const char *)src + 36, 4 );
+    memcpy( (char *)dst32 + 28, (const char *)src + 40, 4 );
+    memcpy( (char *)dst32 + 32, (const char *)src + 44, 4 );
+}
+
+/* D3D11_SIGNATURE_PARAMETER_DESC: 40 bytes / align 8 on a 64-bit guest, 32 / 4 on i386 */
+#define WINE_REPACK32_SIZE_D3D11_SIGNATURE_PARAMETER_DESC 32
+static inline void wine_repack32_D3D11_SIGNATURE_PARAMETER_DESC( void *dst, const void *src32 )
+{
+    *(unsigned long long *)((char *)dst + 0) = (unsigned long long)*(const unsigned int *)((const char *)src32 + 0);
+    memcpy( (char *)dst + 8, (const char *)src32 + 4, 4 );
+    memcpy( (char *)dst + 12, (const char *)src32 + 8, 4 );
+    memcpy( (char *)dst + 16, (const char *)src32 + 12, 4 );
+    memcpy( (char *)dst + 20, (const char *)src32 + 16, 4 );
+    memcpy( (char *)dst + 24, (const char *)src32 + 20, 1 );
+    memcpy( (char *)dst + 25, (const char *)src32 + 21, 1 );
+    memcpy( (char *)dst + 28, (const char *)src32 + 24, 4 );
+    memcpy( (char *)dst + 32, (const char *)src32 + 28, 4 );
+}
+static inline void wine_repack64_D3D11_SIGNATURE_PARAMETER_DESC( void *dst32, const void *src )
+{
+    *(unsigned int *)((char *)dst32 + 0) = (unsigned int)*(const unsigned long long *)((const char *)src + 0);
+    memcpy( (char *)dst32 + 4, (const char *)src + 8, 4 );
+    memcpy( (char *)dst32 + 8, (const char *)src + 12, 4 );
+    memcpy( (char *)dst32 + 12, (const char *)src + 16, 4 );
+    memcpy( (char *)dst32 + 16, (const char *)src + 20, 4 );
+    memcpy( (char *)dst32 + 20, (const char *)src + 24, 1 );
+    memcpy( (char *)dst32 + 21, (const char *)src + 25, 1 );
+    memcpy( (char *)dst32 + 24, (const char *)src + 28, 4 );
+    memcpy( (char *)dst32 + 28, (const char *)src + 32, 4 );
 }
 
 /* D3D11_SO_DECLARATION_ENTRY: 24 bytes / align 8 on a 64-bit guest, 16 / 4 on i386 */

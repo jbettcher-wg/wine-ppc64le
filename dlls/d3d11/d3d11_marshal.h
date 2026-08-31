@@ -231,7 +231,8 @@ static const struct winecom_slot slots_ID3D10Buffer[13] =
     { "ID3D10Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Resource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Resource::GetEvictionPriority", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Buffer::Map", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10Buffer::Map", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, 
+      "ID3D10Buffer::Map: parameter `void **ppData` is a cell the host fills with a POINTER, and a 32-bit guest's cell is four bytes wide -- the native side would read or write eight. A hand32 walker with a below-4GiB answer must serve this row" },
     { "ID3D10Buffer::Unmap", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Buffer::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
@@ -950,7 +951,8 @@ static const struct winecom_slot slots_ID3D10Texture1D[13] =
     { "ID3D10Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Resource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Resource::GetEvictionPriority", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Texture1D::Map", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0007, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10Texture1D::Map", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0007, 0x0000, 0x0000, NULL, 0, 
+      "ID3D10Texture1D::Map: parameter `void **ppData` is a cell the host fills with a POINTER, and a 32-bit guest's cell is four bytes wide -- the native side would read or write eight. A hand32 walker with a below-4GiB answer must serve this row" },
     { "ID3D10Texture1D::Unmap", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Texture1D::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
@@ -1040,6 +1042,8 @@ static const struct winecom_slot slots_ID3D11Asynchronous[8] =
 
 static const unsigned char cls_ID3D11AuthenticatedChannel_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11AuthenticatedChannel_3[] = { 39 };
+static const struct winecom_rep reps_ID3D11AuthenticatedChannel_9[] =
+    { { 0, 0xff, 2, 8, 4, wine_repack32_PTRWIDTH, wine_repack64_PTRWIDTH } };
 static const struct winecom_slot slots_ID3D11AuthenticatedChannel[10] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
@@ -1051,8 +1055,7 @@ static const struct winecom_slot slots_ID3D11AuthenticatedChannel[10] =
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11AuthenticatedChannel::GetCertificateSize", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11AuthenticatedChannel::GetCertificate", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11AuthenticatedChannel::GetChannelHandle", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11AuthenticatedChannel::GetChannelHandle: parameter `HANDLE *pChannelHandle` points at HANDLE, which the i386 layout roster never audited" },
+    { "ID3D11AuthenticatedChannel::GetChannelHandle", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11AuthenticatedChannel_9, 1, NULL },
 };
 
 static const unsigned char cls_ID3D11BlendState_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
@@ -1183,6 +1186,8 @@ static const struct winecom_slot slots_ID3D11Counter[9] =
 
 static const unsigned char cls_ID3D11CryptoSession_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11CryptoSession_3[] = { 39 };
+static const struct winecom_rep reps_ID3D11CryptoSession_11[] =
+    { { 0, 0xff, 2, 8, 4, wine_repack32_PTRWIDTH, wine_repack64_PTRWIDTH } };
 static const struct winecom_slot slots_ID3D11CryptoSession[12] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
@@ -1196,8 +1201,7 @@ static const struct winecom_slot slots_ID3D11CryptoSession[12] =
     { "ID3D11CryptoSession::GetDecoderProfile", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11CryptoSession::GetCertificateSize", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11CryptoSession::GetCertificate", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11CryptoSession::GetCryptoSessionHandle", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11CryptoSession::GetCryptoSessionHandle: parameter `HANDLE *pCryptoSessionHandle` points at HANDLE, which the i386 layout roster never audited" },
+    { "ID3D11CryptoSession::GetCryptoSessionHandle", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11CryptoSession_11, 1, NULL },
 };
 
 static const unsigned char cls_ID3D11DepthStencilState_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
@@ -4673,6 +4677,8 @@ static const struct winecom_slot slots_ID3D11VideoContext2[83] =
 
 static const unsigned char cls_ID3D11VideoDecoder_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11VideoDecoder_3[] = { 39 };
+static const struct winecom_rep reps_ID3D11VideoDecoder_8[] =
+    { { 0, 0xff, 2, 8, 4, wine_repack32_PTRWIDTH, wine_repack64_PTRWIDTH } };
 static const struct winecom_slot slots_ID3D11VideoDecoder[9] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
@@ -4683,8 +4689,7 @@ static const struct winecom_slot slots_ID3D11VideoDecoder[9] =
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11VideoDecoder::GetCreationParameters", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDecoder::GetDriverHandle", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11VideoDecoder::GetDriverHandle: parameter `HANDLE *pDriverHandle` points at HANDLE, which the i386 layout roster never audited" },
+    { "ID3D11VideoDecoder::GetDriverHandle", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11VideoDecoder_8, 1, NULL },
 };
 
 static const unsigned char cls_ID3D11VideoDecoderOutputView_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
@@ -5927,6 +5932,8 @@ static const struct winecom_slot slots_IDXGIOutputDuplication[15] =
 
 static const unsigned char cls_IDXGIResource_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_IDXGIResource_7[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
+static const struct winecom_rep reps_IDXGIResource_8[] =
+    { { 0, 0xff, 2, 8, 4, wine_repack32_PTRWIDTH, wine_repack64_PTRWIDTH } };
 static const struct winecom_slot slots_IDXGIResource[12] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
@@ -5937,8 +5944,7 @@ static const struct winecom_slot slots_IDXGIResource[12] =
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetParent", NULL, cls_IDXGIResource_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGIResource_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIResource::GetSharedHandle", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "IDXGIResource::GetSharedHandle: parameter `HANDLE *pSharedHandle` points at HANDLE, which the i386 layout roster never audited" },
+    { "IDXGIResource::GetSharedHandle", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIResource_8, 1, NULL },
     { "IDXGIResource::GetUsage", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIResource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIResource::GetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -5946,6 +5952,8 @@ static const struct winecom_slot slots_IDXGIResource[12] =
 
 static const unsigned char cls_IDXGIResource1_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_IDXGIResource1_7[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
+static const struct winecom_rep reps_IDXGIResource1_8[] =
+    { { 0, 0xff, 2, 8, 4, wine_repack32_PTRWIDTH, wine_repack64_PTRWIDTH } };
 static const unsigned char cls_IDXGIResource1_12[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IDXGIResource1_12[] = { 0, 129 };
 static const struct winecom_slot slots_IDXGIResource1[14] =
@@ -5958,8 +5966,7 @@ static const struct winecom_slot slots_IDXGIResource1[14] =
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetParent", NULL, cls_IDXGIResource1_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGIResource1_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIResource::GetSharedHandle", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "IDXGIResource::GetSharedHandle: parameter `HANDLE *pSharedHandle` points at HANDLE, which the i386 layout roster never audited" },
+    { "IDXGIResource::GetSharedHandle", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIResource1_8, 1, NULL },
     { "IDXGIResource::GetUsage", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIResource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIResource::GetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -6571,5 +6578,5 @@ static const struct winecom_iface d3d11_com_ifaces[D3D11_IFACE_COUNT] =
  * i386 geometry: 2588 row(s) carry WINECOM_F_I386_GEOM (639 distinct
  * frames re-checked against clang's stdcall @N decoration), 21 with
  * a non-zero qwordmask, 1 returning EDX:EAX; 5 row(s) publish no
- * i386 geometry and a 32-bit lane must fail closed on them; 50
+ * i386 geometry and a 32-bit lane must fail closed on them; 47
  * row(s) refuse on the 32-bit lane only (refuse32). */

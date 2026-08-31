@@ -1,5 +1,20 @@
 {
  "divergent": {
+  "D3D10_EFFECT_SHADER_DESC": {
+   "out_unsafe": true,
+   "size32": 28,
+   "size64": 48
+  },
+  "D3D10_EFFECT_TYPE_DESC": {
+   "out_unsafe": true,
+   "size32": 40,
+   "size64": 48
+  },
+  "D3D10_EFFECT_VARIABLE_DESC": {
+   "out_unsafe": true,
+   "size32": 24,
+   "size64": 32
+  },
   "D3D10_INFO_QUEUE_FILTER": {
    "out_unsafe": false,
    "size32": 48,
@@ -30,12 +45,52 @@
    "size32": 20,
    "size64": 32
   },
+  "D3D10_PASS_DESC": {
+   "out_unsafe": true,
+   "size32": 40,
+   "size64": 56
+  },
+  "D3D10_PASS_SHADER_DESC": {
+   "out_unsafe": true,
+   "size32": 8,
+   "size64": 16
+  },
+  "D3D10_SHADER_BUFFER_DESC": {
+   "out_unsafe": true,
+   "size32": 20,
+   "size64": 24
+  },
+  "D3D10_SHADER_DESC": {
+   "out_unsafe": true,
+   "size32": 112,
+   "size64": 120
+  },
+  "D3D10_SHADER_INPUT_BIND_DESC": {
+   "out_unsafe": true,
+   "size32": 32,
+   "size64": 40
+  },
+  "D3D10_SHADER_VARIABLE_DESC": {
+   "out_unsafe": true,
+   "size32": 20,
+   "size64": 32
+  },
+  "D3D10_SIGNATURE_PARAMETER_DESC": {
+   "out_unsafe": true,
+   "size32": 24,
+   "size64": 32
+  },
   "D3D10_SO_DECLARATION_ENTRY": {
    "out_unsafe": true,
    "size32": 12,
    "size64": 16
   },
   "D3D10_SUBRESOURCE_DATA": {
+   "out_unsafe": true,
+   "size32": 12,
+   "size64": 16
+  },
+  "D3D10_TECHNIQUE_DESC": {
    "out_unsafe": true,
    "size32": 12,
    "size64": 16
@@ -89,6 +144,11 @@
    "out_unsafe": false,
    "size32": 64,
    "size64": 72
+  },
+  "D3D11_AUTHENTICATED_QUERY_ACCESSIBILITY_OUTPUT": {
+   "out_unsafe": false,
+   "size32": 56,
+   "size64": 64
   },
   "D3D11_AUTHENTICATED_QUERY_CHANNEL_TYPE_OUTPUT": {
    "out_unsafe": false,
@@ -199,6 +259,41 @@
    "out_unsafe": true,
    "size32": 20,
    "size64": 32
+  },
+  "D3D11_PARAMETER_DESC": {
+   "out_unsafe": true,
+   "size32": 48,
+   "size64": 56
+  },
+  "D3D11_SHADER_BUFFER_DESC": {
+   "out_unsafe": true,
+   "size32": 20,
+   "size64": 24
+  },
+  "D3D11_SHADER_DESC": {
+   "out_unsafe": true,
+   "size32": 152,
+   "size64": 160
+  },
+  "D3D11_SHADER_INPUT_BIND_DESC": {
+   "out_unsafe": true,
+   "size32": 32,
+   "size64": 40
+  },
+  "D3D11_SHADER_TYPE_DESC": {
+   "out_unsafe": true,
+   "size32": 32,
+   "size64": 40
+  },
+  "D3D11_SHADER_VARIABLE_DESC": {
+   "out_unsafe": true,
+   "size32": 36,
+   "size64": 48
+  },
+  "D3D11_SIGNATURE_PARAMETER_DESC": {
+   "out_unsafe": true,
+   "size32": 32,
+   "size64": 40
   },
   "D3D11_SO_DECLARATION_ENTRY": {
    "out_unsafe": true,
@@ -313,6 +408,7 @@
   "D3D10_DEPTH_STENCILOP_DESC",
   "D3D10_DEPTH_STENCIL_DESC",
   "D3D10_DEPTH_STENCIL_VIEW_DESC",
+  "D3D10_EFFECT_DESC",
   "D3D10_QUERY_DATA_PIPELINE_STATISTICS",
   "D3D10_QUERY_DATA_SO_STATISTICS",
   "D3D10_QUERY_DATA_TIMESTAMP_DISJOINT",
@@ -323,6 +419,8 @@
   "D3D10_SAMPLER_DESC",
   "D3D10_SHADER_RESOURCE_VIEW_DESC",
   "D3D10_SHADER_RESOURCE_VIEW_DESC1",
+  "D3D10_SHADER_TYPE_DESC",
+  "D3D10_STATE_BLOCK_MASK",
   "D3D10_TEX1D_ARRAY_DSV",
   "D3D10_TEX1D_ARRAY_RTV",
   "D3D10_TEX1D_ARRAY_SRV",
