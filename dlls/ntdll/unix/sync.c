@@ -111,6 +111,15 @@ int inproc_device_fd = -1;
  * mapped, sync->shm is NULL everywhere, and every path below is the ioctl path
  * that was here before.  Set it to 2 to also count hits and misses; that mode
  * shares counters between threads and is for diagnosis, not for benchmarking.
+ *
+ * WINE_PPC64LE_NTSYNC_SPIN=<microseconds> sets the spin-then-block budget for
+ * waits whose every object is a mapped semaphore (default 5, 0 disables).  The
+ * 2026-08-31 measurement found 91% of acquires arrive while the count is empty
+ * -- but in a handoff the release is often only microseconds behind, and going
+ * to sleep then costs two scheduler round trips.  Spinning on the mapped word
+ * for a few microseconds first lets the release land and the CAS take it, and
+ * both syscalls plus the wake disappear.  Only meaningful with the fast path
+ * enabled; it needs the word to watch.
  */
 
 #define NTSYNC_SHM_VERSION      1
@@ -136,7 +145,11 @@ struct ntsync_shm
  * under fd_cache_mutex, in map_inproc_sync(). */
 static int ntsync_fastpath = -1;
 
-static LONG ntsync_fp_stats[4];   /* acquire hit, acquire miss, release, wake ioctl */
+/* Spin budget in timebase ticks; 0 means no spinning.  Resolved together with
+ * ntsync_fastpath, under fd_cache_mutex. */
+static unsigned long long ntsync_spin_ticks;
+
+static LONG ntsync_fp_stats[5];   /* acquire hit, acquire miss, release, wake ioctl, spin take */
 static LONG ntsync_fp_events;     /* sum of the above, so the report always fires */
 
 static void ntsync_fp_count( unsigned int which )
@@ -150,9 +163,10 @@ static void ntsync_fp_count( unsigned int which )
      * printed at all. */
     total = __atomic_fetch_add( &ntsync_fp_events, 1, __ATOMIC_RELAXED ) + 1;
     if (total & 0x3ffff) return;
-    ERR( "ntsync fastpath: acquire %d hit / %d miss, release %d fast, %d needed a wake ioctl\n",
+    ERR( "ntsync fastpath: acquire %d hit / %d miss (%d taken in spin), release %d fast, %d needed a wake ioctl\n",
          (int)__atomic_load_n( &ntsync_fp_stats[0], __ATOMIC_RELAXED ),
          (int)__atomic_load_n( &ntsync_fp_stats[1], __ATOMIC_RELAXED ),
+         (int)__atomic_load_n( &ntsync_fp_stats[4], __ATOMIC_RELAXED ),
          (int)__atomic_load_n( &ntsync_fp_stats[2], __ATOMIC_RELAXED ),
          (int)__atomic_load_n( &ntsync_fp_stats[3], __ATOMIC_RELAXED ) );
 }
@@ -802,7 +816,18 @@ static void map_inproc_sync( struct inproc_sync *sync )
             const char *str = getenv( "WINE_PPC64LE_NTSYNC_FASTPATH" );
             if (!str || !str[0] || str[0] == '0') ntsync_fastpath = 0;
             else if (!(ntsync_fastpath = atoi( str ))) ntsync_fastpath = 1;
-            if (ntsync_fastpath) ERR( "ntsync userspace fast path enabled (mode %d)\n", ntsync_fastpath );
+            if (ntsync_fastpath)
+            {
+                int spin_us = 5;
+                if ((str = getenv( "WINE_PPC64LE_NTSYNC_SPIN" )) && str[0]) spin_us = atoi( str );
+                /* Timebase ticks per microsecond.  512 MHz on every POWER this
+                 * was written against ([MEASURED] in emu_qpc.h); this is a spin
+                 * budget to be tuned by A/B, not a clock, so a different
+                 * timebase merely rescales the knob. */
+                if (spin_us > 0) ntsync_spin_ticks = (unsigned long long)spin_us * 512;
+                ERR( "ntsync userspace fast path enabled (mode %d, spin %d us)\n",
+                     ntsync_fastpath, spin_us > 0 ? spin_us : 0 );
+            }
         }
         if (!ntsync_fastpath) return;
         if (sync->type != INPROC_SYNC_SEMAPHORE) return;
@@ -825,22 +850,38 @@ static void map_inproc_sync( struct inproc_sync *sync )
 #endif
 }
 
-/* Take one unit without entering the kernel.  Returns FALSE for "could not",
- * which is always safe: the caller then does exactly what it did before.
+/* Take one unit without entering the kernel.  The two failure cases are NOT
+ * interchangeable, and the caller's correctness depends on telling them apart:
+ * an empty count is proof the object was unsignalled at the CAS's point in the
+ * word's coherence order, so a wait-any may walk past it to the next object.
+ * A word carrying NTSYNC_F_NO_TOUCH proves nothing -- the object may well be
+ * signalled and merely off limits (a wait-all is queued on it) -- and walking
+ * past it could hand back index 1 while object 0 was signalled, which
+ * NtWaitForMultipleObjects promises never to do.  KEEPOUT therefore means
+ * "stop deciding in userspace"; the caller must fall to the kernel, which
+ * checks the objects in order under the lock.
  *
- * This needs no waiter check.  Taking a unit only removes signal, so it cannot
- * lose a wakeup; it is precisely the decrement the kernel would have performed,
- * on precisely the word the kernel would have performed it on, and the kernel
- * performs its own decrements with the same atomic, so a unit cannot be handed
- * out twice.  What it does change is fairness: a running thread can now take a
- * unit ahead of a thread already queued in the kernel.  NT semaphores do not
- * promise wakeup order, and no unit is lost -- the release that would have fed
- * the sleeper is still counted, and whichever release finally finds the count
- * empty and a waiter queued takes the ioctl and wakes it.
+ * The take itself needs no waiter check.  Taking a unit only removes signal,
+ * so it cannot lose a wakeup; it is precisely the decrement the kernel would
+ * have performed, on precisely the word the kernel would have performed it on,
+ * and the kernel performs its own decrements with the same atomic, so a unit
+ * cannot be handed out twice.  What it does change is fairness: a running
+ * thread can now take a unit ahead of a thread already queued in the kernel.
+ * NT semaphores do not promise wakeup order, and no unit is lost -- the
+ * release that would have fed the sleeper is still counted, and whichever
+ * release finally finds the count empty and a waiter queued takes the ioctl
+ * and wakes it.
  *
  * SEQ_CST on success so that whatever the releasing thread published before its
  * release is visible to us before we return holding the unit. */
-static BOOL fast_acquire_semaphore( struct inproc_sync *sync )
+enum fast_acquire_result
+{
+    FAST_ACQ_TOOK,      /* took a unit; the wait is satisfied */
+    FAST_ACQ_EMPTY,     /* provably unsignalled; safe to walk past */
+    FAST_ACQ_KEEPOUT,   /* nothing is known; only the kernel may decide */
+};
+
+static enum fast_acquire_result fast_acquire_semaphore( struct inproc_sync *sync )
 {
 #ifdef NTSYNC_IOC_EVENT_READ
     struct ntsync_shm *shm = sync->shm;
@@ -848,18 +889,22 @@ static BOOL fast_acquire_semaphore( struct inproc_sync *sync )
 
     for (;;)
     {
-        if (old & NTSYNC_F_NO_TOUCH) break;
+        if (old & NTSYNC_F_NO_TOUCH)
+        {
+            if (ntsync_fastpath > 1) ntsync_fp_count( 1 );
+            return FAST_ACQ_KEEPOUT;
+        }
         if (!(old & NTSYNC_COUNT_MASK)) break;
         if (__atomic_compare_exchange_n( &shm->state, &old, old - 1, FALSE,
                                          __ATOMIC_SEQ_CST, __ATOMIC_RELAXED ))
         {
             if (ntsync_fastpath > 1) ntsync_fp_count( 0 );
-            return TRUE;
+            return FAST_ACQ_TOOK;
         }
     }
     if (ntsync_fastpath > 1) ntsync_fp_count( 1 );
 #endif
-    return FALSE;
+    return FAST_ACQ_EMPTY;
 }
 
 /* Add "count" units without entering the kernel where that is possible.
@@ -1289,24 +1334,80 @@ static NTSTATUS inproc_wait( DWORD count, const HANDLE *handles, WAIT_TYPE type,
     }
 
     /* A wait-any returns the first signalled object in index order, so we may
-     * only walk past an object we know is not signalled.  An object with no
-     * mapping tells us nothing about itself, so we stop there and let the
-     * kernel decide.  Wait-all is never fast-pathed: it has to take every
-     * object at once, which is precisely what we cannot do from here. */
+     * only walk past an object we know is not signalled -- FAST_ACQ_EMPTY is
+     * that proof, FAST_ACQ_KEEPOUT is not, and an object with no mapping tells
+     * us nothing either: both stop the walk and let the kernel decide.
+     * Wait-all is never fast-pathed: it has to take every object at once,
+     * which is precisely what we cannot do from here. */
     if (count && (type != WaitAll || count == 1))
     {
+        int took = -1;
+
         for (int i = 0; i < count; ++i)
         {
-            if (!syncs[i]->shm) break;
-            if (fast_acquire_semaphore( syncs[i] ))
+            enum fast_acquire_result r;
+
+            if (!syncs[i]->shm) goto enter_kernel;
+            if ((r = fast_acquire_semaphore( syncs[i] )) == FAST_ACQ_TOOK)
             {
-                ret = (type != WaitAll) ? i : 0;
-                while (count--) release_inproc_sync( syncs[count] );
-                return ret;
+                took = i;
+                goto took_one;
             }
+            if (r == FAST_ACQ_KEEPOUT) goto enter_kernel;
         }
+
+#if defined(__powerpc64__) && defined(NTSYNC_IOC_EVENT_READ)
+        /* Spin-then-block.  Every object is a mapped semaphore and every one
+         * read empty just now, so nothing signalled is being kept waiting by
+         * this loop.  In a handoff the release is often only microseconds
+         * behind the wait; sleeping then costs two scheduler round trips, so
+         * watch the words for a few microseconds first, at low SMT priority.
+         * Order stays honest: a unit is only ever taken through the same CAS
+         * as above, and a NO_TOUCH sighting sends us to the kernel just as it
+         * does in the walk.  A zero timeout is a poll and must not become a
+         * short blocking wait; a nonzero timeout stretches by at most the spin
+         * budget, which is inside kernel wakeup slop anyway.  An alertable
+         * wait's APC delivery is delayed by the same bound. */
+        if (ntsync_spin_ticks && !(timeout && !timeout->QuadPart))
+        {
+            ULONG64 deadline = emu_qpc_timebase() + ntsync_spin_ticks;
+
+            for (;;)
+            {
+                for (int i = 0; i < count; ++i)
+                {
+                    unsigned long long old = __atomic_load_n( &syncs[i]->shm->state, __ATOMIC_RELAXED );
+
+                    if (old & NTSYNC_F_NO_TOUCH) goto spin_out;
+                    if (!(old & NTSYNC_COUNT_MASK)) continue;
+                    if (fast_acquire_semaphore( syncs[i] ) == FAST_ACQ_TOOK)
+                    {
+                        if (ntsync_fastpath > 1) ntsync_fp_count( 4 );
+                        took = i;
+                        goto took_one;
+                    }
+                    /* Raced or NO_TOUCH appeared; the reload next pass decides. */
+                }
+                __asm__ __volatile__( "or 1,1,1" ::: "memory" );   /* HMT low */
+                if (emu_qpc_timebase() >= deadline) break;
+            }
+        spin_out:
+            __asm__ __volatile__( "or 2,2,2" ::: "memory" );   /* HMT medium */
+        }
+#endif
+        goto enter_kernel;
+
+    took_one:
+#if defined(__powerpc64__)
+        /* Restore SMT priority in case the take came out of the spin. */
+        __asm__ __volatile__( "or 2,2,2" ::: "memory" );
+#endif
+        ret = (type != WaitAll) ? took : 0;
+        while (count--) release_inproc_sync( syncs[count] );
+        return ret;
     }
 
+enter_kernel:
     if (alertable) alert_fd = get_inproc_alert_fd();
     ret = linux_wait_objs( inproc_device_fd, count, objs, type, alert_fd, timeout );
 

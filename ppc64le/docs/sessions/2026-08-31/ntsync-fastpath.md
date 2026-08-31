@@ -138,6 +138,37 @@ with zero lost wakeups.
   objects per run that is ~4.6 MB on this 4K-page kernel; it would be ~74 MB on a
   64K-page kernel.
 
+## Addendum (same day, other seat): a wait-order bug fixed, and the spin the negative result does not kill
+
+Review of the merged fast path found one real defect, latent while default-off:
+`fast_acquire_semaphore()` returned plain FALSE for two states that are not
+interchangeable.  Count-zero is proof the object was unsignalled at the CAS's
+point in the word's coherence order -- a wait-any may walk past it.
+NTSYNC_F_NO_TOUCH is not proof of anything: the object may be signalled and
+merely off limits while a wait-all is queued, and walking past it let
+`inproc_wait()` return index 1 while object 0 was signalled, which
+NtWaitForMultipleObjects documents never happens.  Fixed by a three-way result
+(TOOK / EMPTY / KEEPOUT); KEEPOUT and an unmapped object now stop the walk and
+fall to the kernel, which checks in order under the lock.  Needs a concurrent
+wait-all on the same semaphore to trigger, which is why the stress suite --
+all single-guarantee runs -- never saw it.
+
+Second: the one lever this file's own negative result leaves standing.  91% of
+acquires find the count empty *at the instant of the call*, but in a handoff
+the release is often only microseconds behind, and sleeping then costs two
+scheduler round trips.  `inproc_wait()` now spins on the mapped word(s) for a
+bounded budget before the wait ioctl -- `WINE_PPC64LE_NTSYNC_SPIN=<us>`,
+default 5, 0 disables, only armed when the fast path itself is on.  Spinning
+runs at low SMT priority (`or 1,1,1`), only when every object in the wait is a
+mapped semaphore that just read empty (so nothing signalled is kept waiting),
+takes only through the same CAS as the walk, and bails to the kernel on any
+NO_TOUCH sighting.  Zero timeouts stay polls; nonzero timeouts stretch by at
+most the budget.  Statistics mode grew a fifth counter: acquires taken inside
+the spin, printed as "(N taken in spin)" -- that number against the acquire
+miss count is the whole verdict on whether the release-to-wait gap is really
+microseconds.  Whether it pays is judged by feel on the live titles, per the
+owner's standing preference; the counters are there if the answer needs a why.
+
 ## What this says about the next lever
 
 The census sized the *opportunity* correctly and the *mechanism* wrongly. 91% of
