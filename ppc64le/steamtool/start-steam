@@ -1,0 +1,98 @@
+#!/bin/bash
+# start-steam -- bring Steam up with the REAL desktop session's environment,
+# from anywhere, including a non-interactive ssh.
+#
+# WHY THIS EXISTS.  Steam on this box needs the graphical session's environment
+# and the emulator's, and nobody could start it by hand because remembering
+# which variables matter is a job in itself.  So it only ever got started once,
+# by the session, and if it died it stayed dead.
+#
+# [2026-08-30] Steam was restarted over ssh with only DISPLAY, XDG_RUNTIME_DIR
+# and the FEX variables set.  It came up, drew its window, and looked entirely
+# healthy while missing WAYLAND_DISPLAY and LANG and reporting XDG_SESSION_TYPE
+# as `tty`.  Every game inherits the launching Steam's environment, so a Steam
+# started that way hands a different world to everything it launches, and
+# nothing about Steam itself looks wrong.
+#
+# STATED HONESTLY: titles did stop working that day, and this was NOT proven to
+# be the cause -- the original Steam's environment was never captured before it
+# died, so there was nothing to diff against.  This script exists because an
+# unreproducible launch environment is a bad thing to have regardless of
+# whether it caused that particular outage, not because the link was measured.
+#
+# HOW.  Do not hand-maintain a list of variables -- that list is exactly what
+# nobody can remember, and a stale one fails the same silent way.  Copy the
+# environment from a process the session actually started, so whatever the
+# session sets is what Steam gets, including anything added later.
+#
+#   usage: start-steam [--dry-run] [extra steam args...]
+set -u
+
+DRY=0
+[ "${1:-}" = "--dry-run" ] && { DRY=1; shift; }
+
+# MERGE, do not pick.  [MEASURED 2026-08-30] no single process on this box
+# carries the whole session environment: the session LEADER predates the
+# compositor so it has no DISPLAY or WAYLAND_DISPLAY, while the processes the
+# compositor started have those but lack others.  Scoring every user process
+# against seven session variables, the best single donor scored five.  So take
+# the union, earliest-listed wins for any variable already set, and report what
+# was actually assembled rather than claiming a donor was sufficient.
+donors=""
+for pat in cosmic-panel xdg-desktop-portal-cosmic cosmic-comp cosmic-session \
+           gnome-session plasma_session xdg-desktop-portal pipewire; do
+    for q in $(pgrep -f "$pat" 2>/dev/null); do
+        [ -r "/proc/$q/environ" ] || continue
+        donors="$donors $q"
+        break
+    done
+done
+
+[ -n "$donors" ] || {
+    echo "start-steam: no readable session process found; is the desktop up?" >&2
+    exit 2
+}
+echo "start-steam: merging session environment from pids:$donors"
+
+for q in $donors; do
+    while IFS= read -r -d "" kv; do
+        case "$kv" in
+            [A-Za-z_]*=*)
+                name=${kv%%=*}
+                # first writer wins, so the preference order above is meaningful
+                eval "cur=\${$name+set}"
+                [ -n "${cur:-}" ] || export "${kv?}"
+                ;;
+        esac
+    done < "/proc/$q/environ"
+done
+
+# The emulator's own variables are NOT part of the desktop session, so they are
+# set here.  Without them FEX aborts in FileManager::SetupOverlay before it
+# runs anything, which reads as a trace trap and looks nothing like a missing
+# environment variable.
+export FEX_APP_DATA_LOCATION="${FEX_APP_DATA_LOCATION:-$HOME/Development/fexrootfs/}"
+export FEX_ROOTFS="${FEX_ROOTFS:-$HOME/Development/fexrootfs/RootFS/Ubuntu_24_04}"
+export FEX_THUNKGUESTLIBS="${FEX_THUNKGUESTLIBS:-$HOME/Development/fastppcx86/build-thunks/Guest}"
+export FEX_THUNKHOSTLIBS="${FEX_THUNKHOSTLIBS:-$HOME/Development/fastppcx86/build-thunks/HostLibs_64}"
+
+STEAM_SH=${STEAM_SH:-$HOME/.local/share/Steam/steam.sh}
+[ -x "$STEAM_SH" ] || { echo "start-steam: no $STEAM_SH" >&2; exit 2; }
+
+if [ "$DRY" = 1 ]; then
+    echo "start-steam: would run $STEAM_SH $*"
+    echo "--- the environment it would inherit (session-relevant subset) ---"
+    for v in DISPLAY WAYLAND_DISPLAY XDG_SESSION_TYPE XDG_RUNTIME_DIR XDG_DATA_DIRS \
+             DBUS_SESSION_BUS_ADDRESS XAUTHORITY LANG PATH FEX_ROOTFS; do
+        eval "printf '  %-26s %s\n' \"\$v\" \"\${$v:-<unset>}\""
+    done
+    exit 0
+fi
+
+if pgrep -f "steamrt64/steam" >/dev/null 2>&1; then
+    echo "start-steam: Steam is already running; not starting a second one."
+    exit 0
+fi
+
+cd "$(dirname "$STEAM_SH")" || exit 2
+exec setsid nohup "$STEAM_SH" "$@" >"$HOME/steam-start.log" 2>&1 < /dev/null
