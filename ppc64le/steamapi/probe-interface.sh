@@ -31,6 +31,15 @@
 #   3  + exception dispatch after CreateInterface     ok            ok
 #   4  + one call through vtable slot 0               ACCESS VIOL   ok (30)
 #
+# FIXED [2026-08-30, later the same evening].  Step 4 now returns rc=30 on
+# BOTH lanes -- a frame crossed to the helper, into the real Steam client, and
+# back, over the 32-bit bridge as well as the 64-bit one.  Three consecutive
+# runs of "--level 4" with no --machine, plus SteamUser021 / SteamUtils010 /
+# SteamFriends017 which return rc=13 on BOTH lanes (CreateInterface does not
+# serve those directly; that is not a regression, x86-64 has always said the
+# same).  The cause is written up under THE LEAD below.  The table above is
+# left as it was measured so the before/after is legible.
+#
 # Step 2 is not a formality on either lane: with a helper listening, the
 # client connects and its drive-map frame really does cross -- the helper,
 # run with -v, logs "accepted connection on fd 5" and both drives.  So on
@@ -93,24 +102,83 @@
 #       ecx before the indirect call; disassembled, not assumed.
 #
 # ===========================================================================
-# THE BEST UNEXPLORED LEAD  -- deliberately NOT chased on 2026-08-30
+# THE LEAD, AND WHAT IT ACTUALLY WAS  [2026-08-30]
 # ===========================================================================
 #
-# dlls/steamclient64/proton/steamclient_main.c skips BOTH RTTI initialisers in
-# DllMain on i386:
+# THE RTTI ASYMMETRY IS NOT THE CAUSE.  It was the best hypothesis anyone had
+# and it is now eliminated, by measurement rather than by argument, so nobody
+# spends another evening on it.  The suspicion was that steamclient_main.c's
+# DllMain skips both RTTI initialisers on i386 while proton/cxx.h still emits
+# an RTTI pointer immediately before every vtable.  Two observations kill it:
 #
-#     #if defined(__x86_64__) || defined(__aarch64__)
-#         init_type_info_rtti( (char *)instance );
-#         init_rtti( (char *)instance );
-#     #endif
+#   * The skip is correct BY DESIGN.  cxx.h's #ifndef RTTI_USE_RVA branch --
+#     the one i386 takes -- builds every rtti_object_locator as a static
+#     initialiser full of absolute pointers and defines NO init_<name>_rtti
+#     function at all; only the RVA branch needs a runtime fixup.  Confirmed
+#     in the built PE: _winISteamClient_SteamClient020_rtti sits in .rdata at
+#     0x1016b5a4, fully formed, and the .data slot immediately before
+#     _winISteamClient_SteamClient020_vtable holds a relocated pointer to it.
 #
-# ...while proton/cxx.h still emits an RTTI pointer immediately BEFORE every
-# vtable (__ASM_VTABLE lays down "<name>_rtti" then the vtable), and undefines
-# RTTI_USE_RVA for i386 so that pointer is absolute rather than an RVA.  That
-# is a real width asymmetry sitting exactly where the failure is: the object
-# whose slot 0 we call is the object whose RTTI was never initialised.  It is
-# most likely fine -- this is Proton's own vendored code and Proton ships i386
-# -- but it is untested here and it is the first thing to check.
+#   * RTTI is not on the call path on EITHER lane.  Proton's alloc_vtable()
+#     copies only the method pointers, so the slot before the vtable the
+#     object actually points at is a plain zero -- on x86-64 too, where step 4
+#     has always passed.
+#
+# WHAT IT REALLY WAS: proton/steamclient_main.c's get_mem_from_steamclient_dll()
+# -- the "Mafia II depends on SteamClient interface pointer to point inside
+# native Windows steamclient.dll" hack -- bump-allocates the interface object
+# and the copy of its vtable from the FIRST BYTE of this module's own .data
+# section, on top of whatever initialised globals the linker put there.
+#
+# The x86-64 lane never noticed because the hack never runs there: it starts
+# with GetModuleHandleW(L"steamclient.dll"), the 64-bit module is called
+# steamclient64.dll, the lookup fails and Proton's own comment on that branch
+# says "no known use cases on x64".  On i386 the module IS steamclient.dll, so
+# it runs.  Measured with a guest probe that dumped .data before and after
+# CreateInterface (module base 0x79e40000, .data at 0x7a064000):
+#
+#   .data+0x00  magic 0x53ba947a
+#   .data+0x04  the w_iface object          } 42 SteamClient020 method
+#   .data+0x14  the copied vtable, 168 by   } pointers, ending at +0xbc
+#
+# and what used to live in .data+0x00..0xbc, from llvm-nm on the built PE:
+#
+#   +0x04 type_info_vtable      +0xa8 steamclient_interfaces
+#   +0x08 type_info_type_info   +0xb0 dbg_level
+#   +0x90 steamclient_cs        +0xb4 rpc_cs   <-- steamrpc.c's own section
+#
+# So rpc_cs.DebugInfo and rpc_cs.LockCount were overwritten with method
+# pointers; LockCount became 0x79e59dd0 instead of -1.  steamrpc_call()'s
+# RtlEnterCriticalSection then saw a section permanently contended and owned
+# by nobody, and every 32-bit interface call blocked for ever.  That is the
+# "section 7A0640B4 (invalid)" in the failure above: 0x7a064000 + 0xb4 is
+# exactly &rpc_cs.
+#
+# AND THE ACCESS VIOLATION WAS A RED HERRING -- worth knowing, because it is
+# what everyone chased.  It is a HANDLED probe read inside ntdll's own
+# debug-string safety net: RtlpWaitForCriticalSection formats its timeout ERR
+# with debugstr_a((char *)crit->DebugInfo->Spare[0]), Spare[0] is at offset
+# 0x18 in a 32-bit CRITICAL_SECTION_DEBUG, the clobbered DebugInfo pointed at
+# code, and *(0x79e59d40 + 0x18) was 0x04245c89 -- the exact address the log
+# says was being read.  wine_dbgstr_an catches it and prints "(invalid)",
+# which is why the ERR line follows the AV every single time.  The AV was
+# ntdll telling us about the corruption, not suffering from it, and the guest
+# ntdll offset 0x20064 that it resolved to named nothing useful.
+#
+# THE FIX: dlls/steamclient64/proton/steamclient_main.c, a FOURTH marked
+# "ppc64le port:" edit to vendored Valve code (dlls/steamclient64/PROVENANCE
+# is updated to match, and that file's "exactly three edits" guarantee now
+# reads four).  The two lines that compute the arena point at a reserved 16 KB
+# buffer in this module instead of at the head of .data.  Every guard around
+# them is untouched -- the x64 early-out, the magic-word reload detection and
+# the size check -- and the memory is still inside the module image, which is
+# the whole point of the hack.  x86-64 is unaffected in the strict sense that
+# the code still never executes there.
+#
+# WHAT THIS DOES NOT TELL YOU.  Portal 2 was NOT launched (no authorisation to
+# launch a title), so the guestpe header's "next wall" paragraph is unverified
+# either way.  The two failures were never proven to be the same defect and
+# still are not; the argument in the section above still stands.
 #
 # ===========================================================================
 # A CORRECTION TO THE RECORD

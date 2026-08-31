@@ -43,13 +43,27 @@
 # backstop rather than the whole story: a crossed pair still refuses out loud
 # (measured in both directions -- see the helper's README-toolchain).
 #
+# THE FIRST MARSHALLED INTERFACE CALL NOW WORKS ON THIS LANE [2026-08-30].
+# ppc64le/steamapi/probe-interface.sh --level 4 returns rc=30 for BOTH guest
+# machines: a call through SteamClient020's vtable slot 0 crosses to the
+# helper, into the real Steam client, and comes back.  It did not before, and
+# the reason it did not was NOT anything 32-bit about the marshalling: Proton's
+# get_mem_from_steamclient_dll() carves the interface object and a copy of its
+# vtable out of the head of this module's own .data section, which on x86-64 it
+# never does (that module is called steamclient64.dll and the hack's
+# GetModuleHandleW("steamclient.dll") fails), and here it landed on rpc_cs.
+# The probe's header has the measurement and the fix; the fix itself is a
+# fourth "ppc64le port:" edit in ../steamclient64/proton/steamclient_main.c.
+#
 # WHAT IS STILL IN THE WAY, so nobody reads the above as "Portal 2 works".
 # [MEASURED 2026-08-30] With the helper running and this DLL actually loaded,
 # Portal 2 stops saying "Steam is not running" and instead dies of an
 # unhandled STATUS_INVALID_HANDLE (0xc0000008) at 7BDAFC26, on the loading
 # thread, immediately after this module is mapped and BEFORE it opens a socket
 # to the helper -- both helpers were still idle.  That is the next wall and it
-# is in this module's load path, not in the bridge.
+# is in this module's load path, not in the bridge.  That measurement PREDATES
+# the .data fix above and has not been repeated since: Portal 2 was not
+# launched, so whether the fix moves that wall is unknown, not "probably".
 #
 # Note also that a bare "steamclient.dll" in the registry does NOT reach this
 # module from a Source title: the game ships its own real Valve

@@ -103,6 +103,12 @@ NTSTATUS steamclient_call( unsigned int code, void *args, const char *name )
 
 static BYTE *alloc_start, *alloc_end;
 
+/* ppc64le port: the arena get_mem_from_steamclient_dll() hands out, replacing
+ * the head of the module's own .data section.  See the comment at the
+ * assignment below for what that cost this port and why the memory still has
+ * to live inside this module. */
+static DECLSPEC_ALIGN(16) BYTE steamclient_iface_arena[16384];
+
 static int8_t allocated_from_steamclient_dll( void *ptr )
 {
     return (BYTE *)ptr >= alloc_start && (BYTE *)ptr < alloc_end;
@@ -181,8 +187,31 @@ static void *get_mem_from_steamclient_dll(size_t size, unsigned int version, voi
         {
             if (!memcmp(sec[i].Name, ".data", 5))
             {
-                alloc_start = alloc_base = (BYTE *)mod + sec[i].VirtualAddress;
-                alloc_end = alloc_base + sec[i].SizeOfRawData;
+                /* ppc64le port: Proton bump-allocates the interface object and
+                 * the copy of its vtable from the FIRST byte of .data, on top
+                 * of whatever initialised globals the linker put there.  On
+                 * x86-64 that is harmless only by accident -- the module is
+                 * named steamclient64.dll, so the GetModuleHandleW() above
+                 * fails and none of this runs (Proton says as much: "no known
+                 * use cases on x64").  On i386 the module IS steamclient.dll,
+                 * this does run, and it was measured writing SteamClient020's
+                 * 42 copied method pointers over .data+0x14..0xbc: over
+                 * type_info_vtable, over steamclient_cs, over
+                 * steamclient_interfaces, and over the first two fields of
+                 * steamrpc.c's rpc_cs.  rpc_cs.LockCount became 0x79e59dd0
+                 * instead of -1, so the first bridge call's
+                 * RtlEnterCriticalSection saw a section that was permanently
+                 * contended and owned by nobody, and every 32-bit interface
+                 * call blocked for ever in RtlpWaitForCriticalSection.
+                 * The memory still has to be INSIDE this module -- that is the
+                 * whole point of the hack, Mafia II checks it -- so it comes
+                 * from a reserved arena here rather than from live data.  Every
+                 * guard around this is left alone: the x64 early-out, the
+                 * magic-word reload detection and the size check all still
+                 * work, because the arena is in this module's image and is
+                 * re-zeroed by a reload just as .data was. */
+                alloc_start = alloc_base = steamclient_iface_arena;
+                alloc_end = alloc_base + sizeof(steamclient_iface_arena);
                 if (alloc_end - alloc_start < sizeof(magic))
                 {
                     ERR(".data section is too small.\n");

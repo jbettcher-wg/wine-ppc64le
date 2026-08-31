@@ -2,7 +2,7 @@ Vendored source: Proton's lsteamclient
 ======================================
 
 Everything under `proton/` is copied verbatim from Valve's Proton, except for
-three edits described below, each marked in place with a comment beginning
+four edits described below, each marked in place with a comment beginning
 "ppc64le port:".
 
     upstream   https://github.com/ValveSoftware/Proton
@@ -64,8 +64,8 @@ serving 32-bit games for real needs an i386 helper against Steam's own 32-bit
 steamclient.so, exactly as Proton ships i386-unix/lsteamclient.so.
 
 
-The three edits to vendored files
----------------------------------
+The four edits to vendored files
+--------------------------------
 
 1. `proton/steamclient_main.c`, `get_unix_buffer()`.  Proton short-circuits
    when the returned `u_buffer` pointer fits a `UINT_PTR`, because its unix
@@ -80,6 +80,22 @@ The three edits to vendored files
    a unix call never fails.  Across a process, "the helper is not there" is
    the ordinary state of a game launched outside Steam, and the assert would
    abort the game instead of letting it print its own SteamAPI_Init failure.
+
+4. `proton/steamclient_main.c`, `get_mem_from_steamclient_dll()`.  Proton
+   bump-allocates the interface object and the copy of its vtable out of the
+   FIRST byte of this module's own `.data` section, over whatever initialised
+   globals the linker put there.  That is inert on x86-64 -- the module is
+   named steamclient64.dll, so the `GetModuleHandleW(L"steamclient.dll")`
+   above it fails and none of it runs -- but on i386 the module IS
+   steamclient.dll, and it was measured writing SteamClient020's 42 copied
+   method pointers over `.data+0x14..0xbc`: over `steamclient_cs`, over
+   `steamclient_interfaces`, and over the first two fields of `steamrpc.c`'s
+   `rpc_cs`, whose `LockCount` stopped being -1.  Every 32-bit interface call
+   then blocked for ever in `RtlpWaitForCriticalSection`.  The two lines that
+   compute the arena now point at a reserved 16 KB buffer in this module
+   instead of at live data; nothing else changes, and the memory is still
+   inside the module image, which is the entire point of the hack (Mafia II
+   checks that the SteamClient pointer lies inside steamclient.dll).
 
 Regenerating the descriptors after re-vendoring:
 
