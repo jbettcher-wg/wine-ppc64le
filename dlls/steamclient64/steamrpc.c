@@ -170,9 +170,30 @@ static void rpc_die( const char *why )
     rpc_state = 2;
 }
 
-/* The helper's address, as "host:port", from the environment.  There is no
- * default and no discovery: whoever started the helper knows the port, and
- * inventing one would connect a game to a stranger's socket. */
+/* ONE VARIABLE PER WIDTH, and it has to be two rather than one.
+ *
+ * A frame is the params struct's own bytes, so a client can only ever talk to
+ * a helper of its own pointer width (steamrpc_wire.h's magic says so, and the
+ * helper enforces it).  The launcher therefore starts BOTH helpers and each
+ * gets its own port -- it cannot know in advance which width will ask, because
+ * a 64-bit launcher .exe spawning a 32-bit game (or the reverse) is ordinary
+ * and both processes load a steamclient DLL of their own width.
+ *
+ * Reading one shared variable and letting the magic reject the mismatch would
+ * be correct but useless: it would connect a 32-bit game to the 64-bit helper
+ * and then refuse every call, which is exactly the STEAMRPC_STATUS_NO_HELPER
+ * outcome this exists to remove.  So the name carries the width and each
+ * client reads only its own; a helper that is never asked for costs one idle
+ * process that the launcher reaps.
+ *
+ * There is still no default and no discovery: whoever started the helper knows
+ * the port, and inventing one would connect a game to a stranger's socket. */
+#ifdef __i386__
+#define STEAMRPC_ADDR_VAR "STEAM_BRIDGE_ADDR32"
+#else
+#define STEAMRPC_ADDR_VAR "STEAM_BRIDGE_ADDR"
+#endif
+
 static int rpc_connect(void)
 {
     char addr[128], *colon;
@@ -181,23 +202,23 @@ static int rpc_connect(void)
     DWORD n;
     u_short port;
 
-    n = GetEnvironmentVariableA( "STEAM_BRIDGE_ADDR", addr, sizeof(addr) );
+    n = GetEnvironmentVariableA( STEAMRPC_ADDR_VAR, addr, sizeof(addr) );
     if (!n || n >= sizeof(addr))
     {
-        WARN( "STEAM_BRIDGE_ADDR is unset; no Steam client is reachable from "
+        WARN( STEAMRPC_ADDR_VAR " is unset; no Steam client is reachable from "
               "this process\n" );
         return 0;
     }
     if (!(colon = strrchr( addr, ':' )))
     {
-        ERR( "STEAM_BRIDGE_ADDR=%s is not host:port\n", addr );
+        ERR( STEAMRPC_ADDR_VAR "=%s is not host:port\n", addr );
         return 0;
     }
     *colon = 0;
     port = (u_short)atoi( colon + 1 );
     if (!port)
     {
-        ERR( "STEAM_BRIDGE_ADDR names port 0\n" );
+        ERR( STEAMRPC_ADDR_VAR " names port 0\n" );
         return 0;
     }
 

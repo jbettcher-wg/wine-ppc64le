@@ -714,6 +714,7 @@ seed_prereq_markers
 # supported way to see what a run looks like without it.
 
 helper_pid=
+helper32_pid=
 presence_pid=
 # Its own function, and called BEFORE the wineserver wait below, not only from
 # the EXIT trap.  "wineserver -w" waits for every process in the prefix, and
@@ -735,6 +736,17 @@ bridge_stop() {
         kill "$helper_pid" 2>/dev/null
         wait "$helper_pid" 2>/dev/null
         helper_pid=
+    fi
+    # The i386 helper is reaped the same way and unconditionally.  It is
+    # commonly the one NOTHING connected to -- a 64-bit title never asks for it
+    # -- and an unconnected helper never reaches its own --exit-when-idle,
+    # which only fires when a client that did connect goes away.  So it is
+    # exactly the process that would be left behind.
+    if [ -n "$helper32_pid" ]; then
+        say "stopping the i386 steam bridge helper (pid $helper32_pid)"
+        kill "$helper32_pid" 2>/dev/null
+        wait "$helper32_pid" 2>/dev/null
+        helper32_pid=
     fi
 }
 trap 'bridge_stop' EXIT INT TERM
@@ -801,17 +813,27 @@ presence_start() {
     return 0
 }
 
-bridge_start() {
-    helper=$src/ppc64le/steamapi/helper/steamhelper
-    if [ ! -x "$helper" ]; then
-        say "building the steam bridge helper"
-        if ! "$src/ppc64le/steamapi/helper/build-helper.sh"; then
-            say "helper build FAILED; the game will see no Steam client"
+# Start ONE helper.  $1 is the machine as build-helper.sh spells it, $2 the
+# executable name.  Results come back in helper_port and helper_started_pid
+# rather than on stdout, because a command substitution would run this in a
+# subshell and the background pid we have to reap would die with it.
+helper_port=
+helper_started_pid=
+helper_launch() {
+    _machine=$1
+    _exe=$src/ppc64le/steamapi/helper/$2
+    helper_port=
+    helper_started_pid=
+
+    if [ ! -x "$_exe" ]; then
+        say "building the $_machine steam bridge helper"
+        if ! "$src/ppc64le/steamapi/helper/build-helper.sh" --machine "$_machine"; then
+            say "$_machine helper build FAILED"
             return 1
         fi
     fi
 
-    helper_log=$compat/steamhelper-$$.log
+    _log=$compat/steamhelper-$_machine-$$.log
     # --exit-when-idle belts the EXIT trap above.  A trap does not run when
     # THIS script is killed with SIGKILL, which is how a stuck run gets cleaned
     # up, and a helper leaked that way sits holding a port and a connection to
@@ -820,27 +842,64 @@ bridge_start() {
     # this covers the other order, where the script exits without the trap
     # firing but the helper's game has already gone.  One launch is one client
     # connection, so "idle" here means "the game is gone".
-    "$helper" --serve --port 0 --exit-when-idle >"$helper_log" 2>&1 &
-    helper_pid=$!
+    "$_exe" --serve --port 0 --exit-when-idle >"$_log" 2>&1 &
+    helper_started_pid=$!
 
     n=0
     while [ $n -lt 100 ]; do
-        port=$(sed -n 's/.*listening on 127\.0\.0\.1:\([0-9][0-9]*\).*/\1/p' \
-                   "$helper_log" 2>/dev/null | head -1)
-        [ -n "$port" ] && break
-        kill -0 "$helper_pid" 2>/dev/null || { helper_pid=; break; }
+        helper_port=$(sed -n 's/.*listening on 127\.0\.0\.1:\([0-9][0-9]*\).*/\1/p' \
+                   "$_log" 2>/dev/null | head -1)
+        [ -n "$helper_port" ] && break
+        kill -0 "$helper_started_pid" 2>/dev/null || { helper_started_pid=; break; }
         n=$((n + 1))
         sleep 0.1
     done
-    if [ -z "${port:-}" ]; then
-        say "the steam bridge helper did not come up; see $helper_log"
-        bridge_stop
+    if [ -z "${helper_port:-}" ]; then
+        say "the $_machine steam bridge helper did not come up; see $_log"
+        [ -n "${helper_started_pid:-}" ] && kill "$helper_started_pid" 2>/dev/null
+        helper_started_pid=
         return 1
     fi
+    say "$_machine steam bridge helper on 127.0.0.1:$helper_port (pid $helper_started_pid, log $_log)"
+    return 0
+}
 
-    STEAM_BRIDGE_ADDR=127.0.0.1:$port
+# BOTH WIDTHS, EVERY LAUNCH.  A frame is the params struct's own bytes, so a
+# guest steamclient DLL can only be served by a helper of its own pointer
+# width -- steamrpc_wire.h puts the width in the frame magic precisely so a
+# mismatched pair refuses instead of misreading.  That makes "which helper" a
+# question this script cannot answer by looking at the game: a 64-bit launcher
+# .exe that spawns the 32-bit real game (or the reverse) is ordinary, and each
+# process loads a steamclient DLL of its own width.  Sniffing the PE header of
+# the exe we were handed would get Portal 2 right and get the next launcher
+# wrong, silently.
+#
+# So start both and let each client read its own variable.  The cost of the
+# one nothing connects to is a single idle process holding a loopback port: it
+# never calls CreateInterface, so it holds no Steam connection, and bridge_stop
+# reaps it.
+bridge_start() {
+    helper_launch x86_64 steamhelper || {
+        say "helper build/launch FAILED; the game will see no Steam client"
+        bridge_stop
+        return 1
+    }
+    helper_pid=$helper_started_pid
+    STEAM_BRIDGE_ADDR=127.0.0.1:$helper_port
     export STEAM_BRIDGE_ADDR
-    say "steam bridge helper on $STEAM_BRIDGE_ADDR (pid $helper_pid, log $helper_log)"
+
+    # NOT fatal.  Without it a 32-bit title gets STEAMRPC_STATUS_NO_HELPER,
+    # which is exactly where this port was before the i386 helper existed and
+    # which Proton's own code is written to survive -- whereas failing the
+    # whole launch here would take out every 64-bit title over a 32-bit
+    # toolchain problem they do not care about.
+    if helper_launch i386 steamhelper32; then
+        helper32_pid=$helper_started_pid
+        STEAM_BRIDGE_ADDR32=127.0.0.1:$helper_port
+        export STEAM_BRIDGE_ADDR32
+    else
+        say "no i386 bridge helper; a 32-bit title will see no Steam client"
+    fi
 
     "$wine" reg add 'HKCU\Software\Valve\Steam\ActiveProcess' /v SteamClientDll64 \
         /t REG_SZ /d 'steamclient64.dll' /f >/dev/null 2>&1
@@ -849,8 +908,47 @@ bridge_start() {
     # 32/64 split, both present in a real install -- so a 32-bit title finds
     # nothing at all if only the 64-bit value is written.  dlls/steamclient
     # builds the module that answers it.
+    # A FULL PATH, where the 64-bit value above is a bare name, and the
+    # difference is measured rather than stylistic.  [MEASURED 2026-08-30,
+    # Portal 2 run 20260830-223350] A bare name sends steam_api.dll through the
+    # ordinary Win32 search order, and a Source title has its own bin/ ahead of
+    # system32 -- so Portal 2 loaded "Portal 2\bin\steamclient.dll", which is
+    # VALVE'S REAL 8.8 MB WINDOWS CLIENT LIBRARY shipped in the depot, not this
+    # tree's builtin.  It pulled in Kerberos/MSV1_0/rsaenh, failed to find a
+    # Windows Steam client, and the engine put up "Steam is not running."
+    #
+    # The 64-bit lane never saw this because Portal 2 ships no
+    # bin/win64/steamclient64.dll -- nothing was there to outrank the builtin
+    # -- which is exactly why it stayed hidden until a 32-bit title got this
+    # far.  A path skips the search entirely and names ours.
+    # A REAL PATH TO THE BUILT FILE, where the 64-bit value above is a bare
+    # name -- and the difference is measured, not stylistic.
+    #
+    # [MEASURED 2026-08-30, Portal 2 runs 20260830-223350 and -224014] A bare
+    # name sends steam_api.dll through the ordinary Win32 search order, and a
+    # Source title has its own bin/ ahead of the system directory.  Portal 2
+    # therefore loaded "Portal 2\bin\steamclient.dll" -- VALVE'S REAL 8.8 MB
+    # WINDOWS CLIENT LIBRARY, shipped in the depot -- which pulled in
+    # Kerberos/MSV1_0/rsaenh looking for a Windows Steam client, found none,
+    # and the engine put up "Steam is not running."  The bridge was never
+    # reached: both helpers sat idle with the game running.
+    #
+    # The 64-bit lane never saw this because Portal 2 ships no
+    # bin/win64/steamclient64.dll, so nothing outranked the builtin there.
+    # That is why it stayed hidden until a 32-bit title got this far.
+    #
+    # A bare name cannot be rescued with WINEDLLOVERRIDES=steamclient=b either:
+    # a guestpe module carries no builtin marker, so Wine classes it native
+    # (the loaddll trace says "native" for C:\windows\system32\steamclient.dll)
+    # and "b" then matches nothing at all -- measured, run 20260830-223526,
+    # where no steamclient loaded whatsoever.  Nor does a system32 path work on
+    # its own: the builtin is virtual, resolved by NAME through
+    # find_builtin_dll, and no such file exists in the prefix.
+    #
+    # So name the file that actually exists.  $tree is the build directory.
     "$wine" reg add 'HKCU\Software\Valve\Steam\ActiveProcess' /v SteamClientDll \
-        /t REG_SZ /d 'steamclient.dll' /f >/dev/null 2>&1
+        /t REG_SZ /d "Z:$(printf %s "$tree/dlls/steamclient/i386-windows/steamclient.dll" | tr / '\\')" \
+        /f >/dev/null 2>&1
     "$wine" reg add 'HKCU\Software\Valve\Steam\ActiveProcess' /v Universe \
         /t REG_SZ /d 'Public' /f >/dev/null 2>&1
     "$wine" reg add 'HKCU\Software\Valve\Steam' /v SteamPath \
@@ -909,13 +1007,13 @@ bridge_start() {
     # naming a DLL that does not exist only moves a game's failure from "no
     # value" to "load failed".  dlls/steamclient now builds one, and it loads
     # and binds (ppc64le/games/probe-dllload.sh --machine i386 steamclient.dll).
-    # What it still cannot do is reach a Steam client: the bridge helper is an
-    # x86-64 program and a frame is the params struct's own bytes, so the
-    # pointer widths have to match -- see the magic in
-    # dlls/steamclient64/steamrpc_wire.h, which makes that pairing refuse
-    # loudly rather than answer with garbage.  A 32-bit title therefore gets a
-    # clean SteamAPI_Init failure, which is what it already gets outside Steam,
-    # instead of dying in its loader.
+    # Since 2026-08-30 it can also REACH a Steam client: helper_launch above
+    # starts an i386 steamhelper32 beside the x86-64 one, built from the same
+    # sources against Steam's own ~/.steam/sdk32/steamclient.so, and the client
+    # picks it up from STEAM_BRIDGE_ADDR32.  The width magic in
+    # dlls/steamclient64/steamrpc_wire.h stays exactly as it was and is now the
+    # backstop rather than the whole answer: if the two are ever crossed, the
+    # pairing still refuses loudly instead of answering with garbage.
     return 0
 }
 

@@ -208,3 +208,113 @@ Other findings relevant to a real helper
   high in the address space.  Any pointer we hand back to ppc64le Wine must be
   treated as an opaque 64-bit token belonging to the helper's address space --
   never dereferenced on the Wine side.
+
+
+===========================================================================
+The i386 helper (steamhelper32)
+===========================================================================
+
+Everything below was measured on the AC922 on 2026-08-30.  Nothing is guessed.
+
+WHY A SECOND HELPER AT ALL.  A frame is the params struct's own bytes, and
+every pointer field in a Proton params struct moves every field after it.  The
+two builds disagree concretely -- MEASURED, by asking each helper what it
+thinks the selftest params are:
+
+    steamhelper32:  selftest params are 40 bytes here
+    steamhelper:    selftest params are 56 bytes here
+
+so a 32-bit guest steamclient.dll served by the x86-64 helper would be read
+with the wrong offsets.  Proton ships i386-unix/lsteamclient.so beside its
+x86-64 one for exactly this reason.
+
+
+The toolchain: clang, because gcc cannot
+----------------------------------------
+    $ x86_64-pc-linux-gnu-gcc -m32 ...
+    /usr/bin/ld: cannot find -lgcc          <- no 32-bit multilib
+    $ i686-pc-linux-gnu-gcc
+    command not found
+
+There is no gcc road to i386 on this box and NOTHING NEEDS INSTALLING to get
+one.  clang carries every backend in the one binary, so the same clang that
+already cross-compiles the x86-64 helper cross-compiles the i386 one:
+
+    -target i686-linux-gnu -m32 -msse2 -mfpmath=sse
+
+-msse2 -mfpmath=sse is taken from fastppcx86/Data/CMake/toolchain_x86_32.cmake,
+which documents the same gcc dead end.  i386 otherwise defaults to x87, whose
+80-bit intermediates are not what the vendored code was compiled against.
+
+
+The sysroot: the SAME rootfs, which is already multiarch
+--------------------------------------------------------
+FEX_ROOTFS=~/Development/fexrootfs/RootFS/Ubuntu_24_04 carries a complete i386
+set beside the x86-64 one -- 525 files under usr/lib/i386-linux-gnu, including
+Scrt1.o crt1.o crti.o crtn.o, libc.so/.so.6, libm, libpthread, libdl,
+libstdc++.so.6, libgcc_s.so.1, and lib/ld-linux.so.2 -- plus
+usr/lib/gcc/i686-linux-gnu/13/ and usr/include/i386-linux-gnu/.  So the answer
+to "do we need a 32-bit sysroot package" is NO: the one already on this disk
+is multiarch.
+
+An ArchLinux-style rootfs would NOT do -- it has no 32-bit runtime at all --
+and build-helper.sh says so by name rather than letting 219 compiles succeed
+and the link fail on a missing crt.  Note the script's FEX_ROOTFS DEFAULT is
+still the ArchLinux path from the original test machine, which does not exist
+on this box; set FEX_ROOTFS explicitly here.
+
+
+The result
+----------
+    $ build-helper.sh --machine i386
+    219 vendored Proton translation units, ZERO errors, ~15s at -j64.
+    steamhelper32: ELF 32-bit LSB pie executable, Intel i386,
+    interpreter /lib/ld-linux.so.2, 6.1 MB
+
+Nothing in steamhelper.c, steamhelper_stub.c or steamhelper_path.c needed a
+width fix -- they were already uintptr_t-clean -- and nothing under proton/
+needed one either, because its width-dependent parts are already behind its
+own #ifdef __i386__.  The ONE change was probe()'s hardcoded sdk64 path; the
+serve path was always right, since Proton's unixlib.cpp picks sdk32 on
+__i386__ through its own STEAM_ARCH.
+
+
+Does fastppcx86 run it?  Yes, and it was established first
+----------------------------------------------------------
+binfmt_misc has FEX-x86 registered beside FEX-x86_64, both pointing at
+fastppcx86/build/Bin/FEX, so an i386 ELF is exec'd like any other program.
+A hello-world that dlopens sdk32 answered the whole feasibility question in
+minutes, before any of the real build was written:
+
+    $ ./steamhelper32 --probe
+    helper: uname machine = x86_64
+    helper: pointer size = 4
+    helper: steamclient = /home/jbettcher/.steam/sdk32/steamclient.so
+    helper: dlopen ok, handle = 0xf77cd3f0
+    export CreateInterface = 0xf663b810
+    ... all seven exports present ...
+    exit 0        real 0m0.53s
+
+All seven exports resolve in Steam's shipping 32-bit steamclient.so, and the
+0.53s startup is the same as the x86-64 helper's -- so the "long-lived daemon,
+one per launch" conclusion above applies unchanged.
+
+NOTE uname still reports x86_64 inside a 32-bit FEX process.  Nothing has
+tripped over it, but a guest that sniffs the machine type and expects i686 has
+not been tested.
+
+
+The width magic holds, and is now tested in both directions
+-----------------------------------------------------------
+MEASURED by sending a bare header to each helper's socket:
+
+    steamhelper32 <- 'SCR1'  refused: "refusing a frame with magic 0x31524353",
+                             connection closed, no reply at all
+    steamhelper32 <- 'SCR3'  accepted, replies 'SCP3'
+    steamhelper   <- 'SCR3'  refused: "refusing a frame with magic 0x33524353"
+    steamhelper   <- 'SCR1'  accepted, replies 'SCP1'
+
+The magic is validated before any length is read, so a crossed pair cannot
+misread a blob.  Nothing about steamrpc_wire.h changed to get this; the i386
+build compiles the same header and gets 'SCR3' for free, exactly as its
+comment said it would.

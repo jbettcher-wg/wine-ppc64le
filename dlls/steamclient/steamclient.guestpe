@@ -30,16 +30,32 @@
 #
 # WHAT THIS DLL CAN AND CANNOT DO TODAY, stated here so nobody has to find out
 # by running a game.  It loads, and its imports bind against Wine's real i386
-# PE builtins.  Its calls to the Steam bridge do NOT reach a Steam client: the
-# bridge helper (ppc64le/steamapi/helper) is an x86-64 program, and a frame is
-# the params struct's own bytes, so a 32-bit client and a 64-bit helper cannot
-# speak to each other -- see the magic in ../steamclient64/steamrpc_wire.h,
-# which encodes the pointer width so that pairing refuses out loud instead of
-# misreading.  Until an i386 helper exists beside the x86-64 one (Proton ships
-# both: i386-unix/lsteamclient.so against Steam's own 32-bit steamclient.so),
-# every method here returns STEAMRPC_STATUS_NO_HELPER, which is exactly what a
-# game launched outside Steam already gets on the 64-bit lane, and which
-# Proton's own code is written to survive.
+# PE builtins.
+#
+# THE i386 BRIDGE HELPER NOW EXISTS [2026-08-30].  This paragraph used to say
+# that every method here returned STEAMRPC_STATUS_NO_HELPER because the only
+# helper was an x86-64 program and a frame is the params struct's own bytes.
+# ppc64le/steamapi/helper/build-helper.sh --machine i386 now builds
+# steamhelper32 from the same sources against Steam's own
+# ~/.steam/sdk32/steamclient.so, ppc64le/steamtool/proton starts it beside the
+# x86-64 one, and steamrpc.c reaches it through STEAM_BRIDGE_ADDR32.  The
+# width magic in ../steamclient64/steamrpc_wire.h is unchanged and is now the
+# backstop rather than the whole story: a crossed pair still refuses out loud
+# (measured in both directions -- see the helper's README-toolchain).
+#
+# WHAT IS STILL IN THE WAY, so nobody reads the above as "Portal 2 works".
+# [MEASURED 2026-08-30] With the helper running and this DLL actually loaded,
+# Portal 2 stops saying "Steam is not running" and instead dies of an
+# unhandled STATUS_INVALID_HANDLE (0xc0000008) at 7BDAFC26, on the loading
+# thread, immediately after this module is mapped and BEFORE it opens a socket
+# to the helper -- both helpers were still idle.  That is the next wall and it
+# is in this module's load path, not in the bridge.
+#
+# Note also that a bare "steamclient.dll" in the registry does NOT reach this
+# module from a Source title: the game ships its own real Valve
+# bin/steamclient.dll and its bin/ outranks the system directory.  proton
+# writes the built file's full path for that reason; the comment there has the
+# measurements.
 
 DLL      steamclient.dll
 ENTRY    DllMain

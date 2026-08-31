@@ -1,7 +1,14 @@
 #!/bin/sh
 #
-# build-helper.sh -- cross-compile the Steam bridge helper: an x86-64 Linux
-# executable, built on ppc64le, run under FEX via binfmt.
+# build-helper.sh -- cross-compile the Steam bridge helper: an x86-64 (or
+# i386) Linux executable, built on ppc64le, run under FEX via binfmt.
+#
+# --machine i386 builds the SECOND helper, steamhelper32, from exactly the
+# same sources, against Steam's own 32-bit ~/.steam/sdk32/steamclient.so.
+# It exists because a frame is the params struct's own bytes: every pointer
+# field in a Proton params struct moves every field after it, so a 32-bit
+# guest steamclient.dll cannot be served by a 64-bit helper at all.  Proton
+# ships i386-unix/lsteamclient.so beside its x86-64 one for the same reason.
 #
 # The helper is deliberately NOT part of "make".  It is not a Wine component:
 # it is a Linux program for a different architecture, linked against a
@@ -57,26 +64,59 @@
 #   * steamhelper_path.c -- DOS<->unix file names, against the drive map the
 #     client measures in its own prefix and sends at connect time.
 #
-# Usage:  build-helper.sh [-o OUTPUT] [-j N]
+# Usage:  build-helper.sh [--machine x86_64|i386] [-o OUTPUT] [-j N]
 # Env:    WINE_TREE   the wine-ppc64le tree (default: three levels up)
-#         FEX_ROOTFS  the x86-64 sysroot (default: the FEX ArchLinux rootfs)
+#         FEX_ROOTFS  the sysroot (default: the FEX ArchLinux rootfs).  The
+#                     SAME rootfs serves both machines when it is a Debian or
+#                     Ubuntu multiarch one: Ubuntu_24_04 carries a complete
+#                     i386 set under usr/lib/i386-linux-gnu (crt, libc,
+#                     libstdc++, libgcc_s) beside the x86-64 one, so nothing
+#                     extra has to be installed or unpacked to build i386.
+#
+# THE i386 TOOLCHAIN, MEASURED (2026-08-30, this machine).  gcc cannot do it:
+# x86_64-pc-linux-gnu-gcc -m32 fails with "cannot find -lgcc" -- there is no
+# 32-bit multilib -- and there is no i686-pc-linux-gnu-gcc.  clang does not
+# care: one binary carries every backend, so -target i686-linux-gnu -m32
+# against the rootfs builds all 219 vendored Proton translation units with
+# zero errors and lld links them.  fastppcx86/Data/CMake/toolchain_x86_32.cmake
+# documents the same gcc dead end and routes around it the same way; -msse2
+# -mfpmath=sse is taken from there (i386 defaults to x87, whose 80-bit
+# intermediates are not what the vendored code was compiled and tested with).
 
 set -eu
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 TREE=${WINE_TREE:-$(cd "$HERE/../../.." && pwd)}
 ROOTFS=${FEX_ROOTFS:-$HOME/.local/share/fex-emu/RootFS/ArchLinux}
-OUT=$HERE/steamhelper
 JOBS=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 8)
-OBJDIR=${OBJDIR:-/tmp/steamhelper-build}
+MACHINE=x86_64
+OUT=
 
 while [ $# -gt 0 ]; do
     case $1 in
     -o) OUT=$2; shift 2 ;;
     -j) JOBS=$2; shift 2 ;;
+    --machine) MACHINE=$2; shift 2 ;;
     *)  echo "build-helper.sh: unknown argument $1" >&2; exit 2 ;;
     esac
 done
+
+# Everything that differs between the two builds, in one place.  LIBDIR is the
+# multiarch directory the crt objects live in and is only used by the preflight
+# check below -- clang's own driver finds them from --sysroot and -target.
+case $MACHINE in
+x86_64)
+    TARGET=x86_64-linux-gnu; MFLAGS=; LIBDIR=x86_64-linux-gnu
+    DEFOUT=$HERE/steamhelper ;;
+i386)
+    TARGET=i686-linux-gnu; MFLAGS="-m32 -msse2 -mfpmath=sse"
+    LIBDIR=i386-linux-gnu
+    DEFOUT=$HERE/steamhelper32 ;;
+*)  echo "build-helper.sh: --machine must be x86_64 or i386, not $MACHINE" >&2
+    exit 2 ;;
+esac
+[ -n "$OUT" ] || OUT=$DEFOUT
+OBJDIR=${OBJDIR:-/tmp/steamhelper-build-$MACHINE}
 
 P=$TREE/dlls/steamclient64/proton
 D=$TREE/dlls/steamclient64
@@ -86,18 +126,30 @@ for f in "$ROOTFS/usr/include/dlfcn.h" \
     [ -e "$f" ] || { echo "build-helper.sh: missing $f" >&2; exit 2; }
 done
 
-# Scrt1.o sits in usr/lib on an Arch-style rootfs and in
-# usr/lib/x86_64-linux-gnu on a Debian/Ubuntu one, which uses multiarch paths.
-# clang's own Linux driver knows both given --sysroot, so only this preflight
-# check needed teaching -- it hardcoded the Arch layout and refused a perfectly
-# good Ubuntu_24_04 rootfs with "missing .../usr/lib/Scrt1.o".
+# Scrt1.o sits in usr/lib on an Arch-style rootfs and in usr/lib/<triple> on a
+# Debian/Ubuntu one, which uses multiarch paths.  clang's own Linux driver
+# knows both given --sysroot, so only this preflight check needed teaching --
+# it hardcoded the Arch layout and refused a perfectly good Ubuntu_24_04
+# rootfs with "missing .../usr/lib/Scrt1.o".
+#
+# For --machine i386 only the multiarch path can match: an Arch x86-64 rootfs
+# has no 32-bit runtime at all, and saying so here is much better than letting
+# 219 compiles succeed and the link fail on a missing crt.
 crt=
-for c in "$ROOTFS/usr/lib/Scrt1.o" "$ROOTFS/usr/lib/x86_64-linux-gnu/Scrt1.o"; do
-    [ -e "$c" ] && { crt=$c; break; }
-done
+if [ "$MACHINE" = x86_64 ]; then
+    for c in "$ROOTFS/usr/lib/Scrt1.o" "$ROOTFS/usr/lib/$LIBDIR/Scrt1.o"; do
+        [ -e "$c" ] && { crt=$c; break; }
+    done
+else
+    [ -e "$ROOTFS/usr/lib/$LIBDIR/Scrt1.o" ] && crt=$ROOTFS/usr/lib/$LIBDIR/Scrt1.o
+fi
 [ -n "$crt" ] || {
-    echo "build-helper.sh: no x86-64 Scrt1.o under $ROOTFS/usr/lib" >&2
-    echo "  looked in usr/lib (Arch layout) and usr/lib/x86_64-linux-gnu (Debian/Ubuntu)." >&2
+    echo "build-helper.sh: no $MACHINE Scrt1.o under $ROOTFS/usr/lib" >&2
+    echo "  looked in usr/lib (Arch layout) and usr/lib/$LIBDIR (Debian/Ubuntu)." >&2
+    if [ "$MACHINE" = i386 ]; then
+        echo "  An i386 helper needs a MULTIARCH rootfs carrying the 32-bit runtime." >&2
+        echo "  The FEX Ubuntu_24_04 rootfs has one; an ArchLinux rootfs does not." >&2
+    fi
     echo "  FEX_ROOTFS names the sysroot; it is currently $ROOTFS" >&2
     exit 2
 }
@@ -109,12 +161,13 @@ INCL="-I$TREE/include -I$P -I$D -I$HERE"
 # warns about and which is intentional in both.
 # -Wno-format-extra-args: one such line in Proton's unixlib.cpp; vendored code
 # is not reformatted here, and the warning names it.
-COMMON="-target x86_64-linux-gnu --sysroot=$ROOTFS -O1 -fPIC -g \
+COMMON="-target $TARGET $MFLAGS --sysroot=$ROOTFS -O1 -fPIC -g \
  -DWINE_UNIX_LIB -D__WINESRC__ -Wno-pragma-pack -Wno-format-extra-args $INCL"
 
 mkdir -p "$OBJDIR"
 rm -f "$OBJDIR"/*.o "$OBJDIR"/*.err
 
+echo "build-helper.sh: machine $MACHINE ($TARGET)"
 echo "build-helper.sh: tree   $TREE"
 echo "build-helper.sh: sysroot $ROOTFS"
 echo "build-helper.sh: objects $OBJDIR"
@@ -138,7 +191,8 @@ if grep -l "error:" "$OBJDIR"/*.err >/dev/null 2>&1; then
     exit 1
 fi
 
-clang++ -target x86_64-linux-gnu --sysroot="$ROOTFS" -fuse-ld=lld \
+# shellcheck disable=SC2086
+clang++ -target $TARGET $MFLAGS --sysroot="$ROOTFS" -fuse-ld=lld \
     -o "$OUT" "$OBJDIR"/*.o -ldl -lpthread
 
 echo "build-helper.sh: $OUT"

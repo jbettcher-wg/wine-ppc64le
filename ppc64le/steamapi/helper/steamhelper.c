@@ -1,9 +1,18 @@
 /*
- * steamhelper -- the x86-64 Linux half of the lsteamclient bridge.
+ * steamhelper -- the x86-64 (or i386) Linux half of the lsteamclient bridge.
+ *
+ * BUILT TWICE, ONE SOURCE.  This file compiles unchanged for both widths;
+ * build-helper.sh --machine i386 produces steamhelper32 beside steamhelper,
+ * exactly as Proton ships i386-unix/lsteamclient.so beside its x86-64 one.
+ * A frame is the params struct's own bytes, so a client and a helper of
+ * different pointer widths cannot speak to each other at all -- the width is
+ * encoded in the frame magic (steamrpc_wire.h: 'SCR3' on i386, 'SCR1' on
+ * x86-64) and the frame loop below validates it before reading any length,
+ * so a mismatched pair refuses out loud instead of misreading a blob.
  *
  * WHY THIS IS A SEPARATE PROCESS.  The real Steam client library is
- * ~/.steam/sdk64/steamclient.so: an x86-64 SysV ELF that wants a Linux
- * loader, a Linux libc, and threads.  Native Wine on this port is ppc64le and
+ * ~/.steam/sdk64/steamclient.so (sdk32 for the i386 build): a SysV ELF that
+ * wants a Linux loader, a Linux libc, and threads.  Native Wine on this port is ppc64le and
  * cannot dlopen it, and the embedded emulator runs x86-64 *Windows* code, not
  * x86-64 Linux code.  So the unix half of Proton's lsteamclient -- which is
  * already a clean, flat, params-struct-in/params-struct-out interface -- is
@@ -101,7 +110,19 @@ static int probe(void)
     else
     {
         if (!(home = getenv( "HOME" ))) home = "";
+        /* WHICH SDK, AND WHY IT IS NOT A CHOICE.  Steam ships two client
+         * libraries -- ~/.steam/sdk64 and ~/.steam/sdk32 -- and a process can
+         * only load the one matching its own word size.  Proton's own
+         * unixlib.cpp already picks between them on __i386__ (its STEAM_ARCH),
+         * so the SERVE path gets this right for free; this is the probe path,
+         * which resolves the name itself in order to report it, and it has to
+         * agree with what serve would actually dlopen or --probe would be
+         * checking a library the helper never loads. */
+#ifdef __i386__
+        snprintf( path, sizeof(path), "%s/.steam/sdk32/steamclient.so", home );
+#else
         snprintf( path, sizeof(path), "%s/.steam/sdk64/steamclient.so", home );
+#endif
     }
     printf( "helper: steamclient = %s\n", path );
 
@@ -764,7 +785,8 @@ static void usage(void)
              "\n"
              "--probe  dlopen the native steamclient.so and report its exports.\n"
              "         Never calls into it, so it cannot disturb a running client.\n"
-             "--serve  listen on 127.0.0.1 for the guest steamclient64.dll.\n"
+             "--serve  listen on 127.0.0.1 for the guest steamclient64.dll\n"
+             "         (steamclient.dll for an i386 build of this helper).\n"
              "         --port 0 (the default) picks a free port and prints it.\n"
              "--exit-when-idle\n"
              "         leave once the last client disconnects.  For a single\n"
