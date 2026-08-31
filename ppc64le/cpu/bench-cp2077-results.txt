@@ -1,0 +1,38 @@
+# 2026-08-30T14:01:22-06:00  tag=revert-67c370ffa  legs=3  smt=SMT=4  bridge=797f23866905
+# 2026-08-30T14:03:14-06:00  tag=no-spinsentinel  legs=3  smt=SMT=4  bridge=b7b9e70a6ac4
+revert-67c370ffa leg 1: avg=17.001543045043947 min=11.112210273742676 max=23.906402587890626 frames=1169 floor_ms=36.87 dir=benchmark_2026-08-30_15-01-50
+no-spinsentinel leg 1: NO RESULT DIR (run did not finish)
+# 2026-08-30T14:09:06-06:00  tag=no-spinsentinel  legs=3  smt=SMT=4  bridge=b7b9e70a6ac4
+no-spinsentinel leg 1: avg=18.104 min=12.544 max=24.271 frames=1208 floor_ms=36.47 dir=benchmark_2026-08-30_15-09-34
+no-spinsentinel leg 2: avg=17.178 min=11.495 max=23.994 frames=1169 floor_ms=35.95 dir=benchmark_2026-08-30_15-12-05
+no-spinsentinel leg 3: avg=16.445 min=11.167 max=22.905 frames=1132 floor_ms=37.44 dir=benchmark_2026-08-30_15-14-37
+# done 2026-08-30T14:16:41-06:00
+# 2026-08-30T23:38:07-06:00  tag=ntsync-on  legs=3  smt=SMT=4  bridge=b7b9e70a6ac4
+ntsync-on leg 1: avg=16.355 min=12.093 max=21.592 frames=1100 floor_ms=35.49 dir=benchmark_2026-08-31_00-38-35
+ntsync-on leg 2: avg=16.747 min=12.762 max=21.479 frames=1116 floor_ms=36.63 dir=benchmark_2026-08-31_00-41-07
+ntsync-on leg 3: avg=17.526 min=13.698 max=23.150 frames=1154 floor_ms=34.03 dir=benchmark_2026-08-31_00-43-38
+# done 2026-08-30T23:45:42-06:00
+# 2026-08-31T00:32:38-06:00  tag=ntsync-off-r1  legs=1  smt=SMT=4  bridge=b7b9e70a6ac4
+ntsync-off-r1 leg 1: avg=17.462 min=13.530 max=22.615 frames=1152 floor_ms=31.77 dir=benchmark_2026-08-31_01-33-06
+# done 2026-08-31T00:35:10-06:00
+# 2026-08-31T00:35:10-06:00  tag=ntsync-on-r1  legs=1  smt=SMT=4  bridge=b7b9e70a6ac4
+ntsync-on-r1 leg 1: avg=17.829 min=13.659 max=22.898 frames=1169 floor_ms=34.28 dir=benchmark_2026-08-31_01-35-38
+# done 2026-08-31T00:37:42-06:00
+# 2026-08-31T00:37:42-06:00  tag=ntsync-off-r2  legs=1  smt=SMT=4  bridge=b7b9e70a6ac4
+ntsync-off-r2 leg 1: NO RESULT (run did not finish; newest=benchmark_2026-08-31_01-38-10)
+# done 2026-08-31T00:38:32-06:00
+# 2026-08-31T00:38:32-06:00  tag=ntsync-on-r2  legs=1  smt=SMT=4  bridge=b7b9e70a6ac4
+ntsync-on-r2 leg 1: avg=18.428 min=14.059 max=24.176 frames=1209 floor_ms=31.13 dir=benchmark_2026-08-31_01-39-02
+# done 2026-08-31T00:41:04-06:00
+# 2026-08-31T00:41:04-06:00  tag=ntsync-off-r3  legs=1  smt=SMT=4  bridge=b7b9e70a6ac4
+ntsync-off-r3 leg 1: avg=16.919 min=12.743 max=22.072 frames=1125 floor_ms=32.91 dir=benchmark_2026-08-31_01-41-32
+# done 2026-08-31T00:43:36-06:00
+# 2026-08-31T00:43:36-06:00  tag=ntsync-on-r3  legs=1  smt=SMT=4  bridge=16c6760f983c
+ntsync-on-r3 leg 1: avg=17.166 min=13.294 max=23.449 frames=1134 floor_ms=34.18 dir=benchmark_2026-08-31_01-44-04
+# done 2026-08-31T00:46:07-06:00
+# 2026-08-31T00:46:07-06:00  tag=ntsync-stats  legs=1  smt=SMT=4  bridge=16c6760f983c
+ntsync-stats leg 1: avg=16.757 min=12.222 max=22.302 frames=1122 floor_ms=29.22 dir=benchmark_2026-08-31_01-46-36
+# done 2026-08-31T00:48:39-06:00
+# 2026-08-31T00:49:35-06:00  tag=ntsync-hitrate  legs=1  smt=SMT=4  bridge=5336272e2c3f
+ntsync-hitrate leg 1: avg=16.487 min=12.818 max=21.526 frames=1097 floor_ms=34.04 dir=benchmark_2026-08-31_01-50-03
+# done 2026-08-31T00:52:07-06:00

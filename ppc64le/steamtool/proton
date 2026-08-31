@@ -901,8 +901,44 @@ bridge_start() {
         say "no i386 bridge helper; a 32-bit title will see no Steam client"
     fi
 
+    # WHICH steamclient64.dll THE TITLE WILL LOAD -- this tree's builtin, or
+    # VALVE'S OWN Windows library.  Default: the builtin, by bare name, for
+    # every reason set out above.
+    #
+    # WINE_PPC64LE_VALVE_STEAMCLIENT=1 takes Proton's route instead: stage
+    # Valve's real 26 MB steamclient64.dll into the prefix (a symlink to the
+    # installed client's own copy -- see ./stage-valve-steamclient for why a
+    # link and not a copy) and name it here BY FULL PATH.  Proton's own log
+    # for Civilization VI is one line,
+    #
+    #   Loaded L"C:\Program Files (x86)\Steam\steamclient64.dll" ... native
+    #
+    # and this is what makes that line reproducible on the native lane.
+    #
+    # A FULL PATH, not a bare name, and that trap is already paid for: a bare
+    # name goes through the ordinary Win32 search order, where a game's own
+    # directory outranks the system one -- which is how Portal 2 came to load
+    # "Portal 2\bin\steamclient.dll" by accident (see the 32-bit block below).
+    # A path skips the search and names the file that was meant.
+    #
+    # THE BUILTIN IS NOT DISPLACED, IT IS DEMOTED.  load_guest_library()
+    # (dlls/ntdll/signal_ppc64.c) tries a path as a file first and falls back
+    # to the BASE NAME in the guest namespace when nothing loads -- so if
+    # Valve's library fails to map, or fails PROCESS_ATTACH, the same
+    # LoadLibrary still lands on dlls/steamclient64, in the same call, with
+    # both outcomes visible in one +loaddll log.  [MEASURED 2026-08-30] that
+    # fallback is not theoretical: it is what the first three probe runs did.
+    # Staging can therefore only add a route, never take one away.
+    sc64='steamclient64.dll'
+    if [ "${WINE_PPC64LE_VALVE_STEAMCLIENT:-0}" = 1 ] && [ -x "$selfdir/stage-valve-steamclient" ]; then
+        _scerr=$compat/stage-valve-steamclient.err
+        _scpath=$("$selfdir/stage-valve-steamclient" "$prefix" 2>"$_scerr")
+        while IFS= read -r l; do say "$l"; done < "$_scerr"
+        rm -f "$_scerr"
+        [ -n "$_scpath" ] && sc64=$_scpath
+    fi
     "$wine" reg add 'HKCU\Software\Valve\Steam\ActiveProcess' /v SteamClientDll64 \
-        /t REG_SZ /d 'steamclient64.dll' /f >/dev/null 2>&1
+        /t REG_SZ /d "$sc64" /f >/dev/null 2>&1
     # ...and the 32-bit one.  A PE32 title's own steam_api.dll reads
     # SteamClientDll, never SteamClientDll64 -- the two names are Steam's own
     # 32/64 split, both present in a real install -- so a 32-bit title finds
@@ -953,7 +989,7 @@ bridge_start() {
         /t REG_SZ /d 'Public' /f >/dev/null 2>&1
     "$wine" reg add 'HKCU\Software\Valve\Steam' /v SteamPath \
         /t REG_SZ /d 'C:\Program Files (x86)\Steam' /f >/dev/null 2>&1
-    say "wrote ActiveProcess\\SteamClientDll64=steamclient64.dll, SteamClientDll=steamclient.dll"
+    say "wrote ActiveProcess\\SteamClientDll64=$sc64, SteamClientDll=steamclient.dll"
     # steam_api reads ActiveProcess\PID and checks it names a LIVE process
     # before it will load any client DLL at all -- Proton's steam.exe helper
     # writes its own pid.  There is no helper exe here, so name the prefix's

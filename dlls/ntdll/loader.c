@@ -1226,6 +1226,127 @@ void * WINAPI RtlFindExportedRoutineByName( HMODULE module, const char *name )
 
 
 /*************************************************************************
+ *		alloc_unused_import_slot
+ *
+ * Sixteen writable, executable bytes for one binding this loader has decided
+ * not to resolve.  Filled with x86-64 `ud2`, and the two properties are both
+ * load-bearing:
+ *
+ *   WRITABLE, because a skipped binding is not always a function pointer.
+ *   [MEASURED 2026-08-30] Valve's steamclient64.dll DllMain is
+ *
+ *       mov rcx,[rip+0x8d18cf]   ; the IAT slot for tier0_s64.g_dwDllEntryThreadId
+ *       mov [rcx],eax            ; eax = GetCurrentThreadId(), 0x13c in that run
+ *
+ *   -- a DATA import, written through on the very first instruction that uses
+ *   it.  With allocate_stub()'s answer in the slot the module took a c0000005
+ *   touching 00000000DEAD001C and PROCESS_ATTACH failed.  That is not a
+ *   steamclient quirk: allocate_stub() hands a GUEST module an UNMAPPED
+ *   sentinel on this port (see its own banner -- no AMD64 stub code can be
+ *   generated from ppc64 host code), whereas on x86-64 Wine and Proton it
+ *   hands back a real PAGE_EXECUTE_READWRITE stub, so every write through an
+ *   unresolved data import lands harmlessly on the stub's own bytes and no
+ *   title has ever noticed.  THAT WIDER GAP IS NOT FIXED HERE -- every other
+ *   caller of allocate_stub() still gets the unmapped sentinel, and a guest
+ *   module that writes through any unresolved data import still dies where
+ *   Windows would not.  It deserves its own change.
+ *
+ *   ud2 RATHER THAN ZEROS, because the other half of a skipped binding may be
+ *   a function pointer, and a CALL landing on a page of 0x00 bytes decodes as
+ *   `add [rax],al` and wanders.  0F 0B faults immediately, at an address the
+ *   WARN at the bind site already printed beside the symbol's name, so the
+ *   post mortem names the symbol exactly as the 0xdead0000+n sentinels do.
+ *
+ * A data READ of such a slot yields 0x0b0f0b0f rather than zero.  Nothing
+ * measured reads one; if something ever does and the value matters, it will
+ * fault on the dereference, which is the outcome that gets reported.
+ */
+static ULONG_PTR alloc_unused_import_slot(void)
+{
+    static const SIZE_T slot_size = 16, region_size = 0x10000;
+    static BYTE *region;
+    static SIZE_T used;
+    BYTE *slot;
+    SIZE_T i;
+
+    if (!region || used + slot_size > region_size)
+    {
+        void *base = NULL;
+        SIZE_T size = region_size;
+
+        if (NtAllocateVirtualMemory( NtCurrentProcess(), &base, 0, &size,
+                                     MEM_COMMIT, PAGE_EXECUTE_READWRITE ))
+            return 0;
+        region = base;
+        used = 0;
+    }
+    slot = region + used;
+    used += slot_size;
+    for (i = 0; i < slot_size; i += 2) { slot[i] = 0x0f; slot[i + 1] = 0x0b; }  /* ud2 */
+    return (ULONG_PTR)slot;
+}
+
+
+/*************************************************************************
+ *		is_unused_steam_import
+ *
+ * Valve's own Windows steamclient64.dll imports 165 symbols from
+ * tier0_s64.dll and 134 from vstdlib_s64.dll -- Source's threading, string
+ * and platform support libraries -- and Valve ships NEITHER of those files
+ * anywhere in a Steam client installation.  Not in the client root beside
+ * steamclient64.dll, not in legacycompat/, and not in the
+ * C:\Program Files (x86)\Steam directory Proton stages into a prefix.  Every
+ * one of those 299 bindings is link-time residue: the client library reaches
+ * the Steam process over IPC and never enters Source's own support code.
+ *
+ * Without this, that DLL cannot be loaded at all -- import_dll() below fails
+ * both libraries, fixup_imports() turns that into STATUS_DLL_NOT_FOUND, and
+ * the whole module load returns c0000135.  [MEASURED 2026-08-30] exactly
+ * that, from ppc64le/games/probe-dllload.sh against
+ * Z:\home\...\.local\share\Steam\steamclient64.dll.
+ *
+ * THIS IS PROTON'S OWN PATCH, not an invention here, and the evidence is in
+ * Proton's shipped binary rather than in reasoning.  Proton loads that exact
+ * file -- md5 22fc5d945cf594edf356a0bc33a6e3f5, byte-identical to the one in
+ * the client root -- as `native` with no reference to either library name
+ * anywhere in a 10,670-line +loaddll log, and
+ *
+ *   .../common/Proton Hotfix/files/lib/wine/{i386,x86_64}-windows/ntdll.dll
+ *
+ * carries the ANSI strings "tier0_s64.dll" and "vstdlib_s64.dll" immediately
+ * followed by the UTF-16 strings "steamclient64.dll" and
+ * "gameoverlayrenderer64.dll", sitting directly beside Wine's own
+ * "Skipping unused import %s\n" in the same string pool.  That message is
+ * upstream's, from the empty-ILT branch a few lines below; the two lists are
+ * Proton's addition to this function.
+ *
+ * NARROW ON PURPOSE, in both directions.  A real Source title that imports
+ * tier0_s64 means it and must still fail loudly, so the skip is keyed to the
+ * IMPORTING module as well as the imported one.  And the list is Proton's
+ * verbatim -- 64-bit only.  The 32-bit steamclient.dll has the same shape
+ * (21 imports, with tier0_s.dll and vstdlib_s.dll in the same two slots), and
+ * Proton does NOT list that pair, in either its i386 or its x86_64 ntdll.
+ * Whether Proton's 32-bit lane simply never loads Valve's steamclient.dll, or
+ * fails the same way this port did, is UNVERIFIED here -- so nothing is
+ * guessed for it.  Adding "tier0_s.dll"/"vstdlib_s.dll" and "steamclient.dll"
+ * is a two-line change once someone measures which.
+ */
+static BOOL is_unused_steam_import( const WINE_MODREF *wm, const char *name )
+{
+    static const char * const unused[] = { "tier0_s64.dll", "vstdlib_s64.dll" };
+    static const WCHAR * const importers[] = { L"steamclient64.dll", L"gameoverlayrenderer64.dll" };
+    const WCHAR *base = wm->ldr.BaseDllName.Buffer;
+    unsigned int i;
+
+    if (!base) return FALSE;
+    for (i = 0; i < ARRAY_SIZE(unused); i++) if (!_stricmp( name, unused[i] )) break;
+    if (i == ARRAY_SIZE(unused)) return FALSE;
+    for (i = 0; i < ARRAY_SIZE(importers); i++) if (!wcsicmp( base, importers[i] )) return TRUE;
+    return FALSE;
+}
+
+
+/*************************************************************************
  *		import_dll
  *
  * Import the dll specified by the given import descriptor.
@@ -1258,6 +1379,43 @@ static BOOL import_dll( WINE_MODREF *wm, const IMAGE_IMPORT_DESCRIPTOR *descr, L
     if (!import_list->u1.Ordinal)
     {
         WARN( "Skipping unused import %s\n", name );
+        *pwm = NULL;
+        return TRUE;
+    }
+
+    /* Same answer, for imports whose ILT is NOT empty but whose bindings are
+     * dead anyway -- see is_unused_steam_import() above for the whole case.
+     * The thunks are filled with a per-binding landing slot rather than
+     * left holding the file's ILT rvas -- see alloc_unused_import_slot()
+     * for what is in one and why it is writable.  If the judgement above is
+     * ever wrong, the WARN below already printed that slot's address beside
+     * the symbol's name, so the fault names it. */
+    if (is_unused_steam_import( wm, name ))
+    {
+        WARN( "Skipping unused import %s in %s\n", name, debugstr_w(wm->ldr.BaseDllName.Buffer) );
+        while (import_list[protect_size].u1.Ordinal) protect_size++;
+        protect_base = thunk_list;
+        protect_size *= sizeof(*thunk_list);
+        NtProtectVirtualMemory( NtCurrentProcess(), &protect_base,
+                                &protect_size, PAGE_READWRITE, &protect_old );
+        while (import_list->u1.Ordinal)
+        {
+            if (IMAGE_SNAP_BY_ORDINAL(import_list->u1.Ordinal))
+            {
+                int ordinal = IMAGE_ORDINAL(import_list->u1.Ordinal);
+                thunk_list->u1.Function = alloc_unused_import_slot();
+                WARN( "  unused %s.%d set to %p\n", name, ordinal, (void *)thunk_list->u1.Function );
+            }
+            else
+            {
+                IMAGE_IMPORT_BY_NAME *pe_name = get_rva( module, (DWORD)import_list->u1.AddressOfData );
+                thunk_list->u1.Function = alloc_unused_import_slot();
+                WARN( "  unused %s.%s set to %p\n", name, pe_name->Name, (void *)thunk_list->u1.Function );
+            }
+            import_list++;
+            thunk_list++;
+        }
+        NtProtectVirtualMemory( NtCurrentProcess(), &protect_base, &protect_size, protect_old, &protect_old );
         *pwm = NULL;
         return TRUE;
     }
@@ -4529,6 +4687,43 @@ NTSTATUS WINAPI LdrUnloadDll( HMODULE hModule )
 PIMAGE_NT_HEADERS WINAPI RtlImageNtHeader(HMODULE hModule)
 {
     IMAGE_NT_HEADERS *ret;
+
+    /* [MEASURED] 2026-08-30, Cyberpunk 2077 (Steam), loading screen after
+     * character creation: hModule==NULL reached the dos->e_magic read below
+     * with a NULL rec/read address (info[0]=0 info[1]=0), and the fault
+     * escaped all the way to KiUserExceptionDispatcher as an unhandled
+     * access violation instead of being absorbed by __EXCEPT_PAGE_FAULT --
+     * confirmed by disassembling the built ntdll.dll.so: the reported
+     * "ntdll.dll"+64d14 is exactly the `lhz r9,0(r31)` compiled from
+     * `dos->e_magic` here, r31 holding hModule, called from the
+     * NtCurrentTeb() call inlined for __wine_push_frame at +64d00
+     * (wine/exception.h:265-267) -- i.e. the __TRY frame WAS pushed onto
+     * Tib.ExceptionList correctly, and the fault still killed the process.
+     *
+     * This port's __TRY/__EXCEPT_PAGE_FAULT relies on call_seh_handlers()
+     * (dlls/ntdll/signal_ppc64.c) walking to that TEB frame after
+     * virtual_unwind() unwinds the faulting frame via the generic ELFv2
+     * back-chain (RtlLookupFunctionEntry() always returns NULL on this
+     * port -- there is no ppc64 .pdata producer, see that file's header
+     * comment), and then resuming through __wine_rtl_unwind() /
+     * __wine_longjmp().  Something in that chain does not reliably recover
+     * a page fault raised deep in a callee's own frame on ppc64; which link
+     * is still unproven -- this was reasoned from the source and the
+     * disassembly, not caught live in a debugger (the crash needs character
+     * creation to reach, and a targeted gdb probe of RtlImageNtHeader(0) in
+     * a freshly-launched native ppc64-windows ntdll_test.exe did not land a
+     * stable breakpoint before the process tree's forks scattered it).  That
+     * gap is real and still open; it can still bite any other __TRY block on
+     * this architecture and deserves its own investigation.
+     *
+     * NULL is not "invalid input this function merely tolerates" here --
+     * every caller in this tree that hands RtlImageNtHeader a possibly-bad
+     * address already null-checks the return (actctx.c, loader.c, relay.c,
+     * resource.c, threadpool.c), so a NULL hModule is an expected, everyday
+     * case, not a caller bug to chase.  Answering it with a plain compare,
+     * before the fault-catching __TRY even runs, needs none of the above
+     * machinery and cannot be defeated by whatever is wrong with it. */
+    if (!hModule) return NULL;
 
     __TRY
     {

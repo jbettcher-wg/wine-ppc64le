@@ -64,7 +64,22 @@ static const char file_name[] = "Local\\SteamStart_SharedMemFile";
  * zeroed rather than filled with a plausible-looking header: a wrong header
  * read as a right one is the silent-wrong-answer this tree refuses.  If a
  * title is ever seen to MapViewOfFile this section and then fail, THAT is the
- * measurement that earns a layout, and it goes in the log first. */
+ * measurement that earns a layout, and it goes in the log first.
+ *
+ * [2026-08-30] THAT HAS NOW HAPPENED, so this file takes the next step it
+ * asked for.  Oblivion Remastered's +seh trace shows the stub reaching
+ * MapViewOfFile(FILE_MAP_WRITE) on this section and only then putting up its
+ * box; Civ VI's trace shows the same OpenEventA -> OpenFileMappingA sequence
+ * ending in MessageBoxA("Steam Error", "Application load error 3:...") ->
+ * TerminateProcess.  So the objects are visible, the handles are accepted, and
+ * what is wrong is the CONTENT.
+ *
+ * This still does not GUESS a layout.  It fills the page with a recognisable
+ * pattern and reports which bytes the title changes and which it leaves alone,
+ * which is evidence about the protocol rather than an assertion about it.  A
+ * pattern beats zeroes for this: with zeroes, "the title wrote nothing" and
+ * "the title wrote a zero" are indistinguishable, and that ambiguity is what
+ * makes a wrong layout look like a right one. */
 #define SHAREDMEM_SIZE 0x1000
 
 static void out( const char *s )
@@ -187,8 +202,47 @@ void __stdcall steampresence_entry( void )
     out( "steampresence: holding.  Kill this process to withdraw them.\n" );
     FlushFileBuffers( GetStdHandle( STD_OUTPUT_HANDLE ) );
 
-    /* Hold the handles.  The objects live exactly as long as this process:
-     * the launcher starts it before the game and kills it after, so a run
-     * that is over stops claiming a client is there. */
-    for (;;) Sleep( 60000 );
+    /* Map a view and stamp it, so what the title does to this page is
+     * observable.  0xA5 is chosen only for being non-zero, non-ASCII and
+     * visually obvious in a dump; nothing reads meaning into it. */
+    {
+        unsigned char *view = MapViewOfFile( fm, FILE_MAP_WRITE, 0, 0, 0 );
+        /* static, not automatic: a 4 KB frame makes clang emit a call to
+         * ___chkstk_ms for stack probing, and a -nostdlib build has no CRT to
+         * provide it.  The link fails rather than misbehaving, but static is
+         * the right storage here anyway -- there is exactly one watcher. */
+        static unsigned char seen[SHAREDMEM_SIZE];
+        DWORD i, tick = 0;
+
+        if (!view)
+        {
+            out( "steampresence: MapViewOfFile FAILED; holding without a watch\n" );
+            out_num( "  last error ", GetLastError() );
+            for (;;) Sleep( 60000 );
+        }
+
+        for (i = 0; i < SHAREDMEM_SIZE; i++) view[i] = 0xA5;
+        for (i = 0; i < SHAREDMEM_SIZE; i++) seen[i] = 0xA5;
+        out( "steampresence: page stamped 0xA5 and under watch\n" );
+        FlushFileBuffers( GetStdHandle( STD_OUTPUT_HANDLE ) );
+
+        /* Poll rather than hook: the writer is the guest title in another
+         * process, so there is nothing here to hook.  50 ms is far below the
+         * stub's own timescale (it maps, checks and gives up inside a second)
+         * and costs nothing while idle. */
+        for (;;)
+        {
+            for (i = 0; i < SHAREDMEM_SIZE; i++)
+            {
+                if (view[i] == seen[i]) continue;
+                out_num( "steampresence: WROTE off ", i );
+                out_num( "  was ", seen[i] );
+                out_num( "  now ", view[i] );
+                seen[i] = view[i];
+                FlushFileBuffers( GetStdHandle( STD_OUTPUT_HANDLE ) );
+            }
+            Sleep( 50 );
+            if (++tick % 1200 == 0) out( "steampresence: still holding\n" );
+        }
+    }
 }

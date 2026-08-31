@@ -1,0 +1,141 @@
+#!/bin/sh
+#
+# stage-valve-steamclient -- put VALVE'S OWN Windows steamclient64.dll where a
+#                            game can load it, the way Proton does.
+#
+#   stage-valve-steamclient <prefix>
+#
+# Prints the Windows path it staged on stdout when it staged one, nothing when
+# it did not.  Diagnostics go to stderr.  The caller writes the registry.
+#
+# WHY THIS EXISTS.  A Steamworks title asks HKCU\Software\Valve\Steam\
+# ActiveProcess\SteamClientDll64 for a client library and loads whatever it
+# names.  On this port that has always been the tree's own guest
+# steamclient64.dll (dlls/steamclient64 -- Proton's lsteamclient PE half, with
+# the unix half moved out to ppc64le/steamapi's helper process).  Proton
+# instead stages VALVE'S REAL 26 MB Windows DLL into the prefix and names it by
+# full path, and its log for Civilization VI says so in one line:
+#
+#     Loaded L"C:\Program Files (x86)\Steam\steamclient64.dll" ... native
+#
+# This script is that staging, so the two routes can be compared on one
+# machine.  It is a SEPARATE FILE, like ./stage-guest-runtime, because ./proton
+# is edited by more than one person at a time and a self-contained script is
+# one line of contact instead of forty.
+#
+# OFF BY DEFAULT.  ./proton calls this only when WINE_PPC64LE_VALVE_STEAMCLIENT
+# is 1.  Every title that works today works through the builtin, and this
+# changes which library a game's steam_api64 loads -- that is not a default to
+# flip on an unmeasured hunch.
+#
+# A SYMLINK, NOT A COPY, and the reason is version lockstep rather than disk.
+# steamclient64.dll speaks a protocol version to a Steam client of its own
+# build, and Steam replaces this file on every client update -- by writing the
+# new one and renaming it into place.  A symlink is resolved at open() and
+# therefore always names the file the CURRENTLY INSTALLED client shipped; a
+# copy silently goes stale the first time Steam updates, and a stale client
+# library against a newer client is exactly the class of bug nobody thinks to
+# look for.  ppc64le/steamapi's helper links against that same installation's
+# ~/.steam/sdk64/steamclient.so, so the two halves stay matched for free.
+# (./stage-guest-runtime copies, for the opposite reason: its sources are
+# Wine's own module out of a Proton dist, where the tree is the thing that
+# moves and the file is not expected to track it.)
+#
+# It also keeps the licensing plain.  Nothing is copied, nothing is vendored,
+# nothing is redistributed -- the prefix points at the file Valve installed on
+# this disk, which is what dlls/steamclient64/PROVENANCE promises.
+#
+# WHERE IT GOES, and this is a decision rather than a detail.
+# C:\Program Files (x86)\Steam is where Proton puts it, it is already what
+# ./proton writes into HKCU\Software\Valve\Steam\SteamPath, and -- the part
+# that matters here -- IT IS NOT drive_c/windows/sysx8664.  find_dll_file()'s
+# guest branch searches that directory FIRST for every bare name, so a
+# steamclient64.dll left there would quietly displace this tree's builtin for
+# every caller in every process, with nothing in the registry saying so.
+# Keeping them in two places keeps the two routes legible and separable:
+#
+#     full path  C:\Program Files (x86)\Steam\steamclient64.dll  -> Valve's
+#     bare name  steamclient64.dll                               -> the builtin
+#
+# and the port's own module is not displaced, it is DEMOTED TO THE FALLBACK.
+# That fallback is real and automatic: load_guest_library() (dlls/ntdll/
+# signal_ppc64.c) tries a path as a file first and, if nothing loads, retries
+# the BASE NAME in the guest namespace -- so a game whose steam_api64 asks for
+# the full path gets Valve's library when it loads and this tree's builtin when
+# it does not, without a second registry value or a second launch.
+set -u
+
+prefix=${1:-}
+[ -n "$prefix" ] || { echo "usage: stage-valve-steamclient <prefix>" >&2; exit 2; }
+
+# 64-bit only, DELIBERATELY.  The 32-bit steamclient.dll has the same shape
+# and the same problem, and ./proton's SteamClientDll value is being worked on
+# separately (the i386 bridge helper landed 2026-08-30); staging under that
+# would make two changes indistinguishable in one log.  See the loader note in
+# dlls/ntdll/loader.c's is_unused_steam_import() for what the 32-bit half would
+# additionally need.
+dll=steamclient64.dll
+dest_dir="$prefix/drive_c/Program Files (x86)/Steam"
+win_path='C:\Program Files (x86)\Steam\steamclient64.dll'
+
+# e_lfanew is a LE u32 at 0x3c, Machine a LE u16 at e_lfanew+4; assembled from
+# bytes so the answer does not depend on the host's endianness.  Same function,
+# same reason, as ./stage-guest-runtime's -- staging a file with the right name
+# and the wrong instruction set is worse than staging nothing.
+pe_machine() {
+    _off=$(od -An -tu4 -j60 -N4 "$1" 2>/dev/null | tr -d ' \n')
+    case ${_off:-x} in ''|*[!0-9]*) return 1 ;; esac
+    _b=$(od -An -tx1 -j$((_off + 4)) -N2 "$1" 2>/dev/null | tr -d ' \n')
+    [ ${#_b} -eq 4 ] || return 1
+    printf '%s%s\n' "$(printf %s "$_b" | cut -c3-4)" "$(printf %s "$_b" | cut -c1-2)"
+}
+
+# Both spellings of the Steam root, deduplicated by real path: ~/.steam/steam
+# is usually a symlink to ~/.local/share/Steam and searching both would offer
+# the same file twice.  legacycompat/ carries a second pair on a current
+# client; it is the same file (a symlink to the root one here) and is searched
+# only as a fallback for an installation shaped differently.
+src=
+_seen=
+for _r in "${STEAM_ROOT:-$HOME/.local/share/Steam}" "$HOME/.steam/steam"; do
+    _root=$(cd "$_r" 2>/dev/null && pwd -P) || continue
+    case " $_seen " in *" $_root "*) continue ;; esac
+    _seen="$_seen $_root"
+    for _c in "$_root/$dll" "$_root/legacycompat/$dll"; do
+        [ -f "$_c" ] || continue
+        [ "$(pe_machine "$_c")" = "8664" ] || {
+            echo "stage-valve-steamclient: $_c is not an x86-64 PE, ignoring" >&2
+            continue
+        }
+        src=$_c
+        break
+    done
+    [ -n "$src" ] && break
+done
+
+if [ -z "$src" ]; then
+    echo "stage-valve-steamclient: no Valve $dll on this machine; leaving the" >&2
+    echo "  builtin to answer SteamClientDll64.  It ships with the Steam client:" >&2
+    echo "  \$HOME/.local/share/Steam/$dll." >&2
+    exit 1
+fi
+
+mkdir -p "$dest_dir" 2>/dev/null || {
+    echo "stage-valve-steamclient: cannot create $dest_dir" >&2
+    exit 1
+}
+
+# Relinked every launch rather than left alone, so the prefix follows a client
+# that moved or was reinstalled.  ln -sfn through a temporary name and rename,
+# so a concurrent process never sees the link missing.
+tmp=$dest_dir/.$dll.tmp
+rm -f "$tmp" 2>/dev/null
+if ln -s "$src" "$tmp" 2>/dev/null && mv -f "$tmp" "$dest_dir/$dll" 2>/dev/null; then
+    echo "stage-valve-steamclient: $win_path -> $src (symlink)" >&2
+    printf '%s\n' "$win_path"
+    exit 0
+fi
+
+rm -f "$tmp" 2>/dev/null
+echo "stage-valve-steamclient: could not link $dest_dir/$dll -> $src" >&2
+exit 1
