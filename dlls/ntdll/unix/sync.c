@@ -78,6 +78,87 @@ WINE_DEFAULT_DEBUG_CHANNEL(sync);
 HANDLE keyed_event = 0;
 int inproc_device_fd = -1;
 
+/*
+ * ---------------------------------------------------------------------------
+ * ntsync userspace fast path (ppc64le port)
+ * ---------------------------------------------------------------------------
+ *
+ * A perf census of the Cyberpunk 2077 benchmark on this port found that 91% of
+ * every ioctl the process issues is ntsync, and that NTSYNC_IOC_WAIT_ANY and
+ * NTSYNC_IOC_SEM_RELEASE are 70% of all ioctls between them -- about 4,700
+ * ntsync ioctls per frame.  Most of them are uncontended.
+ *
+ * With the matching module (ppc64le/kernel/ntsync-fastpath/) each semaphore
+ * object's fd can be mmap()ed, exposing one 64-bit word that holds the count,
+ * the number of tasks queued in the kernel, and two flag bits:
+ *
+ *	bits  0..31	count
+ *	bits 32..60	waiters
+ *	bit  61		the kernel has a unit on loan -- do not release
+ *	bit  62		a wait-all is queued -- do not touch
+ *	bit  63		not a semaphore -- do not touch
+ *
+ * Acquire is then a decrement-if-positive and release is an add, both a single
+ * 64-bit compare-and-swap, with the ioctl only when the word says the kernel
+ * has to be involved.  The memory-ordering argument is written out in full at
+ * the top of the module source; the part that matters here is that count and
+ * waiters deliberately share one word, so the release CAS reports the waiter
+ * count exactly as of its own position in that word's coherence order.  There
+ * is no store-buffer pattern to get wrong, which on POWER9 is the difference
+ * between correct and "hangs for someone else in three hours".
+ *
+ * Off unless WINE_PPC64LE_NTSYNC_FASTPATH is set.  When it is off nothing is
+ * mapped, sync->shm is NULL everywhere, and every path below is the ioctl path
+ * that was here before.  Set it to 2 to also count hits and misses; that mode
+ * shares counters between threads and is for diagnosis, not for benchmarking.
+ */
+
+#define NTSYNC_SHM_VERSION      1
+#define NTSYNC_SHM_TYPE_SEM     0                        /* enum ntsync_type */
+
+#define NTSYNC_COUNT_MASK       0x00000000ffffffffull
+#define NTSYNC_WAITER_MASK      0x1fffffff00000000ull
+#define NTSYNC_F_NO_TOUCH       0xc000000000000000ull     /* WAIT_ALL | NO_FASTPATH */
+#define NTSYNC_F_NO_RELEASE     0xe000000000000000ull     /* the above, plus HOLD */
+
+struct ntsync_shm
+{
+    unsigned long long state;
+    unsigned int       max;
+    unsigned int       type;
+    unsigned int       version;
+    unsigned int       reserved[27];
+};
+
+#ifdef NTSYNC_IOC_EVENT_READ
+
+/* -1 not yet resolved, 0 off, 1 on, 2 on with statistics.  Only ever written
+ * under fd_cache_mutex, in map_inproc_sync(). */
+static int ntsync_fastpath = -1;
+
+static LONG ntsync_fp_stats[4];   /* acquire hit, acquire miss, release, wake ioctl */
+static LONG ntsync_fp_events;     /* sum of the above, so the report always fires */
+
+static void ntsync_fp_count( unsigned int which )
+{
+    LONG total;
+
+    __atomic_fetch_add( &ntsync_fp_stats[which], 1, __ATOMIC_RELAXED );
+    /* Trigger on the total, not on one bucket.  Keying this off acquire hits
+     * was useless: on this workload semaphores are a few percent of all ntsync
+     * objects, so acquire hits are the rarest thing here and the report never
+     * printed at all. */
+    total = __atomic_fetch_add( &ntsync_fp_events, 1, __ATOMIC_RELAXED ) + 1;
+    if (total & 0x3ffff) return;
+    ERR( "ntsync fastpath: acquire %d hit / %d miss, release %d fast, %d needed a wake ioctl\n",
+         (int)__atomic_load_n( &ntsync_fp_stats[0], __ATOMIC_RELAXED ),
+         (int)__atomic_load_n( &ntsync_fp_stats[1], __ATOMIC_RELAXED ),
+         (int)__atomic_load_n( &ntsync_fp_stats[2], __ATOMIC_RELAXED ),
+         (int)__atomic_load_n( &ntsync_fp_stats[3], __ATOMIC_RELAXED ) );
+}
+
+#endif /* NTSYNC_IOC_EVENT_READ */
+
 static const char *debugstr_timeout( const LARGE_INTEGER *timeout )
 {
     if (!timeout) return "(infinite)";
@@ -686,6 +767,7 @@ struct inproc_sync
     unsigned int   access;    /* handle access rights */
     unsigned short type;      /* enum inproc_sync_type as short to save space */
     unsigned short closed;    /* fd has been closed but sync is still referenced */
+    struct ntsync_shm *shm;   /* fast-path page, or NULL: follows the fd's lifetime */
 };
 
 #define INPROC_SYNC_CACHE_BLOCK_SIZE  (65536 / sizeof(struct inproc_sync))
@@ -704,6 +786,140 @@ static inline unsigned int inproc_sync_handle_to_index( HANDLE handle, unsigned 
 static BOOL is_pseudo_handle( HANDLE handle )
 {
     return ((ULONG)(ULONG_PTR)handle >= 0xfffffffa);
+}
+
+/* caller must hold fd_cache_mutex */
+static void map_inproc_sync( struct inproc_sync *sync )
+{
+    sync->shm = NULL;
+
+#ifdef NTSYNC_IOC_EVENT_READ
+    {
+        struct ntsync_shm *shm;
+
+        if (ntsync_fastpath < 0)
+        {
+            const char *str = getenv( "WINE_PPC64LE_NTSYNC_FASTPATH" );
+            if (!str || !str[0] || str[0] == '0') ntsync_fastpath = 0;
+            else if (!(ntsync_fastpath = atoi( str ))) ntsync_fastpath = 1;
+            if (ntsync_fastpath) ERR( "ntsync userspace fast path enabled (mode %d)\n", ntsync_fastpath );
+        }
+        if (!ntsync_fastpath) return;
+        if (sync->type != INPROC_SYNC_SEMAPHORE) return;
+
+        /* One page. Passing the struct size rather than a page size keeps this
+         * right whatever the kernel's page size is; mmap rounds up and the
+         * module insists on exactly one page. */
+        shm = mmap( NULL, sizeof(*shm), PROT_READ | PROT_WRITE, MAP_SHARED, sync->fd, 0 );
+        if (shm == MAP_FAILED) return;   /* module without the fast path: ENODEV */
+
+        /* Refuse anything unrecognised outright rather than guessing at a
+         * layout we might be wrong about. */
+        if (shm->version != NTSYNC_SHM_VERSION || shm->type != NTSYNC_SHM_TYPE_SEM || !shm->max)
+        {
+            munmap( shm, sizeof(*shm) );
+            return;
+        }
+        sync->shm = shm;
+    }
+#endif
+}
+
+/* Take one unit without entering the kernel.  Returns FALSE for "could not",
+ * which is always safe: the caller then does exactly what it did before.
+ *
+ * This needs no waiter check.  Taking a unit only removes signal, so it cannot
+ * lose a wakeup; it is precisely the decrement the kernel would have performed,
+ * on precisely the word the kernel would have performed it on, and the kernel
+ * performs its own decrements with the same atomic, so a unit cannot be handed
+ * out twice.  What it does change is fairness: a running thread can now take a
+ * unit ahead of a thread already queued in the kernel.  NT semaphores do not
+ * promise wakeup order, and no unit is lost -- the release that would have fed
+ * the sleeper is still counted, and whichever release finally finds the count
+ * empty and a waiter queued takes the ioctl and wakes it.
+ *
+ * SEQ_CST on success so that whatever the releasing thread published before its
+ * release is visible to us before we return holding the unit. */
+static BOOL fast_acquire_semaphore( struct inproc_sync *sync )
+{
+#ifdef NTSYNC_IOC_EVENT_READ
+    struct ntsync_shm *shm = sync->shm;
+    unsigned long long old = __atomic_load_n( &shm->state, __ATOMIC_RELAXED );
+
+    for (;;)
+    {
+        if (old & NTSYNC_F_NO_TOUCH) break;
+        if (!(old & NTSYNC_COUNT_MASK)) break;
+        if (__atomic_compare_exchange_n( &shm->state, &old, old - 1, FALSE,
+                                         __ATOMIC_SEQ_CST, __ATOMIC_RELAXED ))
+        {
+            if (ntsync_fastpath > 1) ntsync_fp_count( 0 );
+            return TRUE;
+        }
+    }
+    if (ntsync_fastpath > 1) ntsync_fp_count( 1 );
+#endif
+    return FALSE;
+}
+
+/* Add "count" units without entering the kernel where that is possible.
+ * Returns STATUS_NOT_IMPLEMENTED for "did not do it", so the caller falls
+ * through to the ioctl exactly as before.
+ *
+ * The whole reason count and waiters live in one word is here: the CAS that
+ * performs the release also reports, in the value it displaces, how many tasks
+ * were queued as of that CAS's own position in the coherence order of the word.
+ * If any were, only the kernel can wake them, so we issue
+ * NTSYNC_IOC_SEM_RELEASE with a count of zero -- which adds nothing and just
+ * runs the wake scan, and is part of the ABI that already exists.  If none
+ * were, then every waiter's own CAS (it increments waiters) is later in that
+ * same coherence order, so that waiter's CAS returns a count already including
+ * this release and the kernel's wait path will not sleep.  Those are the only
+ * two cases; two read-modify-writes of one location cannot both be first.
+ *
+ * We also decline while the module has a unit on loan (bit 61).  It takes a
+ * unit out of the count before it has found a waiter to hand it to and puts it
+ * back if it finds none, so during that window the count reads one low; a
+ * release measured against that number could make the put-back overshoot max.
+ * Declining sends us to the ioctl, which runs under the object lock and so
+ * cannot overlap the window at all.  The acquire path above is not blocked by
+ * the loan -- taking a unit while one is out is harmless, and the loan window
+ * is exactly when someone is queued, which here is often. */
+static NTSTATUS fast_release_semaphore( struct inproc_sync *sync, ULONG count, ULONG *prev_count )
+{
+#ifdef NTSYNC_IOC_EVENT_READ
+    struct ntsync_shm *shm = sync->shm;
+    unsigned long long old, val;
+    unsigned int prev;
+
+    if (!count) return STATUS_NOT_IMPLEMENTED;   /* a pure wake; let the ioctl do it */
+
+    old = __atomic_load_n( &shm->state, __ATOMIC_RELAXED );
+    for (;;)
+    {
+        if (old & NTSYNC_F_NO_RELEASE) return STATUS_NOT_IMPLEMENTED;
+        prev = (unsigned int)(old & NTSYNC_COUNT_MASK);
+        if ((unsigned long long)prev + count > shm->max) return STATUS_NOT_IMPLEMENTED;
+        val = (old & ~NTSYNC_COUNT_MASK) | (prev + count);
+        if (__atomic_compare_exchange_n( &shm->state, &old, val, FALSE,
+                                         __ATOMIC_SEQ_CST, __ATOMIC_RELAXED )) break;
+    }
+
+    if (ntsync_fastpath > 1) ntsync_fp_count( 2 );
+
+    if (old & NTSYNC_WAITER_MASK)
+    {
+        __u32 zero = 0;
+
+        if (ntsync_fastpath > 1) ntsync_fp_count( 3 );
+        if (ioctl( sync->fd, NTSYNC_IOC_SEM_RELEASE, &zero ) < 0) return errno_to_status( errno );
+    }
+
+    if (prev_count) *prev_count = prev;
+    return STATUS_SUCCESS;
+#else
+    return STATUS_NOT_IMPLEMENTED;
+#endif
 }
 
 static struct inproc_sync *cache_inproc_sync( HANDLE handle, struct inproc_sync *sync )
@@ -748,6 +964,7 @@ static struct inproc_sync *cache_inproc_sync( HANDLE handle, struct inproc_sync 
     cache->access = sync->access;
     cache->type = sync->type;
     cache->closed = sync->closed;
+    cache->shm = sync->shm;
     /* Make sure we set the other members before the refcount; this store needs
      * release semantics [paired with the load in get_cached_inproc_sync()].
      * Set the refcount to 2 (one for the handle, one for the caller). */
@@ -777,10 +994,15 @@ static void release_inproc_sync( struct inproc_sync *sync )
     /* save the fd now; as soon as the refcount hits 0 we cannot
      * access the cache anymore */
     int fd = sync->fd;
+    struct ntsync_shm *shm = sync->shm;
     LONG ref = InterlockedDecrement( &sync->refcount );
 
     assert( ref >= 0 );
-    if (!ref) close( fd );
+    if (!ref)
+    {
+        if (shm) munmap( shm, sizeof(*shm) );
+        close( fd );
+    }
 }
 
 static struct inproc_sync *get_cached_inproc_sync( HANDLE handle )
@@ -826,6 +1048,7 @@ static NTSTATUS get_server_inproc_sync( HANDLE handle, struct inproc_sync *sync 
             sync->access = reply->access;
             sync->type = reply->type;
             sync->closed = 0;
+            sync->shm = NULL;
         }
     }
     SERVER_END_REQ;
@@ -863,6 +1086,7 @@ static NTSTATUS get_inproc_sync( HANDLE handle, enum inproc_sync_type desired_ty
                 server_leave_uninterrupted_section( &fd_cache_mutex, &sigset );
                 return ret;
             }
+            map_inproc_sync( stack );
             sync = cache_inproc_sync( handle, stack );
         }
         server_leave_uninterrupted_section( &fd_cache_mutex, &sigset );
@@ -926,7 +1150,8 @@ static NTSTATUS inproc_release_semaphore( HANDLE handle, ULONG count, ULONG *pre
 
     if (inproc_device_fd < 0) return STATUS_NOT_IMPLEMENTED;
     if ((ret = get_inproc_sync( handle, INPROC_SYNC_SEMAPHORE, SEMAPHORE_MODIFY_STATE, &stack, &sync ))) return ret;
-    ret = linux_release_semaphore_obj( sync->fd, count, prev_count );
+    ret = sync->shm ? fast_release_semaphore( sync, count, prev_count ) : STATUS_NOT_IMPLEMENTED;
+    if (ret == STATUS_NOT_IMPLEMENTED) ret = linux_release_semaphore_obj( sync->fd, count, prev_count );
     release_inproc_sync( sync );
     return ret;
 }
@@ -1061,6 +1286,25 @@ static NTSTATUS inproc_wait( DWORD count, const HANDLE *handles, WAIT_TYPE type,
             return ret;
         }
         objs[i] = syncs[i]->fd;
+    }
+
+    /* A wait-any returns the first signalled object in index order, so we may
+     * only walk past an object we know is not signalled.  An object with no
+     * mapping tells us nothing about itself, so we stop there and let the
+     * kernel decide.  Wait-all is never fast-pathed: it has to take every
+     * object at once, which is precisely what we cannot do from here. */
+    if (count && (type != WaitAll || count == 1))
+    {
+        for (int i = 0; i < count; ++i)
+        {
+            if (!syncs[i]->shm) break;
+            if (fast_acquire_semaphore( syncs[i] ))
+            {
+                ret = (type != WaitAll) ? i : 0;
+                while (count--) release_inproc_sync( syncs[count] );
+                return ret;
+            }
+        }
     }
 
     if (alertable) alert_fd = get_inproc_alert_fd();
