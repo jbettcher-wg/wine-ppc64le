@@ -432,6 +432,10 @@ static HRESULT call_LockRect( IDirect3DSurface9 *surf, D3DLOCKED_RECT *lr, DWORD
 {
     return ((PFN_LockRect)surf->lpVtbl->LockRect)( surf, lr, NULL, flags );
 }
+#ifndef __i386__
+/* Defined only where they are called.  The i386 leg does not attempt
+ * NPatchMode at all -- see the step that says so -- and a helper it cannot
+ * use would only warn. */
 static HRESULT call_SetNPatchMode( IDirect3DDevice9 *dev, float segments )
 {
     return ((PFN_SetNPatchMode)dev->lpVtbl->SetNPatchMode)( dev, segments );
@@ -440,10 +444,175 @@ static float call_GetNPatchMode( IDirect3DDevice9 *dev )
 {
     return ((PFN_GetNPatchMode)dev->lpVtbl->GetNPatchMode)( dev );
 }
+#endif
 static HRESULT call_UnlockRect( IDirect3DSurface9 *surf )
 {
     return ((PFN_UnlockRect)surf->lpVtbl->UnlockRect)( surf );
 }
+
+#ifdef __i386__
+/* ---- the Lock-family helpers, for the i386 leg's bounce steps ------------
+ *
+ * Guarded to the leg that calls them, like the two NPatchMode helpers above
+ * and for the same reason: a static function no leg calls is a warning, and
+ * only the i386 leg bounces anything (see the bounce steps' banner).  The
+ * day those steps are promoted to every leg this guard comes off with them. */
+typedef HRESULT (WINAPI *PFN_CreateTexture)(
+    IDirect3DDevice9 *, UINT, UINT, UINT, DWORD, D3DFORMAT, D3DPOOL,
+    IDirect3DTexture9 **, HANDLE *);
+typedef HRESULT (WINAPI *PFN_TexLockRect)(
+    IDirect3DTexture9 *, UINT, D3DLOCKED_RECT *, const RECT *, DWORD);
+typedef HRESULT (WINAPI *PFN_TexUnlockRect)(IDirect3DTexture9 *, UINT);
+typedef ULONG   (WINAPI *PFN_Release_Texture)(IDirect3DTexture9 *);
+typedef HRESULT (WINAPI *PFN_CreateVertexBuffer)(
+    IDirect3DDevice9 *, UINT, DWORD, DWORD, D3DPOOL,
+    IDirect3DVertexBuffer9 **, HANDLE *);
+typedef HRESULT (WINAPI *PFN_VBLock)(
+    IDirect3DVertexBuffer9 *, UINT, UINT, void **, DWORD);
+typedef HRESULT (WINAPI *PFN_VBUnlock)(IDirect3DVertexBuffer9 *);
+typedef ULONG   (WINAPI *PFN_Release_VB)(IDirect3DVertexBuffer9 *);
+
+static HRESULT call_CreateTexture( IDirect3DDevice9 *dev, UINT w, UINT h, UINT levels,
+    D3DFORMAT fmt, D3DPOOL pool, IDirect3DTexture9 **out_tex )
+{
+    return ((PFN_CreateTexture)dev->lpVtbl->CreateTexture)(
+        dev, w, h, levels, 0, fmt, pool, out_tex, NULL );
+}
+static HRESULT call_TexLockRect( IDirect3DTexture9 *tex, UINT level, D3DLOCKED_RECT *lr,
+    const RECT *rect, DWORD flags )
+{
+    return ((PFN_TexLockRect)tex->lpVtbl->LockRect)( tex, level, lr, rect, flags );
+}
+static HRESULT call_TexUnlockRect( IDirect3DTexture9 *tex, UINT level )
+{
+    return ((PFN_TexUnlockRect)tex->lpVtbl->UnlockRect)( tex, level );
+}
+static void call_Release_Texture( IDirect3DTexture9 *p )
+{
+    if (p) ((PFN_Release_Texture)p->lpVtbl->Release)( p );
+}
+static HRESULT call_CreateVertexBuffer( IDirect3DDevice9 *dev, UINT length, D3DPOOL pool,
+    IDirect3DVertexBuffer9 **out_vb )
+{
+    return ((PFN_CreateVertexBuffer)dev->lpVtbl->CreateVertexBuffer)(
+        dev, length, 0, 0, pool, out_vb, NULL );
+}
+static HRESULT call_VBLock( IDirect3DVertexBuffer9 *vb, UINT offset, UINT size,
+    void **bits, DWORD flags )
+{
+    return ((PFN_VBLock)vb->lpVtbl->Lock)( vb, offset, size, bits, flags );
+}
+static HRESULT call_VBUnlock( IDirect3DVertexBuffer9 *vb )
+{
+    return ((PFN_VBUnlock)vb->lpVtbl->Unlock)( vb );
+}
+static void call_Release_VB( IDirect3DVertexBuffer9 *p )
+{
+    if (p) ((PFN_Release_VB)p->lpVtbl->Release)( p );
+}
+typedef HRESULT (WINAPI *PFN_CreateCubeTexture)(
+    IDirect3DDevice9 *, UINT, UINT, DWORD, D3DFORMAT, D3DPOOL,
+    IDirect3DCubeTexture9 **, HANDLE *);
+typedef HRESULT (WINAPI *PFN_CubeLockRect)(
+    IDirect3DCubeTexture9 *, D3DCUBEMAP_FACES, UINT, D3DLOCKED_RECT *, const RECT *, DWORD);
+typedef HRESULT (WINAPI *PFN_CubeUnlockRect)(
+    IDirect3DCubeTexture9 *, D3DCUBEMAP_FACES, UINT);
+typedef ULONG   (WINAPI *PFN_Release_Cube)(IDirect3DCubeTexture9 *);
+typedef HRESULT (WINAPI *PFN_CreateVolumeTexture)(
+    IDirect3DDevice9 *, UINT, UINT, UINT, UINT, DWORD, D3DFORMAT, D3DPOOL,
+    IDirect3DVolumeTexture9 **, HANDLE *);
+typedef HRESULT (WINAPI *PFN_VolTexLockBox)(
+    IDirect3DVolumeTexture9 *, UINT, D3DLOCKED_BOX *, const D3DBOX *, DWORD);
+typedef HRESULT (WINAPI *PFN_VolTexUnlockBox)(IDirect3DVolumeTexture9 *, UINT);
+typedef HRESULT (WINAPI *PFN_GetVolumeLevel)(
+    IDirect3DVolumeTexture9 *, UINT, IDirect3DVolume9 **);
+typedef ULONG   (WINAPI *PFN_Release_VolTex)(IDirect3DVolumeTexture9 *);
+typedef HRESULT (WINAPI *PFN_VolLockBox)(
+    IDirect3DVolume9 *, D3DLOCKED_BOX *, const D3DBOX *, DWORD);
+typedef HRESULT (WINAPI *PFN_VolUnlockBox)(IDirect3DVolume9 *);
+typedef ULONG   (WINAPI *PFN_Release_Volume)(IDirect3DVolume9 *);
+typedef HRESULT (WINAPI *PFN_CreateIndexBuffer)(
+    IDirect3DDevice9 *, UINT, DWORD, D3DFORMAT, D3DPOOL,
+    IDirect3DIndexBuffer9 **, HANDLE *);
+typedef HRESULT (WINAPI *PFN_IBLock)(IDirect3DIndexBuffer9 *, UINT, UINT, void **, DWORD);
+typedef HRESULT (WINAPI *PFN_IBUnlock)(IDirect3DIndexBuffer9 *);
+typedef ULONG   (WINAPI *PFN_Release_IB)(IDirect3DIndexBuffer9 *);
+
+static HRESULT call_CreateCubeTexture( IDirect3DDevice9 *dev, UINT edge, UINT levels,
+    D3DFORMAT fmt, D3DPOOL pool, IDirect3DCubeTexture9 **out_tex )
+{
+    return ((PFN_CreateCubeTexture)dev->lpVtbl->CreateCubeTexture)(
+        dev, edge, levels, 0, fmt, pool, out_tex, NULL );
+}
+static HRESULT call_CubeLockRect( IDirect3DCubeTexture9 *tex, D3DCUBEMAP_FACES face,
+    UINT level, D3DLOCKED_RECT *lr, DWORD flags )
+{
+    return ((PFN_CubeLockRect)tex->lpVtbl->LockRect)( tex, face, level, lr, NULL, flags );
+}
+static HRESULT call_CubeUnlockRect( IDirect3DCubeTexture9 *tex, D3DCUBEMAP_FACES face, UINT level )
+{
+    return ((PFN_CubeUnlockRect)tex->lpVtbl->UnlockRect)( tex, face, level );
+}
+static void call_Release_Cube( IDirect3DCubeTexture9 *p )
+{
+    if (p) ((PFN_Release_Cube)p->lpVtbl->Release)( p );
+}
+static HRESULT call_CreateVolumeTexture( IDirect3DDevice9 *dev, UINT w, UINT h, UINT d,
+    UINT levels, D3DFORMAT fmt, D3DPOOL pool, IDirect3DVolumeTexture9 **out_tex )
+{
+    return ((PFN_CreateVolumeTexture)dev->lpVtbl->CreateVolumeTexture)(
+        dev, w, h, d, levels, 0, fmt, pool, out_tex, NULL );
+}
+static HRESULT call_VolTexLockBox( IDirect3DVolumeTexture9 *tex, UINT level,
+    D3DLOCKED_BOX *lb, DWORD flags )
+{
+    return ((PFN_VolTexLockBox)tex->lpVtbl->LockBox)( tex, level, lb, NULL, flags );
+}
+static HRESULT call_VolTexUnlockBox( IDirect3DVolumeTexture9 *tex, UINT level )
+{
+    return ((PFN_VolTexUnlockBox)tex->lpVtbl->UnlockBox)( tex, level );
+}
+static HRESULT call_GetVolumeLevel( IDirect3DVolumeTexture9 *tex, UINT level,
+    IDirect3DVolume9 **out_vol )
+{
+    return ((PFN_GetVolumeLevel)tex->lpVtbl->GetVolumeLevel)( tex, level, out_vol );
+}
+static void call_Release_VolTex( IDirect3DVolumeTexture9 *p )
+{
+    if (p) ((PFN_Release_VolTex)p->lpVtbl->Release)( p );
+}
+static HRESULT call_VolLockBox( IDirect3DVolume9 *vol, D3DLOCKED_BOX *lb, DWORD flags )
+{
+    return ((PFN_VolLockBox)vol->lpVtbl->LockBox)( vol, lb, NULL, flags );
+}
+static HRESULT call_VolUnlockBox( IDirect3DVolume9 *vol )
+{
+    return ((PFN_VolUnlockBox)vol->lpVtbl->UnlockBox)( vol );
+}
+static void call_Release_Volume( IDirect3DVolume9 *p )
+{
+    if (p) ((PFN_Release_Volume)p->lpVtbl->Release)( p );
+}
+static HRESULT call_CreateIndexBuffer( IDirect3DDevice9 *dev, UINT length, D3DPOOL pool,
+    IDirect3DIndexBuffer9 **out_ib )
+{
+    return ((PFN_CreateIndexBuffer)dev->lpVtbl->CreateIndexBuffer)(
+        dev, length, 0, D3DFMT_INDEX16, pool, out_ib, NULL );
+}
+static HRESULT call_IBLock( IDirect3DIndexBuffer9 *ib, UINT offset, UINT size,
+    void **bits, DWORD flags )
+{
+    return ((PFN_IBLock)ib->lpVtbl->Lock)( ib, offset, size, bits, flags );
+}
+static HRESULT call_IBUnlock( IDirect3DIndexBuffer9 *ib )
+{
+    return ((PFN_IBUnlock)ib->lpVtbl->Unlock)( ib );
+}
+static void call_Release_IB( IDirect3DIndexBuffer9 *p )
+{
+    if (p) ((PFN_Release_IB)p->lpVtbl->Release)( p );
+}
+#endif /* __i386__ */
 
 /* ------------------------------------------------------------- output */
 
@@ -690,6 +859,390 @@ static int d3d9_smoke_run( void )
         out( "\n" );
     }
 
+#ifdef __i386__
+    /* =================================================================
+     *  THE BELOW-4-GiB LOCK BOUNCE -- i386 LEG ONLY
+     * =================================================================
+     *
+     * WHY THESE THREE STEPS EXIST AND WHY THEY ARE GUARDED.  On this host
+     * DXVK's d3d9 maps above 4 GiB, so on the i386 lane every LockRect,
+     * LockBox and buffer Lock is served by a BOUNCE: dlls/d3d9/main.c hands
+     * the guest a below-4-GiB buffer, fills it from the host mapping, and
+     * copies it back before the host sees the Unlock.  Getting the SIZE of
+     * that copy right is block-compressed mip arithmetic per format, and a
+     * wrong size corrupts exactly the buffers the bounce exists to protect,
+     * silently.  Steps above prove the READ direction on one uncompressed
+     * full-surface lock; these three prove the three things that one cannot:
+     * block-compressed pitch and the one-block mip floor, the WRITE
+     * direction, and that a sub-rect flush leaves everything outside the
+     * rect alone.
+     *
+     * They are #ifdef'd to i386 because check-d3d9-smoke.sh's gate is a DIFF
+     * of the native leg against the x86-64 guest leg, neither of which
+     * bounces anything -- adding steps there would change a gate this work
+     * cannot run (it raises modal dialogs on a desktop somebody is using).
+     * Promoting them to all three legs is a follow-up that needs that gate
+     * run once, not a thing to do blind. */
+    {
+        IDirect3DTexture9 *dxt = NULL, *argb = NULL;
+        IDirect3DCubeTexture9 *cube = NULL;
+        IDirect3DVolumeTexture9 *voltex = NULL;
+        IDirect3DVolume9 *vol = NULL;
+        IDirect3DVertexBuffer9 *vb = NULL;
+        IDirect3DIndexBuffer9 *ib = NULL;
+        D3DLOCKED_RECT lr;
+        UINT i, bad;
+
+        /* ---- DXT1: the block pitch, and the mip that floors at one block --
+         *
+         * 64x64 DXT1 is 16x16 blocks of 8 bytes: pitch = align(8*16,4) = 128,
+         * 16 block rows, 2048 bytes.  Level 6 is 1x1 TEXELS, which is still
+         * ONE 4x4 BLOCK: pitch 8, one row, 8 bytes -- the case a pitch-times-
+         * height sizing gets wrong by 4x in each direction and the case that
+         * makes a bounce write off the end of the host's slice. */
+        begin( "CreateTexture(64x64 DXT1, full chain) + LockRect L0 and L6: "
+               "block pitch, write, read back" );
+        bad = 0;
+        hr = call_CreateTexture( device, 64, 64, 0, D3DFMT_DXT1, D3DPOOL_SYSTEMMEM, &dxt );
+        if (SUCCEEDED(hr) && dxt)
+        {
+            UINT pitch0 = 0, pitch6 = 0;
+
+            hr = call_TexLockRect( dxt, 0, &lr, NULL, 0 );
+            if (SUCCEEDED(hr) && lr.pBits)
+            {
+                pitch0 = (UINT)lr.Pitch;
+                for (i = 0; i < 16u * 128u; i++) ((BYTE *)lr.pBits)[i] = (BYTE)(i * 7 + 3);
+                call_TexUnlockRect( dxt, 0 );
+                hr = call_TexLockRect( dxt, 0, &lr, NULL, D3DLOCK_READONLY );
+                if (SUCCEEDED(hr) && lr.pBits)
+                {
+                    for (i = 0; i < 16u * 128u; i++)
+                        if (((const BYTE *)lr.pBits)[i] != (BYTE)(i * 7 + 3)) bad++;
+                    call_TexUnlockRect( dxt, 0 );
+                }
+                else bad++;
+            }
+            else bad++;
+
+            if (SUCCEEDED(hr))
+            {
+                hr = call_TexLockRect( dxt, 6, &lr, NULL, 0 );
+                if (SUCCEEDED(hr) && lr.pBits)
+                {
+                    pitch6 = (UINT)lr.Pitch;
+                    for (i = 0; i < 8; i++) ((BYTE *)lr.pBits)[i] = (BYTE)(0xA0 + i);
+                    call_TexUnlockRect( dxt, 6 );
+                    hr = call_TexLockRect( dxt, 6, &lr, NULL, D3DLOCK_READONLY );
+                    if (SUCCEEDED(hr) && lr.pBits)
+                    {
+                        for (i = 0; i < 8; i++)
+                            if (((const BYTE *)lr.pBits)[i] != (BYTE)(0xA0 + i)) bad++;
+                        call_TexUnlockRect( dxt, 6 );
+                    }
+                    else bad++;
+                }
+                else bad++;
+            }
+            out( "L0pitch=" ); out_dec( pitch0 );
+            out( " L6pitch=" ); out_dec( pitch6 );
+            out( " bad=" ); out_dec( bad );
+            verdict( SUCCEEDED(hr) && pitch0 == 128 && pitch6 == 8 && !bad,
+                     "DXT1 block pitch or the one-block mip did not round trip" );
+        }
+        else
+        {
+            out_hr( "hr", hr );
+            verdict( FALSE, "no DXT1 texture" );
+        }
+
+        /* ---- the sub-rect flush must not spill ---------------------------
+         *
+         * Fill a 32x32 A8R8G8B8 level with 0x11, then lock ONLY (8,8)-(24,24)
+         * and write 0x22 there.  A bounce that flushed its whole span would
+         * write its own uninitialised bytes over the 0x11 texels outside the
+         * rect; a bounce with the offset arithmetic wrong would land the
+         * 0x22 block somewhere else.  Both show up here as a nonzero count,
+         * and the two counts are printed separately so a failure says WHICH. */
+        begin( "LockRect(sub-rect 8,8-24,24) on 32x32 A8R8G8B8: the flush must "
+               "leave every texel outside the rect alone" );
+        bad = 0;
+        {
+            UINT inside_bad = 0, outside_bad = 0;
+            RECT sub;
+
+            sub.left = 8; sub.top = 8; sub.right = 24; sub.bottom = 24;
+            hr = call_CreateTexture( device, 32, 32, 1, D3DFMT_A8R8G8B8,
+                                     D3DPOOL_SYSTEMMEM, &argb );
+            if (SUCCEEDED(hr) && argb)
+            {
+                hr = call_TexLockRect( argb, 0, &lr, NULL, 0 );
+                if (SUCCEEDED(hr) && lr.pBits)
+                {
+                    UINT y;
+                    for (y = 0; y < 32; y++)
+                    {
+                        BYTE *row = (BYTE *)lr.pBits + (size_t)y * lr.Pitch;
+                        for (i = 0; i < 32 * 4; i++) row[i] = 0x11;
+                    }
+                    call_TexUnlockRect( argb, 0 );
+                }
+                else bad++;
+            }
+            if (SUCCEEDED(hr) && argb && !bad)
+            {
+                hr = call_TexLockRect( argb, 0, &lr, &sub, 0 );
+                if (SUCCEEDED(hr) && lr.pBits)
+                {
+                    UINT y;
+                    for (y = 0; y < 16; y++)
+                    {
+                        BYTE *row = (BYTE *)lr.pBits + (size_t)y * lr.Pitch;
+                        for (i = 0; i < 16 * 4; i++) row[i] = 0x22;
+                    }
+                    call_TexUnlockRect( argb, 0 );
+                }
+                else bad++;
+            }
+            if (SUCCEEDED(hr) && argb && !bad)
+            {
+                hr = call_TexLockRect( argb, 0, &lr, NULL, D3DLOCK_READONLY );
+                if (SUCCEEDED(hr) && lr.pBits)
+                {
+                    UINT x, y;
+                    for (y = 0; y < 32; y++)
+                    {
+                        const BYTE *row = (const BYTE *)lr.pBits + (size_t)y * lr.Pitch;
+                        for (x = 0; x < 32; x++)
+                        {
+                            BOOL in = (x >= 8 && x < 24 && y >= 8 && y < 24);
+                            BYTE want = in ? 0x22 : 0x11;
+                            for (i = 0; i < 4; i++)
+                                if (row[x * 4 + i] != want) { if (in) inside_bad++; else outside_bad++; }
+                        }
+                    }
+                    call_TexUnlockRect( argb, 0 );
+                }
+                else bad++;
+            }
+            out( "inside_bad=" ); out_dec( inside_bad );
+            out( " outside_bad=" ); out_dec( outside_bad );
+            verdict( SUCCEEDED(hr) && !bad && !inside_bad && !outside_bad,
+                     "a sub-rect lock did not land, or its flush spilled outside the rect" );
+        }
+
+        /* ---- the buffer Lock: OffsetToLock, and a SizeToLock of 0 --------
+         *
+         * These two rows were compiled but NEVER EXECUTED before this probe
+         * step existed -- nothing in the lane had reached them.  The first
+         * lock passes SizeToLock 0, which means "to the end" and is the one
+         * case that has to ask the buffer its own length; the second locks a
+         * 512-byte window at offset 256, whose flush must touch that window
+         * and nothing either side of it. */
+        begin( "CreateVertexBuffer(1024, MANAGED) + Lock(0,0) then Lock(256,512): "
+               "the offset and the implicit length" );
+        bad = 0;
+        {
+            void *bits = NULL;
+
+            hr = call_CreateVertexBuffer( device, 1024, D3DPOOL_MANAGED, &vb );
+            if (SUCCEEDED(hr) && vb)
+            {
+                hr = call_VBLock( vb, 0, 0, &bits, 0 );
+                if (SUCCEEDED(hr) && bits)
+                {
+                    for (i = 0; i < 1024; i++) ((BYTE *)bits)[i] = (BYTE)(i * 5 + 1);
+                    call_VBUnlock( vb );
+                }
+                else bad++;
+            }
+            else bad++;
+            if (!bad)
+            {
+                hr = call_VBLock( vb, 256, 512, &bits, 0 );
+                if (SUCCEEDED(hr) && bits)
+                {
+                    for (i = 0; i < 512; i++) ((BYTE *)bits)[i] = 0xAA;
+                    call_VBUnlock( vb );
+                }
+                else bad++;
+            }
+            if (!bad)
+            {
+                hr = call_VBLock( vb, 0, 0, &bits, D3DLOCK_READONLY );
+                if (SUCCEEDED(hr) && bits)
+                {
+                    for (i = 0; i < 1024; i++)
+                    {
+                        BYTE want = (i >= 256 && i < 768) ? 0xAA : (BYTE)(i * 5 + 1);
+                        if (((const BYTE *)bits)[i] != want) bad++;
+                    }
+                    call_VBUnlock( vb );
+                }
+                else bad++;
+            }
+            out( "bad=" ); out_dec( bad );
+            verdict( SUCCEEDED(hr) && !bad,
+                     "a vertex-buffer lock lost its bytes, its offset, or its implicit length" );
+        }
+
+
+        /* ---- the four rows nothing in this lane had ever reached ---------
+         *
+         * The cube LockRect, both LockBox rows and the index-buffer Lock were
+         * COMPILED BUT NEVER EXECUTED: no probe and no title on this lane had
+         * called any of them, so "it builds" was the whole of what was known
+         * about them.  These steps execute all four.  The cube one also pins
+         * the walker's cache key, which is (face, level) and not level alone
+         * -- face 3 level 0 must not collide with face 0 level 0. */
+        begin( "CreateCubeTexture(32x32 A8R8G8B8) + LockRect(face 3 and face 0, "
+               "level 0): write both, read both back" );
+        bad = 0;
+        {
+            UINT pitch = 0, y;
+
+            hr = call_CreateCubeTexture( device, 32, 1, D3DFMT_A8R8G8B8,
+                                         D3DPOOL_SYSTEMMEM, &cube );
+            if (SUCCEEDED(hr) && cube)
+            {
+                UINT face;
+                for (face = 0; face < 4 && SUCCEEDED(hr); face += 3)
+                {
+                    hr = call_CubeLockRect( cube, (D3DCUBEMAP_FACES)face, 0, &lr, 0 );
+                    if (SUCCEEDED(hr) && lr.pBits)
+                    {
+                        pitch = (UINT)lr.Pitch;
+                        for (y = 0; y < 32; y++)
+                        {
+                            BYTE *row = (BYTE *)lr.pBits + (size_t)y * lr.Pitch;
+                            for (i = 0; i < 32 * 4; i++) row[i] = (BYTE)(face * 16 + y);
+                        }
+                        call_CubeUnlockRect( cube, (D3DCUBEMAP_FACES)face, 0 );
+                    }
+                    else bad++;
+                }
+                for (face = 0; face < 4 && SUCCEEDED(hr); face += 3)
+                {
+                    hr = call_CubeLockRect( cube, (D3DCUBEMAP_FACES)face, 0, &lr, D3DLOCK_READONLY );
+                    if (SUCCEEDED(hr) && lr.pBits)
+                    {
+                        for (y = 0; y < 32; y++)
+                        {
+                            const BYTE *row = (const BYTE *)lr.pBits + (size_t)y * lr.Pitch;
+                            for (i = 0; i < 32 * 4; i++)
+                                if (row[i] != (BYTE)(face * 16 + y)) bad++;
+                        }
+                        call_CubeUnlockRect( cube, (D3DCUBEMAP_FACES)face, 0 );
+                    }
+                    else bad++;
+                }
+            }
+            else bad++;
+            out( "pitch=" ); out_dec( pitch );
+            out( " bad=" ); out_dec( bad );
+            verdict( SUCCEEDED(hr) && pitch == 128 && !bad,
+                     "a cube face did not round trip, or two faces shared one bounce" );
+        }
+
+        /* A volume's SlicePitch is RowPitch x block rows and its total is that
+         * times DEPTH -- the one place the bounce has to multiply by a third
+         * dimension.  16x16x4 A8R8G8B8: RowPitch 64, SlicePitch 1024, 4096
+         * bytes.  Then the SAME storage is re-locked through the standalone
+         * IDirect3DVolume9 that GetVolumeLevel hands back, which is a
+         * different host object on a different vtable and therefore a
+         * different walker and a different bounce. */
+        begin( "CreateVolumeTexture(16x16x4 A8R8G8B8) + LockBox, then the same "
+               "storage through GetVolumeLevel(0) + IDirect3DVolume9::LockBox" );
+        bad = 0;
+        {
+            D3DLOCKED_BOX lb;
+            UINT rp = 0, sp = 0, z;
+
+            hr = call_CreateVolumeTexture( device, 16, 16, 4, 1, D3DFMT_A8R8G8B8,
+                                           D3DPOOL_SYSTEMMEM, &voltex );
+            if (SUCCEEDED(hr) && voltex)
+            {
+                hr = call_VolTexLockBox( voltex, 0, &lb, 0 );
+                if (SUCCEEDED(hr) && lb.pBits)
+                {
+                    rp = (UINT)lb.RowPitch;
+                    sp = (UINT)lb.SlicePitch;
+                    for (z = 0; z < 4; z++)
+                    {
+                        BYTE *slice = (BYTE *)lb.pBits + (size_t)z * lb.SlicePitch;
+                        for (i = 0; i < 16u * 64u; i++) slice[i] = (BYTE)(z * 32 + (i & 31));
+                    }
+                    call_VolTexUnlockBox( voltex, 0 );
+                }
+                else bad++;
+            }
+            else bad++;
+            if (!bad && SUCCEEDED(hr))
+            {
+                hr = call_GetVolumeLevel( voltex, 0, &vol );
+                if (SUCCEEDED(hr) && vol)
+                {
+                    hr = call_VolLockBox( vol, &lb, D3DLOCK_READONLY );
+                    if (SUCCEEDED(hr) && lb.pBits)
+                    {
+                        for (z = 0; z < 4; z++)
+                        {
+                            const BYTE *slice = (const BYTE *)lb.pBits + (size_t)z * lb.SlicePitch;
+                            for (i = 0; i < 16u * 64u; i++)
+                                if (slice[i] != (BYTE)(z * 32 + (i & 31))) bad++;
+                        }
+                        call_VolUnlockBox( vol );
+                    }
+                    else bad++;
+                }
+                else bad++;
+            }
+            out( "RowPitch=" ); out_dec( rp );
+            out( " SlicePitch=" ); out_dec( sp );
+            out( " bad=" ); out_dec( bad );
+            verdict( SUCCEEDED(hr) && rp == 64 && sp == 1024 && !bad,
+                     "the volume's depth or its standalone-volume view did not round trip" );
+        }
+
+        begin( "CreateIndexBuffer(512, INDEX16, MANAGED) + Lock(0,0): write, read back" );
+        bad = 0;
+        {
+            void *bits = NULL;
+
+            hr = call_CreateIndexBuffer( device, 512, D3DPOOL_MANAGED, &ib );
+            if (SUCCEEDED(hr) && ib)
+            {
+                hr = call_IBLock( ib, 0, 0, &bits, 0 );
+                if (SUCCEEDED(hr) && bits)
+                {
+                    for (i = 0; i < 512; i++) ((BYTE *)bits)[i] = (BYTE)(i ^ 0x5a);
+                    call_IBUnlock( ib );
+                    hr = call_IBLock( ib, 0, 0, &bits, D3DLOCK_READONLY );
+                    if (SUCCEEDED(hr) && bits)
+                    {
+                        for (i = 0; i < 512; i++)
+                            if (((const BYTE *)bits)[i] != (BYTE)(i ^ 0x5a)) bad++;
+                        call_IBUnlock( ib );
+                    }
+                    else bad++;
+                }
+                else bad++;
+            }
+            else bad++;
+            out( "bad=" ); out_dec( bad );
+            verdict( SUCCEEDED(hr) && !bad, "the index buffer lost its bytes" );
+        }
+
+        call_Release_IB( ib );
+        call_Release_VB( vb );
+        call_Release_Volume( vol );
+        call_Release_VolTex( voltex );
+        call_Release_Cube( cube );
+        call_Release_Texture( argb );
+        call_Release_Texture( dxt );
+    }
+#endif /* __i386__ */
+
     /* ---- step 8: the by-value float, both directions --------------------
      *
      * SetNPatchMode/GetNPatchMode is the only round trip on this surface that
@@ -706,6 +1259,21 @@ static int d3d9_smoke_run( void )
      * The BITS are printed, not the number, because a probe that printed
      * "3.500000" would hide a low-mantissa difference behind its own
      * formatting -- and because these two legs must be byte-identical. */
+#ifdef __i386__
+    /* NOT RUN ON THE i386 LEG, and not as a convenience.  GetNPatchMode
+     * returns its float in x87 ST(0); the marshalling row for it publishes no
+     * i386 frame geometry and fails closed rather than popping a frame it
+     * cannot describe.  That refusal cannot pop the guest's stdcall frame
+     * either, so on this leg the call does not merely fail this step -- it
+     * takes the process down, and every step below it (the depth pair, the
+     * release, the PASS/FAIL line) never runs at all.  So the i386 leg says
+     * so and walks past.  It is not counted as a step: nothing was proved.
+     * The native and x86-64 legs, which are what check-d3d9-smoke.sh diffs,
+     * still run it exactly as before. */
+    out( "SetNPatchMode/GetNPatchMode: not attempted on the i386 lane -- the "
+         "x87 ST(0) return has no i386 frame geometry, and the refusal cannot "
+         "pop the guest frame\n" );
+#else
     if (device)
     {
         union { float f; DWORD u; } set, got;
@@ -719,6 +1287,7 @@ static int d3d9_smoke_run( void )
         verdict( SUCCEEDED(hr) && got.u == set.u,
                  "the by-value float did not survive the round trip" );
     }
+#endif
 
     /* =================================================================
      *  steps 9-11: THE DEPTH BUFFER, BY VALUE

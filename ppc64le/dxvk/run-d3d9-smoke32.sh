@@ -5,10 +5,15 @@
 #
 # WHY THIS IS NOT A check-*.sh.  The check- scripts in this directory are
 # gates: they compare a guest run against a native reference and are expected
-# to be green.  This one is a MEASURING INSTRUMENT.  The 32-bit D3D9 lane is
-# not finished -- the Lock family still refuses, loudly, until the below-4-GiB
-# bounce exists -- so a green run is not yet the expected outcome and calling
-# this a gate would be a lie.  Promote it when the bounce lands.
+# to be green.  This one is a MEASURING INSTRUMENT -- there is no native
+# reference for the i386 leg to be diffed against, because the i386 leg is the
+# only one that BOUNCES anything (see the probe's own bounce-steps banner).
+# What it does have is a self-checking claim: every step asserts a value known
+# at compile time, and the run ends in an explicit PASS n/n line.
+#
+# It is now expected to be green end to end.  Promoting it to a gate would
+# mean giving it a reference to diff against; a run that stops printing
+# `d3d9_smoke: PASS 17/17` is a regression either way.
 #
 # It is also the cheap way to work on this lane: no foreground, no game lock,
 # no GPU submission beyond a couple of clears, and it reaches every hand32
@@ -21,8 +26,21 @@
 #
 #   WINEPREFIX=<a prefix wineboot has run in> ./run-d3d9-smoke32.sh
 #
-# [MEASURED 2026-08-30] steps 1-6 pass; step 7 (LockRect) refuses with the
-# host address it was handed, which is what proves the bounce is required.
+# [MEASURED 2026-08-30, before] steps 1-6 passed; step 7 (LockRect) refused
+# with the host address it had been handed -- 0x3FFF307FB000, above 4 GiB --
+# and that refusal is what proved the below-4-GiB bounce was required rather
+# than optional.  Steps 8 onwards never ran: the i386 leg used to call
+# GetNPatchMode, whose refusal cannot pop the guest's stdcall frame, and the
+# process died there.
+#
+# [MEASURED 2026-08-30, after] `d3d9_smoke: PASS 17/17`, rc=0, and not one
+# refusal in the log.  The six steps the bounce added all pass -- DXT1 block
+# pitch and the one-block mip, a sub-rect flush that must not spill, a vertex
+# buffer's offset and implicit length, a cube face's (face, level) key, a
+# volume's depth and its standalone-volume view, and an index buffer -- and so
+# do the two depth steps that had never been reachable on this lane before.
+# Between them they EXECUTE all seven Lock rows and all seven Unlock rows;
+# before this, four of the seven had only ever been compiled.
 set -u
 
 HERE=$(cd "$(dirname "$0")" && pwd)

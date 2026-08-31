@@ -200,6 +200,12 @@ static UINT64 hand32_d3d9_cube_lock_rect( void *host, UINT slot, I386_CONTEXT *c
 static UINT64 hand32_d3d9_volume_lock_box( void *host, UINT slot, I386_CONTEXT *ctx );
 static UINT64 hand32_d3d9_volumetex_lock_box( void *host, UINT slot, I386_CONTEXT *ctx );
 static UINT64 hand32_d3d9_buffer_lock( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_d3d9_surface_unlock_rect( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_d3d9_texture_unlock_rect( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_d3d9_cube_unlock_rect( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_d3d9_volume_unlock_box( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_d3d9_volumetex_unlock_box( void *host, UINT slot, I386_CONTEXT *ctx );
+static UINT64 hand32_d3d9_buffer_unlock( void *host, UINT slot, I386_CONTEXT *ctx );
 
 /* Matched to rows by slot NAME at attach, so this table is not ordered
  * against anything and a missing row is a refusal rather than a
@@ -230,6 +236,18 @@ static const struct winecom_hand32 d3d9_hand32[] =
     { "IDirect3DVolumeTexture9::LockBox",            hand32_d3d9_volumetex_lock_box },
     { "IDirect3DVertexBuffer9::Lock",                hand32_d3d9_buffer_lock },
     { "IDirect3DIndexBuffer9::Lock",                 hand32_d3d9_buffer_lock },
+    /* ...and the Unlocks that close them.  These are mechanically
+     * marshallable -- no pointer crosses them -- and the generator served
+     * them until the bounce landed.  They are hand rows purely so the
+     * guest's bytes can be flushed back to the host mapping BEFORE the host
+     * is told the lock is over. */
+    { "IDirect3DSurface9::UnlockRect",               hand32_d3d9_surface_unlock_rect },
+    { "IDirect3DTexture9::UnlockRect",               hand32_d3d9_texture_unlock_rect },
+    { "IDirect3DCubeTexture9::UnlockRect",           hand32_d3d9_cube_unlock_rect },
+    { "IDirect3DVolume9::UnlockBox",                 hand32_d3d9_volume_unlock_box },
+    { "IDirect3DVolumeTexture9::UnlockBox",          hand32_d3d9_volumetex_unlock_box },
+    { "IDirect3DVertexBuffer9::Unlock",              hand32_d3d9_buffer_unlock },
+    { "IDirect3DIndexBuffer9::Unlock",               hand32_d3d9_buffer_unlock },
 };
 
 static const struct winecom_surface d3d9_surface =
@@ -962,33 +980,92 @@ static UINT64 hand32_d3d9_set_npatch_mode( void *host, UINT slot, I386_CONTEXT *
 /* ------------------------------------------------- the Lock family, i386
  *
  * Every D3D9 way of getting at pixels or vertices answers with a POINTER
- * INTO HOST MEMORY, and the guest's cell for it is four bytes.  Seven rows:
- * three LockRect, two LockBox, and the two buffer Locks whose answer is a
- * bare `void **`.
+ * INTO HOST MEMORY, and the guest's cell for it is four bytes.  Fourteen
+ * rows: seven Locks -- three LockRect, two LockBox, the two buffer Locks --
+ * and the seven Unlocks that close them.  The Unlocks are mechanically
+ * marshallable and were served by the generator until now; they are hand
+ * rows here only because the flush has to happen BEFORE the host sees the
+ * Unlock.
  *
- * WHAT THIS DOES, AND WHAT IT DELIBERATELY DOES NOT.  It calls the host,
- * looks at the address, and hands it back when it fits below 4 GiB.  When it
- * does not fit it UNLOCKS AGAIN and refuses by name, because a truncated
- * pointer is not a worse pointer, it is a different one, and the guest would
- * write the application's vertices over whatever lives at the low half.
+ * [MEASURED 2026-08-30] The pointer does not fit.  ppc64le/dxvk/probes/
+ * d3d9_smoke.c built as an i386 PE and run under this port was answered
+ * `IDirect3DSurface9::LockRect answered 00003FFF307FB000`: DXVK's d3d9 maps
+ * its system-memory surfaces above 4 GiB on this host, so the below-4-GiB
+ * BOUNCE is REQUIRED, not optional.  This is that bounce, built the way
+ * dlls/d3d11/main.c builds it for ID3D11DeviceContext::Map -- a guest-legal
+ * buffer, filled from the host mapping, copied back before the host Unlock,
+ * cached per (object, subresource) -- and the rest of this comment is about
+ * the one thing D3D9 makes harder than D3D11, which is the SIZE.
  *
- * It does NOT bounce.  dlls/d3d11/main.c's Map walker keeps a below-4-GiB
- * shadow per subresource and copies in and out around Unmap, and that is the
- * complete answer -- but it needs to SIZE the mapping, which on D3D11 meant a
- * subresource-size computation and on D3D9 means block-compressed mip
- * arithmetic per format.  Sizing a D3D9 lock correctly is the next piece of
- * work here, and guessing at it would corrupt exactly the buffers this is
- * meant to protect.  So: correct or loud, and the loudness names the wall.
+ * [MEASURED 2026-08-30, after] the same probe now runs to
+ * `d3d9_smoke: PASS 17/17` with no refusal in the log.  Six of those steps
+ * exist to hold this code down: DXT1's block pitch (128) and its one-block
+ * bottom mip (pitch 8, 1x1 texels, still one 4x4 block), a sub-rect lock
+ * whose flush must leave every texel outside the rect alone, a vertex
+ * buffer's OffsetToLock and its SizeToLock-of-zero, a cube face proving the
+ * cache key is (face, level) and not level, a volume's SlicePitch x depth
+ * and the standalone IDirect3DVolume9 view of the same storage, and an index
+ * buffer.  Between them they EXECUTE all seven Lock rows and all seven
+ * Unlock rows; before this, four of the seven had only ever been compiled.
  *
- * [MEASURED 2026-08-30] It does not fit.  ppc64le/dxvk/probes/d3d9_smoke.c
- * built as an i386 PE and run under this port reaches step 7 and gets
- * `IDirect3DSurface9::LockRect answered 00003FFF141FC000` -- so DXVK's d3d9
- * maps its system-memory surfaces high on this host and THE BOUNCE IS
- * REQUIRED, not optional.  That is the next wall on this lane and the
- * refusal above is what names it.  Everything before it in that probe
- * passes: Direct3DCreate9, CreateDevice, CreateRenderTarget,
- * SetRenderTarget, Clear, CreateOffscreenPlainSurface, GetRenderTargetData.
- * ppc64le/dxvk/run-d3d9-smoke32.sh reproduces the run. */
+ * WHERE THE SIZE COMES FROM.  D3D11's Map hands back a DepthPitch that IS
+ * the mapped slice's byte count, so d3d11's walker barely has to compute
+ * anything.  D3D9's LockRect hands back a Pitch and nothing else, the Pitch
+ * is the whole MIP LEVEL's row stride (not the locked sub-rect's), pBits is
+ * offset INTO that slice when a rect was given, and for block-compressed
+ * formats a row of the slice is a row of 4x4 BLOCKS -- so the row count is
+ * ceil(h/4), floored at one block, not one pixel.  Guessing any part of that
+ * corrupts exactly the buffers this exists to protect.
+ *
+ * So it is not guessed.  DXVK is the host here, and D3D9DeviceEx::LockImage
+ * (dxvk-ppc64le/src/src/d3d9/d3d9_device.cpp) states its own arithmetic:
+ *
+ *     blockCount           = ceil(levelExtent / formatInfo->blockSize)
+ *     pLockedBox->RowPitch = align(formatInfo->elementSize * blockCount.width, 4)
+ *     SlicePitch           = RowPitch * blockCount.height
+ *     pBits                = mapPtr + CalcImageLockOffset(...)
+ *     CalcImageLockOffset  = (Front/blockD)*SlicePitch
+ *                          + (Top/blockH)*RowPitch
+ *                          + (Left/blockW)*elementSize
+ *
+ * and D3D9CommonTexture::GetMipSize says the buffer behind mapPtr is exactly
+ * align(elementSize * blockCount.width, 4) * blockCount.height * blockCount.depth,
+ * i.e. SlicePitch * depth.  Reproducing those four lines needs one datum per
+ * format -- (blockW, blockH, elementSize) -- and d3d9_format_geoms[] below
+ * carries it, derived rather than remembered (see the table's own comment).
+ *
+ * AND IT IS CHECKED AT RUNTIME, EVERY LOCK.  The table is used to recompute
+ * align(elementSize * ceil(w/blockW), 4) and that is compared against the
+ * Pitch the host just answered.  If they disagree the lock is REFUSED, by
+ * name, with both numbers -- because a bounce sized by arithmetic the host
+ * does not share would copy the wrong bytes back, and that is the failure
+ * this whole file is built to make impossible.  A format missing from the
+ * table refuses the same way.  The check is free (the host already told us
+ * the Pitch) and it turns the table from something trusted into something
+ * verified against the actual host on every single lock.
+ *
+ * ONE FORMAT PAIR IS SPECIAL AND SAYS SO.  For ATI1/ATI2 DXVK deliberately
+ * LIES about the geometry -- `atiHack` in LockImage reports
+ * RowPitch = align(width, 4) and SlicePitch = RowPitch * height, treating a
+ * block-compressed format as if it were one byte per texel, "so we need to
+ * lie here, the game is expected to use this info and do a workaround".  The
+ * lied slice is larger than the real buffer, so the bounce is ALLOCATED to
+ * the lied size (a guest that believes the pitch cannot run off the end of
+ * our buffer) and only the REAL block-compressed slice is ever copied back
+ * (nothing can run off the end of the host's).  A sub-rect ATI lock is
+ * refused: under the lie the guest's offset and the host's do not name the
+ * same byte, and there is no honest way to reconcile them.
+ *
+ * WHAT IS NOT DONE HERE, DELIBERATELY.  d3d11's walker caches the subresource
+ * size and keeps a per-destination shadow so an identical WRITE_DISCARD flush
+ * can be skipped; both were measured wins on a real title.  Neither is here.
+ * The size is recomputed from a fresh GetDesc on every lock because the cache
+ * key is a HOST POINTER, D3D9 objects are created and released far more
+ * freely than D3D11 resources, and a released-then-reused address with a
+ * stale extent behind it is the silent-corruption bug this file exists to
+ * avoid; the per-lock GetDesc is one unix call and buys that away.  The
+ * dedup shadow is a pure optimisation and is worth adding the day a title
+ * measures it, not before. */
 
 /* D3DLOCKED_RECT and D3DLOCKED_BOX, spelled here for the same reason
  * d3d9_present_parameters is: this module includes no D3D9 header.  The
@@ -1011,43 +1088,512 @@ struct d3d9_locked_box
 C_ASSERT( FIELD_OFFSET(struct d3d9_locked_box, pBits) == 8 );
 C_ASSERT( sizeof(struct d3d9_locked_box) == 16 );
 
-/* -> TRUE when the address fits a guest cell.  One log per module: a lock
- * that does not fit repeats every frame and would drown the run. */
-static BOOL guest_legal( const void *p, const char *what )
-{
-    if (!p || (ULONG_PTR)p < 0x100000000ull) return TRUE;
-    {
-        static BOOL logged;
+/* the two D3DLOCK_ flags that change what the bounce has to copy */
+#define D3D9_LOCK_READONLY 0x00000010
+#define D3D9_LOCK_DISCARD  0x00002000
 
-        if (!logged)
-        {
-            logged = TRUE;
-            ERR( "%s answered %p, above 4 GiB, which a 32-bit guest's pointer "
-                 "cell cannot hold.  Unlocking and refusing rather than "
-                 "handing back a truncated address that names different "
-                 "memory.  Serving this needs the below-4-GiB bounce "
-                 "dlls/d3d11/main.c built for ID3D11DeviceContext::Map, which "
-                 "in turn needs a correct size for a D3D9 lock.\n", what, p );
-        }
+#define D3D9_FOURCC(a,b,c,d) \
+    ((UINT)(unsigned char)(a)         | ((UINT)(unsigned char)(b) << 8) | \
+    ((UINT)(unsigned char)(c) << 16)  | ((UINT)(unsigned char)(d) << 24))
+
+#define D3D9_FMT_ATI1 D3D9_FOURCC('A','T','I','1')
+#define D3D9_FMT_ATI2 D3D9_FOURCC('A','T','I','2')
+
+/* (block width, block height, bytes per block) per D3DFORMAT.
+ *
+ * WHERE THESE NUMBERS CAME FROM.  Not from memory.  They were derived twice,
+ * from two independent in-tree sources, and the two derivations were diffed:
+ *
+ *   1. Wine's own tables.  dlls/d3d9/device.c's wined3dformat_from_d3dformat()
+ *      maps D3DFORMAT -> wined3d_format_id (FOURCCs pass through unchanged);
+ *      dlls/wined3d/utils.c's format_block_info[] gives block geometry for
+ *      every block or macropixel format and formats[]/typed_formats[] give
+ *      bpp for the rest.  Composing the three yields (1,1,bpp) or the block
+ *      triple for each D3DFORMAT.
+ *
+ *   2. DXVK's, which is what actually matters, because DXVK is the host that
+ *      answers the Pitch and owns the buffer.  src/d3d9/d3d9_format.cpp maps
+ *      D3D9Format -> VkFormat, whose elementSize/blockSize are DxvkFormatInfo
+ *      in src/dxvk/dxvk_format.h; formats DXVK does not map fall to
+ *      D3D9VkFormatTable::GetUnsupportedFormatInfo(), which states an
+ *      elementSize outright (R8G8B8 3, R3G3B2 1, X4R4G4B4 2, A8R3G3B2 2,
+ *      A8P8 2, P8 1, W11V11U10 4, CxV8U8 2, D16_LOCKABLE 2, D32F_LOCKABLE 4,
+ *      D32_LOCKABLE 4, S8_LOCKABLE 1).
+ *
+ * The two agree on every format below except four, and DXVK wins all four
+ * because DXVK is the host: R8G8_B8G8 and G8R8_G8B8 are (2,1,4) macropixel
+ * formats under DXVK (VK_FORMAT_G8B8G8R8_422_UNORM / B8G8R8G8_422_UNORM)
+ * where wined3d's formats[] carries a placeholder bpp of 1; and
+ * D3DFMT_D32_LOCKABLE / D3DFMT_S8_LOCKABLE are unmapped in wined3d but named
+ * with a size by DXVK.  Conversion formats do NOT change the answer: the
+ * Pitch DXVK reports comes from lookupFormatInfo(formatMapping.Format), the
+ * plain Vulkan format, never the conversion one -- checked one by one for the
+ * mixed-signedness formats (L6V5U5 -> B5G6R5_PACK16, 2; X8L8V8U8 ->
+ * B8G8R8A8_UNORM, 4; A2W10V10U10 -> A2B10G10R10_PACK32, 4).
+ *
+ * A format not listed here is REFUSED, not approximated.  That includes the
+ * ones DXVK maps to nothing and gives no unsupported-info for -- D3DFMT_D32,
+ * D15S1, D24X4S4, A1, A2B10G10R10_XR_BIAS, MULTI2_ARGB8 -- for which DXVK's
+ * own elementSize is 0 and the Pitch it would answer is 0, and the
+ * multi-planar YUV formats, whose plane arithmetic is not this table's shape.
+ *
+ * ppc64le/dxvk/derive-d3d9-block-sizes.py regenerates and diffs both
+ * derivations against this table. */
+struct d3d9_format_geom
+{
+    UINT format;
+    unsigned char block_w, block_h, block_bytes;
+};
+
+static const struct d3d9_format_geom d3d9_format_geoms[] =
+{
+    {  20, 1, 1,  3 },  /* D3DFMT_R8G8B8            */
+    {  21, 1, 1,  4 },  /* D3DFMT_A8R8G8B8          */
+    {  22, 1, 1,  4 },  /* D3DFMT_X8R8G8B8          */
+    {  23, 1, 1,  2 },  /* D3DFMT_R5G6B5            */
+    {  24, 1, 1,  2 },  /* D3DFMT_X1R5G5B5          */
+    {  25, 1, 1,  2 },  /* D3DFMT_A1R5G5B5          */
+    {  26, 1, 1,  2 },  /* D3DFMT_A4R4G4B4          */
+    {  27, 1, 1,  1 },  /* D3DFMT_R3G3B2            */
+    {  28, 1, 1,  1 },  /* D3DFMT_A8                */
+    {  29, 1, 1,  2 },  /* D3DFMT_A8R3G3B2          */
+    {  30, 1, 1,  2 },  /* D3DFMT_X4R4G4B4          */
+    {  31, 1, 1,  4 },  /* D3DFMT_A2B10G10R10       */
+    {  32, 1, 1,  4 },  /* D3DFMT_A8B8G8R8          */
+    {  33, 1, 1,  4 },  /* D3DFMT_X8B8G8R8          */
+    {  34, 1, 1,  4 },  /* D3DFMT_G16R16            */
+    {  35, 1, 1,  4 },  /* D3DFMT_A2R10G10B10       */
+    {  36, 1, 1,  8 },  /* D3DFMT_A16B16G16R16      */
+    {  40, 1, 1,  2 },  /* D3DFMT_A8P8              */
+    {  41, 1, 1,  1 },  /* D3DFMT_P8                */
+    {  50, 1, 1,  1 },  /* D3DFMT_L8                */
+    {  51, 1, 1,  2 },  /* D3DFMT_A8L8              */
+    {  52, 1, 1,  1 },  /* D3DFMT_A4L4              */
+    {  60, 1, 1,  2 },  /* D3DFMT_V8U8              */
+    {  61, 1, 1,  2 },  /* D3DFMT_L6V5U5            */
+    {  62, 1, 1,  4 },  /* D3DFMT_X8L8V8U8          */
+    {  63, 1, 1,  4 },  /* D3DFMT_Q8W8V8U8          */
+    {  64, 1, 1,  4 },  /* D3DFMT_V16U16            */
+    {  65, 1, 1,  4 },  /* D3DFMT_W11V11U10, D3D8 only; DXVK names it */
+    {  67, 1, 1,  4 },  /* D3DFMT_A2W10V10U10       */
+    {  70, 1, 1,  2 },  /* D3DFMT_D16_LOCKABLE      */
+    {  75, 1, 1,  4 },  /* D3DFMT_D24S8             */
+    {  77, 1, 1,  4 },  /* D3DFMT_D24X8             */
+    {  80, 1, 1,  2 },  /* D3DFMT_D16               */
+    {  81, 1, 1,  2 },  /* D3DFMT_L16               */
+    {  82, 1, 1,  4 },  /* D3DFMT_D32F_LOCKABLE     */
+    {  83, 1, 1,  4 },  /* D3DFMT_D24FS8            */
+    {  84, 1, 1,  4 },  /* D3DFMT_D32_LOCKABLE      */
+    {  85, 1, 1,  1 },  /* D3DFMT_S8_LOCKABLE       */
+    { 101, 1, 1,  2 },  /* D3DFMT_INDEX16           */
+    { 102, 1, 1,  4 },  /* D3DFMT_INDEX32           */
+    { 110, 1, 1,  8 },  /* D3DFMT_Q16W16V16U16      */
+    { 111, 1, 1,  2 },  /* D3DFMT_R16F              */
+    { 112, 1, 1,  4 },  /* D3DFMT_G16R16F           */
+    { 113, 1, 1,  8 },  /* D3DFMT_A16B16G16R16F     */
+    { 114, 1, 1,  4 },  /* D3DFMT_R32F              */
+    { 115, 1, 1,  8 },  /* D3DFMT_G32R32F           */
+    { 116, 1, 1, 16 },  /* D3DFMT_A32B32G32R32F     */
+    { 117, 1, 1,  2 },  /* D3DFMT_CxV8U8            */
+
+    /* the FOURCCs.  4x4 blocks for the compressed ones, 2x1 macropixels for
+     * the packed-YUV four, and the three depth-read driver hacks DXVK maps
+     * onto real depth formats. */
+    { D3D9_FOURCC('D','X','T','1'), 4, 4,  8 },
+    { D3D9_FOURCC('D','X','T','2'), 4, 4, 16 },
+    { D3D9_FOURCC('D','X','T','3'), 4, 4, 16 },
+    { D3D9_FOURCC('D','X','T','4'), 4, 4, 16 },
+    { D3D9_FOURCC('D','X','T','5'), 4, 4, 16 },
+    { D3D9_FMT_ATI1,                4, 4,  8 },   /* BC4; see atiHack below */
+    { D3D9_FMT_ATI2,                4, 4, 16 },   /* BC5; see atiHack below */
+    { D3D9_FOURCC('U','Y','V','Y'), 2, 1,  4 },
+    { D3D9_FOURCC('Y','U','Y','2'), 2, 1,  4 },
+    { D3D9_FOURCC('R','G','B','G'), 2, 1,  4 },   /* D3DFMT_R8G8_B8G8 */
+    { D3D9_FOURCC('G','R','G','B'), 2, 1,  4 },   /* D3DFMT_G8R8_G8B8 */
+    { D3D9_FOURCC('D','F','1','6'), 1, 1,  2 },
+    { D3D9_FOURCC('D','F','2','4'), 1, 1,  4 },
+    { D3D9_FOURCC('I','N','T','Z'), 1, 1,  4 },
+};
+
+static BOOL d3d9_format_geometry( UINT format, UINT *bw, UINT *bh, UINT *bb )
+{
+    UINT i;
+
+    for (i = 0; i < ARRAY_SIZE(d3d9_format_geoms); i++)
+    {
+        if (d3d9_format_geoms[i].format != format) continue;
+        *bw = d3d9_format_geoms[i].block_w;
+        *bh = d3d9_format_geoms[i].block_h;
+        *bb = d3d9_format_geoms[i].block_bytes;
+        return TRUE;
     }
     return FALSE;
 }
 
-/* the shared tail of the five rect/box walkers: `unlock_slot` is the row
- * that undoes this one, which on every one of these interfaces is the very
- * next vtable slot (LockRect/UnlockRect, LockBox/UnlockBox -- checked
- * against ppc64le/dxvk/interfaces_d3d9.json, and the C_ASSERT-free way to
- * say so is that a wrong guess only ever unlocks something already
- * unlocked). */
-static UINT64 lock_answer( void *host, UINT unlock_slot, UINT unlock_argc,
-                           UINT64 *unlock_args, HRESULT hr, const void *bits,
-                           const char *what )
+/* ------------------------------------------------- the bounce buffers */
+
+struct lock_bounce
 {
-    if (FAILED(hr)) return (UINT64)(UINT)hr;
-    if (guest_legal( bits, what )) return (UINT64)(UINT)hr;
-    unix_vtbl_call( host, unlock_slot, unlock_argc, unlock_args );
-    return (UINT64)(UINT)E_NOTIMPL;
+    struct lock_bounce *next;
+    void   *host;        /* HOST object pointer; with sub, the cache key */
+    UINT    sub;         /* level, or face<<8|level, or 0 */
+    void   *low;         /* the guest-legal buffer */
+    SIZE_T  cap;
+    void   *host_ptr;    /* what the live lock answered, NULL when unlocked */
+    SIZE_T  size;        /* the live lock's byte count */
+    BOOL    flush;       /* copy back at Unlock (i.e. not READONLY) */
+};
+
+static CRITICAL_SECTION lock_cs;
+static CRITICAL_SECTION_DEBUG lock_cs_debug =
+{
+    0, 0, &lock_cs,
+    { &lock_cs_debug.ProcessLocksList, &lock_cs_debug.ProcessLocksList },
+      0, 0, { (DWORD_PTR)(__FILE__ ": d3d9 lock_cs") }
+};
+static CRITICAL_SECTION lock_cs = { &lock_cs_debug, -1, 0, 0, 0, 0 };
+static struct lock_bounce *lock_bounces;
+
+/* Below-4-GiB address space is a FINITE resource shared with everything else
+ * the guest owns, and a title that locks thousands of distinct mip levels
+ * over a session would retain all of them if the cache never gave anything
+ * back.  So the retained total is capped, and a lock that would push past the
+ * cap first releases the buffers of entries that are not currently locked.
+ * The entries themselves stay -- they are a pointer and two counts each --
+ * so the cache is a cache of ALLOCATIONS, not of geometry (there is no
+ * cached geometry; see the section banner). */
+#define LOCK_BOUNCE_BUDGET ((SIZE_T)64 * 1024 * 1024)
+static SIZE_T lock_retained;
+
+/* caller holds lock_cs */
+static void lock_bounce_release( struct lock_bounce *b )
+{
+    SIZE_T zero = 0;
+    void *low = b->low;
+
+    if (!low) return;
+    NtFreeVirtualMemory( NtCurrentProcess(), &low, &zero, MEM_RELEASE );
+    lock_retained -= b->cap;
+    b->low = NULL;
+    b->cap = 0;
 }
+
+/* caller holds lock_cs */
+static void lock_bounce_trim( const struct lock_bounce *keep, SIZE_T need )
+{
+    struct lock_bounce *b;
+
+    for (b = lock_bounces; b; b = b->next)
+    {
+        if (lock_retained + need <= LOCK_BOUNCE_BUDGET) return;
+        if (b == keep || !b->low || b->host_ptr) continue;
+        lock_bounce_release( b );
+    }
+}
+
+/* The byte counts for one lock.  `size` is what is reachable from the pBits
+ * the host answered -- everything from there to the end of the host's own
+ * mip slice, which is the most the guest can legally touch and never one
+ * byte more than the host allocated.  `alloc` is what the guest could
+ * ADDRESS through the pitch it was handed, which differs from `size` only
+ * under DXVK's ATI lie.
+ *
+ * -> FALSE is a REFUSAL, and every one of them logs which disagreement it
+ * was.  Nothing here approximates. */
+static BOOL lock_span( const char *what, UINT format, UINT width, UINT height,
+                       UINT depth, INT pitch, INT slice_pitch, BOOL have_slice,
+                       const UINT *origin, SIZE_T *size, SIZE_T *alloc )
+{
+    UINT bw, bh, bb, cols, rows, row_pitch;
+    SIZE_T slice, total, off;
+
+    if (pitch <= 0 || !width || !height || !depth)
+    {
+        ERR( "%s: host answered pitch %d for a %ux%ux%u level; refusing.\n",
+             what, pitch, width, height, depth );
+        return FALSE;
+    }
+    if (!d3d9_format_geometry( format, &bw, &bh, &bb ))
+    {
+        ERR( "%s: D3DFORMAT %#x is not in this module's block table, so the "
+             "lock cannot be sized.  Refusing rather than guessing -- see the "
+             "table's comment for how to add it and where the numbers come "
+             "from.\n", what, format );
+        return FALSE;
+    }
+
+    cols = (width  + bw - 1) / bw;
+    rows = (height + bh - 1) / bh;
+    row_pitch = (bb * cols + 3) & ~3u;
+
+    if (format == D3D9_FMT_ATI1 || format == D3D9_FMT_ATI2)
+    {
+        /* DXVK's atiHack: RowPitch = align(width,4), SlicePitch = that times
+         * height, as if the format were one byte per texel.  Allocate to the
+         * lie so a guest that believes the pitch stays inside our buffer;
+         * copy only the real block-compressed slice so nothing ever runs off
+         * the end of the host's. */
+        UINT lied_pitch = (width + 3) & ~3u;
+        SIZE_T lied = (SIZE_T)lied_pitch * height * depth;
+
+        if ((UINT)pitch != lied_pitch)
+        {
+            ERR( "%s: ATI1/ATI2 lock answered pitch %d, but DXVK's atiHack "
+                 "reports align(%u, 4) = %u.  Refusing.\n",
+                 what, pitch, width, lied_pitch );
+            return FALSE;
+        }
+        if (origin && (origin[0] || origin[1] || origin[2]))
+        {
+            ERR( "%s: a sub-rect lock of an ATI1/ATI2 surface.  DXVK reports a "
+                 "pitch geometry for these that does not describe the buffer it "
+                 "hands back, so the guest's byte offset and the host's do not "
+                 "name the same byte and the bounce cannot be reconciled.  "
+                 "Refusing; a full-level lock of the same surface is served.\n",
+                 what );
+            return FALSE;
+        }
+        total = (SIZE_T)row_pitch * rows * depth;
+        *size = total;
+        *alloc = lied > total ? lied : total;
+        return TRUE;
+    }
+
+    if ((UINT)pitch != row_pitch)
+    {
+        ERR( "%s: host answered pitch %d for a %ux%u D3DFORMAT %#x, but this "
+             "module's block table computes align(%u * ceil(%u/%u), 4) = %u.  "
+             "REFUSING: a bounce sized by arithmetic the host does not share "
+             "would copy the wrong bytes back, which is the exact failure this "
+             "walker exists to prevent.  The table is wrong for this format, "
+             "or the host changed its layout.\n",
+             what, pitch, width, height, format, bb, width, bw, row_pitch );
+        return FALSE;
+    }
+
+    slice = (SIZE_T)row_pitch * rows;
+    if (have_slice && (SIZE_T)(UINT)slice_pitch != slice)
+    {
+        ERR( "%s: host answered slice pitch %d, this module computes %Iu "
+             "(pitch %u x %u block rows).  Refusing.\n",
+             what, slice_pitch, slice, row_pitch, rows );
+        return FALSE;
+    }
+    total = slice * depth;
+
+    off = 0;
+    if (origin)
+        off = (SIZE_T)origin[2] * slice
+            + (SIZE_T)(origin[1] / bh) * row_pitch
+            + (SIZE_T)(origin[0] / bw) * bb;
+    if (off >= total)
+    {
+        ERR( "%s: lock origin (%u,%u,%u) lands at byte %Iu of a %Iu-byte "
+             "level.  Refusing.\n", what, origin[0], origin[1], origin[2],
+             off, total );
+        return FALSE;
+    }
+    *size = total - off;
+    *alloc = *size;
+    return TRUE;
+}
+
+/* Install the bounce and swap the guest-legal address in.  `full` says the
+ * lock covers the whole subresource, which is the only case in which a
+ * DISCARD may skip the fill-in: the flush at Unlock copies the WHOLE span
+ * back, so a partial lock whose bounce started uninitialised would write
+ * this module's garbage over texels the guest never touched.  (DXVK's
+ * LockImage clears D3DLOCK_DISCARD for partial locks for the same reason.) */
+static HRESULT lock_bounce_apply( void *host, UINT sub, const char *what,
+                                  void **bits, SIZE_T size, SIZE_T alloc,
+                                  DWORD flags, BOOL full )
+{
+    struct lock_bounce *b;
+    HRESULT hr = S_OK;
+
+    RtlEnterCriticalSection( &lock_cs );
+    for (b = lock_bounces; b; b = b->next)
+        if (b->host == host && b->sub == sub) break;
+    if (!b)
+    {
+        if (!(b = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap,
+                                   HEAP_ZERO_MEMORY, sizeof(*b) )))
+        {
+            RtlLeaveCriticalSection( &lock_cs );
+            return E_OUTOFMEMORY;
+        }
+        b->host = host;
+        b->sub = sub;
+        b->next = lock_bounces;
+        lock_bounces = b;
+    }
+    if (b->cap < alloc)
+    {
+        SIZE_T cap = (alloc + 0xffff) & ~(SIZE_T)0xffff;
+        void *mem = NULL;
+
+        lock_bounce_release( b );
+        lock_bounce_trim( b, cap );
+        /* zero_bits 0x7fffffff: the allocation must land below 2 GiB, which
+         * is a guest-legal 4-byte address with room to spare.  Same call
+         * dlls/d3d11/main.c's Map bounce makes. */
+        if (!NtAllocateVirtualMemory( NtCurrentProcess(), &mem, 0x7fffffff, &cap,
+                                      MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE ))
+        {
+            b->low = mem;
+            b->cap = cap;
+            lock_retained += cap;
+        }
+    }
+    if (!b->low)
+    {
+        ERR( "%s: no guest-legal bounce for a %Iu-byte lock.\n", what, alloc );
+        hr = E_OUTOFMEMORY;
+    }
+    else
+    {
+        b->host_ptr = *bits;
+        b->size = size;
+        b->flush = !(flags & D3D9_LOCK_READONLY);
+        if (!full || !(flags & D3D9_LOCK_DISCARD)) memcpy( b->low, *bits, size );
+        TRACE( "%s: BOUNCED %p -> %p (%Iu bytes of %Iu, flags %#x)\n",
+               what, *bits, b->low, size, b->cap, (UINT)flags );
+        *bits = b->low;
+    }
+    RtlLeaveCriticalSection( &lock_cs );
+    return hr;
+}
+
+/* everything the shared serve path needs from a walker */
+struct lock_serve_params
+{
+    void       *host;
+    const char *what;
+    UINT        sub;
+    UINT        desc_slot;      /* GetDesc, or GetLevelDesc */
+    UINT        desc_argc;      /* 2, or 3 when it takes a level */
+    UINT64      desc_level;
+    BOOL        is_volume;      /* D3DVOLUME_DESC rather than D3DSURFACE_DESC */
+    UINT        unlock_slot;
+    UINT        unlock_argc;
+    UINT64      unlock_args[D3D9_UNIX_MAX_ARGS];
+    DWORD       flags;
+    const UINT *origin;         /* {left, top, front} in texels; NULL = full */
+    INT         pitch;
+    INT         slice_pitch;
+    BOOL        have_slice;
+    void      **bits;
+};
+
+/* GetDesc / GetLevelDesc.  D3DSURFACE_DESC is Format, Type, Usage, Pool,
+ * MultiSampleType, MultiSampleQuality, Width, Height; D3DVOLUME_DESC is
+ * Format, Type, Usage, Pool, Width, Height, Depth -- both DWORD-only and both
+ * listed identical 32/64 in ppc64le/dxvk/repack32_d3d9.json, so the native
+ * layout read here is the layout.  A texture's GetLevelDesc already reports
+ * the LEVEL's extent, so nothing is shifted by the mip index here. */
+static BOOL lock_desc( const struct lock_serve_params *s, UINT *format,
+                       UINT *w, UINT *h, UINT *d )
+{
+    UINT64 args[D3D9_UNIX_MAX_ARGS] = { 0 };
+    UINT desc[8] = { 0 };
+
+    if (s->desc_argc == 3) args[1] = s->desc_level;
+    args[s->desc_argc - 1] = (UINT64)(ULONG_PTR)desc;
+    if (FAILED((HRESULT)unix_vtbl_call( s->host, s->desc_slot, s->desc_argc, args )))
+    {
+        ERR( "%s: the object refused its own description; cannot size the "
+             "lock.\n", s->what );
+        return FALSE;
+    }
+    *format = desc[0];
+    *w = s->is_volume ? desc[4] : desc[6];
+    *h = s->is_volume ? desc[5] : desc[7];
+    *d = s->is_volume ? desc[6] : 1;
+    return TRUE;
+}
+
+/* the shared tail of the five rect/box walkers.  On refusal it UNLOCKS again
+ * -- a lock left open would fail the guest's next one with INVALIDCALL and
+ * blame the wrong call. */
+static HRESULT lock_serve( struct lock_serve_params *s )
+{
+    UINT format, w, h, d;
+    SIZE_T size, alloc;
+    HRESULT hr;
+
+    if (!*s->bits || (ULONG_PTR)*s->bits < 0x100000000ull)
+    {
+        /* already guest-legal: no bounce, no copies */
+        TRACE( "%s: host answered %p, guest-legal.\n", s->what, *s->bits );
+        return S_OK;
+    }
+    if (!lock_desc( s, &format, &w, &h, &d )
+        || !lock_span( s->what, format, w, h, d, s->pitch, s->slice_pitch,
+                       s->have_slice, s->origin, &size, &alloc ))
+        hr = E_NOTIMPL;
+    else
+        hr = lock_bounce_apply( s->host, s->sub, s->what, s->bits,
+                                size, alloc, s->flags, !s->origin );
+
+    if (FAILED(hr))
+        unix_vtbl_call( s->host, s->unlock_slot, s->unlock_argc, s->unlock_args );
+    return hr;
+}
+
+/* a guest RECT is four LONGs and a D3DBOX six UINTs, both identical 32/64;
+ * only the near corner enters the offset arithmetic. */
+static BOOL lock_origin_from_rect( const LONG *rect, UINT *origin )
+{
+    if (!rect) return FALSE;
+    /* a negative corner is not a legal RECT; clamped to zero rather than
+     * refused, because the caller has already told us the lock is PARTIAL and
+     * a zero origin only ever widens the span this module fills and flushes,
+     * which is the safe direction. */
+    origin[0] = rect[0] > 0 ? (UINT)rect[0] : 0;
+    origin[1] = rect[1] > 0 ? (UINT)rect[1] : 0;
+    origin[2] = 0;
+    return TRUE;
+}
+
+static BOOL lock_origin_from_box( const UINT *box, UINT *origin )
+{
+    if (!box) return FALSE;
+    origin[0] = box[0];
+    origin[1] = box[1];
+    origin[2] = box[4];
+    return TRUE;
+}
+
+/* the shared tail of the seven Unlocks: flush, then let the host have it. */
+static UINT64 unlock_bounce( void *host, UINT sub, UINT slot, UINT argc, UINT64 *args )
+{
+    struct lock_bounce *b;
+
+    RtlEnterCriticalSection( &lock_cs );
+    for (b = lock_bounces; b; b = b->next)
+        if (b->host == host && b->sub == sub) break;
+    if (b && b->host_ptr)
+    {
+        if (b->flush) memcpy( b->host_ptr, b->low, b->size );
+        b->host_ptr = NULL;
+    }
+    RtlLeaveCriticalSection( &lock_cs );
+    return unix_vtbl_call( host, slot, argc, args );
+}
+
+/* ------------------------------------------------- the Lock walkers
+ *
+ * The neighbouring slots each walker reaches for -- GetDesc/GetLevelDesc and
+ * the Unlock -- are fixed offsets from the Lock slot on every one of these
+ * interfaces, checked against ppc64le/dxvk/interfaces_d3d9.json:
+ *
+ *   IDirect3DSurface9        GetDesc 12  LockRect 13  UnlockRect 14
+ *   IDirect3DTexture9        GetLevelDesc 17  LockRect 19  UnlockRect 20
+ *   IDirect3DCubeTexture9    GetLevelDesc 17  LockRect 19  UnlockRect 20
+ *   IDirect3DVolume9         GetDesc 8   LockBox 9    UnlockBox 10
+ *   IDirect3DVolumeTexture9  GetLevelDesc 17  LockBox 19   UnlockBox 20
+ *   IDirect3D{Vertex,Index}Buffer9  Lock 11  Unlock 12  GetDesc 13
+ */
 
 /* IDirect3DSurface9::LockRect( D3DLOCKED_RECT *, const RECT *, DWORD ) */
 static UINT64 hand32_d3d9_surface_lock_rect( void *host, UINT slot, I386_CONTEXT *ctx )
@@ -1056,7 +1602,8 @@ static UINT64 hand32_d3d9_surface_lock_rect( void *host, UINT slot, I386_CONTEXT
     UINT *out = (UINT *)(ULONG_PTR)esp[2];       /* {INT Pitch; ptr32 pBits} */
     struct d3d9_locked_rect lr = { 0 };
     UINT64 args[D3D9_UNIX_MAX_ARGS] = { 0 };
-    UINT64 un[D3D9_UNIX_MAX_ARGS] = { 0 };
+    struct lock_serve_params s = { 0 };
+    UINT origin[3];
     HRESULT hr;
 
     if (!out) return (UINT64)(UINT)E_INVALIDARG;
@@ -1064,12 +1611,31 @@ static UINT64 hand32_d3d9_surface_lock_rect( void *host, UINT slot, I386_CONTEXT
     args[2] = esp[3];
     args[3] = esp[4];
     hr = (HRESULT)unix_vtbl_call( host, slot, 4, args );
-    hr = (HRESULT)(UINT)lock_answer( host, slot + 1, 1, un, hr, lr.pBits,
-                                     "IDirect3DSurface9::LockRect" );
     if (FAILED(hr)) return (UINT64)(UINT)hr;
+
+    s.host = host;
+    s.what = "IDirect3DSurface9::LockRect";
+    s.sub = 0;
+    s.desc_slot = slot - 1;
+    s.desc_argc = 2;
+    s.unlock_slot = slot + 1;
+    s.unlock_argc = 1;
+    s.flags = esp[4];
+    s.origin = lock_origin_from_rect( (const LONG *)(ULONG_PTR)esp[3], origin ) ? origin : NULL;
+    s.pitch = lr.Pitch;
+    s.bits = &lr.pBits;
+    if (FAILED(hr = lock_serve( &s ))) return (UINT64)(UINT)hr;
+
     out[0] = (UINT)lr.Pitch;
     out[1] = (UINT)(ULONG_PTR)lr.pBits;
     return (UINT64)(UINT)hr;
+}
+
+static UINT64 hand32_d3d9_surface_unlock_rect( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    UINT64 args[D3D9_UNIX_MAX_ARGS] = { 0 };
+
+    return unlock_bounce( host, 0, slot, 1, args );
 }
 
 /* IDirect3DTexture9::LockRect( UINT Level, D3DLOCKED_RECT *, const RECT *,
@@ -1080,7 +1646,8 @@ static UINT64 hand32_d3d9_texture_lock_rect( void *host, UINT slot, I386_CONTEXT
     UINT *out = (UINT *)(ULONG_PTR)esp[3];
     struct d3d9_locked_rect lr = { 0 };
     UINT64 args[D3D9_UNIX_MAX_ARGS] = { 0 };
-    UINT64 un[D3D9_UNIX_MAX_ARGS] = { 0 };
+    struct lock_serve_params s = { 0 };
+    UINT origin[3];
     HRESULT hr;
 
     if (!out) return (UINT64)(UINT)E_INVALIDARG;
@@ -1089,13 +1656,35 @@ static UINT64 hand32_d3d9_texture_lock_rect( void *host, UINT slot, I386_CONTEXT
     args[3] = esp[4];
     args[4] = esp[5];
     hr = (HRESULT)unix_vtbl_call( host, slot, 5, args );
-    un[1] = esp[2];
-    hr = (HRESULT)(UINT)lock_answer( host, slot + 1, 2, un, hr, lr.pBits,
-                                     "IDirect3DTexture9::LockRect" );
     if (FAILED(hr)) return (UINT64)(UINT)hr;
+
+    s.host = host;
+    s.what = "IDirect3DTexture9::LockRect";
+    s.sub = esp[2];
+    s.desc_slot = slot - 2;              /* GetLevelDesc */
+    s.desc_argc = 3;
+    s.desc_level = esp[2];
+    s.unlock_slot = slot + 1;
+    s.unlock_argc = 2;
+    s.unlock_args[1] = esp[2];
+    s.flags = esp[5];
+    s.origin = lock_origin_from_rect( (const LONG *)(ULONG_PTR)esp[4], origin ) ? origin : NULL;
+    s.pitch = lr.Pitch;
+    s.bits = &lr.pBits;
+    if (FAILED(hr = lock_serve( &s ))) return (UINT64)(UINT)hr;
+
     out[0] = (UINT)lr.Pitch;
     out[1] = (UINT)(ULONG_PTR)lr.pBits;
     return (UINT64)(UINT)hr;
+}
+
+static UINT64 hand32_d3d9_texture_unlock_rect( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    const ULONG *esp = frame32( ctx );
+    UINT64 args[D3D9_UNIX_MAX_ARGS] = { 0 };
+
+    args[1] = esp[2];
+    return unlock_bounce( host, esp[2], slot, 2, args );
 }
 
 /* IDirect3DCubeTexture9::LockRect( D3DCUBEMAP_FACES, UINT Level,
@@ -1106,7 +1695,8 @@ static UINT64 hand32_d3d9_cube_lock_rect( void *host, UINT slot, I386_CONTEXT *c
     UINT *out = (UINT *)(ULONG_PTR)esp[4];
     struct d3d9_locked_rect lr = { 0 };
     UINT64 args[D3D9_UNIX_MAX_ARGS] = { 0 };
-    UINT64 un[D3D9_UNIX_MAX_ARGS] = { 0 };
+    struct lock_serve_params s = { 0 };
+    UINT origin[3];
     HRESULT hr;
 
     if (!out) return (UINT64)(UINT)E_INVALIDARG;
@@ -1116,14 +1706,37 @@ static UINT64 hand32_d3d9_cube_lock_rect( void *host, UINT slot, I386_CONTEXT *c
     args[4] = esp[5];
     args[5] = esp[6];
     hr = (HRESULT)unix_vtbl_call( host, slot, 6, args );
-    un[1] = esp[2];
-    un[2] = esp[3];
-    hr = (HRESULT)(UINT)lock_answer( host, slot + 1, 3, un, hr, lr.pBits,
-                                     "IDirect3DCubeTexture9::LockRect" );
     if (FAILED(hr)) return (UINT64)(UINT)hr;
+
+    s.host = host;
+    s.what = "IDirect3DCubeTexture9::LockRect";
+    s.sub = (esp[2] << 8) | (esp[3] & 0xff);   /* face, level */
+    s.desc_slot = slot - 2;              /* GetLevelDesc( Level, desc ) */
+    s.desc_argc = 3;
+    s.desc_level = esp[3];
+    s.unlock_slot = slot + 1;
+    s.unlock_argc = 3;
+    s.unlock_args[1] = esp[2];
+    s.unlock_args[2] = esp[3];
+    s.flags = esp[6];
+    s.origin = lock_origin_from_rect( (const LONG *)(ULONG_PTR)esp[5], origin ) ? origin : NULL;
+    s.pitch = lr.Pitch;
+    s.bits = &lr.pBits;
+    if (FAILED(hr = lock_serve( &s ))) return (UINT64)(UINT)hr;
+
     out[0] = (UINT)lr.Pitch;
     out[1] = (UINT)(ULONG_PTR)lr.pBits;
     return (UINT64)(UINT)hr;
+}
+
+static UINT64 hand32_d3d9_cube_unlock_rect( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    const ULONG *esp = frame32( ctx );
+    UINT64 args[D3D9_UNIX_MAX_ARGS] = { 0 };
+
+    args[1] = esp[2];
+    args[2] = esp[3];
+    return unlock_bounce( host, (esp[2] << 8) | (esp[3] & 0xff), slot, 3, args );
 }
 
 /* IDirect3DVolume9::LockBox( D3DLOCKED_BOX *, const D3DBOX *, DWORD ) */
@@ -1133,7 +1746,8 @@ static UINT64 hand32_d3d9_volume_lock_box( void *host, UINT slot, I386_CONTEXT *
     UINT *out = (UINT *)(ULONG_PTR)esp[2];  /* {RowPitch, SlicePitch, ptr32} */
     struct d3d9_locked_box lb = { 0 };
     UINT64 args[D3D9_UNIX_MAX_ARGS] = { 0 };
-    UINT64 un[D3D9_UNIX_MAX_ARGS] = { 0 };
+    struct lock_serve_params s = { 0 };
+    UINT origin[3];
     HRESULT hr;
 
     if (!out) return (UINT64)(UINT)E_INVALIDARG;
@@ -1141,13 +1755,35 @@ static UINT64 hand32_d3d9_volume_lock_box( void *host, UINT slot, I386_CONTEXT *
     args[2] = esp[3];
     args[3] = esp[4];
     hr = (HRESULT)unix_vtbl_call( host, slot, 4, args );
-    hr = (HRESULT)(UINT)lock_answer( host, slot + 1, 1, un, hr, lb.pBits,
-                                     "IDirect3DVolume9::LockBox" );
     if (FAILED(hr)) return (UINT64)(UINT)hr;
+
+    s.host = host;
+    s.what = "IDirect3DVolume9::LockBox";
+    s.sub = 0;
+    s.desc_slot = slot - 1;
+    s.desc_argc = 2;
+    s.is_volume = TRUE;
+    s.unlock_slot = slot + 1;
+    s.unlock_argc = 1;
+    s.flags = esp[4];
+    s.origin = lock_origin_from_box( (const UINT *)(ULONG_PTR)esp[3], origin ) ? origin : NULL;
+    s.pitch = lb.RowPitch;
+    s.slice_pitch = lb.SlicePitch;
+    s.have_slice = TRUE;
+    s.bits = &lb.pBits;
+    if (FAILED(hr = lock_serve( &s ))) return (UINT64)(UINT)hr;
+
     out[0] = (UINT)lb.RowPitch;
     out[1] = (UINT)lb.SlicePitch;
     out[2] = (UINT)(ULONG_PTR)lb.pBits;
     return (UINT64)(UINT)hr;
+}
+
+static UINT64 hand32_d3d9_volume_unlock_box( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    UINT64 args[D3D9_UNIX_MAX_ARGS] = { 0 };
+
+    return unlock_bounce( host, 0, slot, 1, args );
 }
 
 /* IDirect3DVolumeTexture9::LockBox( UINT Level, D3DLOCKED_BOX *,
@@ -1158,7 +1794,8 @@ static UINT64 hand32_d3d9_volumetex_lock_box( void *host, UINT slot, I386_CONTEX
     UINT *out = (UINT *)(ULONG_PTR)esp[3];
     struct d3d9_locked_box lb = { 0 };
     UINT64 args[D3D9_UNIX_MAX_ARGS] = { 0 };
-    UINT64 un[D3D9_UNIX_MAX_ARGS] = { 0 };
+    struct lock_serve_params s = { 0 };
+    UINT origin[3];
     HRESULT hr;
 
     if (!out) return (UINT64)(UINT)E_INVALIDARG;
@@ -1167,39 +1804,119 @@ static UINT64 hand32_d3d9_volumetex_lock_box( void *host, UINT slot, I386_CONTEX
     args[3] = esp[4];
     args[4] = esp[5];
     hr = (HRESULT)unix_vtbl_call( host, slot, 5, args );
-    un[1] = esp[2];
-    hr = (HRESULT)(UINT)lock_answer( host, slot + 1, 2, un, hr, lb.pBits,
-                                     "IDirect3DVolumeTexture9::LockBox" );
     if (FAILED(hr)) return (UINT64)(UINT)hr;
+
+    s.host = host;
+    s.what = "IDirect3DVolumeTexture9::LockBox";
+    s.sub = esp[2];
+    s.desc_slot = slot - 2;              /* GetLevelDesc */
+    s.desc_argc = 3;
+    s.desc_level = esp[2];
+    s.is_volume = TRUE;
+    s.unlock_slot = slot + 1;
+    s.unlock_argc = 2;
+    s.unlock_args[1] = esp[2];
+    s.flags = esp[5];
+    s.origin = lock_origin_from_box( (const UINT *)(ULONG_PTR)esp[4], origin ) ? origin : NULL;
+    s.pitch = lb.RowPitch;
+    s.slice_pitch = lb.SlicePitch;
+    s.have_slice = TRUE;
+    s.bits = &lb.pBits;
+    if (FAILED(hr = lock_serve( &s ))) return (UINT64)(UINT)hr;
+
     out[0] = (UINT)lb.RowPitch;
     out[1] = (UINT)lb.SlicePitch;
     out[2] = (UINT)(ULONG_PTR)lb.pBits;
     return (UINT64)(UINT)hr;
 }
 
+static UINT64 hand32_d3d9_volumetex_unlock_box( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    const ULONG *esp = frame32( ctx );
+    UINT64 args[D3D9_UNIX_MAX_ARGS] = { 0 };
+
+    args[1] = esp[2];
+    return unlock_bounce( host, esp[2], slot, 2, args );
+}
+
 /* IDirect3DVertexBuffer9::Lock / IDirect3DIndexBuffer9::Lock
  * ( UINT OffsetToLock, UINT SizeToLock, void **ppbData, DWORD Flags ).
- * Unlock takes nothing, and is the next slot on both interfaces. */
+ *
+ * No block arithmetic here: a buffer's mapping is desc.Size bytes and DXVK's
+ * LockBuffer does nothing to it but `data += OffsetToLock` -- "the offset/size
+ * is not clamped to or affected by the desc size", so the reachable span is
+ * desc.Size - OffsetToLock and a SizeToLock of 0 means all of it.  D3DVERTEX-
+ * BUFFER_DESC and D3DINDEXBUFFER_DESC both put Size at DWORD index 4 and both
+ * are listed identical 32/64 in repack32_d3d9.json.  GetDesc is asked only
+ * when it is needed -- a SizeToLock the guest named is the answer, and the
+ * dynamic-buffer path that runs every frame names one. */
 static UINT64 hand32_d3d9_buffer_lock( void *host, UINT slot, I386_CONTEXT *ctx )
 {
     const ULONG *esp = frame32( ctx );
     UINT *out = (UINT *)(ULONG_PTR)esp[4];
+    UINT offset = esp[2], want = esp[3];
+    DWORD flags = esp[5];
     UINT64 args[D3D9_UNIX_MAX_ARGS] = { 0 };
-    UINT64 un[D3D9_UNIX_MAX_ARGS] = { 0 };
     void *bits = NULL;
+    SIZE_T size;
     HRESULT hr;
 
     if (!out) return (UINT64)(UINT)E_INVALIDARG;
-    args[1] = esp[2];
-    args[2] = esp[3];
+    args[1] = offset;
+    args[2] = want;
     args[3] = (UINT64)(ULONG_PTR)&bits;
-    args[4] = esp[5];
+    args[4] = flags;
     hr = (HRESULT)unix_vtbl_call( host, slot, 5, args );
-    hr = (HRESULT)(UINT)lock_answer( host, slot + 1, 1, un, hr, bits,
-                                     "IDirect3D{Vertex,Index}Buffer9::Lock" );
     if (FAILED(hr)) return (UINT64)(UINT)hr;
+
+    if (!bits || (ULONG_PTR)bits < 0x100000000ull)
+    {
+        *out = (UINT)(ULONG_PTR)bits;
+        return (UINT64)(UINT)hr;
+    }
+
+    size = want;
+    if (!size)
+    {
+        UINT desc[8] = { 0 };
+        UINT64 d[D3D9_UNIX_MAX_ARGS] = { 0 };
+
+        d[1] = (UINT64)(ULONG_PTR)desc;
+        if (FAILED((HRESULT)unix_vtbl_call( host, slot + 2 /* GetDesc */, 2, d ))
+            || desc[4] <= offset)
+        {
+            ERR( "IDirect3D{Vertex,Index}Buffer9::Lock: SizeToLock 0 means "
+                 "'to the end', and the buffer would not say how long it is "
+                 "(described size %u, offset %u).  Unlocking and refusing "
+                 "rather than bouncing a length this module guessed.\n",
+                 desc[4], offset );
+            memset( d, 0, sizeof(d) );
+            unix_vtbl_call( host, slot + 1 /* Unlock */, 1, d );
+            return (UINT64)(UINT)E_NOTIMPL;
+        }
+        size = desc[4] - offset;
+    }
+
+    /* the flush copies back exactly [OffsetToLock, +size), which is exactly
+     * what the guest was given -- so a partial lock never writes over bytes
+     * outside it, and DISCARD may skip the fill for any lock. */
+    if (FAILED(hr = lock_bounce_apply( host, 0, "IDirect3D{Vertex,Index}Buffer9::Lock",
+                                       &bits, size, size, flags, TRUE )))
+    {
+        UINT64 un[D3D9_UNIX_MAX_ARGS] = { 0 };
+
+        unix_vtbl_call( host, slot + 1 /* Unlock */, 1, un );
+        return (UINT64)(UINT)hr;
+    }
     *out = (UINT)(ULONG_PTR)bits;
     return (UINT64)(UINT)hr;
+}
+
+static UINT64 hand32_d3d9_buffer_unlock( void *host, UINT slot, I386_CONTEXT *ctx )
+{
+    UINT64 args[D3D9_UNIX_MAX_ARGS] = { 0 };
+
+    return unlock_bounce( host, 0, slot, 1, args );
 }
 
 /* ---------------------------------------------------------- flat entries */
