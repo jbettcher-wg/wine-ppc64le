@@ -1956,6 +1956,16 @@ static void faultdump( int signal, siginfo_t *siginfo, ucontext_t *context )
     fd_str( "  --- gprs ---\n" );
     for (i = 0; i < 32; i++) fd_describe( names[i], GPR_sig(i,context) );
 
+    /* THE HOST INSTRUCTION.  For a fault taken inside the emulator's JIT the
+     * guest disassembly says nothing: what matters is which ppc64 load or
+     * store the JIT emitted for the guest access and what it added to build
+     * the effective address.  Dumped as raw words -- little-endian, so each
+     * 64-bit slot holds insn[n] in the low half and insn[n+1] in the high
+     * half -- because there is no disassembler available in a signal
+     * handler.  nip-32 .. nip+32. */
+    fd_str( "  --- code at nip (2 insns per slot, low half first) ---\n" );
+    fd_dump_words( "code", nip - 32, 8 );
+
     /* an indirect call through a bad pointer leaves the pointer in r12/ctr and
      * the slot it was loaded from usually still addressable via r11 or r2 */
     fd_str( "  --- r2 (TOC) window ---\n" );
@@ -1965,15 +1975,20 @@ static void faultdump( int signal, siginfo_t *siginfo, ucontext_t *context )
     fd_str( "=== END FAULTDUMP ===\n" );
 }
 
-static BOOL faultdump_enabled(void)
+static int faultdump_level(void)
 {
     static int cached = -1;
     if (cached == -1)
     {
         const char *v = getenv( "WINE_FAULTDUMP" );
-        cached = (v && v[0] && v[0] != '0');
+        cached = (v && v[0] && v[0] != '0') ? (v[0] - '0' >= 2 ? v[0] - '0' : 1) : 0;
     }
     return cached;
+}
+
+static BOOL faultdump_enabled(void)
+{
+    return faultdump_level() > 0;
 }
 
 
@@ -2017,6 +2032,20 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
      * the guest state thrown away.  Does not return when it takes the fault;
      * the record built above is stashed inside so the run loop can dispatch
      * it (guest-seh S2). */
+    /* WINE_FAULTDUMP=2: dump the NATIVE fault context BEFORE emu_handle_fault
+     * claims it.  A fault inside the JIT is unwound into the guest by the
+     * bridge and never reaches the faultdump below, so the host pc, the host
+     * gprs and the host instruction that computed the effective address --
+     * the only things that can say whether a bad guest address was the
+     * guest's own or the JIT's arithmetic -- are otherwise unobservable.
+     * Bounded, opt-in, and off by default; costs nothing when unset. */
+    {
+        static LONG emu_dumped;
+
+        if (faultdump_level() >= 2 && InterlockedIncrement( &emu_dumped ) <= 4)
+            faultdump( signal, siginfo, context );
+    }
+
     if (emu_handle_fault( context, &rec )) return;
 
     if (handle_syscall_fault( data, context, &rec )) return;
