@@ -318,3 +318,13 @@ The magic is validated before any length is read, so a crossed pair cannot
 misread a blob.  Nothing about steamrpc_wire.h changed to get this; the i386
 build compiles the same header and gets 'SCR3' for free, exactly as its
 comment said it would.
+
+
+Where the i386 lane actually stands
+-----------------------------------
+The helper builds, runs, and carries traffic -- but "the transport works" is
+not the same claim as "interface calls work", and on i386 those two have
+different answers today.  ../probe-interface.sh runs both lanes headless in
+four escalating steps and its header carries the measured table, the exact
+i386 fault, the dead ends (winedbg gives NO backtrace on this port), and the
+best unexplored lead.  Run that before believing anything about this lane.
