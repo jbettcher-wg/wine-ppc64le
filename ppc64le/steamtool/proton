@@ -256,9 +256,9 @@ say "WINEFEXBRIDGE=${WINEFEXBRIDGE:-<unset>}"
 # every client, and the two views must agree bit for bit.  A game whose
 # .env was applied after the server was already up got a server on one
 # topology and a game on another.
-appcfg=$selfdir/appconfig/${SteamAppId:-none}.env
-if [ -f "$appcfg" ]; then
-    say "applying $appcfg"
+apply_appcfg() {
+    [ -f "$1" ] || return 0
+    say "applying $1"
     while IFS= read -r line; do
         case $line in ''|\#*) continue ;; esac
         name=${line%%=*}
@@ -268,8 +268,15 @@ if [ -f "$appcfg" ]; then
         else
             say "  keeping caller's $name"
         fi
-    done < "$appcfg"
-fi
+    done < "$1"
+}
+apply_appcfg "$selfdir/appconfig/${SteamAppId:-none}.env"
+# A run-native --name title has no appid; its per-title file is keyed on the
+# name the prefix is already keyed on.  Applied second, same
+# caller-env-wins semantics, so an explicit env on the command line still
+# overrides both files.
+[ -n "${WINE_PPC64LE_RUN_NAME:-}" ] && \
+    apply_appcfg "$selfdir/appconfig/name-$WINE_PPC64LE_RUN_NAME.env"
 
 # The lane's own JIT defaults, applied after the per-title file so a Steam
 # launch option or a title's .env wins.  This is the emulated stack's

@@ -92,6 +92,14 @@ if [ -n "$appid" ]; then
     SteamAppId=$appid; SteamGameId=$appid
     export SteamAppId SteamGameId
 fi
+# A --name run has no appid, and per-title appconfig used to be unreachable
+# for exactly the titles this tool exists for (GOG installs).  The name is
+# the stable key the prefix is already keyed on, so it is the .env key too:
+# proton applies appconfig/name-<name>.env for it.
+if [ -n "$name" ]; then
+    WINE_PPC64LE_RUN_NAME=$name
+    export WINE_PPC64LE_RUN_NAME
+fi
 
 echo "run-native: prefix $prefix" >&2
 # The game dir is the working directory, because that is what Steam does when
