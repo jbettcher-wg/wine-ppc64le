@@ -13,14 +13,33 @@
 > | bridge floor | 296 | 145 | 86 | **68** |
 > | wine level | 575 | ~430 | ~430 | **~423** |
 >
-> The bridge-side prediction held (2.1× at the floor); the wine-level
-> crossing is now dominated by the wine-side path — PE re-entry
-> (`call_user_mode_callback`/`NtCallbackReturn`), dispatch, the native
-> call — which is where the next cut lives, along with row-pointer
-> cookies to skip `find_guest_thunk_target`.  Step C (gen_winecom FP
-> descriptors) remains unbuilt.  Kill switches:
-> `WINE_PPC64LE_NO_TRAP_VIEW=1`, `WINE_PPC64LE_NO_EC=1`,
-> `FEXBRIDGE_EAGER_CTX=1`.  Gate: `ppc64le/cpu/check-ec-transition.sh`.
+> The bridge-side prediction held (2.1× at the floor).  **Same night,
+> both wine-side levers landed too**: row cookies (`582e9c47b2b` + fex
+> `0411b2749` — the registration cookie IS the stub's resolved dispatch
+> row, `thunk_rip_cache_get` left the crossing) and the lean trap
+> return (`49f0feff4d0` — `NtCallbackReturn`'s syscall left it;
+> `emu_trap_return_direct` mirrors `user_mode_callback_return` without
+> the gate, restore_flags-guarded with the syscall tail as fallback).
+> Final ladder on the shipping build against the live bridge, one
+> binary, env-var legs:
+>
+> | leg | ns/crossing |
+> |---|---:|
+> | old CONTEXT protocol (`WINE_PPC64LE_NO_TRAP_VIEW=1`) | 388 |
+> | view, no EC (`WINE_PPC64LE_NO_EC=1`) | 394 |
+> | no lean return (`WINE_PPC64LE_NO_LEAN_RETURN=1`) | 408 |
+> | **default: view + EC + cookies + lean return** | **365** |
+>
+> (Legs are not nested — the lean return serves the trap path too, so
+> the pre-PPC64EC production crossing, lazy CONTEXT + syscall return,
+> sat at ~430–437.)  Remaining named work: the entry half of the PE
+> re-entry + `emu_teb_stack_switch` (~10% of the bench crossing
+> between them), the exception path's lean-return adoption (cold),
+> step C (gen_winecom FP), and the winecom global `wc_cs` attribution
+> (a callgraph W3 run on a real seat — headless WSI init fails).  Kill
+> switches: `WINE_PPC64LE_NO_TRAP_VIEW=1`, `WINE_PPC64LE_NO_EC=1`,
+> `WINE_PPC64LE_NO_LEAN_RETURN=1`, `FEXBRIDGE_EAGER_CTX=1`.  Gates:
+> `check-ec-transition.sh`, `check-rip-cache.sh` layer 4b.
 > The plan below is the original feasibility page, kept as written.
 
 The question: do what ARM64EC does — compile the hot PE-side surface as

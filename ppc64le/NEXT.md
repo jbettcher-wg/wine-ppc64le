@@ -545,12 +545,24 @@ The crossing fell 145→68 ns at the bridge floor but only ~430→~423 at the
 wine level: **the crossing price now lives almost entirely in the
 wine-side path**.  In order of expected yield:
 
-* **The PE re-entry**: `call_emu_trap_dispatcher` → `call_user_mode_callback`
-  → PE dispatch → `NtCallbackReturn` (a full syscall per crossing).  A
-  dedicated lean return path for trap dispatch is the next real lever.
-* **Row cookies**: the EC handler passes cookie=NULL and re-runs
-  `find_guest_thunk_target` per call; a precomputed row pointer in the
-  cookie deletes the lookup.  Mechanical now that registration exists.
+* **DONE same night — the PE re-entry's return half** (`49f0feff4d0`):
+  `emu_trap_return_direct` replaces NtCallbackReturn's syscall on the
+  normal trap return, restore_flags-guarded, lever
+  WINE_PPC64LE_NO_LEAN_RETURN=1.  ~402→~352 ns on the bench;
+  __wine_syscall_dispatcher left the crossing profile.  Still standing:
+  the ENTRY half (call_user_mode_callback's frame build ~4.6%) and
+  emu_teb_stack_switch (~5%) — together the next ~10%; and the
+  exception-dispatch path still returns through NtCallbackReturn (cold).
+* **DONE same night — row cookies** (`582e9c47b2b` + fex `0411b2749`):
+  per-slot row cells ride as the bridge cookie; thunk_rip_cache_get is
+  gone from the crossing; the cache levers win over the cells
+  (check-rip-cache layer 4b).  ~423→~402 ns.
+* **The winecom global wc_cs**: 6.6% of W3's D3D11-submission thread is
+  native RtlEnter/LeaveCriticalSection; wc_cs is taken on EVERY proxy
+  AddRef/Release and every interface intern (winecom.c).  Attribution
+  needs a CALLGRAPH profile of a seat-run W3 (headless dies at DXVK's
+  headless-WSI init, pristine tree too) — measure before touching
+  locking.
 * **Step C**: gen_winecom FP descriptors (the hand_clear_dsv class) — see
   the doc's corrected scope.
 * **NOTE for the JIT side** (found building this, filed in the fex tree's
