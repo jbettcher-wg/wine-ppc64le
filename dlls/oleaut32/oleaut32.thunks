@@ -58,7 +58,7 @@ GUEST-IMPL   VariantClear                     __wine_guest_VariantClear
 # a pass-through that would hand the guest a native vtable
 GUEST-REFUSE BstrFromVector
 GUEST-REFUSE CreateDispTypeInfo
-GUEST-REFUSE CreateErrorInfo
+GUEST-IMPL   CreateErrorInfo                  __wine_guest_CreateErrorInfo
 GUEST-REFUSE CreateStdDispatch
 GUEST-REFUSE DispCallFunc
 GUEST-REFUSE DispGetIDsOfNames
@@ -66,7 +66,7 @@ GUEST-REFUSE DispGetParam
 GUEST-REFUSE DispInvoke
 GUEST-REFUSE DllGetClassObject
 GUEST-REFUSE GetActiveObject
-GUEST-REFUSE GetErrorInfo
+GUEST-IMPL   GetErrorInfo                     __wine_guest_GetErrorInfo
 GUEST-REFUSE GetRecordInfoFromGuids
 GUEST-REFUSE GetRecordInfoFromTypeInfo
 GUEST-REFUSE LPSAFEARRAY_UserFree
@@ -123,7 +123,7 @@ GUEST-REFUSE SafeArraySetIID
 GUEST-REFUSE SafeArraySetRecordInfo
 GUEST-REFUSE SafeArrayUnaccessData
 GUEST-REFUSE SafeArrayUnlock
-GUEST-REFUSE SetErrorInfo
+GUEST-IMPL   SetErrorInfo                     __wine_guest_SetErrorInfo
 GUEST-REFUSE VARIANT_UserFree
 GUEST-REFUSE VARIANT_UserMarshal
 GUEST-REFUSE VARIANT_UserSize

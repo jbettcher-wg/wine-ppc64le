@@ -44,6 +44,7 @@
 
 #include <windows.h>
 #include <objbase.h>
+#include <propidl.h>   /* PROPVARIANT, for the PropVariantClear legs */
 
 /* Spelled out here rather than linked from libuuid: the guest build has no
  * Wine import libraries at all, and a GUID both builds compile from the same
@@ -58,6 +59,14 @@ static const GUID smoke_IID_IPersistStream =
     { 0x00000109, 0x0000, 0x0000, { 0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x46 } };
 static const GUID smoke_IID_IClassFactory =
     { 0x00000001, 0x0000, 0x0000, { 0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x46 } };
+static const GUID smoke_CLSID_NetworkListManager =
+    { 0xdcb00c01, 0x570f, 0x4a9b, { 0x8d,0x69,0x19,0x9f,0xdb,0xa5,0x72,0x3b } };
+static const GUID smoke_IID_IDispatch =
+    { 0x00020400, 0x0000, 0x0000, { 0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x46 } };
+static const GUID smoke_IID_NULL =
+    { 0x00000000, 0x0000, 0x0000, { 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 } };
+static const GUID smoke_IID_IErrorInfo =
+    { 0x1cf2b120, 0x547d, 0x101b, { 0x8e,0x65,0x08,0x00,0x2b,0x2b,0xd1,0x19 } };
 
 /* ------------------------------------------------------------- output */
 
@@ -340,6 +349,167 @@ static int com_smoke_run( void )
         out( "refs=" );
         out_dec( r1 );
         verdict( r1 == 0, "last reference did not drop to zero" );
+    }
+
+    /* ---- the 2026-09-01 completeness legs ------------------------------
+     * Each drives a slot or export that was REFUSED before the syscom
+     * completeness pass and is checkable by value now:
+     *   - IDispatch::GetIDsOfNames was refused for by-value LCID/DISPID (the
+     *     offline prover could not resolve integer typedefs); the
+     *     NetworkListManager vends a rostered IDispatch to drive it.
+     *   - PropVariantClear/CoSetProxyBlanket were flat GUEST-REFUSE stubs;
+     *     the interface-bearing PROPVARIANT case must consume the GUEST
+     *     reference (the proxy must survive and still work), and
+     *     CoSetProxyBlanket must return native's real answer, not the
+     *     stub's E_NOTIMPL. */
+    {
+        IDispatch *disp = NULL;
+        IMoniker *mk2 = NULL;
+
+        begin( "CoCreateInstance(CLSID_NetworkListManager, IID_IDispatch)" );
+        hr = CoCreateInstance( &smoke_CLSID_NetworkListManager, NULL,
+                               CLSCTX_INPROC_SERVER, &smoke_IID_IDispatch,
+                               (void **)&disp );
+        out_hr( "hr", hr );
+        verdict( hr == S_OK && disp != NULL, "no IDispatch" );
+
+        if (disp)
+        {
+            static const WCHAR name_gnc[] = L"GetNetworkConnections";
+            LPOLESTR names[1];
+            DISPID dispid = 0x7fffffff;   /* a value it must overwrite */
+
+            begin( "IDispatch::GetIDsOfNames(GetNetworkConnections)" );
+            names[0] = (LPOLESTR)name_gnc;
+            hr = IDispatch_GetIDsOfNames( disp, &smoke_IID_NULL, names, 1,
+                                          0x0800 /* LOCALE_SYSTEM_DEFAULT */,
+                                          &dispid );
+            out_hr( "hr", hr );
+            out( " dispid=0x" );
+            out_hex( (ULONG)dispid, 8 );
+            /* Wine's netprofm answers E_NOTIMPL here NATIVELY (no typelib
+             * dispatch); what this step proves is the UPGRADED row carrying
+             * LCID/DISPID/LPOLESTR* faithfully -- the call must reach the
+             * implementation and bring back its real answer with the out
+             * cell untouched, identically on both legs. */
+            verdict( hr == E_NOTIMPL && dispid == 0x7fffffff,
+                     "the upgraded row did not carry the call faithfully" );
+
+            begin( "IUnknown::Release the IDispatch" );
+            IDispatch_Release( disp );
+            out( "released" );
+            verdict( TRUE, "" );
+        }
+
+        begin( "CoCreateInstance a second FileMoniker (PropVariant legs)" );
+        hr = CoCreateInstance( &smoke_CLSID_FileMoniker, NULL,
+                               CLSCTX_INPROC_SERVER, &smoke_IID_IMoniker,
+                               (void **)&mk2 );
+        out_hr( "hr", hr );
+        verdict( hr == S_OK && mk2 != NULL, "no interface" );
+
+        if (mk2)
+        {
+            PROPVARIANT pv;
+            WCHAR *buf;
+            DWORD mksys2 = 0;
+            int i;
+
+            begin( "PropVariantClear(VT_LPWSTR)" );
+            buf = CoTaskMemAlloc( 6 * sizeof(WCHAR) );
+            for (i = 0; i < 5; i++) buf[i] = (WCHAR)('s' - i);
+            buf[5] = 0;
+            pv.vt = VT_LPWSTR;
+            pv.pwszVal = buf;
+            hr = PropVariantClear( &pv );
+            out_hr( "hr", hr );
+            out( " vt=" );
+            out_dec( pv.vt );
+            verdict( hr == S_OK && pv.vt == VT_EMPTY,
+                     "did not clear to VT_EMPTY" );
+
+            begin( "PropVariantClear(VT_UNKNOWN) consumes the GUEST reference" );
+            IMoniker_AddRef( mk2 );          /* the reference the clear consumes */
+            pv.vt = VT_UNKNOWN;
+            pv.punkVal = (IUnknown *)mk2;
+            hr = PropVariantClear( &pv );
+            out_hr( "hr", hr );
+            out( " vt=" );
+            out_dec( pv.vt );
+            verdict( hr == S_OK && pv.vt == VT_EMPTY,
+                     "did not clear to VT_EMPTY" );
+
+            begin( "the moniker still works after the clear" );
+            hr = IMoniker_IsSystemMoniker( mk2, &mksys2 );
+            out_hr( "hr", hr );
+            out( " mksys=" );
+            out_dec( mksys2 );
+            verdict( hr == S_OK && mksys2 == MKSYS_FILEMONIKER,
+                     "the clear took the proxy's own reference with it" );
+
+            begin( "CoSetProxyBlanket answers natively, not with the stub" );
+            hr = CoSetProxyBlanket( (IUnknown *)mk2, 0xffffffff /* DEFAULT */,
+                                    0, NULL, 0, 0, NULL, 0 );
+            out_hr( "hr", hr );
+            verdict( hr != E_NOTIMPL, "still the refusal stub's E_NOTIMPL" );
+
+            begin( "IUnknown::Release the second moniker" );
+            r1 = IMoniker_Release( mk2 );
+            out( "refs=" );
+            out_dec( r1 );
+            verdict( r1 == 0, "refcount did not return to zero" );
+        }
+    }
+
+    /* ---- the error-info loop: two UPGRADED rows + three new wrappers ----
+     * CreateErrorInfo (flat, was GUEST-REFUSE) vends ICreateErrorInfo;
+     * SetDescription takes by-value LPOLESTR (an upgraded legacy row);
+     * SetErrorInfo/GetErrorInfo (flat, were GUEST-REFUSE) carry it through
+     * TLS; GetDescription's BSTR comes back as bytes both legs must print
+     * identically. */
+    {
+        ICreateErrorInfo *cei = NULL;
+        IErrorInfo *ei = NULL, *got = NULL;
+        BSTR desc = NULL;
+
+        begin( "CreateErrorInfo" );
+        hr = CreateErrorInfo( &cei );
+        out_hr( "hr", hr );
+        verdict( hr == S_OK && cei != NULL, "no ICreateErrorInfo" );
+
+        if (cei)
+        {
+            static const WCHAR text[] = L"syscom-error-info";
+
+            begin( "ICreateErrorInfo::SetDescription (an upgraded LPOLESTR row)" );
+            hr = ICreateErrorInfo_SetDescription( cei, (LPOLESTR)text );
+            out_hr( "hr", hr );
+            verdict( hr == S_OK, "not S_OK" );
+
+            begin( "QI to IErrorInfo, SetErrorInfo, GetErrorInfo" );
+            hr = ICreateErrorInfo_QueryInterface( cei, &smoke_IID_IErrorInfo,
+                                                  (void **)&ei );
+            if (hr == S_OK) hr = SetErrorInfo( 0, ei );
+            if (hr == S_OK) hr = GetErrorInfo( 0, &got );
+            out_hr( "hr", hr );
+            verdict( hr == S_OK && got != NULL, "the loop did not round-trip" );
+
+            if (got)
+            {
+                begin( "IErrorInfo::GetDescription round-trips the text" );
+                hr = IErrorInfo_GetDescription( got, &desc );
+                out_hr( "hr", hr );
+                out( " len=" );
+                out_dec( desc ? (ULONG)SysStringLen( desc ) : 0 );
+                out( " last=" );
+                out_hex( desc ? (ULONG)desc[16] : 0, 2 );
+                verdict( hr == S_OK && desc && desc[0] == 's' && desc[16] == 'o',
+                         "description did not survive the loop" );
+                IErrorInfo_Release( got );
+            }
+            if (ei) IErrorInfo_Release( ei );
+            ICreateErrorInfo_Release( cei );
+        }
     }
 
 uninit:

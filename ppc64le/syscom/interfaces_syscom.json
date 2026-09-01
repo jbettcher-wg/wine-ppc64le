@@ -97,6 +97,7 @@
     "AUDCLNT_SHAREMODE",
     "AUDCLNT_STREAMOPTIONS",
     "AUDIO_STREAM_CATEGORY",
+    "AudioSessionDisconnectReason",
     "AudioSessionState",
     "BIND_FLAGS",
     "CALLCONV",
@@ -582,6 +583,273 @@
           "params": [
             "UINT32 NumFramesWritten",
             "DWORD dwFlags"
+          ]
+        }
+      ]
+    },
+    "IAudioSessionControl": {
+      "uuid": "f4b1a599-7266-4319-a8ca-e70acb11e8cd",
+      "base": "IUnknown",
+      "header": "audiopolicy.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IAudioSessionControl",
+          "name": "GetState",
+          "ret": "HRESULT",
+          "params": [
+            "AudioSessionState *pRetVal"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IAudioSessionControl",
+          "name": "GetDisplayName",
+          "ret": "HRESULT",
+          "params": [
+            "LPWSTR *pRetVal"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IAudioSessionControl",
+          "name": "SetDisplayName",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR DisplayName",
+            "LPCGUID EventContext"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IAudioSessionControl",
+          "name": "GetIconPath",
+          "ret": "HRESULT",
+          "params": [
+            "LPWSTR *pRetVal"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IAudioSessionControl",
+          "name": "SetIconPath",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR Value",
+            "LPCGUID EventContext"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IAudioSessionControl",
+          "name": "GetGroupingParam",
+          "ret": "HRESULT",
+          "params": [
+            "GUID *pRetVal"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IAudioSessionControl",
+          "name": "SetGroupingParam",
+          "ret": "HRESULT",
+          "params": [
+            "LPCGUID Override",
+            "LPCGUID EventContext"
+          ]
+        },
+        {
+          "slot": 10,
+          "owner": "IAudioSessionControl",
+          "name": "RegisterAudioSessionNotification",
+          "ret": "HRESULT",
+          "params": [
+            "IAudioSessionEvents *NewNotifications"
+          ]
+        },
+        {
+          "slot": 11,
+          "owner": "IAudioSessionControl",
+          "name": "UnregisterAudioSessionNotification",
+          "ret": "HRESULT",
+          "params": [
+            "IAudioSessionEvents *NewNotifications"
+          ]
+        }
+      ]
+    },
+    "IAudioSessionManager": {
+      "uuid": "bfa971f1-4d5e-40bb-935e-967039bfbee4",
+      "base": "IUnknown",
+      "header": "audiopolicy.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IAudioSessionManager",
+          "name": "GetAudioSessionControl",
+          "ret": "HRESULT",
+          "params": [
+            "LPCGUID AudioSessionGuid",
+            "DWORD StreamFlags",
+            "IAudioSessionControl **SessionControl"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IAudioSessionManager",
+          "name": "GetSimpleAudioVolume",
+          "ret": "HRESULT",
+          "params": [
+            "LPCGUID AudioSessionGuid",
+            "DWORD StreamFlags",
+            "ISimpleAudioVolume **AudioVolume"
+          ]
+        }
+      ]
+    },
+    "IAudioSessionManager2": {
+      "uuid": "77aa99a0-1bd6-484f-8bc7-2c654c9a9b6f",
+      "base": "IAudioSessionManager",
+      "header": "audiopolicy.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IAudioSessionManager",
+          "name": "GetAudioSessionControl",
+          "ret": "HRESULT",
+          "params": [
+            "LPCGUID AudioSessionGuid",
+            "DWORD StreamFlags",
+            "IAudioSessionControl **SessionControl"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IAudioSessionManager",
+          "name": "GetSimpleAudioVolume",
+          "ret": "HRESULT",
+          "params": [
+            "LPCGUID AudioSessionGuid",
+            "DWORD StreamFlags",
+            "ISimpleAudioVolume **AudioVolume"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IAudioSessionManager2",
+          "name": "GetSessionEnumerator",
+          "ret": "HRESULT",
+          "params": [
+            "IAudioSessionEnumerator **SessionEnum"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IAudioSessionManager2",
+          "name": "RegisterSessionNotification",
+          "ret": "HRESULT",
+          "params": [
+            "IAudioSessionNotification *SessionNotification"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IAudioSessionManager2",
+          "name": "UnregisterSessionNotification",
+          "ret": "HRESULT",
+          "params": [
+            "IAudioSessionNotification *SessionNotification"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IAudioSessionManager2",
+          "name": "RegisterDuckNotification",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR sessionID",
+            "IAudioVolumeDuckNotification *duckNotification"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IAudioSessionManager2",
+          "name": "UnregisterDuckNotification",
+          "ret": "HRESULT",
+          "params": [
+            "IAudioVolumeDuckNotification *duckNotification"
           ]
         }
       ]
@@ -7411,6 +7679,75 @@
             "const void *pv",
             "ULONG cb",
             "ULONG *pcbWritten"
+          ]
+        }
+      ]
+    },
+    "ISimpleAudioVolume": {
+      "uuid": "87ce5498-68d6-44e5-9215-6da47ef883d8",
+      "base": "IUnknown",
+      "header": "audioclient.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "ISimpleAudioVolume",
+          "name": "SetMasterVolume",
+          "ret": "HRESULT",
+          "params": [
+            "float fLevel",
+            "LPCGUID EventContext"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "ISimpleAudioVolume",
+          "name": "GetMasterVolume",
+          "ret": "HRESULT",
+          "params": [
+            "float *pfLevel"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "ISimpleAudioVolume",
+          "name": "SetMute",
+          "ret": "HRESULT",
+          "params": [
+            "const BOOL bMute",
+            "LPCGUID EventContext"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "ISimpleAudioVolume",
+          "name": "GetMute",
+          "ret": "HRESULT",
+          "params": [
+            "BOOL *pbMute"
           ]
         }
       ]

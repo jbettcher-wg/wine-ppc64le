@@ -70,6 +70,7 @@ ${CC:-gcc} -c -o "$OUT/com_smoke.o" "$HERE/com_smoke.c" $INCL \
     -Wl,--wine-builtin -mconsole "$OUT/com_smoke.o" \
     "$BUILD/libs/winecrt0/ppc64-windows/libwinecrt0.a" \
     "$BUILD/dlls/ole32/ppc64-windows/libole32.a" \
+    "$BUILD/dlls/oleaut32/ppc64-windows/liboleaut32.a" \
     "$BUILD/dlls/ucrtbase/ppc64-windows/libucrtbase.a" \
     "$BUILD/dlls/kernel32/ppc64-windows/libkernel32.a" \
     "$BUILD/dlls/ntdll/ppc64-windows/libntdll.a" || skip "native link failed"
@@ -96,6 +97,17 @@ CoUninitialize
 CoCreateInstance
 CoGetClassObject
 CreateStreamOnHGlobal
+CoTaskMemAlloc
+PropVariantClear
+CoSetProxyBlanket
+CreateErrorInfo
+GetErrorInfo
+SetErrorInfo
+EOF
+cat > "$OUT/oleaut32.def" <<'EOF'
+LIBRARY oleaut32.dll
+EXPORTS
+SysStringLen
 EOF
 cat > "$OUT/kernel32.def" <<'EOF'
 LIBRARY kernel32.dll
@@ -104,7 +116,7 @@ GetStdHandle
 WriteFile
 ExitProcess
 EOF
-for m in ole32 kernel32; do
+for m in ole32 oleaut32 kernel32; do
     llvm-dlltool -m i386:x86-64 -d "$OUT/$m.def" -l "$OUT/lib$m.a" \
         || skip "llvm-dlltool failed for $m"
 done
@@ -116,7 +128,7 @@ clang -target x86_64-windows-gnu -nostdlibinc $INCL \
 clang -target x86_64-windows-gnu -fuse-ld=lld -nostdlib \
     -Wl,--entry=com_smoke_entry -Wl,--subsystem,console \
     -o "$OUT/com_smoke_guest.exe" "$OUT/com_smoke_guest.o" \
-    "$OUT/libole32.a" "$OUT/libkernel32.a" || skip "guest link failed"
+    "$OUT/libole32.a" "$OUT/liboleaut32.a" "$OUT/libkernel32.a" || skip "guest link failed"
 
 # Bounded, because a run that never returns is a result too: the sabotage
 # control hands the guest a native code pointer and it can spin instead of

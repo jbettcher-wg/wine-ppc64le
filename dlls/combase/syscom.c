@@ -87,6 +87,8 @@
 #include "windef.h"
 #include "winbase.h"
 #include "objbase.h"
+#include "propidl.h"   /* PROPVARIANT + the PropVariant* prototypes the
+                        * guest-side trio below wraps */
 #include "oleauto.h"
 #include "winternl.h"
 #include "wine/debug.h"
@@ -1247,3 +1249,329 @@ HRESULT WINAPI __wine_guest_VariantClear( VARIANTARG *v )
         return VariantClear( v );
     }
 }
+
+#ifdef __powerpc64__   /* the guest-facing wrappers below serve the 64-bit
+ * thunk lane only; the i386 lane is real WoW64 (no GUEST-IMPL consumers), and
+ * compiling them there pulls dllimport stubs into collision with combase's
+ * own definitions.  The spec lines carry -arch=ppc64 to match. */
+
+/* --------------------------------------------- the PROPVARIANT trio
+ *
+ * PropVariantClear / PropVariantCopy / FreePropVariantArray were on the
+ * GUEST-REFUSE list, and The Witcher 3's run log showed the refusal firing
+ * (the 2026-08-31 seat run: err:combase:__wine_com_refuse x17 with
+ * PropVariantClear among the traced names).  PROPVARIANT is VARIANT's
+ * sibling tagged union -- vt at offset 0, payload at offset 8, 24 bytes on
+ * this pair of ABIs, the same measured layout the VariantClear wrapper above
+ * leans on -- and the same discipline applies: scalars, strings, blobs and
+ * plain vectors are bytes both sides read identically, so those pass
+ * through; the interface-bearing tags are the ones that must never reach
+ * native unclassified.
+ *
+ * Native reference for every branch: dlls/combase/combase.c PropVariantClear
+ * (propvar_validatetype first, memset-to-zero on both the failure and the
+ * success path).  The interface-bearing tag set is native's own case list:
+ * VT_DISPATCH, VT_UNKNOWN, VT_STREAM, VT_STREAMED_OBJECT, VT_STORAGE,
+ * VT_STORED_OBJECT -- all of which native releases through the one pStream
+ * slot. */
+
+static BOOL syscom_propvt_iface( VARTYPE vt )
+{
+    switch (vt)
+    {
+    case VT_DISPATCH:
+    case VT_UNKNOWN:
+    case VT_STREAM:
+    case VT_STREAMED_OBJECT:
+    case VT_STORAGE:
+    case VT_STORED_OBJECT:
+        return TRUE;
+    }
+    return FALSE;
+}
+
+HRESULT WINAPI __wine_guest_PropVariantClear( PROPVARIANT *pvar )
+{
+    if (!syscom_ready()) return E_FAIL;
+    if (!pvar) return S_OK;                    /* native: S_OK on NULL */
+
+    if (syscom_propvt_iface( pvar->vt ))
+    {
+        IUnknown *punk = (IUnknown *)pvar->pStream;
+        void *host;
+
+        if (!punk)
+        {
+            /* native's release branch guards on the pointer and then falls
+             * through to the memset; mirror both halves */
+            memset( pvar, 0, sizeof(*pvar) );
+            return S_OK;
+        }
+        if (__wine_com_translate_in( punk, &host ))
+        {
+            /* One of our forward proxies: the guest-visible reference is the
+             * one this clear consumes, and only the guest-side release knows
+             * how to drop it without touching the single host reference the
+             * proxy owns for its whole life -- the VariantClear wrapper's
+             * VT_UNKNOWN reasoning, verbatim. */
+            __wine_com_release_guest( punk );
+            memset( pvar, 0, sizeof(*pvar) );
+            return S_OK;
+        }
+        FIXME( "syscom: PropVariantClear refuses vt %#x over %p: either a "
+               "guest-implemented object (Release ownership through a "
+               "reverse proxy is undesigned) or a proxy already released "
+               "once too often; the PROPVARIANT is left untouched\n",
+               pvar->vt, punk );
+        return E_NOTIMPL;
+    }
+    if ((pvar->vt & VT_VECTOR) && (pvar->vt & VT_TYPEMASK) == VT_VARIANT)
+    {
+        /* a vector of VARIANTs may hold VT_UNKNOWN elements native would
+         * Release; v1 does not recurse into elements, same stance as the
+         * VariantClear wrapper's SAFEARRAY branch */
+        FIXME( "syscom: PropVariantClear refuses VT_VECTOR|VT_VARIANT %p: "
+               "elements could carry interface pointers and v1 does not "
+               "recurse\n", pvar );
+        return E_NOTIMPL;
+    }
+    /* everything else -- scalars, strings, blobs, CF, CLSID, plain vectors,
+     * and any vt native's own validator will refuse-and-zero */
+    return PropVariantClear( pvar );
+}
+
+HRESULT WINAPI __wine_guest_PropVariantCopy( PROPVARIANT *dest, const PROPVARIANT *src )
+{
+    if (!syscom_ready()) return E_FAIL;
+    if (!dest || !src) return E_INVALIDARG;
+
+    if (syscom_propvt_iface( src->vt ))
+    {
+        IUnknown *punk = (IUnknown *)src->pStream;
+        void *host;
+
+        if (!punk || __wine_com_translate_in( punk, &host ))
+        {
+            /* Copying an interface-bearing PROPVARIANT is one AddRef plus a
+             * struct copy (native: *pvarDest = *pvarSrc; AddRef).  For a
+             * forward proxy the reference that must grow is the GUEST-side
+             * one -- the host reference stays the proxy's single one. */
+            *dest = *src;
+            if (punk) __wine_com_addref_guest( punk );
+            return S_OK;
+        }
+        FIXME( "syscom: PropVariantCopy refuses vt %#x over %p: a "
+               "guest-implemented object's AddRef runs guest code this "
+               "wrapper cannot enter\n", src->vt, punk );
+        return E_NOTIMPL;
+    }
+    if ((src->vt & VT_VECTOR) && (src->vt & VT_TYPEMASK) == VT_VARIANT)
+    {
+        FIXME( "syscom: PropVariantCopy refuses VT_VECTOR|VT_VARIANT %p: "
+               "elements could carry interface pointers and v1 does not "
+               "recurse\n", src );
+        return E_NOTIMPL;
+    }
+    return PropVariantCopy( dest, src );
+}
+
+HRESULT WINAPI __wine_guest_FreePropVariantArray( ULONG cnt, PROPVARIANT *rgvars )
+{
+    ULONG i;
+    HRESULT hr = S_OK, first = S_OK;
+
+    if (!syscom_ready()) return E_FAIL;
+    if (!rgvars) return cnt ? E_INVALIDARG : S_OK;
+    /* native (combase.c FreePropVariantArray): clear every element, report
+     * the FIRST failure; a refused element here leaves that element
+     * untouched, exactly as its own wrapper promises */
+    for (i = 0; i < cnt; i++)
+    {
+        hr = __wine_guest_PropVariantClear( &rgvars[i] );
+        if (FAILED( hr ) && first == S_OK) first = hr;
+    }
+    return first;
+}
+
+/* ------------------------------------------------- CoSetProxyBlanket
+ *
+ * Was GUEST-REFUSE; The Witcher 3 calls it on boot (the 2026-08-31 run log's
+ * `L"ole32.dll".CoSetProxyBlanket is refused` line -- ole32's thunk forwards
+ * here).  The signature is one interface IN plus plain integers/pointers:
+ * translate the proxy and let native answer.  For the in-process objects
+ * this lane serves, native's own answer is E_NOINTERFACE (no proxy manager),
+ * which is precisely what Windows says for a non-DCOM object -- an honest
+ * answer a caller must already handle, where the refusal stub's E_NOTIMPL
+ * was an invented one. */
+HRESULT WINAPI __wine_guest_CoSetProxyBlanket( IUnknown *proxy, DWORD authn_svc,
+                                               DWORD authz_svc, OLECHAR *server,
+                                               DWORD authn_level, DWORD imp_level,
+                                               void *auth_info, DWORD capabilities )
+{
+    void *host;
+    HRESULT hr;
+
+    if (!syscom_ready()) return E_FAIL;
+    if (!winecom_to_native( proxy, ~0u, &host ))
+    {
+        FIXME( "syscom: CoSetProxyBlanket on the guest-implemented object %p "
+               "is refused: no native identity exists to set a blanket on\n",
+               proxy );
+        return E_NOTIMPL;
+    }
+    hr = CoSetProxyBlanket( (IUnknown *)host, authn_svc, authz_svc, server,
+                            authn_level, imp_level, auth_info, capabilities );
+    if (host) winecom_to_native_end( host );
+    return hr;
+}
+
+/* --------------------------------------- the error-info flat family
+ *
+ * ICreateErrorInfo and IErrorInfo are BOTH on the roster, so these five
+ * flats were refusals out of nothing but queue order: each is one
+ * translate/wrap on machinery that already exists (the CoGetMalloc shape).
+ * Games use Get/SetErrorInfo around every rich-error COM failure. */
+HRESULT WINAPI __wine_guest_CreateErrorInfo( ICreateErrorInfo **pperrinfo )
+{
+    HRESULT hr;
+
+    if (!syscom_ready()) return E_FAIL;
+    hr = CreateErrorInfo( pperrinfo );
+    return __wine_com_wrap_out_iface( hr, &IID_ICreateErrorInfo,
+                                      (void **)pperrinfo );
+}
+
+HRESULT WINAPI __wine_guest_GetErrorInfo( ULONG reserved, IErrorInfo **pperrinfo )
+{
+    HRESULT hr;
+
+    if (!syscom_ready()) return E_FAIL;
+    hr = GetErrorInfo( reserved, pperrinfo );
+    /* S_FALSE = no error info pending, *pperrinfo already NULL */
+    if (hr != S_OK) return hr;
+    return __wine_com_wrap_out_iface( hr, &IID_IErrorInfo, (void **)pperrinfo );
+}
+
+HRESULT WINAPI __wine_guest_SetErrorInfo( ULONG reserved, IErrorInfo *perrinfo )
+{
+    void *host = NULL;
+    HRESULT hr;
+
+    if (!syscom_ready()) return E_FAIL;
+    if (perrinfo && !winecom_to_native( perrinfo, ~0u, &host ))
+    {
+        FIXME( "syscom: SetErrorInfo with the guest-implemented IErrorInfo %p "
+               "is refused: the error object outlives this call and native "
+               "readers would call it as x86-64\n", perrinfo );
+        return E_NOTIMPL;
+    }
+    hr = SetErrorInfo( reserved, (IErrorInfo *)host );
+    if (host) winecom_to_native_end( host );
+    return hr;
+}
+
+/* the object-context pair: both are the CoCreateInstance RIID/ppv shape */
+HRESULT WINAPI __wine_guest_CoGetObjectContext( REFIID riid, void **ppv )
+{
+    HRESULT hr;
+
+    if (!syscom_ready()) return E_FAIL;
+    hr = CoGetObjectContext( riid, ppv );
+    return __wine_com_wrap_out_iface( hr, riid, ppv );
+}
+
+HRESULT WINAPI __wine_guest_CoGetCallContext( REFIID riid, void **ppv )
+{
+    HRESULT hr;
+
+    if (!syscom_ready()) return E_FAIL;
+    hr = CoGetCallContext( riid, ppv );
+    return __wine_com_wrap_out_iface( hr, riid, ppv );
+}
+
+/* the translate-one-IUnknown-in trio */
+HRESULT WINAPI __wine_guest_CoDisconnectObject( IUnknown *unk, DWORD reserved )
+{
+    void *host;
+    HRESULT hr;
+
+    if (!syscom_ready()) return E_FAIL;
+    if (!winecom_to_native( unk, ~0u, &host ))
+    {
+        FIXME( "syscom: CoDisconnectObject on the guest-implemented object %p "
+               "is refused\n", unk );
+        return E_NOTIMPL;
+    }
+    hr = CoDisconnectObject( (IUnknown *)host, reserved );
+    if (host) winecom_to_native_end( host );
+    return hr;
+}
+
+HRESULT WINAPI __wine_guest_CoLockObjectExternal( IUnknown *unk, BOOL lock,
+                                                  BOOL last_unlock_releases )
+{
+    void *host;
+    HRESULT hr;
+
+    if (!syscom_ready()) return E_FAIL;
+    if (!winecom_to_native( unk, ~0u, &host ))
+    {
+        FIXME( "syscom: CoLockObjectExternal on the guest-implemented object "
+               "%p is refused\n", unk );
+        return E_NOTIMPL;
+    }
+    hr = CoLockObjectExternal( (IUnknown *)host, lock, last_unlock_releases );
+    if (host) winecom_to_native_end( host );
+    return hr;
+}
+
+HRESULT WINAPI __wine_guest_CoIsHandlerConnected( IUnknown *unk )
+{
+    void *host;
+    HRESULT hr;
+
+    if (!syscom_ready()) return E_FAIL;
+    if (!winecom_to_native( unk, ~0u, &host ))
+        return S_OK;   /* native's own answer for a local object */
+    hr = CoIsHandlerConnected( (IUnknown *)host );
+    if (host) winecom_to_native_end( host );
+    return hr;
+}
+
+/* the HRESULT-through-a-stream helpers: IStream is rostered, the payload is
+ * four plain bytes */
+HRESULT WINAPI __wine_guest_CoMarshalHresult( IStream *stm, HRESULT hresult )
+{
+    void *host;
+    HRESULT hr;
+
+    if (!syscom_ready()) return E_FAIL;
+    if (!winecom_to_native( stm, ~0u, &host ))
+    {
+        FIXME( "syscom: CoMarshalHresult into the guest-implemented stream %p "
+               "is refused\n", stm );
+        return E_NOTIMPL;
+    }
+    hr = CoMarshalHresult( (IStream *)host, hresult );
+    if (host) winecom_to_native_end( host );
+    return hr;
+}
+
+HRESULT WINAPI __wine_guest_CoUnmarshalHresult( IStream *stm, HRESULT *phresult )
+{
+    void *host;
+    HRESULT hr;
+
+    if (!syscom_ready()) return E_FAIL;
+    if (!winecom_to_native( stm, ~0u, &host ))
+    {
+        FIXME( "syscom: CoUnmarshalHresult from the guest-implemented stream "
+               "%p is refused\n", stm );
+        return E_NOTIMPL;
+    }
+    hr = CoUnmarshalHresult( (IStream *)host, phresult );
+    if (host) winecom_to_native_end( host );
+    return hr;
+}
+
+#endif /* __powerpc64__ -- the 64-bit-lane flat wrappers */

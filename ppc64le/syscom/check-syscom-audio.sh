@@ -691,6 +691,10 @@ for iface, slot in want:
         if line.startswith('    { "'):
             if cur is not None: rows.append(cur)
             cur = line
+        elif line.strip().startswith("/*"):
+            # the reclassification pass's marker comments sit BETWEEN rows;
+            # gluing one onto the previous row shifted every later slot
+            continue
         elif cur is not None:
             cur += " " + line.strip()
     if cur is not None: rows.append(cur)
@@ -703,9 +707,15 @@ for iface, slot in want:
     # tenth and eleventh, and it is the eleventh that would open the door.
     fields = row.rstrip("},").split(",")
     if len(fields) > 8:
-        bad.append("%s slot %d carries %d fields (%s) -- an xmask reached a "
-                   "reused row" % (iface, slot, len(fields), row))
-        continue
+        # A full-form row in a reused block is the reclassification pass's
+        # (2026-09-01).  The hazard is not the FIELD but the BIT: the pass
+        # applies the same REVERSE_SINKS licence as every owned row, so the
+        # emitted xmask -- the last field -- must still be zero here.
+        xmask = int(fields[-1].strip(), 16)
+        if xmask:
+            bad.append("%s slot %d carries xmask %#x -- a licence bit reached "
+                       "a hazard row (%s)" % (iface, slot, xmask, row))
+            continue
     n_in += 1
 print("%d of %d hazard rows stop at aux2 (no xmask, so every interface "
       "IN-parameter in them fails closed)" % (n_in, len(want)))

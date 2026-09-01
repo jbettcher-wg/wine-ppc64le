@@ -306,6 +306,20 @@
 # forward to combase's single runtime instance and wrapper bodies.
 @ stdcall __wine_com_dispatch(long long ptr) combase.__wine_com_dispatch
 @ stdcall __wine_com_refuse() combase.__wine_com_refuse
+@ stdcall -arch=ppc64 __wine_guest_CreateErrorInfo(ptr) combase.__wine_guest_CreateErrorInfo
+@ stdcall -arch=ppc64 __wine_guest_GetErrorInfo(long ptr) combase.__wine_guest_GetErrorInfo
+@ stdcall -arch=ppc64 __wine_guest_SetErrorInfo(long ptr) combase.__wine_guest_SetErrorInfo
+@ stdcall -arch=ppc64 __wine_guest_CoGetObjectContext(ptr ptr) combase.__wine_guest_CoGetObjectContext
+@ stdcall -arch=ppc64 __wine_guest_CoGetCallContext(ptr ptr) combase.__wine_guest_CoGetCallContext
+@ stdcall -arch=ppc64 __wine_guest_CoDisconnectObject(ptr long) combase.__wine_guest_CoDisconnectObject
+@ stdcall -arch=ppc64 __wine_guest_CoLockObjectExternal(ptr long long) combase.__wine_guest_CoLockObjectExternal
+@ stdcall -arch=ppc64 __wine_guest_CoIsHandlerConnected(ptr) combase.__wine_guest_CoIsHandlerConnected
+@ stdcall -arch=ppc64 __wine_guest_CoMarshalHresult(ptr long) combase.__wine_guest_CoMarshalHresult
+@ stdcall -arch=ppc64 __wine_guest_CoUnmarshalHresult(ptr ptr) combase.__wine_guest_CoUnmarshalHresult
+@ stdcall -arch=ppc64 __wine_guest_PropVariantClear(ptr) combase.__wine_guest_PropVariantClear
+@ stdcall -arch=ppc64 __wine_guest_PropVariantCopy(ptr ptr) combase.__wine_guest_PropVariantCopy
+@ stdcall -arch=ppc64 __wine_guest_FreePropVariantArray(long ptr) combase.__wine_guest_FreePropVariantArray
+@ stdcall -arch=ppc64 __wine_guest_CoSetProxyBlanket(ptr long long ptr long long ptr long) combase.__wine_guest_CoSetProxyBlanket
 @ stdcall __wine_guest_CoCreateInstance(ptr ptr long ptr ptr) combase.__wine_guest_CoCreateInstance
 @ stdcall __wine_guest_CoGetClassObject(ptr long ptr ptr ptr) combase.__wine_guest_CoGetClassObject
 @ stdcall __wine_guest_CoGetMalloc(long ptr) combase.__wine_guest_CoGetMalloc

@@ -30,38 +30,38 @@ GUEST-REFUSE CoCopyProxy
 GUEST-REFUSE CoCreateFreeThreadedMarshaler
 GUEST-REFUSE CoCreateInstanceEx
 GUEST-REFUSE CoCreateInstanceFromApp
-GUEST-REFUSE CoDisconnectObject
-GUEST-REFUSE CoGetCallContext
+GUEST-IMPL   CoDisconnectObject               __wine_guest_CoDisconnectObject
+GUEST-IMPL   CoGetCallContext                 __wine_guest_CoGetCallContext
 GUEST-REFUSE CoGetInstanceFromFile
 GUEST-REFUSE CoGetInstanceFromIStorage
 GUEST-REFUSE CoGetInterfaceAndReleaseStream
 GUEST-REFUSE CoGetMarshalSizeMax
-GUEST-REFUSE CoGetObjectContext
+GUEST-IMPL   CoGetObjectContext               __wine_guest_CoGetObjectContext
 GUEST-REFUSE CoGetStandardMarshal
-GUEST-REFUSE CoIsHandlerConnected
-GUEST-REFUSE CoLockObjectExternal
-GUEST-REFUSE CoMarshalHresult
+GUEST-IMPL   CoIsHandlerConnected             __wine_guest_CoIsHandlerConnected
+GUEST-IMPL   CoLockObjectExternal             __wine_guest_CoLockObjectExternal
+GUEST-IMPL   CoMarshalHresult                 __wine_guest_CoMarshalHresult
 GUEST-REFUSE CoMarshalInterThreadInterfaceInStream
 GUEST-REFUSE CoMarshalInterface
 GUEST-REFUSE CoQueryProxyBlanket
 GUEST-REFUSE CoRegisterClassObject
 GUEST-REFUSE CoReleaseMarshalData
-GUEST-REFUSE CoSetProxyBlanket
+GUEST-IMPL   CoSetProxyBlanket                __wine_guest_CoSetProxyBlanket
 GUEST-REFUSE CoSwitchCallContext
-GUEST-REFUSE CoUnmarshalHresult
+GUEST-IMPL   CoUnmarshalHresult               __wine_guest_CoUnmarshalHresult
 GUEST-REFUSE CoUnmarshalInterface
-GUEST-REFUSE CreateErrorInfo
+GUEST-IMPL   CreateErrorInfo                  __wine_guest_CreateErrorInfo
 # The Co-prefixed spellings are .spec ALIASES of the three ErrorInfo exports
 # refused above; they became emittable when spec2thunk learned to take an
 # alias's signature from its target, and the same refusal applies for the
 # same reason.
-GUEST-REFUSE CoCreateErrorInfo
-GUEST-REFUSE CoGetErrorInfo
-GUEST-REFUSE CoSetErrorInfo
+GUEST-IMPL   CoCreateErrorInfo                __wine_guest_CreateErrorInfo
+GUEST-IMPL   CoGetErrorInfo                   __wine_guest_GetErrorInfo
+GUEST-IMPL   CoSetErrorInfo                   __wine_guest_SetErrorInfo
 GUEST-REFUSE DllGetClassObject
-GUEST-REFUSE FreePropVariantArray
-GUEST-REFUSE GetErrorInfo
-GUEST-REFUSE PropVariantClear
-GUEST-REFUSE PropVariantCopy
+GUEST-IMPL   FreePropVariantArray             __wine_guest_FreePropVariantArray
+GUEST-IMPL   GetErrorInfo                     __wine_guest_GetErrorInfo
+GUEST-IMPL   PropVariantClear                 __wine_guest_PropVariantClear
+GUEST-IMPL   PropVariantCopy                  __wine_guest_PropVariantCopy
 GUEST-REFUSE RoGetAgileReference
-GUEST-REFUSE SetErrorInfo
+GUEST-IMPL   SetErrorInfo                     __wine_guest_SetErrorInfo

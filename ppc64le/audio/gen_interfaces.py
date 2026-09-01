@@ -186,6 +186,12 @@ SURFACES = {
             # gen_syscom_audio.py owns the rows; this extractor must
             # regenerate them for the drift gate.
             ("include/propsys.h",      "midl",              True),
+            # The session-volume chain: The Witcher 3 asks
+            # IAudioClient::GetService for IAudioSessionManager2 (the
+            # unknown-IID release in the 2026-08-31 run log) on its way to
+            # ISimpleAudioVolume.  gen_syscom_audio.py owns the rows; this
+            # extractor must regenerate them for the drift gate.
+            ("include/audiopolicy.h",  "midl",              True),
             ("dsound.h",               "declare_interface", False),
             ("dmusicc.h",              "declare_interface", False),
             ("dmusici.h",              "declare_interface", False),
@@ -194,7 +200,10 @@ SURFACES = {
         builtin=["IUnknown"],
         keep=[
             "IActivationFactory", "IAgileObject", "IAudioClient",
-            "IAudioRenderClient", "IBindCtx", "IClassFactory",
+            "IAudioRenderClient",
+            "IAudioSessionControl", "IAudioSessionManager",
+            "IAudioSessionManager2", "ISimpleAudioVolume",
+            "IBindCtx", "IClassFactory",
             "IConnectionPoint", "IConnectionPointContainer", "ICreateErrorInfo",
             "IDirectMusic", "IDirectMusicAudioPath", "IDirectMusicBand",
             "IDirectMusicBuffer", "IDirectMusicDownloadedInstrument",

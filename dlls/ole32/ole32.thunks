@@ -32,32 +32,32 @@ GUEST-REFUSE CoCopyProxy
 GUEST-REFUSE CoCreateFreeThreadedMarshaler
 GUEST-REFUSE CoCreateInstanceEx
 GUEST-REFUSE CoCreateInstanceFromApp
-GUEST-REFUSE CoDisconnectObject
-GUEST-REFUSE CoGetCallContext
+GUEST-IMPL   CoDisconnectObject               __wine_guest_CoDisconnectObject
+GUEST-IMPL   CoGetCallContext                 __wine_guest_CoGetCallContext
 GUEST-REFUSE CoGetInstanceFromFile
 GUEST-REFUSE CoGetInstanceFromIStorage
 GUEST-REFUSE CoGetInterfaceAndReleaseStream
 GUEST-REFUSE CoGetMarshalSizeMax
 GUEST-REFUSE CoGetObject
-GUEST-REFUSE CoGetObjectContext
+GUEST-IMPL   CoGetObjectContext               __wine_guest_CoGetObjectContext
 GUEST-REFUSE CoGetStandardMarshal
-GUEST-REFUSE CoIsHandlerConnected
-GUEST-REFUSE CoLockObjectExternal
-GUEST-REFUSE CoMarshalHresult
+GUEST-IMPL   CoIsHandlerConnected             __wine_guest_CoIsHandlerConnected
+GUEST-IMPL   CoLockObjectExternal             __wine_guest_CoLockObjectExternal
+GUEST-IMPL   CoMarshalHresult                 __wine_guest_CoMarshalHresult
 GUEST-REFUSE CoMarshalInterThreadInterfaceInStream
 GUEST-REFUSE CoMarshalInterface
 GUEST-REFUSE CoQueryProxyBlanket
 GUEST-REFUSE CoRegisterClassObject
 GUEST-REFUSE CoReleaseMarshalData
-GUEST-REFUSE CoSetProxyBlanket
+GUEST-IMPL   CoSetProxyBlanket                __wine_guest_CoSetProxyBlanket
 GUEST-REFUSE CoSwitchCallContext
-GUEST-REFUSE CoUnmarshalHresult
+GUEST-IMPL   CoUnmarshalHresult               __wine_guest_CoUnmarshalHresult
 GUEST-REFUSE CoUnmarshalInterface
 GUEST-REFUSE CreateAntiMoniker
 GUEST-REFUSE CreateBindCtx
 GUEST-REFUSE CreateClassMoniker
 GUEST-REFUSE CreateDataCache
-GUEST-REFUSE CreateErrorInfo
+GUEST-IMPL   CreateErrorInfo                  __wine_guest_CreateErrorInfo
 GUEST-REFUSE CreateFileMoniker
 GUEST-REFUSE CreateGenericComposite
 GUEST-REFUSE CreateILockBytesOnHGlobal
@@ -65,9 +65,9 @@ GUEST-REFUSE CreateItemMoniker
 GUEST-REFUSE CreateObjrefMoniker
 GUEST-REFUSE CreatePointerMoniker
 GUEST-REFUSE DllGetClassObject
-GUEST-REFUSE FreePropVariantArray
+GUEST-IMPL   FreePropVariantArray             __wine_guest_FreePropVariantArray
 GUEST-REFUSE GetConvertStg
-GUEST-REFUSE GetErrorInfo
+GUEST-IMPL   GetErrorInfo                     __wine_guest_GetErrorInfo
 GUEST-REFUSE GetHGlobalFromILockBytes
 GUEST-REFUSE GetRunningObjectTable
 GUEST-REFUSE IsValidInterface
@@ -97,8 +97,8 @@ GUEST-REFUSE OleRun
 GUEST-REFUSE OleSave
 GUEST-REFUSE OleSaveToStream
 GUEST-REFUSE OleSetContainedObject
-GUEST-REFUSE PropVariantClear
-GUEST-REFUSE PropVariantCopy
+GUEST-IMPL   PropVariantClear                 __wine_guest_PropVariantClear
+GUEST-IMPL   PropVariantCopy                  __wine_guest_PropVariantCopy
 GUEST-REFUSE ReadClassStg
 GUEST-REFUSE ReadClassStm
 GUEST-REFUSE ReadFmtUserTypeStg
@@ -108,7 +108,7 @@ GUEST-REFUSE STGMEDIUM_UserMarshal
 GUEST-REFUSE STGMEDIUM_UserSize
 GUEST-REFUSE STGMEDIUM_UserUnmarshal
 GUEST-REFUSE SetConvertStg
-GUEST-REFUSE SetErrorInfo
+GUEST-IMPL   SetErrorInfo                     __wine_guest_SetErrorInfo
 GUEST-REFUSE StgCreateDocfile
 GUEST-REFUSE StgCreateDocfileOnILockBytes
 GUEST-REFUSE StgCreatePropSetStg

@@ -96,8 +96,14 @@ BANNER = """/* GENERATED -- do not edit.
  * ppc64le/syscom/gen_syscom_audio.py, which also owns the enum, the
  * interface array and the roster indices in every xaux[] here.  The other
  * %d rows are the emitted output of the earlier generator named in the
- * git history, reused verbatim; ppc64le/syscom/check-syscom-audio.sh
- * proves that reuse is byte-exact.
+ * git history, reused verbatim EXCEPT where the reclassification pass
+ * lifted a refusal (rows marked "upgraded from a legacy refusal": the
+ * offline generator's type prover could not resolve pointer/integer
+ * typedefs such as LPOLESTR or LCID; gen_syscom_audio.py's can, with
+ * per-typedef provenance, and it reclassifies ONLY the reason families
+ * its UPGRADE_LICENSED_RE licenses -- semantic refusals are never
+ * touched); ppc64le/syscom/check-syscom-audio.sh
+ * proves the reuse-plus-pass is deterministic.
  *
  * WHICH IS WHY THE ROWS ARE NOT ALL THE SAME LENGTH, and it is a
  * statement rather than an oversight: this generator's rows carry the
@@ -194,7 +200,32 @@ MMDEV_IFACES = ["IMMDeviceEnumerator", "IMMDeviceCollection", "IMMDevice",
 PROPSTORE_HEADERS = [os.path.join("include", "propsys.h")]
 PROPSTORE_IFACES = ["IPropertyStore"]
 
-AUDIO_IFACES = XAUDIO2_IFACES + MMDEV_IFACES + PROPSTORE_IFACES
+# The session-volume chain, and the measurement that put it here: The Witcher
+# 3's audio boot calls IAudioClient::GetService( IID_IAudioSessionManager2 )
+# and the unknown-IID choke point released the answer --
+# `winecom_wrap_out_iface: an interface for unknown IID
+# {77aa99a0-1bd6-484f-8bc7-2c654c9a9b6f}` in the 2026-08-31 run log, which
+# include/audiopolicy.idl names IAudioSessionManager2.  The game wants it for
+# ISimpleAudioVolume (in-game volume sliders).  Same lesson as IPropertyStore
+# and the NetworkListManager above: the path a shipped game actually walks
+# must be SERVED, and partial slot coverage is the design working --
+# GetSessionEnumerator, the notification registrations and every other slot
+# naming an unrostered interface refuses BY SLOT.
+# ISimpleAudioVolume::SetMasterVolume is float-bearing in exactly the
+# existing "fi>i" hand shape (IXAudio2Voice::SetVolume's), so it is served by
+# the same hand_f_i with no new code.
+SESSION_HEADERS = [os.path.join("include", "audiopolicy.h")]
+SESSION_IFACES = ["IAudioSessionManager", "IAudioSessionManager2",
+                  "IAudioSessionControl", "ISimpleAudioVolume"]
+# IAudioSessionManager is here because Manager2 derives from it and its two
+# slots (GetAudioSessionControl / GetSimpleAudioVolume) are the ones the
+# volume path actually calls.  NOT here: IAudioSessionEnumerator,
+# IAudioSessionControl2, IAudioSessionEvents, IAudioSessionNotification,
+# IAudioVolumeDuckNotification -- nothing on the measured path needs them,
+# and the events/notification pair would need the reverse-proxy licence
+# besides.
+
+AUDIO_IFACES = XAUDIO2_IFACES + MMDEV_IFACES + PROPSTORE_IFACES + SESSION_IFACES
 
 # --------------------------------------------------------------------------
 # THE SYSTEM-INFORMATION FAMILY: WMI and the NetworkListManager.
@@ -277,6 +308,40 @@ POINTER_TYPEDEFS = {
     "LPGUID": ("GUID", 1), "LPCGUID": ("GUID", 1),
     "LPVOID": ("void", 1), "LPCVOID": ("void", 1),
     "LPUNKNOWN": ("IUnknown", 1), "PUNKNOWN": ("IUnknown", 1),
+    # The LEGACY families' spellings, added for the upgrade pass (see
+    # upgrade_legacy below).  Every entry is an ABI fact read out of the named
+    # header, not an assumption -- these are the typedefs the legacy blocks'
+    # refusal texts name as "not provably integer-class", and each one IS a
+    # pointer, provable at the cited line:
+    "LPDWORD": ("DWORD", 1),          # include/windef.h: typedef DWORD *LPDWORD
+    "LPLONG": ("LONG", 1),            # include/windef.h: typedef LONG *LPLONG
+    "LPBYTE": ("BYTE", 1),            # include/windef.h: typedef BYTE *LPBYTE
+    "PVOID": ("void", 1),             # include/winnt.h: typedef void *PVOID
+    "LPWAVEFORMATEX": ("WAVEFORMATEX", 1),    # include/mmreg.h
+    "LPCWAVEFORMATEX": ("WAVEFORMATEX", 1),   # include/mmreg.h (const)
+    "LPCDSBUFFERDESC": ("DSBUFFERDESC", 1),   # include/dsound.h (const)
+    "LPREFERENCE_TIME": ("REFERENCE_TIME", 1),  # include/dmusicc.h
+    # include/dsound.h: typedef IDirectSoundBuffer *LPDIRECTSOUNDBUFFER,
+    # *LPLPDIRECTSOUNDBUFFER -- two stars from the interface, so it resolves
+    # to IDirectSoundBuffer** and classifies as CA_IFACE_OUT_STATIC (the
+    # rostered type), not merely a plain pointer.
+    "LPLPDIRECTSOUNDBUFFER": ("IDirectSoundBuffer", 2),
+    # Three more the upgrade pass's own STAYS log diagnosed (2026-09-01):
+    "LPOVERLAPPED": ("OVERLAPPED", 1),   # include/minwinbase.h
+    # include/wtypes.h (widl): typedef LPOLESTR *SNB; -- the wire_marshal
+    # comment in the widl output defeats the typedef scanner's regex
+    "SNB": ("WCHAR", 2),
+}
+
+# By-value INTEGER typedefs the same way: each resolves to a BYVAL_INTEGER
+# member at the cited line.  classify() consults this after BYVAL_INTEGER
+# itself, so the licence is one hop, spelled here, never guessed.
+BYVAL_INTEGER_TYPEDEFS = {
+    "LCID": "include/winnt.h: typedef DWORD LCID",
+    "DISPID": "include/oaidl.h (widl): typedef LONG DISPID",
+    "CIMTYPE": "include/wbemcli.h (widl): typedef long CIMTYPE",
+    "MUSIC_TIME": "include/dmusici.h: typedef long MUSIC_TIME",
+    "MEMBERID": "include/oaidl.h (widl): typedef DISPID MEMBERID (-> LONG)",
 }
 
 FLOAT_TOKENS = re.compile(r'\b(FLOAT|float|double|DOUBLE)\b')
@@ -637,15 +702,18 @@ def build_audio_rows(build):
     xa_text = read_header(XAUDIO2_HEADER, build)
     mm_texts = [read_header(h, build) for h in MMDEV_HEADERS]
     ps_texts = [read_header(h, build) for h in PROPSTORE_HEADERS]
+    se_texts = [read_header(h, build) for h in SESSION_HEADERS]
     ctx_texts = [read_header(h, SRCTREE) for h in CONTEXT_HEADERS]
     si_texts = [read_header(h, build) for h in SYSINFO_HEADERS]
     si_base_texts = [read_header(h, build) for h in SYSINFO_BASE_HEADERS]
 
     # Parsed per header so each row records the header it was read from; no
-    # interface in the AUDIO family inherits across the two files.
+    # interface in the AUDIO family inherits across the two files.  (The
+    # session chain inherits WITHIN audiopolicy.h -- IAudioSessionManager2
+    # derives from IAudioSessionManager -- which per-header parsing serves.)
     parsed = {XAUDIO2_HEADER: parse_midl(xa_text, XAUDIO2_HEADER)}
-    for path, text in zip(MMDEV_HEADERS + PROPSTORE_HEADERS,
-                          mm_texts + ps_texts):
+    for path, text in zip(MMDEV_HEADERS + PROPSTORE_HEADERS + SESSION_HEADERS,
+                          mm_texts + ps_texts + se_texts):
         parsed[path] = parse_midl(text, path)
 
     # The SYSINFO family DOES inherit across files -- INetworkListManager's
@@ -661,13 +729,14 @@ def build_audio_rows(build):
 
     rows, synthetic = {}, []
     for want in (XAUDIO2_IFACES, MMDEV_IFACES, PROPSTORE_IFACES,
-                 SYSINFO_IFACES):
+                 SESSION_IFACES, SYSINFO_IFACES):
         for name in want:
             got = next((g for g in parsed.values() if name in g), None)
             if got is None:
                 sys.exit("gen_syscom_audio: %s is declared in none of %s"
                          % (name, ", ".join([XAUDIO2_HEADER] + MMDEV_HEADERS
                                             + PROPSTORE_HEADERS
+                                            + SESSION_HEADERS
                                             + SYSINFO_HEADERS)))
             i = got[name]
             uuid = i["uuid"]
@@ -680,7 +749,7 @@ def build_audio_rows(build):
                 synthetic.append(name)
             rows[name] = row
 
-    texts = ([xa_text] + mm_texts + ps_texts + ctx_texts + si_texts
+    texts = ([xa_text] + mm_texts + ps_texts + se_texts + ctx_texts + si_texts
              + si_base_texts)
     return rows, scan_enums(texts), texts, sorted(synthetic)
 
@@ -1067,6 +1136,16 @@ def derive_legacy(old, roster, order, iface_index, typedefs):
                 continue
             dcls, dx = got
             if dcls != emit_cls:
+                # A STRICT REFINEMENT -- every disagreeing position is one the
+                # reused block left PASS and today's typedef knowledge proves
+                # is really RIID/PPV_OUT/IFACE_* -- is not a description of a
+                # different function; it is the offline prover's gap showing
+                # up in a SERVED row, i.e. a typed out-interface passing RAW
+                # (the GetShader leak class, on the served side).  The upgrade
+                # pass rewrites these rows; anything else is still fatal.
+                if all(e == CA["PASS"] for d, e in zip(dcls, emit_cls) if d != e):
+                    checked += 1
+                    continue
                 sys.exit("gen_syscom_audio: %s slot %d (%s) re-derives as %s "
                          "from the roster and the reused block says %s -- the "
                          "roster and the reused tables describe different "
@@ -1105,6 +1184,185 @@ def derive_legacy(old, roster, order, iface_index, typedefs):
     return checked, withheld
 
 
+# --------------------------------------------------------------------------
+# THE LEGACY UPGRADE PASS (2026-09-01).  The reused blocks carry refusals
+# their offline generator decided with a weaker type prover than classify()'s
+# -- `by-value LPOLESTR is not provably integer-class` names a POINTER
+# typedef it could not resolve -- and the Witcher 3 GetShader crash class
+# made the cost of a stale refusal concrete: a refused slot leaves out-params
+# holding stack residue for a caller that never checks.
+#
+# The pass is DOUBLE-GATED, and both gates are the point:
+#   1. the row's ORIGINAL refusal reason must match a LICENSED family below
+#      -- the mechanical prover gaps, nothing else.  Reasons that encode a
+#      semantic judgment (array-capable Next, tag-dispatched payloads,
+#      interface-bearing structs, void** with no REFIID, unrostered types)
+#      are NEVER upgraded by this pass, whatever classify() would say,
+#      because classify() cannot re-detect what those reasons detected.
+#   2. classify() must then prove the WHOLE signature under today's rules
+#      (typedefs with provenance above, the roster, the enums).  One
+#      unprovable parameter and the row stays byte-identical to the reuse.
+#
+# An upgraded row is emitted in this generator's own full-row form (it
+# carries fpmask/fpwide/xmask like every owned row) with a provenance marker,
+# and --report lists old reason against new plan for every one.  Rows that
+# STAY refused keep their reason text byte-for-byte -- the pass never
+# rewrites a refusal it does not lift.
+UPGRADE_LICENSED_RE = re.compile(
+    r': by-value (LPOLESTR|LPCOLESTR|PVOID|LPVOID|LPDWORD|LPLONG|LPBYTE|'
+    r'LPGUID|LPCGUID|LPREFERENCE_TIME|LPWAVEFORMATEX|LPCWAVEFORMATEX|'
+    r'LPCDSBUFFERDESC|LPLPDIRECTSOUNDBUFFER|SNB|short) is not provably '
+    r'integer-class$|'
+    r': by-value parameter `(?:LCID|DISPID|CIMTYPE|MUSIC_TIME|short)'
+    r'[^`]*` is of a type this generator cannot prove is integer-class')
+
+LEGACY_SERVED_ROW_RE = re.compile(
+    r'    \{ "([\w:~]+)", (NULL), (NULL|\w+), (NULL|\w+), (\d+), 0, 0, 0 \},(?!\s*/\* runtime \*/)')
+
+LEGACY_REFUSED_ROW_RE = re.compile(
+    r'    \{ "([\w:~]+)",\n      "((?:[^"\\]|\\.)*)",\n'
+    r'      NULL, NULL, (\d+), 0, 0, 0 \},')
+
+
+def upgrade_legacy_block(name, para, ifaces, order, iface_index, typedefs,
+                         byval_ok, bearing, why_bearing, stats, upgrade_log,
+                         withheld):
+    """One reused block -> the same block with its LICENSED refusals
+    reclassified.  Returns (paragraph, decls_to_prepend)."""
+    slots = ifaces[name]["slots"]
+    key_to_slot = {"%s::%s" % (s["owner"], s["name"]): s for s in slots}
+    slot_no = {"%s::%s" % (s["owner"], s["name"]): s["slot"] for s in slots}
+    new_decls = []
+
+    def try_upgrade(m):
+        key, reason, argc = m.group(1), m.group(2), int(m.group(3))
+        if not UPGRADE_LICENSED_RE.search(reason):
+            return m.group(0)
+        s = key_to_slot.get(key)
+        if s is None or 1 + len(s["params"]) != argc:
+            sys.exit("gen_syscom_audio: upgrade pass cannot find %s (argc %d) "
+                     "in the roster" % (key, argc))
+        try:
+            (cls, xaux, aux, fp, fpmask, fpwide, want_xaux) = classify(
+                key, s, ifaces, iface_index, typedefs, byval_ok,
+                bearing, why_bearing)
+        except Refused as e:
+            upgrade_log.append((name, key, reason, "STAYS: %s" % e))
+            return m.group(0)
+        if fp is not None:
+            # a float-bearing legacy slot would need a hand shape;
+            # none is licensed for the reused corpus in this pass
+            upgrade_log.append((name, key, reason,
+                                "STAYS: float-bearing (shape %s)" % fp))
+            return m.group(0)
+        n = slot_no[key]
+        xmask = 0
+        for i, c in enumerate(cls):
+            if c in (CA["IFACE_OUT_STATIC"], CA["IFACE_ARR_OUT_STATIC"]):
+                xmask |= 1 << i
+            elif c == CA["IFACE_IN"]:
+                tname = order[xaux[i]]
+                if tname in REVERSE_SINKS:
+                    xmask |= 1 << i
+                else:
+                    withheld.append((name, n, key, i, tname))
+        cname = xname = "NULL"
+        if any(c != CA["PASS"] for c in cls):
+            cname = "cls_%s_%d" % (name, n)
+            new_decls.append("static const unsigned char %s[] = { %s };"
+                             % (cname, ", ".join(CA_NAME[c] for c in cls)))
+        if want_xaux:
+            xname = "xaux_%s_%d" % (name, n)
+            new_decls.append("static const unsigned char %s[] = { %s };"
+                             % (xname, ", ".join(str(x) for x in xaux)))
+        stats["run_upgraded"] += 1
+        upgrade_log.append((name, key, reason,
+                            "SERVED: cls=[%s]" % ",".join(
+                                CA_NAME[c].replace("WINECOM_CA_", "")
+                                for c in cls)))
+        return ('    /* upgraded from a legacy refusal -- see the banner */\n'
+                '    { "%s", NULL, %s, %s, %d, 0, %d, 0, NULL, '
+                '0x%02x, 0x%02x, 0x%02x },'
+                % (key, cname, xname, argc, aux, fpmask, fpwide, xmask))
+
+    para = LEGACY_REFUSED_ROW_RE.sub(try_upgrade, para)
+
+    # ---- the SERVED-row refinement pass ---------------------------------
+    # derive_legacy found rows the offline prover classified WEAKER than the
+    # roster text proves -- a typed out-interface (PVOID* behind a REFIID,
+    # an interface the roster now carries) passing RAW.  That is the
+    # GetShader leak class on the served side: native writes a native
+    # vtable into guest memory and the guest calls it as x86-64.  Rewrite
+    # every such row to the derived classes; any disagreement that is NOT a
+    # strict refinement is fatal in derive_legacy already.
+    decl_of = {m.group(1): m for m in DECL_RE.finditer(para)}
+
+    def try_refine(m):
+        key, refuse, cname, xname, argc = m.groups()
+        if refuse != "NULL":
+            return m.group(0)          # refused rows: the pass above owns them
+        s = key_to_slot.get(key)
+        if s is None:
+            return m.group(0)
+        n = slot_no[key]
+        if n < 3:
+            return m.group(0)          # IUnknown, served by the runtime
+        got = derive_row(s["params"], ifaces, iface_index, typedefs)
+        if got is None:
+            return m.group(0)
+        dcls, dx = got
+        emit_cls = ([CA[v.strip().replace("WINECOM_CA_", "")]
+                     for v in decl_of[cname].group(2).split(",")]
+                    if cname != "NULL" else [CA["PASS"]] * len(s["params"]))
+        if dcls == emit_cls:
+            return m.group(0)
+        if not all(e == CA["PASS"] for d, e in zip(dcls, emit_cls) if d != e):
+            return m.group(0)          # derive_legacy already died on these
+        aux = 0
+        for i, c in enumerate(dcls):
+            if c == CA["RIID"]:
+                aux = i
+        xmask = 0
+        for i, c in enumerate(dcls):
+            if c in (CA["IFACE_OUT_STATIC"], CA["IFACE_ARR_OUT_STATIC"]):
+                xmask |= 1 << i
+            elif c == CA["IFACE_IN"]:
+                tname = order[dx[i]]
+                if tname in REVERSE_SINKS:
+                    xmask |= 1 << i
+                else:
+                    withheld.append((name, n, key, i, tname))
+        ncname = nxname = "NULL"
+        if any(c != CA["PASS"] for c in dcls):
+            ncname = "cls_up_%s_%d" % (name, n)
+            new_decls.append("static const unsigned char %s[] = { %s };"
+                             % (ncname, ", ".join(CA_NAME[c] for c in dcls)))
+        if any(dx) or any(c in (CA["IFACE_IN"], CA["IFACE_OUT_STATIC"])
+                          for c in dcls):
+            nxname = "xaux_up_%s_%d" % (name, n)
+            new_decls.append("static const unsigned char %s[] = { %s };"
+                             % (nxname, ", ".join(str(x) for x in dx)))
+        stats["run_refined"] += 1
+        upgrade_log.append((name, key,
+                            "SERVED but underclassified: %s" %
+                            [CA_NAME[c].replace("WINECOM_CA_", "") for c in emit_cls],
+                            "REFINED: cls=[%s]" % ",".join(
+                                CA_NAME[c].replace("WINECOM_CA_", "")
+                                for c in dcls)))
+        return ('    /* reclassified: a typed out-interface was passing RAW -- '
+                'see the banner */\n'
+                '    { "%s", NULL, %s, %s, %s, 0, %d, 0, NULL, '
+                '0x00, 0x00, 0x%02x },'
+                % (key, ncname, nxname, argc, aux, xmask))
+
+    para = LEGACY_SERVED_ROW_RE.sub(try_refine, para)
+    if new_decls:
+        marker = "static const struct winecom_slot slots_%s" % name
+        idx = para.index(marker)
+        para = para[:idx] + "\n".join(new_decls) + "\n" + para[idx:]
+    return para
+
+
 def assert_sinks_are_leaves(ifaces, typedefs):
     """A licensed reverse sink must be a LEAF: no slot of it may take or return
     an interface pointer.  That is what makes the licence bounded -- accepting
@@ -1128,7 +1386,8 @@ def generate(roster, texts, old):
     order = sorted(ifaces)
     iface_index = {n: i for i, n in enumerate(order)}
     old_index = {n: i for i, n in enumerate(old["order"])}
-    byval_ok = set(BYVAL_INTEGER) | set(roster.get("enums", ()))
+    byval_ok = (set(BYVAL_INTEGER) | set(roster.get("enums", ()))
+                | set(BYVAL_INTEGER_TYPEDEFS))
     typedefs = scan_pointer_typedefs(texts)
     typedefs.update(POINTER_TYPEDEFS)
     for k, v in roster.get("iface_ptr_aliases", {}).items():
@@ -1148,8 +1407,10 @@ def generate(roster, texts, old):
 
     stats = dict(marshalled=0, refused=0, hand=0, iunknown=0, fp=0,
                  legacy_marshalled=0, legacy_refused=0, legacy_iunknown=0,
-                 legacy_checked=0)
+                 legacy_checked=0, legacy_upgraded=0, legacy_refined=0,
+                 run_upgraded=0, run_refined=0)
     refusal_log = []
+    upgrade_log = []
     withheld = []
 
     # The licence is bounded because its members are leaves, and that is
@@ -1167,7 +1428,13 @@ def generate(roster, texts, old):
             return (m.group(1) + ", ".join(str(iface_index[v]) for v in vals)
                     + " " + m.group(3))
 
-        blocks[name] = XAUX_RE.sub(renumber, para)
+        para = XAUX_RE.sub(renumber, para)
+        # The upgrade pass runs AFTER the renumber: every xaux it writes is
+        # already in the new order, and the renumber regex never sees them.
+        para = upgrade_legacy_block(name, para, ifaces, order, iface_index,
+                                    typedefs, byval_ok, bearing, why_bearing,
+                                    stats, upgrade_log, withheld)
+        blocks[name] = para
         # Counted rather than carried over, so the closing statistics describe
         # the file that is actually being written.  A row that opens with the
         # method name and closes with the runtime comment is an IUnknown slot;
@@ -1181,6 +1448,14 @@ def generate(roster, texts, old):
             else:
                 stats["legacy_marshalled"] += 1
         stats["legacy_refused"] += para.count('",\n      "')
+        # The pass is a RATCHET: a row upgraded by an earlier regeneration is
+        # already served in `old` and this run's pass does nothing to it, so
+        # the per-run counters above would decay to zero and the tail text
+        # would never be stable.  The MARKERS are cumulative; count those.
+        stats["legacy_upgraded"] += para.count(
+            "/* upgraded from a legacy refusal")
+        stats["legacy_refined"] += para.count(
+            "/* reclassified: a typed out-interface was passing RAW")
 
     stats["legacy_marshalled"] -= stats["legacy_refused"]
 
@@ -1330,14 +1605,19 @@ def generate(roster, texts, old):
             "shape), %d refused with a\n * named reason, %d IUnknown slot(s) "
             "served by the runtime, %d interface(s)\n * [local] and served by "
             "combase's own dispatcher.  The %d reused row(s):\n * %d "
-            "marshalled, %d refused, %d IUnknown; %d of them re-derived from\n"
+            "marshalled (%d of those upgraded from legacy refusals by the\n"
+            " * reclassification pass -- see gen_syscom_audio.py's "
+            "UPGRADE_LICENSED_RE --\n * and %d REFINED where a typed "
+            "out-interface was passing RAW),\n * %d refused, %d IUnknown; "
+            "%d of them re-derived from\n"
             " * the roster and cross-checked against this file.\n"
             " * Reverse-proxy licence: %s.  %d interface IN-parameter(s)\n"
             " * withheld, each of which fails closed. */"
             % (len(order), total, len(OWNED_IFACES), stats["marshalled"],
                stats["hand"], stats["fp"], stats["refused"], stats["iunknown"],
                n_local, len(order) - len(OWNED_IFACES),
-               stats["legacy_marshalled"], stats["legacy_refused"],
+               stats["legacy_marshalled"], stats["legacy_upgraded"],
+               stats["legacy_refined"], stats["legacy_refused"],
                stats["legacy_iunknown"], stats["legacy_checked"],
                ", ".join(sorted(REVERSE_SINKS)), len(withheld)))
 
@@ -1345,7 +1625,7 @@ def generate(roster, texts, old):
                      len(order) - len(OWNED_IFACES))
     text = render(head, order, blocks, meta, defines,
                   [local_paragraph(order, is_local), tail])
-    return text, stats, refusal_log, hand_order, withheld
+    return text, stats, refusal_log, hand_order, withheld, upgrade_log
 
 
 # --------------------------------------------------------------------------
@@ -1402,7 +1682,7 @@ def main():
     target = args.check or args.out or MARSHAL
     with open(MARSHAL) as fh:
         old = parse_marshal(fh.read())
-    text, stats, refusals, hand_order, withheld = generate(roster, texts, old)
+    text, stats, refusals, hand_order, withheld, upgrades = generate(roster, texts, old)
 
     print("wine-syscom: %d interface(s), %d vtable slot(s); audio family "
           "%d marshalled, %d hand-written (%d float-shaped), %d refused, "
@@ -1411,6 +1691,12 @@ def main():
              sum(len(i["slots"]) for i in roster["interfaces"].values()),
              stats["marshalled"], stats["hand"], stats["fp"], stats["refused"],
              stats["iunknown"], len(hand_order)))
+    print("legacy corpus: %d marshalled (%d UPGRADED from refusals by the "
+          "reclassification pass, %d refined from raw pass-through), "
+          "%d still refused, %d IUnknown"
+          % (stats["legacy_marshalled"], stats["legacy_upgraded"],
+             stats["legacy_refined"],
+             stats["legacy_refused"], stats["legacy_iunknown"]))
 
     print("reverse-proxy licence: %s; %d interface IN-parameter(s) WITHHELD "
           "across %d slot(s), each fails closed and is refused by name"
@@ -1428,6 +1714,11 @@ def main():
             keys = [k for k, fn in HAND_SLOTS if fn == f] or \
                    ["<shape %s>" % s for s, fn in FP_SHAPES.items() if fn == f]
             print("  %d  %-30s %s" % (i, f, ", ".join(keys)))
+        print("\nlegacy rows visited by the upgrade pass (SERVED = reclassified,"
+              " STAYS = still refused):")
+        for iname, key, reason, verdict in upgrades:
+            print("  %-30s %s\n      was: %s\n      now: %s"
+                  % (iname, key, reason.split(".")[0][:100], verdict))
         print("\nrefused slots, by reason:")
         for name, slot, key, reason in refusals:
             print("  %s slot %d\n      %s\n      %s"
@@ -1448,9 +1739,23 @@ def main():
                  "Regenerate it (--marshal --out) and re-run every gate."
                  % args.check)
     if args.out:
-        with open(args.out, "w") as fh:
-            fh.write(text)
-        print("\nwrote %s" % args.out)
+        # The upgrade pass is a ratchet whose bookkeeping (legacy_checked)
+        # reads the PREVIOUS file, so one write may not be the fixed point.
+        # Iterate until re-generation reproduces its own output; two rounds
+        # in practice, three tolerated, more is a bug.
+        for round_ in range(3):
+            with open(args.out, "w") as fh:
+                fh.write(text)
+            old2 = parse_marshal(text)
+            text2 = generate(roster, texts, old2)[0]
+            if text2 == text:
+                break
+            text = text2
+        else:
+            sys.exit("gen_syscom_audio: --out did not reach a fixed point "
+                     "in 3 rounds")
+        print("\nwrote %s (fixed point after %d regeneration(s))"
+              % (args.out, round_ + 1))
     return 0
 
 

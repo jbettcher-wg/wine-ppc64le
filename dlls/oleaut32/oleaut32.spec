@@ -429,6 +429,9 @@
 # itself needs (__wine_com_translate_in, __wine_com_release_guest) is a plain
 # intra-combase call -- those two are not forwarded here because nothing in
 # oleaut32 ever has to resolve them by name.
+@ stdcall -arch=ppc64 __wine_guest_CreateErrorInfo(ptr) combase.__wine_guest_CreateErrorInfo
+@ stdcall -arch=ppc64 __wine_guest_GetErrorInfo(long ptr) combase.__wine_guest_GetErrorInfo
+@ stdcall -arch=ppc64 __wine_guest_SetErrorInfo(long ptr) combase.__wine_guest_SetErrorInfo
 @ stdcall __wine_guest_VariantClear(ptr) combase.__wine_guest_VariantClear
 
 # Appended at the END so no `@` export above it is renumbered:
