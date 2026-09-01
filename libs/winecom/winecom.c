@@ -63,6 +63,7 @@
 #include "wine/winecom.h"
 
 #include "winecom_private.h"
+#include "winecom_waves.h"
 #include "wine/emu_qpc.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(winecom);
@@ -405,6 +406,509 @@ static BOOL com_env_flag( const WCHAR *name )
            value.Length && buf[0] == '1';
 }
 
+/* ------------------------------------------------ the wave kill switches --
+ *
+ * WHY THESE EXIST.  The completeness landings 74591109c3f..c199f79caf9 turned
+ * hundreds of refused COM rows into served ones in one stretch, and shipped no
+ * way to put any of them back.  When the Witcher 3 stopped loading afterwards,
+ * bisecting that stretch cost SEVEN seat runs, each one a swap of built PE
+ * halves in and out of a tree (ppc64le/docs/sessions/2026-09-01/
+ * w3-load-regression-bisect.md, whose closing lesson is this file's whole
+ * reason).  Three levers, all read once at attach, all making a served row
+ * behave EXACTLY as a generation-refused one did:
+ *
+ *   WINEEMUNOCOMROWS   comma-separated `Iface::Slot` names, or `@/path/file`
+ *                      with one name per line (# comments allowed).  Each
+ *                      named row takes the generated-refusal path: refuse
+ *                      once by name, E_NOTIMPL, and scrub_refused_outs() so
+ *                      the refusal is INERT.  A refusal that is merely loud
+ *                      is the crash class this runtime already learned about.
+ *   WINEEMUNOCOMIIDS   comma-separated IIDs, `{xxxxxxxx-....}` or a bare
+ *                      leading 8 hex digits.  A listed IID is treated as
+ *                      UNROSTERED where interfaces are handed out, which is
+ *                      the release-and-NULL + E_NOINTERFACE the guest got for
+ *                      months before the syscom wave rostered it.
+ *   WINEEMUNOCOMWAVE   comma-separated wave names from winecom_waves.h --
+ *                      whole landings expanded to the row and IID sets that
+ *                      ppc64le/winecom/derive-wave-rows.py derived FROM GIT.
+ *                      One environment variable per theory leg.
+ *
+ * THE HOT PATH PAYS NOTHING WHEN THEY ARE UNSET.  The row lever's result is a
+ * per-(iface,slot) byte array that is only ALLOCATED when a lever named
+ * something, so the unarmed test is `forced_refuse == NULL` -- one load and a
+ * predictable branch, no environment read, no string work.  The IID lever is
+ * a count that stays 0.  Resolution happens ONCE, at attach, against the
+ * surface's own const tables, which are never written.
+ *
+ * A NAME THAT MATCHES NOTHING IS LOUD.  A typo in a bisect leg that passed
+ * silently would be recorded as "tested, clean" and would take the leg's
+ * conclusion with it.  Every target that matched no row on any attached
+ * surface gets one ERR naming it. */
+
+static char **row_targets;             /* "Iface::Slot", NUL-terminated */
+static unsigned char *row_target_hit;  /* per target: matched at least one row */
+static UINT row_target_count;
+static unsigned char *forced_refuse;   /* per (iface, slot); NULL = UNARMED,
+                                          and that NULL is the hot-path test */
+
+/* A blocked IID.  `data1_only` is the bare 8-hex-digit spelling the port's own
+ * notes use -- "{77aa99a0} IAudioSessionManager2" -- which is enough to name
+ * an interface uniquely in practice and is what a reader has in front of them
+ * when they reach for this lever. */
+struct blocked_iid
+{
+    GUID guid;
+    BOOL data1_only;
+};
+static struct blocked_iid *blocked_iids;
+static UINT blocked_iid_count;         /* 0 = UNARMED */
+
+static const char forced_why[] =
+    "forced by WINEEMUNOCOMROWS/WINEEMUNOCOMWAVE (a served row put back to its "
+    "pre-landing refusal for a bisect leg)";
+
+/* An environment variable's VALUE, ASCII, heap-allocated, or NULL.  PE-side,
+ * so no getenv: RtlQueryEnvironmentVariable_U writes UTF-16 into a caller
+ * buffer whose MaximumLength is a USHORT, which caps a value at 32767
+ * characters -- ample for a name list, and a `@file` carries the long ones. */
+static char *com_env_str( const WCHAR *name )
+{
+    UNICODE_STRING nameW, value;
+    ULONG chars = 512;
+    WCHAR *buf = NULL;
+    char *ret;
+    NTSTATUS st;
+    UINT i, n;
+
+    RtlInitUnicodeString( &nameW, name );
+    for (;;)
+    {
+        if (!(buf = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0,
+                                     chars * sizeof(WCHAR) ))) return NULL;
+        value.Buffer = buf;
+        value.MaximumLength = (USHORT)(chars * sizeof(WCHAR));
+        value.Length = 0;
+        st = RtlQueryEnvironmentVariable_U( NULL, &nameW, &value );
+        if (st != STATUS_BUFFER_TOO_SMALL || chars >= 0x7fff) break;
+        RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, buf );
+        chars = chars * 4 < 0x7fff ? chars * 4 : 0x7fff;
+    }
+    n = value.Length / sizeof(WCHAR);
+    if (st || !n)
+    {
+        RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, buf );
+        return NULL;
+    }
+    if ((ret = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, n + 1 )))
+    {
+        /* every spelling these levers accept -- C++ identifiers, GUIDs,
+         * paths -- is ASCII; anything else is a typo, and '?' makes it one
+         * the unmatched-target report can print */
+        for (i = 0; i < n; i++) ret[i] = buf[i] < 0x80 ? (char)buf[i] : '?';
+        ret[n] = 0;
+    }
+    RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, buf );
+    return ret;
+}
+
+/* `@path` -- the whole file as one ASCII buffer, or NULL.  A UNIX absolute
+ * path is spelled through the Z: drive rather than through a unix-side
+ * conversion this side has no access to: `/home/x/rows.list` is
+ * `Z:\home\x\rows.list`, which is what every Wine prefix maps it to and what
+ * the caller would have to type otherwise. */
+static char *com_read_list_file( const char *path )
+{
+    UNICODE_STRING ntpath;
+    OBJECT_ATTRIBUTES attr;
+    IO_STATUS_BLOCK io;
+    FILE_STANDARD_INFORMATION info;
+    WCHAR dos[MAX_PATH + 4];
+    HANDLE handle;
+    char *data = NULL;
+    UINT i, n = 0;
+    LARGE_INTEGER off;
+
+    if (path[0] == '/') { dos[n++] = 'Z'; dos[n++] = ':'; }
+    for (i = 0; path[i] && n < ARRAYSIZE(dos) - 1; i++)
+        dos[n++] = path[i] == '/' ? '\\' : (WCHAR)(unsigned char)path[i];
+    dos[n] = 0;
+    if (path[i])
+    {
+        ERR( "the COM row-list path %s is longer than MAX_PATH; ignoring it\n", path );
+        return NULL;
+    }
+    if (!RtlDosPathNameToNtPathName_U( dos, &ntpath, NULL, NULL ))
+    {
+        ERR( "the COM row-list path %s is not a path this side can open\n", path );
+        return NULL;
+    }
+    InitializeObjectAttributes( &attr, &ntpath, OBJ_CASE_INSENSITIVE, NULL, NULL );
+    if (NtOpenFile( &handle, GENERIC_READ | SYNCHRONIZE, &attr, &io,
+                    FILE_SHARE_READ, FILE_SYNCHRONOUS_IO_NONALERT ))
+    {
+        ERR( "cannot open the COM row list %s; NO rows are forced -- do not "
+             "read this leg as 'tested clean'\n", path );
+        RtlFreeUnicodeString( &ntpath );
+        return NULL;
+    }
+    RtlFreeUnicodeString( &ntpath );
+    if (!NtQueryInformationFile( handle, &io, &info, sizeof(info),
+                                 FileStandardInformation ) &&
+        info.EndOfFile.QuadPart > 0 && info.EndOfFile.QuadPart < 0x100000 &&
+        (data = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0,
+                                 (SIZE_T)info.EndOfFile.QuadPart + 1 )))
+    {
+        off.QuadPart = 0;
+        if (NtReadFile( handle, NULL, NULL, NULL, &io, data,
+                        (ULONG)info.EndOfFile.QuadPart, &off, NULL ))
+        {
+            RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, data );
+            data = NULL;
+        }
+        else data[io.Information] = 0;
+    }
+    NtClose( handle );
+    if (!data)
+        ERR( "cannot read the COM row list %s (empty, over 1 MB, or a read "
+             "error); NO rows are forced\n", path );
+    return data;
+}
+
+static int ascii_lower( int c ) { return c >= 'A' && c <= 'Z' ? c + 32 : c; }
+
+static BOOL ascii_ieq( const char *a, const char *b )
+{
+    while (*a && ascii_lower( (unsigned char)*a ) == ascii_lower( (unsigned char)*b ))
+    { a++; b++; }
+    return !*a && !*b;
+}
+
+static BOOL ascii_ineq( const char *a, const char *b, UINT n )
+{
+    UINT i;
+
+    for (i = 0; i < n; i++)
+        if (ascii_lower( (unsigned char)a[i] ) != ascii_lower( (unsigned char)b[i] ))
+            return FALSE;
+    return TRUE;
+}
+
+/* Add one target name to row_targets, taking ownership of nothing: the name
+ * is copied, because it may point into an environment string or a file buffer
+ * that is freed as soon as parsing is done. */
+static void add_row_target( const char *name, UINT len )
+{
+    char **grown;
+    char *copy;
+
+    if (!len) return;
+    /* RtlReAllocateHeap is NOT realloc: it answers NULL for a NULL pointer
+     * rather than allocating, so the first entry has to be allocated. */
+    grown = row_targets
+        ? RtlReAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, row_targets,
+                             (row_target_count + 1) * sizeof(*row_targets) )
+        : RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, sizeof(*row_targets) );
+    if (!grown) return;
+    row_targets = grown;
+    if (!(copy = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, len + 1 ))) return;
+    memcpy( copy, name, len );
+    copy[len] = 0;
+    row_targets[row_target_count++] = copy;
+}
+
+/* Split on commas and newlines, dropping `#` comments and surrounding space,
+ * and expanding a leading `@` into the file it names.  `depth` stops an
+ * `@file` whose contents name another file. */
+static void parse_row_targets( const char *list, void (*take)( const char *, UINT ),
+                               int depth )
+{
+    const char *p = list;
+
+    while (*p)
+    {
+        const char *start, *end;
+
+        while (*p == ',' || *p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+        if (*p == '#')
+        {
+            while (*p && *p != '\n') p++;
+            continue;
+        }
+        start = p;
+        while (*p && *p != ',' && *p != '\n' && *p != '#') p++;
+        end = p;
+        while (end > start && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r')) end--;
+        if (end == start) continue;
+        if (*start == '@')
+        {
+            char *body, *name;
+            UINT len = (UINT)(end - start - 1);
+
+            if (depth || !len)
+            {
+                ERR( "nested or empty @file in a COM lever list; ignored\n" );
+                continue;
+            }
+            if (!(name = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, len + 1 )))
+                continue;
+            memcpy( name, start + 1, len );
+            name[len] = 0;
+            if ((body = com_read_list_file( name )))
+            {
+                parse_row_targets( body, take, 1 );
+                RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, body );
+            }
+            RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, name );
+            continue;
+        }
+        take( start, (UINT)(end - start) );
+    }
+}
+
+static UINT hexval( char c )
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return ~0u;
+}
+
+/* One IID target: `{xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}` (braces optional)
+ * or a bare leading 8 hex digits, which matches on Data1 alone. */
+static void add_blocked_iid( const char *name, UINT len )
+{
+    struct blocked_iid *grown, ent;
+    UINT hex[32], nhex = 0, i;
+
+    memset( &ent, 0, sizeof(ent) );
+    for (i = 0; i < len && nhex < ARRAYSIZE(hex); i++)
+    {
+        UINT v;
+
+        if (name[i] == '{' || name[i] == '}' || name[i] == '-') continue;
+        if ((v = hexval( name[i] )) == ~0u) { nhex = 0; break; }
+        hex[nhex++] = v;
+    }
+    if (nhex != 8 && nhex != 32)
+    {
+        ERR( "WINEEMUNOCOMIIDS: %.*s is neither a full IID nor a leading "
+             "8 hex digits; ignored\n", (int)len, name );
+        return;
+    }
+    for (i = 0; i < 8; i++) ent.guid.Data1 = (ent.guid.Data1 << 4) | hex[i];
+    if (nhex == 32)
+    {
+        for (i = 8; i < 12; i++) ent.guid.Data2 = (USHORT)((ent.guid.Data2 << 4) | hex[i]);
+        for (i = 12; i < 16; i++) ent.guid.Data3 = (USHORT)((ent.guid.Data3 << 4) | hex[i]);
+        for (i = 0; i < 8; i++)
+            ent.guid.Data4[i] = (unsigned char)((hex[16 + i * 2] << 4) | hex[17 + i * 2]);
+    }
+    else ent.data1_only = TRUE;
+
+    grown = blocked_iids     /* the NULL rule again, see add_row_target */
+        ? RtlReAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, blocked_iids,
+                             (blocked_iid_count + 1) * sizeof(*blocked_iids) )
+        : RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, sizeof(*blocked_iids) );
+    if (!grown) return;
+    blocked_iids = grown;
+    blocked_iids[blocked_iid_count++] = ent;
+}
+
+static BOOL iid_is_blocked( const GUID *riid )
+{
+    UINT i;
+
+    for (i = 0; i < blocked_iid_count; i++)
+    {
+        if (blocked_iids[i].guid.Data1 != riid->Data1) continue;
+        if (blocked_iids[i].data1_only) return TRUE;
+        if (!memcmp( &blocked_iids[i].guid, riid, sizeof(GUID) )) return TRUE;
+    }
+    return FALSE;
+}
+
+/* Does `target` (an `Iface::Slot` spelling) name this row?  Two spellings are
+ * accepted for one reason: the row's OWN name carries the interface a slot was
+ * DECLARED on, which for an inherited slot is a base interface -- the
+ * ID3D10Device1 table's rows are all named "ID3D10Device::..." -- while the
+ * roster and every doc name the interface the row LIVES on.  A reader with
+ * either in front of them should get the row they meant. */
+static BOOL row_target_matches( const char *target, const char *iface_name,
+                                const char *slot_name )
+{
+    const char *tsep, *ssep;
+    UINT n;
+
+    if (!slot_name) return FALSE;
+    for (tsep = target; *tsep; tsep++)
+        if (tsep[0] == ':' && tsep[1] == ':') break;
+    if (!*tsep || !tsep[2]) return FALSE;      /* no `::`, or nothing after it */
+    if (!(n = (UINT)(tsep - target))) return FALSE;
+
+    /* a row's own name is either `Iface::Slot` or a bare slot name */
+    for (ssep = slot_name; *ssep; ssep++)
+        if (ssep[0] == ':' && ssep[1] == ':') break;
+    if (!ascii_ieq( tsep + 2, *ssep ? ssep + 2 : slot_name )) return FALSE;
+
+    if (iface_name && strlen( iface_name ) == n && ascii_ineq( target, iface_name, n ))
+        return TRUE;
+    return *ssep && (UINT)(ssep - slot_name) == n && ascii_ineq( target, slot_name, n );
+}
+
+/* Does this row have out-parameters the generator could not give scrub masks
+ * for?  A forced refusal of such a row is still the right answer -- it is what
+ * the row did before the landing -- but the caller's out-params keep whatever
+ * residue was in them, which is the Witcher 3 crash class.  Say so per row
+ * rather than let a bisect leg carry a silent hazard. */
+static BOOL row_out_params_unscrubbed( const struct winecom_slot *sl )
+{
+    UINT i;
+
+    if (sl->scrubptr | sl->scrubdw | sl->scrubq) return FALSE;
+    if (!sl->cls) return FALSE;
+    for (i = 1; i < sl->argc; i++)
+        switch (sl->cls[i - 1])
+        {
+        case WINECOM_CA_PPV_OUT:
+        case WINECOM_CA_RET_PTR:
+        case WINECOM_CA_IFACE_OUT_STATIC:
+        case WINECOM_CA_IFACE_ARR_OUT_STATIC:
+        case WINECOM_CA_IFACE_ARR_OUT_COUNTPTR:
+            return TRUE;
+        }
+    return FALSE;
+}
+
+/* Read the three levers and resolve them against THIS surface's tables.  Runs
+ * once, inside com_runtime_init_once, after iface_slot_base/total_slots are
+ * built and BEFORE any guest-side fast path is installed -- a const-getter or
+ * journal snippet on a forced row would serve it from guest code without ever
+ * trapping, and the lever would be a lie. */
+static void arm_row_kill_switches( void )
+{
+    char *rows, *iids, *waves;
+    UINT i, n, t, forced = 0, partial = 0;
+
+    rows = com_env_str( L"WINEEMUNOCOMROWS" );
+    iids = com_env_str( L"WINEEMUNOCOMIIDS" );
+    waves = com_env_str( L"WINEEMUNOCOMWAVE" );
+    if (!rows && !iids && !waves) return;
+
+    if (rows) parse_row_targets( rows, add_row_target, 0 );
+    if (iids) parse_row_targets( iids, add_blocked_iid, 0 );
+    if (waves)
+    {
+        /* wave names are not row names: expand each into the derived sets,
+         * and name an unknown wave rather than expanding it to nothing */
+        const char *p = waves;
+
+        while (*p)
+        {
+            const char *start;
+            UINT len, w;
+            BOOL known = FALSE;
+
+            while (*p == ',' || *p == ' ' || *p == '\t') p++;
+            start = p;
+            while (*p && *p != ',') p++;
+            len = (UINT)(p - start);
+            while (len && (start[len - 1] == ' ' || start[len - 1] == '\t')) len--;
+            if (!len) continue;
+            for (w = 0; w < ARRAYSIZE(wc_waves); w++)
+            {
+                if (strlen( wc_waves[w].name ) != len ||
+                    memcmp( wc_waves[w].name, start, len )) continue;
+                known = TRUE;
+                for (i = 0; i < wc_waves[w].row_count; i++)
+                    add_row_target( wc_waves[w].rows[i],
+                                    (UINT)strlen( wc_waves[w].rows[i] ) );
+                for (i = 0; i < wc_waves[w].iid_count; i++)
+                    add_blocked_iid( wc_waves[w].iids[i],
+                                     (UINT)strlen( wc_waves[w].iids[i] ) );
+                ERR( "%s: WINEEMUNOCOMWAVE=%s -- %u rows and %u IIDs go back to "
+                     "their pre-landing refusal\n", wc_surface->name,
+                     wc_waves[w].name, wc_waves[w].row_count, wc_waves[w].iid_count );
+                break;
+            }
+            if (!known)
+                ERR( "WINEEMUNOCOMWAVE names no wave '%.*s' -- this leg forces "
+                     "NOTHING from it; the known names are in "
+                     "libs/winecom/winecom_waves.h\n", (int)len, start );
+        }
+    }
+    RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, rows );
+    RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, iids );
+    RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, waves );
+
+    if (blocked_iid_count)
+        ERR( "%s: WINEEMUNOCOMIIDS -- %u IIDs are treated as UNROSTERED; an "
+             "interface handed out under one is released, the out pointer "
+             "NULLed, E_NOINTERFACE returned\n", wc_surface->name, blocked_iid_count );
+    if (!row_target_count) return;
+
+    /* the per-(iface,slot) bitset, allocated only because something matched */
+    if (!(forced_refuse = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap,
+                                           HEAP_ZERO_MEMORY, total_slots )))
+    {
+        ERR( "%s: no memory for the forced-refusal map; NO rows are forced -- "
+             "do not read this leg as 'tested clean'\n", wc_surface->name );
+        return;
+    }
+    row_target_hit = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap,
+                                      HEAP_ZERO_MEMORY, row_target_count );
+
+    for (i = 0; i < wc_surface->iface_count; i++)
+    {
+        const struct winecom_iface *itf = &wc_surface->ifaces[i];
+
+        if (!itf->slots) continue;
+        for (n = 0; n < itf->slot_count; n++)
+            for (t = 0; t < row_target_count; t++)
+            {
+                if (!row_target_matches( row_targets[t], itf->name,
+                                         itf->slots[n].name )) continue;
+                if (row_target_hit) row_target_hit[t] = 1;
+                if (forced_refuse[iface_slot_base[i] + n]) break;
+                forced_refuse[iface_slot_base[i] + n] = 1;
+                forced++;
+                if (row_out_params_unscrubbed( &itf->slots[n] ))
+                {
+                    partial++;
+                    ERR( "%s: forcing %s::%s to refuse, but the row has "
+                         "out-parameters and NO scrub masks -- the refusal is "
+                         "PARTIAL and the caller reads its own residue there "
+                         "(the Witcher 3 GetShader class)\n", wc_surface->name,
+                         itf->name, itf->slots[n].name );
+                }
+                break;
+            }
+    }
+    ERR( "%s: WINEEMUNOCOMROWS/WAVE armed -- %u of this surface's slots forced "
+         "to refuse (%u of them scrub only partially)\n", wc_surface->name,
+         forced, partial );
+
+    /* A target that matched nothing HERE may well match on another surface's
+     * runtime (this library is one instance per linkee), so the report names
+     * the surface and stays a warning; a target that matches nowhere shows up
+     * once per attached surface, which is the loudest a per-instance runtime
+     * can be about it. */
+    if (row_target_hit)
+        for (t = 0; t < row_target_count; t++)
+            if (!row_target_hit[t])
+                WARN( "%s: WINEEMUNOCOMROWS names '%s', which matches no row on "
+                      "this surface -- if no surface claims it, it is a TYPO and "
+                      "this leg tested nothing\n", wc_surface->name, row_targets[t] );
+    if (!forced)
+        ERR( "%s: every name given to WINEEMUNOCOMROWS/WAVE missed; NOTHING is "
+             "forced on this surface\n", wc_surface->name );
+}
+
+/* The dispatch-time question, both lanes.  Unarmed: one NULL test. */
+static inline BOOL row_forced_refused( UINT iface, UINT slot )
+{
+    return forced_refuse && forced_refuse[iface_slot_base[iface] + slot];
+}
+
 static HMODULE find_guest_module( const WCHAR *const *names, UINT count, BOOL require_com_table )
 {
     LIST_ENTRY *mark, *entry;
@@ -571,7 +1075,8 @@ static void install_const_getters( void )
         const struct winecom_iface *itf = &wc_surface->ifaces[i];
         if (!itf->slots) continue;
         for (n = 0; n < itf->slot_count; n++)
-            if (itf->slots[n].flags & WINECOM_F_CONST_QWORD) count++;
+            if ((itf->slots[n].flags & WINECOM_F_CONST_QWORD) &&
+                !row_forced_refused( i, n )) count++;
     }
     if (!count) return;
     if (com_env_flag( L"WINEEMUNOCOMCONSTGET" ))
@@ -601,7 +1106,12 @@ static void install_const_getters( void )
             UINT64 *vslot;
             unsigned char *p = code;
 
-            if (!(itf->slots[n].flags & WINECOM_F_CONST_QWORD)) continue;
+            /* A forced-refused row must keep TRAPPING: a guest-side snippet
+             * would answer it from the cache with no dispatch at all, and the
+             * kill switch would be a lie.  Both loops skip identically or the
+             * emitted block would not be the size the first pass counted. */
+            if (!(itf->slots[n].flags & WINECOM_F_CONST_QWORD) ||
+                row_forced_refused( i, n )) continue;
             vslot = &guest_vtbl_block[iface_slot_base[i] + n];
 
             *p++ = 0x48; *p++ = 0x8b; *p++ = 0x41;             /* mov rax,[rcx+disp8] */
@@ -940,6 +1450,11 @@ static void install_journal( void )
                 if (sl->name && !strcmp( sl->name, journal_slots[j].name ))
                 { def = &journal_slots[j]; break; }
             if (!def) continue;
+
+            /* a forced-refused row keeps TRAPPING: a guest-side journal
+             * snippet would record the call and never reach the dispatcher,
+             * so the kill switch would not be one */
+            if (row_forced_refused( i, n )) continue;
 
             /* fail closed to trapping if the table row stopped matching the
              * curated shape -- a drifted roster must never produce a wrong
@@ -1555,6 +2070,11 @@ static void install_dev_journal( void )
                 { argc = dev_slot_defs[j].argc; break; }
             if (!argc) continue;
 
+            /* a forced-refused row keeps TRAPPING: a guest-side journal
+             * snippet would record the call and never reach the dispatcher,
+             * so the kill switch would not be one */
+            if (row_forced_refused( i, n )) continue;
+
             /* fail closed to trapping if the table row stopped matching the
              * curated shape -- a drifted roster must never produce a wrong
              * record */
@@ -1743,6 +2263,10 @@ static BOOL com_runtime_init_once( void )
     }
     TRACE( "%s: materialised %u guest vtable slots across %u interfaces from %p\n",
            wc_surface->name, total_slots, i, guest );
+    /* BEFORE the three snippet installers: each of them replaces a trap stub
+     * with guest-side code, and a forced-refused row must keep trapping or the
+     * kill switch never sees the call at all. */
+    arm_row_kill_switches();
     install_const_getters();
     install_journal();
     install_dev_journal();
@@ -2264,6 +2788,20 @@ HRESULT winecom_wrap_out_iface( HRESULT hr, const GUID *riid, void **ppv )
 
     if (FAILED(hr) || !ppv || !*ppv) return hr;
     idx = riid ? winecom_iface_from_iid( riid ) : ~0u;
+    /* WINEEMUNOCOMIIDS: a listed IID is treated as if the roster had never
+     * gained it, which is the release-and-NULL the guest got before the
+     * syscom wave -- {77aa99a0} IAudioSessionManager2 is the one the Witcher 3
+     * bisect names.  Deliberately here and not in winecom_iface_from_iid:
+     * this is the choke point where an interface is HANDED OUT, and blocking
+     * the lookup itself would also break QueryInterface on objects the guest
+     * already holds, which is not what the pre-landing world did. */
+    if (idx != ~0u && blocked_iid_count && riid && iid_is_blocked( riid ))
+    {
+        ERR( "%s: WINEEMUNOCOMIIDS lists %s -- treating it as unrostered, "
+             "releasing the object and answering E_NOINTERFACE\n",
+             wc_surface->name, debugstr_guid(riid) );
+        idx = ~0u;
+    }
     if (idx == ~0u)
     {
         ERR( "%s: an interface for unknown IID %s; releasing it rather than "
@@ -2838,9 +3376,14 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
     }
 
     sl = itf->slots ? &itf->slots[slot] : NULL;
-    if (!sl || sl->refuse)
+    /* WINEEMUNOCOMROWS/WAVE: a served row put back to the refusal it had
+     * before the completeness landings.  Same path as a generated refusal,
+     * scrub included -- the whole point is that the guest cannot tell which
+     * kind it hit, only the log can. */
+    if (!sl || sl->refuse || row_forced_refused( iface, slot ))
     {
-        refuse_once( iface, slot, sl ? sl->name : NULL, sl ? sl->refuse : NULL );
+        refuse_once( iface, slot, sl ? sl->name : NULL,
+                     sl && !sl->refuse ? forced_why : sl ? sl->refuse : NULL );
         /* refusal hygiene: a generation-refused row still carries the scrub
          * masks the generator derived from its signature, so the caller's
          * out-params are made NULL/0 rather than left as the uninitialized
@@ -3076,8 +3619,10 @@ NTSTATUS winecom_dispatch32( UINT iface, UINT slot, I386_CONTEXT *ctx )
 
     /* a 32-bit hand walker, matched by name at attach, serves the row before
      * any other disposition -- including a 64-bit refusal, which is about
-     * the OTHER lane's marshalling */
-    if (hand32_map && hand32_map[iface_slot_base[iface] + slot] != 0xff)
+     * the OTHER lane's marshalling.  A row the KILL SWITCH names is the one
+     * exception: the lever is asked about the row, not about a lane. */
+    if (hand32_map && hand32_map[iface_slot_base[iface] + slot] != 0xff &&
+        !row_forced_refused( iface, slot ))
     {
         UINT64 r = wc_surface->hand32[hand32_map[iface_slot_base[iface] + slot]]
                        .fn( proxy->host, slot, ctx );
@@ -3088,9 +3633,11 @@ NTSTATUS winecom_dispatch32( UINT iface, UINT slot, I386_CONTEXT *ctx )
         return STATUS_SUCCESS;
     }
 
-    if (sl->refuse || sl->refuse32)
+    if (sl->refuse || sl->refuse32 || row_forced_refused( iface, slot ))
     {
-        refuse_once( iface, slot, sl->name, sl->refuse ? sl->refuse : sl->refuse32 );
+        refuse_once( iface, slot, sl->name,
+                     sl->refuse ? sl->refuse :
+                     row_forced_refused( iface, slot ) ? forced_why : sl->refuse32 );
         /* refusal hygiene, the 32-bit spelling: the scrub masks index
          * parameters the same way, but the values come from the stdcall
          * frame -- [esp]=return, [esp+4]=this, then each parameter one

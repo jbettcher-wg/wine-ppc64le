@@ -150,6 +150,51 @@ boundary, on the one thread where a fault is least recoverable.
 |---|---|
 | `check-reverse-proxy.sh` | the mechanism gate (5 layers); `--sabotage` runs three negative controls |
 | `probes/reverse_probe.c` | guest-only: two COM objects in its own image, handed to a native hook |
+| `check-com-levers.sh` | the gate on the three wave kill switches; `--sabotage` runs the three unarmed controls |
+| `probes/com_lever_smoke.c` | guest-only: one served row and one riid-typed handout, watched from the caller's chair |
+| `derive-wave-rows.py` | derives the wave membership FROM GIT and regenerates both files below |
+| `wave-rows.list` | the derived membership, with its provenance in the header |
+| `../../libs/winecom/winecom_waves.h` | the runtime's generated copy of that list |
+
+## The wave kill switches
+
+The completeness landings `74591109c3f..c199f79caf9` turned hundreds of
+refused rows into served ones in one stretch and shipped no way to put any of
+them back. Bisecting the Witcher 3 load regression that followed cost **seven
+seat runs** of swapping built PE halves in and out of a tree
+(`ppc64le/docs/sessions/2026-09-01/w3-load-regression-bisect.md`). Three
+levers, read once at attach, make the same legs one environment variable:
+
+| lever | what it does |
+|---|---|
+| `WINEEMUNOCOMROWS` | comma-separated `Iface::Slot` names, or `@/path/file` with one per line (`#` comments allowed). Each named row takes the **generated-refusal path**: refuse once by name, `E_NOTIMPL`, and `scrub_refused_outs()` — refused means INERT. |
+| `WINEEMUNOCOMIIDS` | comma-separated IIDs, `{xxxxxxxx-…}` or a bare leading 8 hex digits. A listed IID is treated as **unrostered** where interfaces are handed out: release the object, NULL the out pointer, `E_NOINTERFACE`. |
+| `WINEEMUNOCOMWAVE` | `getfamily`, `syscom`, `dinput8` — whole landings, expanded to the row and IID sets `derive-wave-rows.py` derived from git. |
+
+Two rules the derivation is built on, both in the script's own banner: a row
+whose `refuse` went from a reason string to `NULL`, and a row whose `caux`
+went from `NULL` to a real count-parameter array. The second rule exists
+because `OMGetRenderTargets` — the bisect's own theory 1 — never carried a
+refuse string at all: it was refused **at runtime** by a dispatcher that could
+not find its count parameter, so the first rule cannot see it.
+
+**A name that matches nothing is loud.** A typo in a bisect leg that passed
+silently would be recorded as "tested, clean", and the conclusion drawn from
+it would be wrong in the most expensive direction. Every unmatched target and
+every unknown wave name gets its own line.
+
+**The hot path pays nothing when they are unset**: the row lever's result is a
+per-`(iface, slot)` byte array that is only allocated when something matched,
+so the unarmed test is one `NULL` pointer check. Resolution happens once, at
+attach, against the surface's own `const` tables — which are never written.
+
+```sh
+./check-com-levers.sh              # nine legs, each an armed/unarmed pair
+./check-com-levers.sh --sabotage   # the three unarmed controls must show the
+                                   # lever NOT firing
+./derive-wave-rows.py              # re-derive both files from git
+./derive-wave-rows.py --check      # and fail if either drifted
+```
 
 The hook is `__wine_winecom_reverse_selftest`, declared in
 `include/wine/winecom_selftest.h` and implemented in `dlls/mfplat/mfcom.c`.

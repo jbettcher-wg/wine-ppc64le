@@ -107,3 +107,112 @@ crash-reporter deadlock shape the user diagnosed for GetShader.
    ppc64-windows PE half is the marshal's home (leg-4 mistake), and
    big-bang landings need a per-wave runtime lever so a regression
    bisects in minutes, not in seven seat runs.
+
+## The levers this bisect needed (added afterwards)
+
+Lesson 4 above is now code.  Three environment variables, read once when a
+COM surface attaches, put served rows back the way they were before the
+completeness landings.  A leg that used to mean swapping built PE halves in
+and out of a tree is now one `env` line, and it can run against the shipping
+build.
+
+| lever | what it does |
+|---|---|
+| `WINEEMUNOCOMROWS` | comma-separated `Iface::Slot` names, or `@/path/to/file` with one name per line (`#` comments allowed).  Each named row refuses exactly the way a generation-refused row does: one log line naming the lever, `E_NOTIMPL`, and the out-params scrubbed so the refusal is INERT. |
+| `WINEEMUNOCOMIIDS` | comma-separated IIDs, either `{770aae78-f26f-4dba-a829-253c83d1b387}` or the bare leading form `770aae78`.  A listed IID is treated as unrostered where interfaces are handed out: the object is released, the out pointer NULLed, `E_NOINTERFACE` returned — the release-and-NULL W3 got for months. |
+| `WINEEMUNOCOMWAVE` | `getfamily`, `syscom`, `dinput8`.  Whole landings, expanded to the row and IID sets in `libs/winecom/winecom_waves.h`. |
+
+The wave membership is **derived from git**, not typed by hand:
+`ppc64le/winecom/derive-wave-rows.py` diffs the generated marshal headers
+between `984c52a6d1d` (this doc's known-good baseline) and `c199f79caf9`, and
+writes `ppc64le/winecom/wave-rows.list` plus the runtime's copy of it.  Counts:
+
+* **getfamily** — 44 rows.  The whole `XSGetShader` count-through-pointer set
+  (30 rows across `ID3D11DeviceContext`..`4`), plus `OMGetRenderTargets` (6),
+  `SOGetTargets` (7) and the two D3D10 `OMGet`/`SOGet` pairs.
+* **syscom** — 158 rows and **12 IIDs**, including
+  `{77aa99a0-1bd6-484f-8bc7-2c654c9a9b6f}` `IAudioSessionManager2`, the one
+  theory 2 names.
+* **dinput8** — 6 rows (`ConfigureDevices`, `EnumDevicesBySemantics`,
+  `EnumCreatedEffectObjects`, each A and W).
+
+**Where the diff disagreed with the theory list above.**  Theory 1 says the
+`OMGetRenderTargets` family is part of the same wave as the `GetShader`
+serves.  It is — but not by the same mechanism, and a refuse-string diff
+cannot see it: `OMGetRenderTargets` never carried a refuse string at either
+commit.  What changed is its `caux`, from `NULL` to a real count-parameter
+array, which is exactly the "caux-at-0 fix" this doc describes: before it the
+row was refused **at runtime**, by a dispatcher that read the array's count
+out of parameter 0.  So the derivation uses two rules, and the second one is
+the only reason `getfamily` contains the rows theory 1 is actually about.
+The script's banner spells both out.
+
+Two more things the same two commits changed that no wave name claims:
+mfplat (174 rows newly served, 4 interfaces newly rostered) and d3d12 (3
+rows).  Neither is in W3's path, but if a leg needs them, name the rows
+individually with `WINEEMUNOCOMROWS`.
+
+### Running the legs
+
+All of these are plain runs of the shipping build.  Nothing is swapped;
+nothing is rebuilt.
+
+```sh
+# leg 1-equivalent: every pre-existing negative control at once, as before
+WINEEMUNOCOMEVENT=1 WINEEMUNOREFUSESCRUB=1 WINEEMUNOCOMFP=1 <launch W3>
+
+# leg 3-equivalent: the syscom wave back to refusing, IIDs included --
+# this is what leg 3 was reaching for, and it now covers the IID half too,
+# which the thunk-regeneration leg could not
+WINEEMUNOCOMWAVE=syscom <launch W3>
+
+# theory 1: the d3d11 Get-family serves (this is what leg 5 was staged for)
+WINEEMUNOCOMWAVE=getfamily <launch W3>
+
+# theory 2: the syscom native upgrades
+WINEEMUNOCOMWAVE=syscom <launch W3>
+
+# theory 3: the dinput8 shims
+WINEEMUNOCOMWAVE=dinput8 <launch W3>
+
+# all three at once -- if THIS still faults, the fault is not in the COM
+# rows at all and the bridge-skew section is where to look next
+WINEEMUNOCOMWAVE=getfamily,syscom,dinput8 <launch W3>
+```
+
+Narrowing after a wave goes clean: split the wave's own list.
+
+```sh
+# the whole wave, from the checked-in file
+WINEEMUNOCOMROWS=@$PWD/ppc64le/winecom/wave-rows.list <launch W3>
+
+# or half of it -- the file format is one name per line, `#` comments
+grep '^row ID3D11DeviceContext::' ppc64le/winecom/wave-rows.list \
+    | sed 's/^row //' | head -15 > /tmp/leg.list
+WINEEMUNOCOMROWS=@/tmp/leg.list <launch W3>
+
+# one row, the finest grain
+WINEEMUNOCOMROWS=ID3D11DeviceContext::PSGetShader <launch W3>
+
+# theory 2 at the single-IID grain: the audio-session path only
+WINEEMUNOCOMIIDS=77aa99a0 <launch W3>
+```
+
+### Reading the result
+
+Run with `WINEDEBUG=+winecom` and check stderr before believing any leg:
+
+* `WINEEMUNOCOMROWS/WAVE armed -- N of this surface's slots forced to refuse`
+  — the leg actually did something.  **If N is 0, the leg tested nothing.**
+* `matches no row on this surface` — a typo.  Every name that matched nothing
+  anywhere gets one of these; a bisect leg that logs one and is recorded as
+  "clean" is a wrong answer, not a data point.
+* `the row has out-parameters and NO scrub masks -- the refusal is PARTIAL`
+  — that row's caller reads its own residue.  Real, and worth knowing, but it
+  means the leg is not a clean pre-landing reproduction for that row.
+
+The gate is `ppc64le/winecom/check-com-levers.sh` (nine legs, each an
+armed/unarmed pair; `--sabotage` runs the unarmed controls alone).  It exists
+because a lever that silently does nothing is worse than no lever: a leg run
+under one is recorded as "tested, clean", and that is the most expensive kind
+of wrong answer this bisect can produce.
