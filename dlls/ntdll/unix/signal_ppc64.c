@@ -1414,6 +1414,157 @@ __ASM_GLOBAL_FUNC( user_mode_callback_return,
 
 
 /***********************************************************************
+ *           emu_trap_return_direct
+ *
+ * user_mode_callback_return without the syscall in front of it -- the lean
+ * return for the emu trap dispatcher (NEXT.md item 7, the PE re-entry cost).
+ * The PE-side emu_trap_dispatch receives this stub's address in its args
+ * block and CALLS it on the normal end of a dispatch instead of paying
+ * NtCallbackReturn's full syscall round trip; the body below is
+ * user_mode_callback_return's, mirrored slot for slot (the pop at the same
+ * point, the same restore order, the same ret_ptr/ret_len stores with the
+ * NULL/0 values NtCallbackReturn(NULL, 0, status) carries today), so on the
+ * path it serves the machine state at return is bit-identical to the syscall
+ * route's.
+ *
+ * TWO GUARDS, checked before anything is touched, and either one returns to
+ * the PE CALLER with EMU_LEAN_RETURN_FALLBACK in r3 so it takes the
+ * NtCallbackReturn route it always took:
+ *
+ *   - no prev_frame: not inside a callback at all -- the syscall route's
+ *     STATUS_NO_CALLBACK_ACTIVE arm owns that error.
+ *   - frame->restore_flags != 0: some syscall during this dispatch left a
+ *     context stash on the frame (NtSetContextThread-on-self leftovers, an
+ *     APC's set_frame_entry redirect -- both CONSUMED by that syscall's own
+ *     return, but the field is only re-zeroed at the NEXT dispatcher entry).
+ *     The stale value is dead either way -- today's NtCallbackReturn entry
+ *     zeroes it unconditionally (__wine_syscall_dispatcher entry, the
+ *     "stw 0, 0x130" above the FPR saves) -- but a nonzero word is also what
+ *     a LIVE stash would look like, and the price of not distinguishing is
+ *     one syscall on a rare path.  Conservative beats clever here.
+ *
+ * NESTED CALLBACKS need no thought at this point by construction: a nested
+ * guest callback inside this dispatch pushed its own frame and popped it on
+ * its own return (lean or syscall), so thread_data->syscall_frame here is
+ * this dispatch's own callback frame -- the reverse-proxy gate's 64-deep
+ * ping-pong is the standing proof.
+ *
+ * The FPR/VR restores read the values call_user_mode_callback saved at
+ * callback ENTRY, where the syscall route restores what NtCallbackReturn's
+ * own dispatcher entry re-saved a moment ago; ELFv2 makes them the same
+ * bytes (the dispatch preserved its nonvolatiles), and the callback-entry
+ * copy is the one a mid-dispatch suspension already trusts.
+ *
+ * No TOC (r2 is restored from the entry frame like every other nonvolatile),
+ * no TLS (the PE side passes the teb); RA_UNRECOVERABLE for exactly
+ * user_mode_callback_return's reason.
+ */
+extern NTSTATUS emu_trap_return_direct( NTSTATUS status, TEB *teb );
+__ASM_GLOBAL_FUNC( emu_trap_return_direct,
+                   /* r3 = status, r4 = teb */
+                   __ASM_CFI_RA_UNRECOVERABLE
+                   "ld 7, 0x378(4)\n\t"             /* thread_data->syscall_frame */
+                   "ld 8, 0x138(7)\n\t"             /* frame->prev_frame */
+                   "cmpdi 8, 0\n\t"
+                   "beq 3f\n\t"
+                   "lwz 9, 0x130(7)\n\t"            /* frame->restore_flags */
+                   "cmpwi 9, 0\n\t"
+                   "bne 3f\n\t"
+                   /* from here this is user_mode_callback_return with
+                    * ret_ptr = NULL, ret_len = 0, status in r5 */
+                   "mr 5, 3\n\t"
+                   "mr 6, 4\n\t"
+                   "std 8, 0x378(6)\n\t"            /* pop the frame, same point */
+                   "lfd 14, 0x1c0(7)\n\t"
+                   "lfd 15, 0x1c8(7)\n\t"
+                   "lfd 16, 0x1d0(7)\n\t"
+                   "lfd 17, 0x1d8(7)\n\t"
+                   "lfd 18, 0x1e0(7)\n\t"
+                   "lfd 19, 0x1e8(7)\n\t"
+                   "lfd 20, 0x1f0(7)\n\t"
+                   "lfd 21, 0x1f8(7)\n\t"
+                   "lfd 22, 0x200(7)\n\t"
+                   "lfd 23, 0x208(7)\n\t"
+                   "lfd 24, 0x210(7)\n\t"
+                   "lfd 25, 0x218(7)\n\t"
+                   "lfd 26, 0x220(7)\n\t"
+                   "lfd 27, 0x228(7)\n\t"
+                   "lfd 28, 0x230(7)\n\t"
+                   "lfd 29, 0x238(7)\n\t"
+                   "lfd 30, 0x240(7)\n\t"
+                   "lfd 31, 0x248(7)\n\t"
+                   "li 12, 0x390\n\t"
+                   "lvx 20, 7, 12\n\t"
+                   "addi 12, 12, 16\n\t"
+                   "lvx 21, 7, 12\n\t"
+                   "addi 12, 12, 16\n\t"
+                   "lvx 22, 7, 12\n\t"
+                   "addi 12, 12, 16\n\t"
+                   "lvx 23, 7, 12\n\t"
+                   "addi 12, 12, 16\n\t"
+                   "lvx 24, 7, 12\n\t"
+                   "addi 12, 12, 16\n\t"
+                   "lvx 25, 7, 12\n\t"
+                   "addi 12, 12, 16\n\t"
+                   "lvx 26, 7, 12\n\t"
+                   "addi 12, 12, 16\n\t"
+                   "lvx 27, 7, 12\n\t"
+                   "addi 12, 12, 16\n\t"
+                   "lvx 28, 7, 12\n\t"
+                   "addi 12, 12, 16\n\t"
+                   "lvx 29, 7, 12\n\t"
+                   "addi 12, 12, 16\n\t"
+                   "lvx 30, 7, 12\n\t"
+                   "addi 12, 12, 16\n\t"
+                   "lvx 31, 7, 12\n\t"
+                   /* back to call_user_mode_callback's frame */
+                   "ld 1, 0x140(7)\n\t"             /* frame->syscall_cfa */
+                   "addi 1, 1, -0x100\n\t"
+                   "ld 9, 0x20(1)\n\t"              /* ret_ptr out-pointer */
+                   "ld 10, 0x28(1)\n\t"             /* ret_len out-pointer */
+                   "ld 11, 0x38(1)\n\t"             /* saved teb->Tib.ExceptionList */
+                   "std 11, 0(6)\n\t"
+                   "li 12, 0\n\t"
+                   "cmpdi 9, 0\n\t"
+                   "beq 1f\n\t"
+                   "std 12, 0(9)\n"                 /* *ret_ptr = NULL */
+                   "1:\tcmpdi 10, 0\n\t"
+                   "beq 2f\n\t"
+                   "stw 12, 0(10)\n"                /* *ret_len = 0 */
+                   "2:\tmr 3, 5\n\t"
+                   /* the slots call_user_mode_callback saved these in */
+                   "ld 14, 0x70(1)\n\t"
+                   "ld 15, 0x78(1)\n\t"
+                   "ld 16, 0x80(1)\n\t"
+                   "ld 17, 0x88(1)\n\t"
+                   "ld 18, 0x90(1)\n\t"
+                   "ld 19, 0x98(1)\n\t"
+                   "ld 20, 0xa0(1)\n\t"
+                   "ld 21, 0xa8(1)\n\t"
+                   "ld 22, 0xb0(1)\n\t"
+                   "ld 23, 0xb8(1)\n\t"
+                   "ld 24, 0xc0(1)\n\t"
+                   "ld 25, 0xc8(1)\n\t"
+                   "ld 26, 0xd0(1)\n\t"
+                   "ld 27, 0xd8(1)\n\t"
+                   "ld 28, 0xe0(1)\n\t"
+                   "ld 29, 0xe8(1)\n\t"
+                   "ld 30, 0xf0(1)\n\t"
+                   "ld 31, 0xf8(1)\n\t"
+                   "addi 1, 1, 0x100\n\t"
+                   "ld 0, 16(1)\n\t"
+                   "ld 2, 24(1)\n\t"
+                   "mtlr 0\n\t"
+                   "blr\n"
+                   /* the fallback: touched nothing, lr intact -- back to the PE
+                    * caller with the sentinel (sign-extended, ELFv2 int) */
+                   "3:\tli 3, 0x0FA1\n\t"
+                   "oris 3, 3, 0xE0EC\n\t"
+                   "extsw 3, 3\n\t"
+                   "blr" )
+
+
+/***********************************************************************
  *           user_mode_abort_thread
  */
 extern void DECLSPEC_NORETURN user_mode_abort_thread( int status, struct syscall_frame *frame );
@@ -1541,13 +1692,16 @@ static void emu_crossing_dump( const struct thread_data *data )
 NTSTATUS call_emu_trap_dispatcher( void *func, void *ctx, void *cookie )
 {
     static int on_kernel_stack = -1;
+    static int no_lean_return = -1;
 
     struct thread_data *data = get_thread_data();
     struct syscall_frame *frame = get_syscall_frame( data );
-    /* two pointers: the payload and the EC row-cell cookie (NULL on every
-     * non-EC path).  Both PE-side consumers unpack the first pointer and
-     * emu_trap_dispatch reads the second only when len says it is there. */
-    void *argblock[2];
+    /* three pointers: the payload, the EC row-cell cookie (NULL on every
+     * non-EC path), and the lean-return stub emu_trap_dispatch calls on its
+     * normal end instead of NtCallbackReturn (NULL under the lever, and for
+     * every consumer that predates it).  Consumers unpack the first pointer
+     * and read the rest only when len says it is there. */
+    void *argblock[3];
     ULONG len = sizeof(argblock);
     ULONG_PTR user_sp = frame->gpr[1];
     struct callback_stack_layout *stack;
@@ -1603,8 +1757,17 @@ NTSTATUS call_emu_trap_dispatcher( void *func, void *ctx, void *cookie )
     }
     if (on_kernel_stack) user_sp = (ULONG_PTR)&ret_len;
 
+    if (no_lean_return == -1)
+    {
+        const char *str = getenv( "WINE_PPC64LE_NO_LEAN_RETURN" );
+        no_lean_return = (str && *str == '1');
+        if (no_lean_return)
+            ERR( "WINE_PPC64LE_NO_LEAN_RETURN: every trap dispatch returns "
+                 "through the NtCallbackReturn syscall\n" );
+    }
     argblock[0] = ctx;
     argblock[1] = cookie;
+    argblock[2] = no_lean_return ? NULL : (void *)emu_trap_return_direct;
     sp = (user_sp - PPC64_RED_ZONE -
           offsetof( struct callback_stack_layout, args_data[sizeof(argblock)] )) & ~15;
     stack = (struct callback_stack_layout *)sp;

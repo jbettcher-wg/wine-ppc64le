@@ -275,6 +275,13 @@ struct emu_register_ec_params
     UINT   skipped;      /* out: wrong bytes, or the bridge refused */
 };
 
+/* emu_trap_return_direct's "I cannot serve this return, take the
+ * NtCallbackReturn route" answer -- the only value the stub ever RETURNS
+ * (the served path does not return).  Customer-bit status, produced by no
+ * dispatch anywhere.  Shared here because the stub lives on the unix side
+ * and the caller is PE-side emu_trap_dispatch. */
+#define EMU_LEAN_RETURN_FALLBACK ((NTSTATUS)0xE0EC0FA1)
+
 extern unixlib_handle_t __wine_unixlib_handle;
 
 #endif /* __NTDLL_UNIXLIB_H */

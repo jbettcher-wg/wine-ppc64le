@@ -9446,6 +9446,12 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
      * this stub's own row cell, or NULL on every trap-protocol path (and
      * from an unextended caller, which the len check keeps honest) */
     struct ec_row_cell *cell = len >= 2 * sizeof(void *) ? ((void **)args)[1] : NULL;
+    /* the third is the unix side's lean-return stub: the normal end of this
+     * dispatch calls it instead of paying NtCallbackReturn's syscall round
+     * trip.  NULL under WINE_PPC64LE_NO_LEAN_RETURN=1 and from any caller
+     * that predates it -- the syscall tail below is always the fallback. */
+    NTSTATUS (*lean_return)( NTSTATUS, TEB * ) =
+        len >= 3 * sizeof(void *) ? (NTSTATUS (*)( NTSTATUS, TEB * ))((void **)args)[2] : NULL;
     AMD64_CONTEXT *prev_trap_ctx = emu_current_trap_ctx;
     BOOL prev_ctx_rewritten = emu_trap_ctx_rewritten;
     thunk_override_func override = NULL;
@@ -9604,6 +9610,23 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
     else if ((guest_exc_pending || guest_unwind_run_end) && !status)
         status = STATUS_EMU_GUEST_EXCEPTION;
 
+    /* The lean return: straight back into call_emu_trap_dispatcher's frame
+     * with no syscall.  EVERY status value rides it -- the unix side reads
+     * NtCallbackReturn's status as a plain return value (its implementation
+     * is a prev_frame check and user_mode_callback_return; the
+     * THREAD_IS_TERMINATING / EMU_GUEST_EXCEPTION arms live in
+     * emu_trap_dispatch_common AFTER the return, on either route).  The stub
+     * comes back only when it cannot serve -- a context stash on the frame,
+     * or no callback frame at all -- and then the syscall tail below is
+     * exactly yesterday's path.  A non-sentinel RETURN from the stub is
+     * impossible by construction (success does not return); turning it into
+     * a loud raise keeps that claim falsifiable. */
+    if (lean_return)
+    {
+        NTSTATUS lr = lean_return( status, NtCurrentTeb() );
+        if (lr != EMU_LEAN_RETURN_FALLBACK) RtlRaiseStatus( STATUS_INTERNAL_ERROR );
+        TRACE( "lean return fell back to NtCallbackReturn (restore_flags stash or no frame)\n" );
+    }
     status = NtCallbackReturn( NULL, 0, status );
     RtlRaiseStatus( status );
 }
