@@ -1965,6 +1965,28 @@ class WineSpecs:
 
 DESC_VOID = 0x100        # bit 8
 DESC_VARIADIC = 0x200    # bit 9
+DESC_SRCTIER = 0x400     # bit 10: THE ROW'S SIGNATURE TIER.  Set means the
+                         # signature came from the module's own implementing C
+                         # DEFINITION (WineSourceDefs) rather than from a Wine
+                         # header declaration.  One bit, not a string: this
+                         # rides in a table the guest PE already carries, one
+                         # uint32 per export, and 20,625 of them is not a place
+                         # to spend a pointer.
+                         #
+                         # WHY IT IS EMITTED AT ALL.  Before it, the tier's
+                         # 2,624 newly served exports could only be identified
+                         # from the generator's --report, which the build never
+                         # writes -- so a load regression that landed with the
+                         # tier had no way to be tested against a tier-off
+                         # world short of rebuilding the tree with the tier
+                         # ripped out (ppc64le/docs/sessions/2026-09-01/
+                         # w3-load-regression-bisect.md).  With the bit in the
+                         # row, ntdll's WINEEMUNOFLAT* levers put any subset of
+                         # the tier back to its pre-tier refusal at RUN time.
+                         #
+                         # Header-tier rows are bit-for-bit unchanged, which is
+                         # what keeps the tier commit's zero-diff proof
+                         # meaningful: only rows the tier itself added move.
 DESC_NARROW_SHIFT = 16   # bits 16..31: bit 16+i set means argument i is a
                          # 32-bit slot (spec class `long`/`word`); the host
                          # must take only the low 32 bits of the guest's
@@ -1972,7 +1994,10 @@ DESC_NARROW_SHIFT = 16   # bits 16..31: bit 16+i set means argument i is a
                          # 32-bit value with a 32-bit store and leaves stack
                          # garbage in the slot's upper half -- which this
                          # port's LP64-built native code WILL read.
-DESC_RESERVED = 0xfffffc00   # bits 10..31, MUST be zero
+DESC_RESERVED = 0x0000f800   # bits 11..15, MUST be zero.  Kept in step with
+                             # THUNK_SIG_RESERVED in ntdll's signal_ppc64.c,
+                             # which REJECTS a row that sets any of them; bit
+                             # 10 left that set when the tier bit took it.
 
 
 def descriptor(sig):
@@ -1983,7 +2008,11 @@ def descriptor(sig):
     bit  8     returns void
     bit  9     variadic -- the host must synthesise a va_list from the guest
                frame past argument nargs-1 and call impl_names_rva[i] instead.
-    bits 10..15 reserved, must be zero.
+    bit  10    source-definition tier (see DESC_SRCTIER).  The host reads it
+               ONLY to answer the WINEEMUNOFLAT* levers; it changes no
+               marshalling, because a source-tier signature is measured by the
+               same rules in a different translation unit.
+    bits 11..15 reserved, must be zero.
     bits 16..31 narrow-argument mask: bit 16+i set means argument i is a
                32-bit slot and the host must zero-extend its low 32 bits.
                For a variadic the mask covers the FIXED arguments only.
@@ -1996,6 +2025,7 @@ def descriptor(sig):
     return ((sig['nargs'] & 0xff)
             | (DESC_VOID if sig['returns_void'] else 0)
             | (DESC_VARIADIC if sig.get('variadic') else 0)
+            | (DESC_SRCTIER if sig.get('provenance') == 'source-definition' else 0)
             | (mask << DESC_NARROW_SHIFT))
 
 

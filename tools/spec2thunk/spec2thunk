@@ -2429,12 +2429,18 @@ def emit_asm(dll, exports, mode, com_ifaces=None, machine='x86_64'):
     a('wine_thunk_sigv:')
     for i, e in enumerate(exports):
         s = e['sig']
-        a('\t.long\t0x%08X\t# %d %-24s %d %sarg%s, returns %s  (%s:%s)%s'
+        # SOURCE-TIER in the comment is the readable half of descriptor bit 10
+        # (wine_sig.DESC_SRCTIER).  The bit is what ntdll's WINEEMUNOFLAT*
+        # levers read; this word is what a human reading the generated .s --
+        # or a gate grepping it -- reads, and the two are emitted from the one
+        # `provenance` field so they cannot disagree.
+        a('\t.long\t0x%08X\t# %d %-24s %d %sarg%s, returns %s  (%s:%s)%s%s'
           % (e['desc'], i, e['name'], s['nargs'],
              'fixed ' if s.get('variadic') else '',
              '' if s['nargs'] == 1 else 's',
              'void' if s['returns_void'] else s['ret'], s['header'], s['line'],
-             (' VARIADIC -> %s' % e['impl']) if s.get('variadic') else ''))
+             (' VARIADIC -> %s' % e['impl']) if s.get('variadic') else '',
+             ' SOURCE-TIER' if s.get('provenance') == 'source-definition' else ''))
     a('')
     for i, e in enumerate(exports):
         a('wine_thunk_name_%d:' % i)
