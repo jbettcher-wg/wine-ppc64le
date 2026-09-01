@@ -534,7 +534,38 @@ nw-<title>` is live end to end — verified by smaps ('ar' VmFlags on 83
 wine-managed VMAs vs 0 in control) and the gate set, per the user's
 direction measured no further.
 
-## 7. Smaller, known, and written down
+## 7. PPC64EC: steps 0/A/B are LIVE — what remains (2026-08-31)
+
+`ppc64le/docs/ppc64ec.md` has the full story and the measured ladder.
+Short form: every byte-verified thunk stub (flat AND COM) now compiles to
+a direct host-call transition on an ABI 7 bridge — no syscall decode, no
+trap sink — default-on, whole gate suite green, levers
+WINE_PPC64LE_NO_EC=1 / WINE_PPC64LE_NO_TRAP_VIEW=1 / FEXBRIDGE_EAGER_CTX=1.
+The crossing fell 145→68 ns at the bridge floor but only ~430→~423 at the
+wine level: **the crossing price now lives almost entirely in the
+wine-side path**.  In order of expected yield:
+
+* **The PE re-entry**: `call_emu_trap_dispatcher` → `call_user_mode_callback`
+  → PE dispatch → `NtCallbackReturn` (a full syscall per crossing).  A
+  dedicated lean return path for trap dispatch is the next real lever.
+* **Row cookies**: the EC handler passes cookie=NULL and re-runs
+  `find_guest_thunk_target` per call; a precomputed row pointer in the
+  cookie deletes the lookup.  Mechanical now that registration exists.
+* **Step C**: gen_winecom FP descriptors (the hand_clear_dsv class) — see
+  the doc's corrected scope.
+* **NOTE for the JIT side** (found building this, filed in the fex tree's
+  e4fd3b3f1 message): plain `fexbridge_invalidate_code_range` never scrubs
+  OTHER threads' L1/L2 for previously-executed-then-invalidated code — a
+  candidate mechanism for the open lazy-SMC cross-thread flake.
+* The i386 lane keeps the trap protocol (bridge refuses 32-bit EC, -3);
+  its measured crossing load never justified more.
+* Live-title proof: the canonical bridge (build-smc, binfmt) is still
+  ABI 5 — games see NO behavior change until it is rebuilt at e4fd3b3f1.
+  When the user wants it: rebuild build-smc's fexbridge, run one title,
+  then bench-crossing + a -benchmark A/B decide whether the worker-side
+  crossing savings show anywhere.
+
+## 8. Smaller, known, and written down
 
 * `SetThreadGroupAffinity(group 1)` needs a `group` field in
   `server/protocol.def`; `check-cpu-topology.sh` reports it as a LIMIT and

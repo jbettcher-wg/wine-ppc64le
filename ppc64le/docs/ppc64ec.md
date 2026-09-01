@@ -1,5 +1,28 @@
 # PPC64EC — feasibility
 
+> **STATUS (2026-08-31, the same day): steps 0, A and B are BUILT and
+> DEFAULT-ON.**  fex `4c776150f` (ABI 6 zero-copy trap) + `3e14683cc`
+> (ABI 7 EC targets) + `e4fd3b3f1` (full SRA refill for EC callees,
+> batch registration); wine `7cd37bc6395` (view consumption) +
+> `f922131cc78` (byte-verified stub registration, flat + COM lanes).
+> The measured ladder, ns per crossing — bridge floor (BridgeSmoke S13)
+> and wine level (`ppc64le/cpu/bench-crossing.sh`):
+>
+> | | eager | lazy (old prod) | view | **ec** |
+> |---|---:|---:|---:|---:|
+> | bridge floor | 296 | 145 | 86 | **68** |
+> | wine level | 575 | ~430 | ~430 | **~423** |
+>
+> The bridge-side prediction held (2.1× at the floor); the wine-level
+> crossing is now dominated by the wine-side path — PE re-entry
+> (`call_user_mode_callback`/`NtCallbackReturn`), dispatch, the native
+> call — which is where the next cut lives, along with row-pointer
+> cookies to skip `find_guest_thunk_target`.  Step C (gen_winecom FP
+> descriptors) remains unbuilt.  Kill switches:
+> `WINE_PPC64LE_NO_TRAP_VIEW=1`, `WINE_PPC64LE_NO_EC=1`,
+> `FEXBRIDGE_EAGER_CTX=1`.  Gate: `ppc64le/cpu/check-ec-transition.sh`.
+> The plan below is the original feasibility page, kept as written.
+
 The question: do what ARM64EC does — compile the hot PE-side surface as
 native ppc64 code carrying x86-shaped exports, so a guest→DLL call is one
 cheap transition instead of a marshalled trap — and stop accumulating
