@@ -303,6 +303,14 @@ ways failed the async run at \
     # in mf_smoke.c MUST fail its value check and the run MUST NOT reach
     # PASS.  This is what proves the FP invoker is load-bearing rather than
     # the value arriving some other way.
+    #
+    # THE ARGUMENT DIRECTION ONLY, and it is worth saying which half this is.
+    # SetDouble takes a by-value double in XMM1 and answers an HRESULT in RAX;
+    # no slot on this gate's surface RETURNS a float, so nothing here touches
+    # winecom_dispatch's XMM0 write-back at all.  That half is measured by the
+    # sibling gate, which owns the only module with reachable .fpret rows:
+    # ppc64le/mf/check-mf-modules.sh drives IMFMediaEngine's on a fresh engine
+    # and carries its own control d for this same lever.
     timeout -k 5 "$TIMEOUT" env WINEDEBUG=-all WINEEMUNOCOMFP=1 "$BUILD/wine" \
         "$OUT/mf_smoke_guest.exe" > "$OUT/sabotage_fp.out" 2>"$OUT/sabotage_fp.err"
     if grep -q "mf_smoke: PASS" "$OUT/sabotage_fp.out"; then

@@ -46,15 +46,45 @@
 > **exonerated on data** (`984c52a6d1d` — every CS caller chain is the
 > game's own contended locks crossing to wait, as they must).
 > Total journey: **~430 → ~313 ns per crossing, −27%, everything
-> default-on.**  Still open, none urgent: row-cookie-style adoption
-> for anything the profile names next, the i386 lane stays on traps by
-> measurement, and no live title has yet value-driven the served FP
-> returns.  Kill switches: `WINE_PPC64LE_NO_TRAP_VIEW=1`,
+> default-on.**
+>
+> **The FP RETURNS are value-driven now, and it took no title.** The
+> disclosure this banner used to carry — "no live title has yet
+> value-driven the served FP returns" — is retired by measurement
+> rather than by waiting.  There are exactly **17 `.fpret` rows in the
+> tree, 11 distinct methods**, all in `dlls/mfplat/mf_marshal.h`
+> (d3d11's float rows are arguments); **six of the eleven answer on a
+> fresh `IMFMediaEngine` with no media, no device and no audio
+> endpoint**, and `check-mf-modules.sh` already creates one for the
+> reverse-proxy lane.  Four are now gated on **non-zero raw bits** in
+> both builds: a fresh engine's `1.0` rate and volume, the quiet NaN
+> `0x7FF8000000000000` its `duration` starts at — a pattern the probe
+> never produced, so it is pure crossing evidence — and three
+> distinctive patterns round-tripped in through the FP argument and out
+> through the FP return, one of them negative
+> (`0xC00FEDCBA9876543` in, `0xC00FEDCBA9876543` out).  `GetCurrentTime`
+> and `GetStartTime` are driven and **printed but not gated**: a fresh
+> engine answers `0.0` and a REFUSED fp row also leaves `0.0` in XMM0,
+> so a check on them could not tell the mechanism from its absence.
+> That is exactly what the new control d demonstrates —
+> `WINEEMUNOCOMFP=1` collapses every gated value to
+> `0x0000000000000000` and the setters to `E_NOTIMPL`, and the lane
+> goes red.  Still unreachable and stated as such:
+> `IMFMediaEngineEx::GetBalance` (Wine's is a `0.0` stub, nothing to
+> drive) and the four `IMFMediaSourceExtension`/`IMFSourceBuffer` rows,
+> which are ONE gap — `CreateMediaSourceExtension` is `E_NOTIMPL`, so
+> the object that owns them cannot be constructed.
+>
+> Still open, none urgent: row-cookie-style adoption for anything the
+> profile names next, and the i386 lane stays on traps by measurement.
+> Kill switches: `WINE_PPC64LE_NO_TRAP_VIEW=1`,
 > `WINE_PPC64LE_NO_EC=1`, `WINE_PPC64LE_NO_LEAN_RETURN=1`,
 > `WINEEMUNOCOMFP=1`, `FEXBRIDGE_EAGER_CTX=1`.  Gates:
 > `check-ec-transition.sh`, `check-rip-cache.sh` 4b, `check-mf-smoke`
-> step 13/control d.  The plan below is the original feasibility page,
-> kept as written.
+> step 13/control d (the FP ARGUMENT direction) and
+> `check-mf-modules.sh` steps 25-32/control d (the FP RETURN
+> direction).  The plan below is the original feasibility page, kept as
+> written.
 
 The question: do what ARM64EC does — compile the hot PE-side surface as
 native ppc64 code carrying x86-shaped exports, so a guest→DLL call is one

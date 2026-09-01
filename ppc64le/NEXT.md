@@ -586,7 +586,13 @@ wine-side path**.  In order of expected yield:
   `server/protocol.def`; `check-cpu-topology.sh` reports it as a LIMIT and
   re-arms itself when the field appears.
 * `mfmediaengine`, `evr`, `wmvcore` have a built COM surface no title has
-  driven.
+  driven — but `check-mf-modules.sh` drives one, and that gate is now also
+  where the SERVED FP RETURNS get value-driven (steps 25-32, control d).
+  What is left there is ONE implementation gap, not a port gap:
+  `IMFMediaEngineClassFactoryEx::CreateMediaSourceExtension` is `E_NOTIMPL`
+  in `dlls/mfmediaengine/main.c`, so the four `.fpret` rows on
+  `IMFMediaSourceExtension` and `IMFSourceBuffer` have no object to be
+  called on.  Implement it and they become drivable by the same block.
 * The callback audit cannot see a callback that arrives inside a **struct**
   (a `WNDPROC` in a `WNDCLASSEX`); those rows carry handlers and are found the
   hard way.  If a future crash names one, add it to

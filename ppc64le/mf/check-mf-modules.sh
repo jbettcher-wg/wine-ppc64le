@@ -28,6 +28,20 @@
 # second way in.  Layer 0 below is what keeps the roster and the marshal
 # tables honest about that fix.
 #
+# WHAT IT IS ALSO THE GATE FOR NOW: the SERVED FLOATING-POINT RETURNS.  A COM
+# method whose return value travels in XMM0 instead of RAX was served by
+# PPC64EC step C and, honestly, disclosed as untested -- the machinery was
+# built and named and nothing had ever put a number through it, because the
+# only rows that carry one belong to IMFMediaEngine and the port has no
+# MediaEngine title to drive.  It turns out not to need one: a fresh engine
+# answers GetDefaultPlaybackRate, GetPlaybackRate, GetVolume and GetDuration
+# with no media, no device and no audio endpoint, and this gate already
+# creates one.  The probe now reads those, round-trips three distinctive bit
+# patterns in through the FP argument and out through the FP return, and
+# compares RAW BITS -- in the native ppc64 run and the x86-64 guest run both,
+# which layer 4 then requires to be byte-identical.  Control d is the lever
+# that proves the FP invoker is what carried them.
+#
 # Seven layers, each of which removes one way of passing by accident:
 #
 #   0  PROVENANCE: both generators reproduce their committed output.  The
@@ -71,6 +85,12 @@
 #   c  a hand-corrupted expected 2D LENGTH MUST fail the evr lane.  It is a
 #      separate control from (b) on purpose: a gate that compared one lane's
 #      oracle and printed the other's would pass (b) and still be blind.
+#   d  WINEEMUNOCOMFP=1 turns every float-bearing slot back into a named
+#      refusal, and a refused FP-RETURN row answers 0.0.  The media-engine
+#      lane's FP checks are written against 1.0, a quiet NaN and three
+#      distinctive bit patterns precisely so that none of them is reachable
+#      that way, so the guest run MUST go red under it.  This is the control
+#      that makes the FP-return claim a measurement rather than an assertion.
 #
 # Exit 0 = pass, 1 = a check failed, 2 = could not run (not a pass).
 set -u
@@ -397,6 +417,31 @@ numbers are not actually being compared"
 length failed the run, as it must"
     fi
 
+    # ---- control d: the floating-point invoker off ------------------------
+    # WINEEMUNOCOMFP=1 makes every float-bearing slot refuse (libs/winecom's
+    # invoke_marshalled fails closed to E_NOTIMPL, the pre-step-C world), and
+    # for a slot whose RETURN is floating point that refusal leaves fpret_bits
+    # at zero -- so winecom_dispatch writes 0.0 into the whole of XMM0 and
+    # every FP return in the media-engine lane answers 0.0.
+    #
+    # THAT IS EXACTLY WHY THE PROBE'S FP CHECKS ARE WRITTEN AGAINST NON-ZERO
+    # VALUES.  1.0 for a fresh engine's rate and volume, a quiet NaN for its
+    # duration, and three distinctive bit patterns through the round trips:
+    # not one of them is reachable by a refusal, so this control turns the FP
+    # RETURN direction red the way control d in check-mf-smoke.sh turns the FP
+    # ARGUMENT direction red.  A probe that had settled for GetCurrentTime's
+    # 0.0 would pass here and prove nothing, which is the trap this control
+    # exists to keep the probe out of.
+    timeout -k 5 "$TIMEOUT" env WINEDEBUG=-all WINEEMUNOCOMFP=1 "$BUILD/wine" \
+        "$OUT/mf_modules_guest.exe" > "$OUT/sabotage_fp.out" 2>"$OUT/sabotage_fp.err"
+    if grep -q "mf_modules: PASS" "$OUT/sabotage_fp.out"; then
+        bad "WINEEMUNOCOMFP=1 still PASSED -- the media engine's by-value \
+doubles are not crossing through the FP invoker"
+    else
+        say "sabotage(fp-off): the FP invoker lever failed the guest run at \
+'$(grep -m1 FAIL "$OUT/sabotage_fp.out" | cut -c1-72)', as it must"
+    fi
+
     [ $fail -eq 0 ] && say "SABOTAGE PASS (all controls red)"
     exit $fail
 fi
@@ -449,6 +494,13 @@ for want in "materialised .* guest vtable slots" \
             "winecom_dispatch IClassFactory::CreateInstance" \
             "winecom_dispatch IMFMediaEngine::GetNetworkState" \
             "winecom_dispatch IMFMediaEngine::GetReadyState" \
+            "winecom_dispatch IMFMediaEngine::GetDuration" \
+            "winecom_dispatch IMFMediaEngine::GetVolume" \
+            "winecom_dispatch IMFMediaEngine::SetVolume" \
+            "winecom_dispatch IMFMediaEngine::GetPlaybackRate" \
+            "winecom_dispatch IMFMediaEngine::SetPlaybackRate" \
+            "winecom_dispatch IMFMediaEngine::GetDefaultPlaybackRate" \
+            "winecom_dispatch IMFMediaEngine::SetDefaultPlaybackRate" \
             "winecom_dispatch IMFMediaError::GetErrorCode" \
             "winecom_dispatch IMFAttributes::SetUnknown" \
             "winecom_dispatch IWMSyncReader::Open" \
@@ -471,8 +523,8 @@ for want in "reverse-wrapped guest IMFMediaEngineNotify .* as native proxy" \
 done
 [ $fail -eq 0 ] && say "mechanism: class object, media engine, sync reader, \
 header info, sample allocator and 2D buffer all wrapped; methods dispatched \
-by name; and the guest's own notify object reverse-wrapped with EventNotify \
-entering through it"
+by name, the FP-return rows among them; and the guest's own notify object \
+reverse-wrapped with EventNotify entering through it"
 
 [ $fail -eq 0 ] && say "PASS"
 exit $fail

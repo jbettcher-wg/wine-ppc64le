@@ -346,6 +346,53 @@ by reading; every one was found by running it.
    winecom_slot` gained `narrowmask`/`narrowwide`/`narrowsign`, `libs/winecom`
    does the extension, and `gen_winecom.py` records the widths.
 
+### The floating-point RETURNS, and the whole roster of them
+
+PPC64EC step C (`cf38a2552d3`) served slots whose **return value** travels in
+`XMM0` rather than `RAX`, and disclosed — correctly — that nothing had ever put
+a number through one. The argument direction was measured
+(`IMFAttributes::SetDouble`, `check-mf-smoke.sh` step 13 and control d); the
+return direction was built, named, fail-closed and untested, filed as "needs a
+MediaEngine title". There is no MediaEngine title in the corpus.
+
+**It does not need one.** There are exactly **17 `.fpret` rows in the whole
+tree**, all of them in `dlls/mfplat/mf_marshal.h` — `dlls/d3d11`'s float rows
+are arguments, not returns — and they are **11 distinct methods** across four
+interfaces. Six of the eleven answer on a **fresh media engine** with no media,
+no device and no audio endpoint, and `check-mf-modules.sh` already creates one.
+
+| method | rows | reachable headless? |
+|---|---|---|
+| `IMFMediaEngine::GetDefaultPlaybackRate` | 2 | **yes — DRIVEN and gated.** `init_media_engine` writes `1.0`; round-tripped against `SetDefaultPlaybackRate` |
+| `IMFMediaEngine::GetPlaybackRate` | 2 | **yes — DRIVEN and gated**, incl. a NEGATIVE bit pattern |
+| `IMFMediaEngine::GetVolume` | 2 | **yes — DRIVEN and gated**, round-tripped against `SetVolume` |
+| `IMFMediaEngine::GetDuration` | 2 | **yes — DRIVEN and gated.** With no source the answer is the quiet NaN `init_media_engine` wrote: a pattern the probe never produced, so it is pure crossing evidence |
+| `IMFMediaEngine::GetCurrentTime` | 2 | yes — **driven, printed, not gated**. A fresh engine answers `0.0`, and `0.0` is exactly what a REFUSED fp row leaves in `XMM0`, so a check on it could pass with the mechanism switched off |
+| `IMFMediaEngine::GetStartTime` | 2 | yes — driven, printed, not gated. Wine's is a `return 0.0;` stub; same reason |
+| `IMFMediaEngineEx::GetBalance` | 1 | reachable by `QueryInterface`, but **no value is drivable**: `media_engine_GetBalance` is a `FIXME` stub returning `0.0` and `SetBalance` is `E_NOTIMPL`, so there is nothing to round-trip and the constant is the refusal's own |
+| `IMFMediaSourceExtension::GetDuration` | 1 | **no.** The only way to an MSE is `IMFMediaEngineClassFactoryEx::CreateMediaSourceExtension`, which Wine implements as `FIXME … return E_NOTIMPL`. The object cannot be made to exist |
+| `IMFSourceBuffer::GetTimeStampOffset` | 1 | **no.** Source buffers come from `IMFMediaSourceExtension::AddSourceBuffer`, and there is no MSE — same root cause |
+| `IMFSourceBuffer::GetAppendWindowStart` | 1 | **no**, same |
+| `IMFSourceBuffer::GetAppendWindowEnd` | 1 | **no**, same |
+
+So: **four methods gated on non-zero values, two more exercised and honestly
+ungated, one reachable but stubbed flat by Wine, four unreachable because the
+object that owns them cannot be constructed at all.** The three unreachable
+ones are one gap, not three — implement `CreateMediaSourceExtension` in
+`dlls/mfmediaengine/main.c` and all four rows become drivable the same
+afternoon.
+
+**Why the values are what they are.** A refused float-bearing slot leaves
+`fpret_bits` at zero and `winecom_dispatch` writes that whole zero into `XMM0`,
+so a probe that compared `0.0` would pass with `WINEEMUNOCOMFP=1` set and prove
+nothing. Every gated value is non-zero, the comparisons are on **raw bits**
+(`nan == nan` is false, `+0.0 == -0.0` is true — neither is a statement about
+the eight bytes that crossed), and the patterns are written as bit constants
+with mostly-distinct nibbles so a half-register copy, a byte swap or a
+single-precision narrowing lands somewhere visibly else. Control **d** of
+`check-mf-modules.sh` is the lever that proves it: `WINEEMUNOCOMFP=1` must turn
+the lane red.
+
 **What is still not measured, stated rather than implied.** A guest cannot
 DECODE through `wmvcore`: `IWMSyncReader::GetNextSample` writes
 `INSSBuffer **`, a pointer-to-pointer whose pointee the generator cannot prove

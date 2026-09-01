@@ -39,6 +39,25 @@
  *                  two of the eight USHORT-returning slots a generator
  *                  inconsistency was refusing until this roster was rebuilt.
  *
+ *                  AND IT IS WHERE THE FLOATING-POINT RETURNS GET DRIVEN.
+ *                  PPC64EC step C served slots whose RETURN VALUE travels in
+ *                  XMM0 rather than RAX and disclosed, correctly, that no
+ *                  live title had ever put a number through one -- the
+ *                  argument direction was measured (IMFAttributes::SetDouble,
+ *                  check-mf-smoke.sh) and the return direction was built,
+ *                  named and untested, filed as needing a MediaEngine title.
+ *                  It needs no title: eleven of the seventeen .fpret rows in
+ *                  dlls/mfplat/mf_marshal.h belong to IMFMediaEngine and
+ *                  IMFMediaEngineEx, and six of those answer on a fresh
+ *                  engine with no media, no device and no audio endpoint.
+ *                  The block marked THE FLOATING-POINT RETURNS below reads
+ *                  three constants Wine's own init_media_engine wrote
+ *                  (including a quiet NaN this program could not have
+ *                  produced), round-trips three distinctive bit patterns in
+ *                  through the FP argument and out through the FP return,
+ *                  and compares RAW BITS in both directions and in both
+ *                  builds.
+ *
  *   wmvcore        IWMSyncReader is the synchronous analogue of
  *                  IMFSourceReader and needs no callback at all.  Wine's
  *                  wmvcore sits on the same winegstreamer pipeline mfplat's
@@ -147,6 +166,22 @@ static void out_dec( ULONG v )
     out( buf + i );
 }
 
+/* Raw bits, and they are the point wherever this is used: a double printed as
+ * a decimal number would hide exactly the failures the FP-return steps below
+ * exist to catch -- a low half taken from a stale register, a single-precision
+ * narrowing on the way through, a sign bit lost.  Sixteen digits, always, so
+ * two transcripts line up column for column. */
+static void out_hex64( ULONGLONG v, int digits )
+{
+    static const char hex[] = "0123456789ABCDEF";
+    char buf[17];
+    int i;
+
+    for (i = 0; i < digits; i++) buf[digits - 1 - i] = hex[(v >> (4 * i)) & 0xf];
+    buf[digits] = 0;
+    out( buf );
+}
+
 static void out_dec64( ULONGLONG v )
 {
     char buf[24];
@@ -216,6 +251,64 @@ static ULONGLONG env_dec( const WCHAR *name, ULONGLONG fallback )
     }
     return v;
 }
+
+/* ------------------------------------------------- doubles, seen as bits */
+/*
+ * Every floating-point check in this file compares RAW BITS, never values,
+ * and the values themselves are written as bit patterns rather than as
+ * decimal literals.  Both halves of that are deliberate.
+ *
+ * Comparing bits is what makes the check exact: `==` on two doubles is true
+ * for +0.0 and -0.0, is false for two identical NaNs, and says nothing at all
+ * about the eight bytes that actually crossed the boundary.  The boundary is
+ * what is under test.
+ *
+ * Writing the constants as bits is what makes the transcript's claim
+ * checkable by hand: the number in the source IS the number the run must
+ * print, with no compiler's decimal-to-binary rounding between them.  Each
+ * pattern below has all-but-no-repeated nibbles on purpose -- a call that
+ * copied only the low half, only the high half, byte-swapped, or narrowed to
+ * single precision and widened again would land on a DIFFERENT pattern and
+ * say so, where a tidy constant like 0.5 (0x3FE0000000000000, fifteen zero
+ * nibbles) would survive most of those and pass.
+ */
+union fpbits { double d; ULONGLONG bits; };
+
+static double bits_to_double( ULONGLONG bits )
+{
+    union fpbits v;
+
+    v.bits = bits;
+    return v.d;
+}
+
+static ULONGLONG double_to_bits( double d )
+{
+    union fpbits v;
+
+    v.d = d;
+    return v.bits;
+}
+
+/* The three values driven through the engine's FP setters, and the three
+ * constants Wine's own dlls/mfmediaengine/main.c init_media_engine writes
+ * into a fresh engine, which are what the FIRST reads must return before
+ * anything has been set.
+ *
+ * NOTE what 1.0 and NaN buy that a set/get round trip alone does not.  A
+ * refused float-bearing slot leaves *fpret_bits at zero and libs/winecom's
+ * dispatcher writes that whole zero into XMM0 (winecom.c, the sl->fpret
+ * arm), so a probe that only ever compared 0.0 would pass with the FP
+ * invoker switched OFF.  1.0 and a quiet NaN are values NOTHING on the
+ * refusal path can produce, and the NaN in particular was never set by this
+ * program at all: it was born in native ppc64 code and the only way it
+ * reaches an x86-64 guest's XMM0 is across the served FP return. */
+#define ENGINE_FRESH_RATE     0x3FF0000000000000ull   /* 1.0  -- default_playback_rate, playback_rate */
+#define ENGINE_FRESH_VOLUME   0x3FF0000000000000ull   /* 1.0  -- volume */
+#define ENGINE_FRESH_DURATION 0x7FF8000000000000ull   /* NaN  -- duration, with no source */
+#define ENGINE_SET_DEFRATE    0x4059FEDCBA987654ull   /* ~103.98 */
+#define ENGINE_SET_RATE       0xC00FEDCBA9876543ull   /* ~-3.9902, sign bit SET */
+#define ENGINE_SET_VOLUME     0x3FD23456789ABCDEull   /* ~0.2846 */
 
 /* --------------------------------- a guest-implemented IMFMediaEngineNotify */
 /*
@@ -371,6 +464,7 @@ static void lane_mediaengine( const WCHAR *url )
     fn_DllGetClassObject get_class;
     IClassFactory *cf = NULL;
     DWORD p1 = 0, p2 = 0;
+    ULONGLONG fp;
     LONG mark = 0;
     HRESULT hr;
     USHORT us;
@@ -563,6 +657,162 @@ static void lane_mediaengine( const WCHAR *url )
     out( " v=" );
     out_dec( n );
     verdict( hr == S_OK && n == MF_MEDIA_ENGINE_PRELOAD_AUTOMATIC, "preload did not round trip" );
+
+    /* ---- THE FLOATING-POINT RETURNS, and this block is the only place on
+     * this port where one has ever been value-driven.
+     *
+     * ppc64le/docs/ppc64ec.md's step C served them and said so plainly: the
+     * FP-return path shares every byte of its machinery with the argument
+     * direction check-mf-smoke.sh already drives (IMFAttributes::SetDouble),
+     * but "no live title has driven GetCurrentTime yet" -- the return itself,
+     * the value that travels in XMM0 rather than RAX, had never carried a
+     * number end to end.  It needed a MediaEngine title, and there is not one
+     * in the corpus.  It does not need a title.  A fresh engine has the whole
+     * roster of reachable FP returns on it, with no media, no device, and no
+     * audio endpoint: dlls/mfmediaengine/main.c stores rate, default rate and
+     * volume in plain struct fields and hands them straight back.
+     *
+     * The mechanism under test, in one sentence: the guest calls a slot whose
+     * marshal row carries .fpret = 1 (dlls/mfplat/mf_marshal.h,
+     * slots_IMFMediaEngine), libs/winecom's invoke_marshalled routes it to
+     * the surface's FP invoker instead of the widest-integer one,
+     * include/wine/winecom_fpcall.h calls the native vtable slot and captures
+     * f1, and winecom_dispatch materialises the guest context and writes
+     * those bits into the WHOLE of XMM0.  Nothing in that chain is exercised
+     * by an FP ARGUMENT: the argument direction reads XMM1-3 and returns an
+     * HRESULT in RAX.
+     *
+     * Three claims, and they are separable on purpose:
+     *
+     *   READ-ONLY   the three fresh-engine constants and, most of all, the
+     *               NaN duration.  This program never set any of them, so
+     *               there is no round trip to be satisfied by a value that
+     *               never left this image -- these bits were written by
+     *               native ppc64 code and read back by an x86-64 guest, and
+     *               that crossing is the entire claim.
+     *   ROUND TRIP  a distinctive pattern in through the FP ARGUMENT and the
+     *               SAME pattern out through the FP RETURN, bit for bit,
+     *               including a negative one so a lost sign bit is a failure
+     *               rather than a rounding-sized nuisance.
+     *   NOT ZERO    every value checked here is non-zero, which is what makes
+     *               the WINEEMUNOCOMFP=1 control in check-mf-modules.sh able
+     *               to go red: a refused FP slot returns exactly 0.0.
+     *
+     * The setters are undone again at the end of the block so the load lanes
+     * below meet the engine Wine's own defaults left. */
+    begin( "IMFMediaEngine::GetDefaultPlaybackRate on a fresh engine (FP RETURN)" );
+    fp = double_to_bits( IMFMediaEngine_GetDefaultPlaybackRate( engine ) );
+    out( "bits=0x" );
+    out_hex64( fp, 16 );
+    verdict( fp == ENGINE_FRESH_RATE,
+             "not the 1.0 init_media_engine wrote -- 0x0000000000000000 here "
+             "is the refusal path, an FP return that never happened" );
+
+    begin( "IMFMediaEngine::GetPlaybackRate on a fresh engine (FP RETURN)" );
+    fp = double_to_bits( IMFMediaEngine_GetPlaybackRate( engine ) );
+    out( "bits=0x" );
+    out_hex64( fp, 16 );
+    verdict( fp == ENGINE_FRESH_RATE, "not the 1.0 init_media_engine wrote" );
+
+    begin( "IMFMediaEngine::GetVolume on a fresh engine (FP RETURN)" );
+    fp = double_to_bits( IMFMediaEngine_GetVolume( engine ) );
+    out( "bits=0x" );
+    out_hex64( fp, 16 );
+    verdict( fp == ENGINE_FRESH_VOLUME, "not the 1.0 init_media_engine wrote" );
+
+    /* The strongest of the read-only checks, and the one worth reading twice.
+     * init_media_engine sets engine->duration = NAN and there is no source,
+     * so the eight bytes that must arrive are a quiet NaN with a zero
+     * payload -- a pattern this program cannot have produced, cannot have
+     * left lying in a register, and that no integer path could carry back in
+     * RAX by accident.  It is also why the check is on BITS: `nan == nan` is
+     * false, so a value comparison here would fail on a correct answer. */
+    begin( "IMFMediaEngine::GetDuration with no source is a quiet NaN (FP RETURN)" );
+    fp = double_to_bits( IMFMediaEngine_GetDuration( engine ) );
+    out( "bits=0x" );
+    out_hex64( fp, 16 );
+    verdict( fp == ENGINE_FRESH_DURATION,
+             "the NaN dlls/mfmediaengine/main.c wrote did not survive the "
+             "crossing intact" );
+
+    /* GetCurrentTime and GetStartTime are FP-return rows too and both are
+     * driven here, but they are PRINTED rather than gated: a fresh engine's
+     * answer to each is 0.0 (media_engine_GetCurrentTime with no clock time,
+     * and GetStartTime which is a `return 0.0;` stub), and 0.0 is exactly
+     * what a REFUSED fp row leaves in XMM0.  A check that could not tell a
+     * served zero from a refused one would be an assertion this file could
+     * make without the mechanism existing at all, which is the one thing no
+     * step here is allowed to be.  The rows are exercised, the answer is on
+     * the record, and the load-bearing claims are the five above and the
+     * three below. */
+    out( "note IMFMediaEngine::GetCurrentTime bits=0x" );
+    out_hex64( double_to_bits( IMFMediaEngine_GetCurrentTime( engine ) ), 16 );
+    out( " GetStartTime bits=0x" );
+    out_hex64( double_to_bits( IMFMediaEngine_GetStartTime( engine ) ), 16 );
+    out( " (both 0.0 on a fresh engine, so neither is gated: see the source)\n" );
+
+    /* ---- and now the round trips: in through XMM1, out through XMM0. */
+    begin( "IMFMediaEngine::SetDefaultPlaybackRate/Get round-trips raw bits" );
+    hr = IMFMediaEngine_SetDefaultPlaybackRate( engine, bits_to_double( ENGINE_SET_DEFRATE ) );
+    fp = double_to_bits( IMFMediaEngine_GetDefaultPlaybackRate( engine ) );
+    out_hr( "hr", hr );
+    out( " sent=0x" );
+    out_hex64( ENGINE_SET_DEFRATE, 16 );
+    out( " got=0x" );
+    out_hex64( fp, 16 );
+    verdict( hr == S_OK && fp == ENGINE_SET_DEFRATE,
+             "the pattern that went in as an FP argument did not come back as "
+             "an FP return" );
+
+    /* Negative on purpose.  A path that moved the value through an integer
+     * register, or that widened a single back to a double, would still get
+     * the magnitude approximately right; only the sign bit and the low
+     * mantissa nibbles say whether the eight bytes are the SAME eight bytes.
+     * Wine's media_engine_SetPlaybackRate stores whatever it is handed -- it
+     * validates nothing -- so this is a pure ABI measurement and not a claim
+     * about what MF does with a reverse rate. */
+    begin( "IMFMediaEngine::SetPlaybackRate/Get round-trips a NEGATIVE raw bit pattern" );
+    hr = IMFMediaEngine_SetPlaybackRate( engine, bits_to_double( ENGINE_SET_RATE ) );
+    fp = double_to_bits( IMFMediaEngine_GetPlaybackRate( engine ) );
+    out_hr( "hr", hr );
+    out( " sent=0x" );
+    out_hex64( ENGINE_SET_RATE, 16 );
+    out( " got=0x" );
+    out_hex64( fp, 16 );
+    verdict( hr == S_OK && fp == ENGINE_SET_RATE,
+             "the negative pattern did not survive the round trip" );
+
+    begin( "IMFMediaEngine::SetVolume/Get round-trips raw bits" );
+    hr = IMFMediaEngine_SetVolume( engine, bits_to_double( ENGINE_SET_VOLUME ) );
+    fp = double_to_bits( IMFMediaEngine_GetVolume( engine ) );
+    out_hr( "hr", hr );
+    out( " sent=0x" );
+    out_hex64( ENGINE_SET_VOLUME, 16 );
+    out( " got=0x" );
+    out_hex64( fp, 16 );
+    verdict( hr == S_OK && fp == ENGINE_SET_VOLUME,
+             "the pattern that went in as an FP argument did not come back as "
+             "an FP return" );
+
+    /* Put the engine back the way init_media_engine left it.  Each of the
+     * three setters above fires an EventNotify (RATECHANGE, VOLUMECHANGE)
+     * through the reverse proxy, and so does each restore; the load lanes
+     * below read the event log FROM A MARK, so those extra entries cost them
+     * nothing -- but an engine left at ~104x playback and a quarter volume
+     * would be a different engine from the one those lanes were written
+     * against, and that IS worth undoing. */
+    IMFMediaEngine_SetDefaultPlaybackRate( engine, bits_to_double( ENGINE_FRESH_RATE ) );
+    IMFMediaEngine_SetPlaybackRate( engine, bits_to_double( ENGINE_FRESH_RATE ) );
+    IMFMediaEngine_SetVolume( engine, bits_to_double( ENGINE_FRESH_VOLUME ) );
+
+    begin( "the engine is back at its defaults after the FP round trips" );
+    out( "rate=0x" );
+    out_hex64( double_to_bits( IMFMediaEngine_GetPlaybackRate( engine ) ), 16 );
+    out( " volume=0x" );
+    out_hex64( double_to_bits( IMFMediaEngine_GetVolume( engine ) ), 16 );
+    verdict( double_to_bits( IMFMediaEngine_GetPlaybackRate( engine ) ) == ENGINE_FRESH_RATE &&
+             double_to_bits( IMFMediaEngine_GetVolume( engine ) ) == ENGINE_FRESH_VOLUME,
+             "the restore did not take" );
 
     /* ---- the load that must FAIL, and must say why.  A URL naming a file
      * that does not exist needs no codec and no audio device, so the answer
