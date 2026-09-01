@@ -1356,7 +1356,7 @@ class WineSourceDefs:
         # include dirs from IMPORTLIB/EXTRAINCL -- Makefile.in's EXTRADEFS
         # alone is an undercount, and a missing -Ilibs/symcrypt/inc turns a
         # servable sha.c into a parse refusal).  Harvested from the first
-        # object rule for this module; falls back to EXTRADEFS when the
+        # PE-half object rule for this module; falls back to EXTRADEFS when the
         # Makefile has no such rule.  -I/-D only: the target stays this
         # oracle's own.
         mf_inc, mf_def = self._build_makefile_flags()
@@ -1375,17 +1375,46 @@ class WineSourceDefs:
             # not apply to this module's build and are not taken.
             del pd, ps
         self.files = self._candidate_files(sources)
+        # EACH DEFINING FILE'S OWN DIRECTORY, because the probe compiles a
+        # COPY of that file (in the workdir, see _tu_with/_compile), and a
+        # quoted #include resolves against the INCLUDING file's directory --
+        # which for the copy is the workdir, not the original's.  A module
+        # whose sources sit in a subdirectory (gdi32's uniscribe/, whose
+        # every file includes "usp10_internal.h" from beside itself) parsed
+        # fine for the AST dump, which reads the file in place, and then
+        # failed every probe: 37 of this tree's 86 defining-TU parse failures,
+        # all one missing -I.  The build's own rule cannot supply it -- it
+        # compiles the original, where the compiler needs no help.
+        self.extra_incs += sorted({os.path.dirname(p) for p in self.files})
 
     # ------------------------------------------------------------ discovery
 
     def _build_makefile_flags(self):
         """(-I dirs, -D flags) from the build Makefile's first compile rule
-        for this module's objects.  Only -I and -D are taken; paths are
-        resolved against the build dir the rule is written for."""
+        for this module's PE-half objects.  Only -I and -D are taken; paths
+        are resolved against the build dir the rule is written for.
+
+        THE OBJECT PATH IS ARCH-QUALIFIED, and matching only the unqualified
+        one is why the harvest came up empty on a large family of modules.  A
+        cross-compiled PE arch puts its objects under
+        dlls/<mod>/<arch>-windows/; a module with no .so builtin (kernelbase,
+        combase, bcrypt, mfplat, ...) has NO rule at dlls/<mod>/<obj>.o at
+        all, so it fell through to the Makefile.in EXTRADEFS undercount --
+        with no -Iinclude/msvcrt and no CRT mode, which is a parse refusal
+        for every definition that includes a CRT header. [MEASURED] against
+        this tree's own Makefile.
+
+        THE UNIX HALF IS NOT THIS ORACLE'S HALF, and its rule is the FIRST
+        match for any module that has one (the generated Makefile emits the
+        unix objects ahead of the PE ones): crypt32, win32u and d3d11 were
+        harvesting -DWINE_UNIX_LIB, which puts Wine's headers in unix-boundary
+        mode, so the module's own PE definitions no longer parse for the guest
+        target.  Same reason _candidate_files() drops the unix sources: the
+        unix half describes the unix boundary, not the PE export."""
         mk = os.path.join(self.builddir, 'Makefile')
         if not os.path.isfile(mk):
             return [], []
-        want = re.compile(r'^dlls/%s/[A-Za-z0-9_.-]+\.o:'
+        want = re.compile(r'^dlls/%s/(?:[a-z0-9_]+-windows/)?[A-Za-z0-9_.-]+\.o:'
                           % re.escape(self.stem))
         try:
             with open(mk, errors='replace') as f:
@@ -1398,7 +1427,7 @@ class WineSourceDefs:
                 continue
             for j in range(i + 1, min(i + 3, len(lines))):
                 cmd = lines[j]
-                if '-c ' not in cmd:
+                if '-c ' not in cmd or '-DWINE_UNIX_LIB' in cmd:
                     continue
                 incs, defs = [], []
                 for tok in cmd.split():
