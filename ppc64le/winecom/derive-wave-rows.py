@@ -42,6 +42,15 @@ landing an interface handed out under it got the release-and-NULL treatment
 winecom_wrap_out_iface still gives an unknown IID.  {77aa99a0}
 IAudioSessionManager2 is the one the Witcher 3 notes name.
 
+FOUR WAVES, AND THEY PARTITION THE LANDING.  `getfamily`, `syscom` and
+`dinput8` are the three theories the bisect note names.  `rest` is everything
+else the rules found -- the d3d11 event/swapchain/video serves, the whole
+mfplat wave, the three d3d12 rows, and mfplat's four newly-rostered IIDs.  It
+exists for two reasons: without it those rows can only be named by re-running
+this script, and the most useful leg of all -- "every row the landing touched
+is back where it was and it STILL faults" -- cannot be written.  --check
+asserts the partition: no row in two waves, no landing row in none.
+
 Usage
 -----
     ./derive-wave-rows.py                 # rewrite wave-rows.list from git
@@ -256,11 +265,61 @@ def build_waves():
 
     dinput8_rows = sorted(served[dinput8])
 
+    # rest: THE LANDING MINUS THE THREE NAMED THEORIES.  Without it the other
+    # 285-odd rows exist only as a count in this file's footer and nobody can
+    # name them without re-running this script -- and the most useful leg of
+    # all, "everything the landing changed is off and it STILL faults", cannot
+    # be written at all.  The landing is both rules over every header; the
+    # three theory waves are subtracted; what is left is `rest`, and the four
+    # together PARTITION the landing (--check asserts it).
+    landing = set()
+    for path in HEADERS:
+        landing |= served.get(path, set()) | caux0.get(path, set())
+    claimed = set(getfamily) | set(syscom_rows) | set(dinput8_rows)
+    rest_rows = sorted(landing - claimed)
+
+    # every newly-rostered IID no theory wave claims -- mfplat's four today
+    rest_iids, rest_iid_names = [], {}
+    for path in HEADERS:
+        for iid, name in newiids.get(path, []):
+            if iid in syscom_iids or iid in rest_iids:
+                continue
+            rest_iids.append(iid)
+            rest_iid_names[iid] = name
+
     return {
         'getfamily': (getfamily, [], {}),
         'syscom': (syscom_rows, syscom_iids, syscom_iid_names),
         'dinput8': (dinput8_rows, [], {}),
+        'rest': (rest_rows, sorted(rest_iids), rest_iid_names),
     }, served, caux0, newiids
+
+
+WAVE_ORDER = ('getfamily', 'syscom', 'dinput8', 'rest')
+
+
+def check_partition():
+    """The four waves must partition the landing: no row in two waves, and
+    nothing the two rules found left over.  A `rest` that silently overlapped
+    `getfamily` would double-count a bisect leg's membership and make the
+    all-waves leg mean less than it claims."""
+    waves, served, caux0, _ = build_waves()
+    landing = set()
+    for path in HEADERS:
+        landing |= served.get(path, set()) | caux0.get(path, set())
+    seen, dupes = set(), set()
+    for name in WAVE_ORDER:
+        rows = set(waves[name][0])
+        dupes |= seen & rows
+        seen |= rows
+    problems = []
+    if dupes:
+        problems.append(f'{len(dupes)} rows appear in two waves: '
+                        f'{sorted(dupes)[:5]}')
+    if seen != landing:
+        problems.append(f'{len(landing - seen)} landing rows in no wave, '
+                        f'{len(seen - landing)} wave rows outside the landing')
+    return problems
 
 
 LIST_HEADER = """\
@@ -292,13 +351,29 @@ LIST_HEADER = """\
 # Rows are named Iface::Slot against the interface the row LIVES on.  The
 # lever also accepts the row's own declared name (an inherited slot's name
 # carries its BASE interface), so either spelling works at the command line.
+#
+# THE FOUR WAVES PARTITION THE LANDING.  `getfamily`, `syscom` and `dinput8`
+# are the three theories the bisect note names; `rest` is everything else the
+# two rules found, so that
+#
+#   WINEEMUNOCOMWAVE=getfamily,syscom,dinput8,rest
+#
+# is the WHOLE stretch off, and "it still faults with every changed row back
+# where it was" becomes a leg somebody can actually run.  No row is in two
+# waves and no row the rules found is in none; `derive-wave-rows.py --check`
+# asserts both.
+#
+# THIS FILE IS ALSO A VALID @file FOR THE LEVERS.  WINEEMUNOCOMROWS=@this-file
+# takes every `row` line and ignores the `[section]` headers, the `iid` lines
+# and the comments; WINEEMUNOCOMIIDS=@this-file takes the `iid` lines the same
+# way.  Feed it an excerpt to bisect within a wave.
 """
 
 
 def emit_list():
     waves, served, caux0, newiids = build_waves()
     out = [LIST_HEADER.format(old=OLD, new=NEW)]
-    for name in ('getfamily', 'syscom', 'dinput8'):
+    for name in WAVE_ORDER:
         rows, iids, iid_names = waves[name]
         out.append('')
         out.append(f'[{name}]  # {len(rows)} rows, {len(iids)} IIDs')
@@ -307,19 +382,16 @@ def emit_list():
         for i in iids:
             out.append(f'iid {i}  # {iid_names.get(i, "")}')
     out.append('')
-    out.append('# --- not claimed by any alias, for the record -------------------------')
-    out.append('# The same two commits also newly serve rows no wave name covers.  They')
-    out.append('# are listed here so the reader knows the aliases are not the whole')
-    out.append('# landing; name them individually with WINEEMUNOCOMROWS if a leg needs')
-    out.append('# them.')
+    out.append('# --- where the landing came from, per header --------------------------')
+    out.append('# Counts only; every row above is already named.  `rest` is what is left')
+    out.append('# once the three theory waves take their share of these.')
     for path in HEADERS:
         extra = len(served.get(path, ()))
+        cx = len(caux0.get(path, ()))
         iid = len(newiids.get(path, ()))
-        if path.endswith(('syscom_marshal.h', 'dinput8_marshal.h')):
-            continue
-        if extra or iid:
-            out.append(f'#   {path}: {extra} rows newly served, '
-                       f'{iid} interfaces newly rostered')
+        if extra or iid or cx:
+            out.append(f'#   {path}: {extra} rows newly served (rule 1), '
+                       f'{cx} caux-at-0 (rule 2), {iid} interfaces newly rostered')
     out.append('')
     return '\n'.join(out)
 
@@ -374,7 +446,7 @@ def emit_header():
     with open(LIST) as f:
         waves = read_list(f.read())
     out = [HEADER_TOP.format(old=OLD, new=NEW)]
-    order = [w for w in ('getfamily', 'syscom', 'dinput8') if w in waves]
+    order = [w for w in WAVE_ORDER if w in waves]
     for name in order:
         rows, iids = waves[name]
         out.append(f'static const char * const wc_wave_{name}_rows[] =')
@@ -412,6 +484,9 @@ def main():
                 print(f'DRIFT: {path} is not what this script generates',
                       file=sys.stderr)
                 bad = 1
+        for problem in check_partition():
+            print(f'PARTITION: {problem}', file=sys.stderr)
+            bad = 1
         return bad
     if '--emit-header' in args:
         with open(HEADER, 'w') as f:

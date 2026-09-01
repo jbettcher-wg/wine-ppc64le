@@ -26,6 +26,22 @@
 # Rows are named Iface::Slot against the interface the row LIVES on.  The
 # lever also accepts the row's own declared name (an inherited slot's name
 # carries its BASE interface), so either spelling works at the command line.
+#
+# THE FOUR WAVES PARTITION THE LANDING.  `getfamily`, `syscom` and `dinput8`
+# are the three theories the bisect note names; `rest` is everything else the
+# two rules found, so that
+#
+#   WINEEMUNOCOMWAVE=getfamily,syscom,dinput8,rest
+#
+# is the WHOLE stretch off, and "it still faults with every changed row back
+# where it was" becomes a leg somebody can actually run.  No row is in two
+# waves and no row the rules found is in none; `derive-wave-rows.py --check`
+# asserts both.
+#
+# THIS FILE IS ALSO A VALID @file FOR THE LEVERS.  WINEEMUNOCOMROWS=@this-file
+# takes every `row` line and ignores the `[section]` headers, the `iid` lines
+# and the comments; WINEEMUNOCOMIIDS=@this-file takes the `iid` lines the same
+# way.  Feed it an excerpt to bisect within a wave.
 
 
 [getfamily]  # 44 rows, 0 IIDs
@@ -254,11 +270,275 @@ row IDirectInput8W::EnumDevicesBySemantics
 row IDirectInputDevice8A::EnumCreatedEffectObjects
 row IDirectInputDevice8W::EnumCreatedEffectObjects
 
-# --- not claimed by any alias, for the record -------------------------
-# The same two commits also newly serve rows no wave name covers.  They
-# are listed here so the reader knows the aliases are not the whole
-# landing; name them individually with WINEEMUNOCOMROWS if a leg needs
-# them.
-#   dlls/d3d11/d3d11_marshal.h: 111 rows newly served, 0 interfaces newly rostered
-#   dlls/d3d12/d3d12_marshal.h: 3 rows newly served, 0 interfaces newly rostered
-#   dlls/mfplat/mf_marshal.h: 174 rows newly served, 4 interfaces newly rostered
+[rest]  # 258 rows, 4 IIDs
+row ID3D11Device1::OpenSharedResourceByName
+row ID3D11Device2::OpenSharedResourceByName
+row ID3D11Device3::OpenSharedResourceByName
+row ID3D11Device4::OpenSharedResourceByName
+row ID3D11Device4::RegisterDeviceRemovedEvent
+row ID3D11Device5::OpenSharedResourceByName
+row ID3D11Device5::RegisterDeviceRemovedEvent
+row ID3D11DeviceContext2::BeginEventInt
+row ID3D11DeviceContext2::SetMarkerInt
+row ID3D11DeviceContext3::BeginEventInt
+row ID3D11DeviceContext3::Flush1
+row ID3D11DeviceContext3::SetMarkerInt
+row ID3D11DeviceContext4::BeginEventInt
+row ID3D11DeviceContext4::Flush1
+row ID3D11DeviceContext4::SetMarkerInt
+row ID3D11Fence::CreateSharedHandle
+row ID3D11Fence::SetEventOnCompletion
+row ID3D11VideoContext1::ConfigureAuthenticatedChannel
+row ID3D11VideoContext1::DecoderExtension
+row ID3D11VideoContext1::GetDecoderBuffer
+row ID3D11VideoContext1::VideoProcessorBlt
+row ID3D11VideoContext1::VideoProcessorSetStreamAlpha
+row ID3D11VideoContext1::VideoProcessorSetStreamLumaKey
+row ID3D11VideoContext2::ConfigureAuthenticatedChannel
+row ID3D11VideoContext2::DecoderExtension
+row ID3D11VideoContext2::GetDecoderBuffer
+row ID3D11VideoContext2::VideoProcessorBlt
+row ID3D11VideoContext2::VideoProcessorSetStreamAlpha
+row ID3D11VideoContext2::VideoProcessorSetStreamLumaKey
+row ID3D11VideoContext::ConfigureAuthenticatedChannel
+row ID3D11VideoContext::DecoderExtension
+row ID3D11VideoContext::GetDecoderBuffer
+row ID3D11VideoContext::VideoProcessorBlt
+row ID3D11VideoContext::VideoProcessorSetStreamAlpha
+row ID3D11VideoContext::VideoProcessorSetStreamLumaKey
+row ID3D12DeviceRemovedExtendedData::GetAutoBreadcrumbsOutput
+row ID3D12WorkGraphProperties::GetEntrypointIndex
+row ID3D12WorkGraphProperties::GetNodeIndex
+row ID3DUserDefinedAnnotation::BeginEvent
+row ID3DUserDefinedAnnotation::SetMarker
+row IDXGIAdapter3::RegisterHardwareContentProtectionTeardownStatusEvent
+row IDXGIAdapter3::RegisterVideoMemoryBudgetChangeNotificationEvent
+row IDXGIAdapter4::RegisterHardwareContentProtectionTeardownStatusEvent
+row IDXGIAdapter4::RegisterVideoMemoryBudgetChangeNotificationEvent
+row IDXGIDevice1::CreateSurface
+row IDXGIDevice2::CreateSurface
+row IDXGIDevice2::EnqueueSetEvent
+row IDXGIDevice3::CreateSurface
+row IDXGIDevice3::EnqueueSetEvent
+row IDXGIDevice4::CreateSurface
+row IDXGIDevice4::EnqueueSetEvent
+row IDXGIDevice::CreateSurface
+row IDXGIFactory2::CreateSwapChainForComposition
+row IDXGIFactory2::CreateSwapChainForCoreWindow
+row IDXGIFactory2::GetSharedResourceAdapterLuid
+row IDXGIFactory2::RegisterOcclusionStatusEvent
+row IDXGIFactory2::RegisterStereoStatusEvent
+row IDXGIFactory3::CreateSwapChainForComposition
+row IDXGIFactory3::CreateSwapChainForCoreWindow
+row IDXGIFactory3::GetSharedResourceAdapterLuid
+row IDXGIFactory3::RegisterOcclusionStatusEvent
+row IDXGIFactory3::RegisterStereoStatusEvent
+row IDXGIFactory4::CreateSwapChainForComposition
+row IDXGIFactory4::CreateSwapChainForCoreWindow
+row IDXGIFactory4::GetSharedResourceAdapterLuid
+row IDXGIFactory4::RegisterOcclusionStatusEvent
+row IDXGIFactory4::RegisterStereoStatusEvent
+row IDXGIFactory5::CreateSwapChainForComposition
+row IDXGIFactory5::CreateSwapChainForCoreWindow
+row IDXGIFactory5::GetSharedResourceAdapterLuid
+row IDXGIFactory5::RegisterOcclusionStatusEvent
+row IDXGIFactory5::RegisterStereoStatusEvent
+row IDXGIFactory6::CreateSwapChainForComposition
+row IDXGIFactory6::CreateSwapChainForCoreWindow
+row IDXGIFactory6::GetSharedResourceAdapterLuid
+row IDXGIFactory6::RegisterOcclusionStatusEvent
+row IDXGIFactory6::RegisterStereoStatusEvent
+row IDXGIFactory7::CreateSwapChainForComposition
+row IDXGIFactory7::CreateSwapChainForCoreWindow
+row IDXGIFactory7::GetSharedResourceAdapterLuid
+row IDXGIFactory7::RegisterAdaptersChangedEvent
+row IDXGIFactory7::RegisterOcclusionStatusEvent
+row IDXGIFactory7::RegisterStereoStatusEvent
+row IDXGIResource1::CreateSharedHandle
+row IMFActivate::CompareItem
+row IMFActivate::GetItem
+row IMFActivate::GetItemByIndex
+row IMFActivate::SetDouble
+row IMFActivate::SetItem
+row IMFAttributes::CompareItem
+row IMFAttributes::GetItem
+row IMFAttributes::GetItemByIndex
+row IMFAttributes::SetDouble
+row IMFAttributes::SetItem
+row IMFAudioMediaType::CompareItem
+row IMFAudioMediaType::FreeRepresentation
+row IMFAudioMediaType::GetItem
+row IMFAudioMediaType::GetItemByIndex
+row IMFAudioMediaType::GetRepresentation
+row IMFAudioMediaType::SetDouble
+row IMFAudioMediaType::SetItem
+row IMFAudioStreamVolume::SetChannelVolume
+row IMFClockStateSink::OnClockSetRate
+row IMFMediaEngine::GetCurrentTime
+row IMFMediaEngine::GetDefaultPlaybackRate
+row IMFMediaEngine::GetDuration
+row IMFMediaEngine::GetPlaybackRate
+row IMFMediaEngine::GetStartTime
+row IMFMediaEngine::GetVolume
+row IMFMediaEngine::SetCurrentTime
+row IMFMediaEngine::SetDefaultPlaybackRate
+row IMFMediaEngine::SetPlaybackRate
+row IMFMediaEngine::SetVolume
+row IMFMediaEngineEx::GetBalance
+row IMFMediaEngineEx::GetCurrentTime
+row IMFMediaEngineEx::GetDefaultPlaybackRate
+row IMFMediaEngineEx::GetDuration
+row IMFMediaEngineEx::GetPlaybackRate
+row IMFMediaEngineEx::GetPresentationAttribute
+row IMFMediaEngineEx::GetStartTime
+row IMFMediaEngineEx::GetStatistics
+row IMFMediaEngineEx::GetStreamAttribute
+row IMFMediaEngineEx::GetVolume
+row IMFMediaEngineEx::IsPlaybackRateSupported
+row IMFMediaEngineEx::SetBalance
+row IMFMediaEngineEx::SetCurrentTime
+row IMFMediaEngineEx::SetCurrentTimeEx
+row IMFMediaEngineEx::SetDefaultPlaybackRate
+row IMFMediaEngineEx::SetPlaybackRate
+row IMFMediaEngineEx::SetTimelineMarkerTimer
+row IMFMediaEngineEx::SetVolume
+row IMFMediaEvent::CompareItem
+row IMFMediaEvent::GetItem
+row IMFMediaEvent::GetItemByIndex
+row IMFMediaEvent::GetValue
+row IMFMediaEvent::SetDouble
+row IMFMediaEvent::SetItem
+row IMFMediaEventGenerator::QueueEvent
+row IMFMediaEventQueue::QueueEventParamVar
+row IMFMediaSession::QueueEvent
+row IMFMediaSource::QueueEvent
+row IMFMediaSource::Start
+row IMFMediaSourceEx::QueueEvent
+row IMFMediaSourceEx::Start
+row IMFMediaSourceExtension::GetDuration
+row IMFMediaSourceExtension::SetDuration
+row IMFMediaStream::QueueEvent
+row IMFMediaTimeRange::AddRange
+row IMFMediaTimeRange::ContainsTime
+row IMFMediaType::CompareItem
+row IMFMediaType::FreeRepresentation
+row IMFMediaType::GetItem
+row IMFMediaType::GetItemByIndex
+row IMFMediaType::GetRepresentation
+row IMFMediaType::SetDouble
+row IMFMediaType::SetItem
+row IMFMetadata::GetAllLanguages
+row IMFMetadata::GetAllPropertyNames
+row IMFMetadata::GetProperty
+row IMFMetadata::SetProperty
+row IMFPresentationDescriptor::CompareItem
+row IMFPresentationDescriptor::GetItem
+row IMFPresentationDescriptor::GetItemByIndex
+row IMFPresentationDescriptor::SetDouble
+row IMFPresentationDescriptor::SetItem
+row IMFRateControl::SetRate
+row IMFRateSupport::IsRateSupported
+row IMFSample::CompareItem
+row IMFSample::GetItem
+row IMFSample::GetItemByIndex
+row IMFSample::SetDouble
+row IMFSample::SetItem
+row IMFSampleGrabberSinkCallback2::OnClockSetRate
+row IMFSampleGrabberSinkCallback::OnClockSetRate
+row IMFSeekInfo::GetNearestKeyFrames
+row IMFSimpleAudioVolume::SetMasterVolume
+row IMFSourceBuffer::GetAppendWindowEnd
+row IMFSourceBuffer::GetAppendWindowStart
+row IMFSourceBuffer::GetTimeStampOffset
+row IMFSourceBuffer::Remove
+row IMFSourceBuffer::SetAppendWindowEnd
+row IMFSourceBuffer::SetAppendWindowStart
+row IMFSourceBuffer::SetTimeStampOffset
+row IMFStreamDescriptor::CompareItem
+row IMFStreamDescriptor::GetItem
+row IMFStreamDescriptor::GetItemByIndex
+row IMFStreamDescriptor::SetDouble
+row IMFStreamDescriptor::SetItem
+row IMFStreamSink::PlaceMarker
+row IMFStreamSink::QueueEvent
+row IMFTopology::CompareItem
+row IMFTopology::GetItem
+row IMFTopology::GetItemByIndex
+row IMFTopology::SetDouble
+row IMFTopology::SetItem
+row IMFTopologyNode::CompareItem
+row IMFTopologyNode::GetItem
+row IMFTopologyNode::GetItemByIndex
+row IMFTopologyNode::SetDouble
+row IMFTopologyNode::SetItem
+row IMFVideoDisplayControl::GetCurrentImage
+row IMFVideoMediaType::CompareItem
+row IMFVideoMediaType::FreeRepresentation
+row IMFVideoMediaType::GetItem
+row IMFVideoMediaType::GetItemByIndex
+row IMFVideoMediaType::GetRepresentation
+row IMFVideoMediaType::GetVideoRepresentation
+row IMFVideoMediaType::SetDouble
+row IMFVideoMediaType::SetItem
+row IMFVideoPositionMapper::MapOutputCoordinateToInputStream
+row IMFVideoPresenter::OnClockSetRate
+row IMFVideoProcessor::GetAvailableVideoProcessorModes
+row IMFVideoProcessorControl3::SetSphericalVideoProperties
+row IWMDRMReader3::GetInclusionList
+row IWMHeaderInfo2::AddMarker
+row IWMHeaderInfo2::AddScript
+row IWMHeaderInfo3::AddCodecInfo
+row IWMHeaderInfo3::AddMarker
+row IWMHeaderInfo3::AddScript
+row IWMHeaderInfo::AddMarker
+row IWMHeaderInfo::AddScript
+row IWMInputMediaProps::GetMediaType
+row IWMInputMediaProps::SetMediaType
+row IWMLanguageList::AddLanguageByRFC1766String
+row IWMMediaProps::GetMediaType
+row IWMMediaProps::SetMediaType
+row IWMOutputMediaProps::GetMediaType
+row IWMOutputMediaProps::SetMediaType
+row IWMReader::GetOutputFormat
+row IWMReader::Start
+row IWMReaderAccelerator::Notify
+row IWMReaderAdvanced2::Preroll
+row IWMReaderAdvanced2::StartAtMarker
+row IWMReaderAdvanced3::Preroll
+row IWMReaderAdvanced3::StartAtMarker
+row IWMReaderAdvanced3::StartAtPosition
+row IWMReaderAdvanced4::Preroll
+row IWMReaderAdvanced4::StartAtMarker
+row IWMReaderAdvanced4::StartAtPosition
+row IWMReaderAdvanced5::Preroll
+row IWMReaderAdvanced5::StartAtMarker
+row IWMReaderAdvanced5::StartAtPosition
+row IWMReaderAdvanced6::Preroll
+row IWMReaderAdvanced6::StartAtMarker
+row IWMReaderAdvanced6::StartAtPosition
+row IWMReaderAllocatorEx::AllocateForOutputEx
+row IWMReaderAllocatorEx::AllocateForStreamEx
+row IWMReaderCallbackAdvanced::AllocateForOutput
+row IWMReaderCallbackAdvanced::AllocateForStream
+row IWMReaderCallbackAdvanced::OnOutputPropsChanged
+row IWMStreamConfig::SetConnectionName
+row IWMStreamConfig::SetStreamName
+row IWMSyncReader2::GetNextSample
+row IWMSyncReader2::GetOutputFormat
+row IWMSyncReader::GetNextSample
+row IWMSyncReader::GetOutputFormat
+row IWMWriter::AllocateSample
+row IWMWriterSink::AllocateDataUnit
+iid {00020400-0000-0000-c000-000000000046}  # IDispatch
+iid {4f528693-1035-43fe-b428-757561ad3a68}  # INSSBuffer2
+iid {c87ceaaf-75be-4bc4-84eb-ac2798507672}  # INSSBuffer3
+iid {e1cd3524-03d7-11d2-9eed-006097d2d7cf}  # INSSBuffer
+
+# --- where the landing came from, per header --------------------------
+# Counts only; every row above is already named.  `rest` is what is left
+# once the three theory waves take their share of these.
+#   dlls/combase/syscom_marshal.h: 158 rows newly served (rule 1), 0 caux-at-0 (rule 2), 12 interfaces newly rostered
+#   dlls/d3d11/d3d11_marshal.h: 111 rows newly served (rule 1), 44 caux-at-0 (rule 2), 0 interfaces newly rostered
+#   dlls/d3d12/d3d12_marshal.h: 3 rows newly served (rule 1), 0 caux-at-0 (rule 2), 0 interfaces newly rostered
+#   dlls/dinput8/dinput8_marshal.h: 6 rows newly served (rule 1), 0 caux-at-0 (rule 2), 0 interfaces newly rostered
+#   dlls/mfplat/mf_marshal.h: 174 rows newly served (rule 1), 0 caux-at-0 (rule 2), 4 interfaces newly rostered

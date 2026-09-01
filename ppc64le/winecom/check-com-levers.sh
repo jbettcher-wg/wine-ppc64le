@@ -43,14 +43,23 @@
 #      +winecom trace names the method AND the lever.
 #   D  SCRUB: C plus WINEEMUNOREFUSESCRUB=1 -> omget_out=sentinel.  This is
 #      what proves leg C's "null" was the SCRUB and not DXVK writing NULL.
-#   E  @FILE: the same row named through `@path` -> omget_out=null.
+#   E  @FILE: the same row named through `@path` -> omget_out=null, in BOTH
+#      dialects -- a plain one-name-per-line file, and `wave-rows.list`'s own
+#      `[section]` / `row X` / `iid Y` spelling, which is what the bisect note
+#      tells a reader to feed the lever.  The same file read by the two levers
+#      must take only its own half of the lines.
 #   F  TYPO: a row name that matches nothing -> omget_out=rtv AND a warning
 #      naming it.  A typo in a bisect leg must never pass as "tested".
 #   G  WAVE: WINEEMUNOCOMWAVE=getfamily -> omget_out=null (the row is in that
-#      wave); an unknown wave name -> omget_out=rtv AND a warning.
+#      wave); an unknown wave name -> omget_out=rtv AND a warning; all four
+#      waves at once -> every one arms; `rest` ALONE -> omget_out=rtv, which
+#      is what makes `rest` a real disjoint wave rather than a synonym.
 #   H  IIDS: WINEEMUNOCOMIIDS naming IID_IDXGIFactory1, in both the full and
 #      the bare 8-hex-digit spellings -> factory_hr=0x80004002 with the out
-#      pointer NULLED.  Absent the lever, leg B already showed it serving.
+#      pointer NULLED.  Absent the lever, leg B already showed it serving.  An
+#      over-long GUID is REJECTED and said, never truncated to 32 digits.
+#  H2  DUAL SPELLING: one row named by both accepted spellings must not
+#      produce a false TYPO warning for the second one.
 #   I  DERIVATION: derive-wave-rows.py --check -- the checked-in wave list and
 #      the generated header still match what git says.
 #
@@ -255,10 +264,39 @@ if run rows_noscrub WINEEMUNOCOMROWS="$ROW" WINEEMUNOREFUSESCRUB=1; then
         "the forced refusal is what wrote NULL in leg C, not the callee"
 fi
 
-# ---- E: the @file spelling -------------------------------------------------
+# ---- E: the @file spelling, both dialects ----------------------------------
+# E1, the plain one: one bare name per line.
 printf '# a bisect leg, one name per line\n%s\n' "$ROW" > "$OUT/rows.list"
 if run rows_file WINEEMUNOCOMROWS="@$OUT/rows.list"; then
     want rows_file omget_out null "the @file spelling resolves the same row"
+fi
+
+# E2, the one that matters: wave-rows.list's OWN dialect.  The documented way
+# to bisect within a wave is to feed the checked-in list (or an excerpt of it)
+# straight to the lever, and that file's lines are `[section]` headers,
+# `row Iface::Slot` and `iid {...}` -- not bare names.  A parser that took
+# tokens as written would miss every line here and force NOTHING, which the
+# run would report loudly and a reader could still mistake for "tested".
+{
+    echo '[excerpt]  # a section header the parser must skip'
+    echo "row $ROW"
+    echo "iid $FACTORY_IID  # an iid line the ROW lever must skip"
+} > "$OUT/rows.dialect"
+if run rows_dialect WINEEMUNOCOMROWS="@$OUT/rows.dialect"; then
+    want rows_dialect omget_out null "the wave-rows.list dialect resolves the row"
+    want rows_dialect factory_out object \
+        "and the ROW lever ignored the iid line, as it must"
+fi
+# and the mirror: the SAME file read by the IID lever takes only the iid line
+if run iid_dialect WINEEMUNOCOMIIDS="@$OUT/rows.dialect"; then
+    want iid_dialect factory_hr 0x80004002 "the IID lever reads the same file's iid line"
+    want iid_dialect omget_out rtv "and ignored the row line, as it must"
+fi
+# the real checked-in file, whole -- the doc's own example
+if [ -f "$HERE/wave-rows.list" ] && \
+   run rows_wholefile WINEEMUNOCOMROWS="@$HERE/wave-rows.list"; then
+    want rows_wholefile omget_out null \
+        "the checked-in wave-rows.list works as an @file, as the doc says"
 fi
 
 # ---- F: the typo warning ---------------------------------------------------
@@ -285,6 +323,24 @@ if run nowave WINEEMUNOCOMWAVE=nosuchwave; then
     grep -q "nosuchwave" "$OUT/nowave.err" || \
         bad "an unknown wave name passed silently"
 fi
+# all four together: the whole landing off, which is the leg the bisect note
+# could not write before `rest` existed.
+if run allwaves WINEEMUNOCOMWAVE=getfamily,syscom,dinput8,rest; then
+    want allwaves omget_out null "the whole landing off still refuses this row"
+    for w in getfamily syscom dinput8 rest; do
+        grep -q "WINEEMUNOCOMWAVE=$w" "$OUT/allwaves.err" || \
+            bad "the wave '$w' did not arm in the all-waves leg"
+    done
+    say "wave: $(grep -m1 'slots forced to refuse' "$OUT/allwaves.err" | cut -c1-140)"
+fi
+# `rest` must be a real, disjoint wave and not a synonym for getfamily: it
+# contains no getfamily row, so this row must still SERVE under it alone.
+if run restwave WINEEMUNOCOMWAVE=rest; then
+    want restwave omget_out rtv \
+        "rest is disjoint from getfamily (the partition the derivation asserts)"
+    grep -q "WINEEMUNOCOMWAVE=rest" "$OUT/restwave.err" || \
+        bad "WINEEMUNOCOMWAVE=rest armed without saying so"
+fi
 
 # ---- H: the IID lever ------------------------------------------------------
 # 0x80004002 is E_NOINTERFACE.  Both accepted spellings, because the bare form
@@ -297,6 +353,36 @@ fi
 if run iid_short WINEEMUNOCOMIIDS=770aae78; then
     want iid_short factory_hr 0x80004002 "the bare 8-hex-digit spelling works too"
     want iid_short factory_out null "and NULLs the out pointer the same way"
+fi
+# An OVER-LONG GUID must be REJECTED, not truncated at 32 digits.  Truncating
+# would accept a mistyped IID silently and block the wrong interface -- or
+# none -- with nothing in the log to say the leg was measuring a typo.
+if run iid_toolong WINEEMUNOCOMIIDS="${FACTORY_IID}0"; then
+    want iid_toolong factory_hr 0x00000000 "an over-long IID blocks nothing"
+    if grep -qi "neither a full IID" "$OUT/iid_toolong.err"; then
+        say "iid_toolong: $(grep -im1 'neither a full IID' "$OUT/iid_toolong.err" | cut -c1-140)"
+    else
+        sed 's/^/  iid_toolong| /' "$OUT/iid_toolong.err" >&2
+        bad "an over-long IID was accepted or rejected SILENTLY; it must be \
+rejected AND said"
+    fi
+fi
+
+# ---- H2: two spellings of one row must not fake a typo ---------------------
+# Both accepted spellings name the SAME slot in the ID3D10Device1 table (a
+# row's own name carries the interface the slot was DECLARED on).  If the
+# resolver stopped scanning targets once a slot was claimed, the second
+# spelling would be marked as matching nothing and reported as a TYPO -- a
+# false alarm on a perfectly good name, in the one report that has to stay
+# trustworthy.  Order matters here: the broader spelling comes first.
+if run dual WINEEMUNOCOMROWS="ID3D10Device::OMGetRenderTargets,ID3D10Device1::OMGetRenderTargets"; then
+    if grep -q "matches no row" "$OUT/dual.err"; then
+        sed 's/^/  dual| /' "$OUT/dual.err" >&2
+        bad "naming one row by both accepted spellings produced a false TYPO \
+warning; the typo report is the one thing that must not cry wolf"
+    else
+        say "dual: both spellings of one row resolve, neither reported as a typo"
+    fi
 fi
 
 # ---- I: the derivation is still what git says ------------------------------

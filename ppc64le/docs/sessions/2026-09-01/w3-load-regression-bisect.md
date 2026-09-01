@@ -118,9 +118,15 @@ build.
 
 | lever | what it does |
 |---|---|
-| `WINEEMUNOCOMROWS` | comma-separated `Iface::Slot` names, or `@/path/to/file` with one name per line (`#` comments allowed).  Each named row refuses exactly the way a generation-refused row does: one log line naming the lever, `E_NOTIMPL`, and the out-params scrubbed so the refusal is INERT. |
-| `WINEEMUNOCOMIIDS` | comma-separated IIDs, either `{770aae78-f26f-4dba-a829-253c83d1b387}` or the bare leading form `770aae78`.  A listed IID is treated as unrostered where interfaces are handed out: the object is released, the out pointer NULLed, `E_NOINTERFACE` returned — the release-and-NULL W3 got for months. |
-| `WINEEMUNOCOMWAVE` | `getfamily`, `syscom`, `dinput8`.  Whole landings, expanded to the row and IID sets in `libs/winecom/winecom_waves.h`. |
+| `WINEEMUNOCOMROWS` | comma-separated `Iface::Slot` names, or `@/path/to/file`.  Each named row refuses exactly the way a generation-refused row does: one log line naming the lever, `E_NOTIMPL`, and the out-params scrubbed so the refusal is INERT. |
+| `WINEEMUNOCOMIIDS` | comma-separated IIDs, either `{770aae78-f26f-4dba-a829-253c83d1b387}` or the bare leading form `770aae78`; `@file` too.  A listed IID is treated as unrostered where interfaces are handed out: the object is released, the out pointer NULLed, `E_NOINTERFACE` returned — the release-and-NULL W3 got for months. |
+| `WINEEMUNOCOMWAVE` | `getfamily`, `syscom`, `dinput8`, `rest`.  Whole landings, expanded to the row and IID sets in `libs/winecom/winecom_waves.h`.  The four **partition** the landing, so naming all four is the entire stretch off. |
+
+An `@file` takes one name per line, `#` comments allowed — **and it also
+reads `wave-rows.list`'s own dialect**: `[section]` headers are skipped,
+a `row `/`iid ` prefix is stripped, and each lever takes only its own kind of
+line.  So the checked-in list, or any excerpt of it, can be handed straight to
+either lever with no reformatting.
 
 The wave membership is **derived from git**, not typed by hand:
 `ppc64le/winecom/derive-wave-rows.py` diffs the generated marshal headers
@@ -135,6 +141,15 @@ writes `ppc64le/winecom/wave-rows.list` plus the runtime's copy of it.  Counts:
   theory 2 names.
 * **dinput8** — 6 rows (`ConfigureDevices`, `EnumDevicesBySemantics`,
   `EnumCreatedEffectObjects`, each A and W).
+* **rest** — 258 rows and **4 IIDs**: everything else the landing touched.
+  The d3d11 event/swapchain/video serves (81 rows once `getfamily` takes its
+  share), the whole mfplat wave (174 rows, and the four `INSSBuffer*` /
+  `IDispatch` IIDs), and the three d3d12 rows.
+
+The four **partition** the landing — 466 rows in total, no row in two waves,
+no row the rules found in none — and `derive-wave-rows.py --check` asserts
+exactly that.  So `getfamily,syscom,dinput8,rest` is the whole stretch off,
+which is the leg this note could not write before.
 
 **Where the diff disagreed with the theory list above.**  Theory 1 says the
 `OMGetRenderTargets` family is part of the same wave as the `GetShader`
@@ -147,10 +162,10 @@ out of parameter 0.  So the derivation uses two rules, and the second one is
 the only reason `getfamily` contains the rows theory 1 is actually about.
 The script's banner spells both out.
 
-Two more things the same two commits changed that no wave name claims:
-mfplat (174 rows newly served, 4 interfaces newly rostered) and d3d12 (3
-rows).  Neither is in W3's path, but if a leg needs them, name the rows
-individually with `WINEEMUNOCOMROWS`.
+The two commits also changed mfplat (174 rows, 4 interfaces newly rostered)
+and d3d12 (3 rows), neither obviously in W3's path.  Those are `rest`, named
+row by row in `wave-rows.list` rather than left as a count — because a row
+nobody can name is a row nobody can rule out.
 
 ### Running the legs
 
@@ -175,20 +190,31 @@ WINEEMUNOCOMWAVE=syscom <launch W3>
 # theory 3: the dinput8 shims
 WINEEMUNOCOMWAVE=dinput8 <launch W3>
 
-# all three at once -- if THIS still faults, the fault is not in the COM
-# rows at all and the bridge-skew section is where to look next
-WINEEMUNOCOMWAVE=getfamily,syscom,dinput8 <launch W3>
+# theory 4, the one that did not exist before: everything ELSE the landing
+# touched -- the d3d11 event/swapchain/video serves, all of mfplat, d3d12
+WINEEMUNOCOMWAVE=rest <launch W3>
+
+# ALL FOUR: the entire stretch off, because the four waves partition it.
+# If THIS still faults, the fault is not in the COM rows at all and the
+# bridge-skew section is where to look next.
+WINEEMUNOCOMWAVE=getfamily,syscom,dinput8,rest <launch W3>
 ```
 
-Narrowing after a wave goes clean: split the wave's own list.
+Narrowing after a wave goes clean: split the wave's own list.  The lever
+reads `wave-rows.list` in its own dialect, so no reformatting is needed —
+`[section]` headers are skipped, the `row `/`iid ` prefix is stripped, and
+each lever takes only its own kind of line.
 
 ```sh
-# the whole wave, from the checked-in file
+# the whole landing, from the checked-in file (same as all four waves)
 WINEEMUNOCOMROWS=@$PWD/ppc64le/winecom/wave-rows.list <launch W3>
 
-# or half of it -- the file format is one name per line, `#` comments
-grep '^row ID3D11DeviceContext::' ppc64le/winecom/wave-rows.list \
-    | sed 's/^row //' | head -15 > /tmp/leg.list
+# ...and the IID half of that same file
+WINEEMUNOCOMIIDS=@$PWD/ppc64le/winecom/wave-rows.list <launch W3>
+
+# one wave's section, or half of one -- still the same dialect
+sed -n '/^\[getfamily\]/,/^\[/p' ppc64le/winecom/wave-rows.list \
+    | head -20 > /tmp/leg.list
 WINEEMUNOCOMROWS=@/tmp/leg.list <launch W3>
 
 # one row, the finest grain
@@ -211,7 +237,7 @@ Run with `WINEDEBUG=+winecom` and check stderr before believing any leg:
   — that row's caller reads its own residue.  Real, and worth knowing, but it
   means the leg is not a clean pre-landing reproduction for that row.
 
-The gate is `ppc64le/winecom/check-com-levers.sh` (nine legs, each an
+The gate is `ppc64le/winecom/check-com-levers.sh` (every leg an
 armed/unarmed pair; `--sabotage` runs the unarmed controls alone).  It exists
 because a lever that silently does nothing is worse than no lever: a leg run
 under one is recorded as "tested, clean", and that is the most expensive kind

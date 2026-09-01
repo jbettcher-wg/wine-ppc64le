@@ -622,11 +622,31 @@ static void add_row_target( const char *name, UINT len )
     row_targets[row_target_count++] = copy;
 }
 
+/* What a parse is collecting.  A list can name both kinds -- wave-rows.list
+ * does -- so the parser has to know which half it is being asked for. */
+#define WC_WANT_ROW 0
+#define WC_WANT_IID 1
+
+static void add_row_target( const char *name, UINT len );
+static void add_blocked_iid( const char *name, UINT len );
+
 /* Split on commas and newlines, dropping `#` comments and surrounding space,
  * and expanding a leading `@` into the file it names.  `depth` stops an
- * `@file` whose contents name another file. */
-static void parse_row_targets( const char *list, void (*take)( const char *, UINT ),
-                               int depth )
+ * `@file` whose contents name another file.
+ *
+ * THE `wave-rows.list` DIALECT IS ACCEPTED VERBATIM, and that is not a
+ * convenience -- it is the difference between a documented example that works
+ * and one that forces NOTHING.  That file's lines are `[section]` headers,
+ * `row Iface::Slot` and `iid {...}`, so a parser that took tokens as written
+ * would miss every line of it; loudly, but a leg that forces nothing and is
+ * recorded as "tested, clean" is exactly the failure this whole mechanism
+ * exists to prevent.  So: a `[section]` token is skipped, a `row `/`iid `
+ * prefix is stripped, and a token whose prefix names the OTHER half is
+ * skipped -- which is what lets `WINEEMUNOCOMROWS=@wave-rows.list` and
+ * `WINEEMUNOCOMIIDS=@wave-rows.list` both read the same file and each take
+ * only its own lines.  A bare token (the plain comma-list form an env value
+ * normally carries) is taken as written, exactly as before. */
+static void parse_row_targets( const char *list, UINT want, int depth )
 {
     const char *p = list;
 
@@ -661,13 +681,28 @@ static void parse_row_targets( const char *list, void (*take)( const char *, UIN
             name[len] = 0;
             if ((body = com_read_list_file( name )))
             {
-                parse_row_targets( body, take, 1 );
+                parse_row_targets( body, want, 1 );
                 RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, body );
             }
             RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, name );
             continue;
         }
-        take( start, (UINT)(end - start) );
+        if (*start == '[') continue;            /* a [wave] section header */
+        if (end - start > 4 && !memcmp( start, "row ", 4 ))
+        {
+            if (want != WC_WANT_ROW) continue;
+            start += 4;
+            while (start < end && (*start == ' ' || *start == '\t')) start++;
+        }
+        else if (end - start > 4 && !memcmp( start, "iid ", 4 ))
+        {
+            if (want != WC_WANT_IID) continue;
+            start += 4;
+            while (start < end && (*start == ' ' || *start == '\t')) start++;
+        }
+        if (end == start) continue;
+        if (want == WC_WANT_ROW) add_row_target( start, (UINT)(end - start) );
+        else add_blocked_iid( start, (UINT)(end - start) );
     }
 }
 
@@ -687,12 +722,17 @@ static void add_blocked_iid( const char *name, UINT len )
     UINT hex[32], nhex = 0, i;
 
     memset( &ent, 0, sizeof(ent) );
-    for (i = 0; i < len && nhex < ARRAYSIZE(hex); i++)
+    for (i = 0; i < len; i++)
     {
         UINT v;
 
         if (name[i] == '{' || name[i] == '}' || name[i] == '-') continue;
         if ((v = hexval( name[i] )) == ~0u) { nhex = 0; break; }
+        /* An over-long GUID must be REJECTED, not truncated: stopping at 32
+         * would silently accept a mistyped IID with a trailing digit and
+         * block the wrong interface -- or none -- while the leg logged
+         * nothing at all. */
+        if (nhex == ARRAYSIZE(hex)) { nhex = ARRAYSIZE(hex) + 1; break; }
         hex[nhex++] = v;
     }
     if (nhex != 8 && nhex != 32)
@@ -800,9 +840,9 @@ static void arm_row_kill_switches( void )
     waves = com_env_str( L"WINEEMUNOCOMWAVE" );
     if (!rows && !iids && !waves) return;
 
-    if (rows) parse_row_targets( rows, add_row_target, 0 );
+    if (rows) parse_row_targets( rows, WC_WANT_ROW, 0 );
     row_targets_typed = row_target_count;   /* everything after this is a wave */
-    if (iids) parse_row_targets( iids, add_blocked_iid, 0 );
+    if (iids) parse_row_targets( iids, WC_WANT_IID, 0 );
     if (waves)
     {
         /* wave names are not row names: expand each into the derived sets,
@@ -870,12 +910,18 @@ static void arm_row_kill_switches( void )
 
         if (!itf->slots) continue;
         for (n = 0; n < itf->slot_count; n++)
+            /* NO early exit once a row is claimed: two targets can name the
+             * same row (the two accepted spellings do exactly that for every
+             * inherited slot), and stopping at the first would leave the
+             * second marked as matching NOTHING -- a false TYPO warning on a
+             * name that was perfectly good.  The slot is forced once; the
+             * hit marking is per target.  Attach-time cost only. */
             for (t = 0; t < row_target_count; t++)
             {
                 if (!row_target_matches( row_targets[t], itf->name,
                                          itf->slots[n].name )) continue;
                 if (row_target_hit) row_target_hit[t] = 1;
-                if (forced_refuse[iface_slot_base[i] + n]) break;
+                if (forced_refuse[iface_slot_base[i] + n]) continue;
                 forced_refuse[iface_slot_base[i] + n] = 1;
                 forced++;
                 if (row_out_params_unscrubbed( &itf->slots[n] ))
@@ -887,7 +933,6 @@ static void arm_row_kill_switches( void )
                          "(the Witcher 3 GetShader class)\n", wc_surface->name,
                          itf->name, itf->slots[n].name );
                 }
-                break;
             }
     }
     ERR( "%s: WINEEMUNOCOMROWS/WAVE armed -- %u of this surface's slots forced "

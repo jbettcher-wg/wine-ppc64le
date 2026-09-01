@@ -167,9 +167,17 @@ levers, read once at attach, make the same legs one environment variable:
 
 | lever | what it does |
 |---|---|
-| `WINEEMUNOCOMROWS` | comma-separated `Iface::Slot` names, or `@/path/file` with one per line (`#` comments allowed). Each named row takes the **generated-refusal path**: refuse once by name, `E_NOTIMPL`, and `scrub_refused_outs()` — refused means INERT. |
-| `WINEEMUNOCOMIIDS` | comma-separated IIDs, `{xxxxxxxx-…}` or a bare leading 8 hex digits. A listed IID is treated as **unrostered** where interfaces are handed out: release the object, NULL the out pointer, `E_NOINTERFACE`. |
-| `WINEEMUNOCOMWAVE` | `getfamily`, `syscom`, `dinput8` — whole landings, expanded to the row and IID sets `derive-wave-rows.py` derived from git. |
+| `WINEEMUNOCOMROWS` | comma-separated `Iface::Slot` names, or `@/path/file`. Each named row takes the **generated-refusal path**: refuse once by name, `E_NOTIMPL`, and `scrub_refused_outs()` — refused means INERT. |
+| `WINEEMUNOCOMIIDS` | comma-separated IIDs, `{xxxxxxxx-…}` or a bare leading 8 hex digits; `@file` too. A listed IID is treated as **unrostered** where interfaces are handed out: release the object, NULL the out pointer, `E_NOINTERFACE`. |
+| `WINEEMUNOCOMWAVE` | `getfamily`, `syscom`, `dinput8`, `rest` — whole landings, expanded to the row and IID sets `derive-wave-rows.py` derived from git. The four **partition** the landing (466 rows), so all four is the entire stretch off. |
+
+An `@file` takes one name per line with `#` comments — **and reads
+`wave-rows.list`'s own dialect too**: `[section]` headers skipped, a
+`row `/`iid ` prefix stripped, each lever taking only its own kind of line.
+That is what lets the checked-in list, or any excerpt of it, go straight to
+either lever. Without it the documented example would have matched nothing —
+loudly, but a leg that forces nothing and reads as "tested, clean" is the
+exact failure the levers exist to prevent.
 
 Two rules the derivation is built on, both in the script's own banner: a row
 whose `refuse` went from a reason string to `NULL`, and a row whose `caux`
@@ -189,7 +197,7 @@ so the unarmed test is one `NULL` pointer check. Resolution happens once, at
 attach, against the surface's own `const` tables — which are never written.
 
 ```sh
-./check-com-levers.sh              # nine legs, each an armed/unarmed pair
+./check-com-levers.sh              # every leg an armed/unarmed pair
 ./check-com-levers.sh --sabotage   # the three unarmed controls must show the
                                    # lever NOT firing
 ./derive-wave-rows.py              # re-derive both files from git
