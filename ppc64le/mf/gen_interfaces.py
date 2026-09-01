@@ -80,7 +80,15 @@ HEADERS = ("mfobjects.h", "mfidl.h", "mfreadwrite.h", "mftransform.h",
            #                  place and letterbox a cutscene.
            #   wmsdkidl       wmvcore's IWMReader/IWMSyncReader/IWMProfile --
            #                  Windows Media, which older titles still ship.
-           "mfmediaengine.h", "evr.h", "evr9.h", "wmsdkidl.h")
+           #   wmsbuffer      INSSBuffer and family -- the WMSDK sample
+           #                  buffer every reader callback and allocator
+           #                  traffics in.  Its absence refused seven slots
+           #                  (GetNextSample, AllocateSample, the four
+           #                  reader-callback allocators, AllocateDataUnit)
+           #                  as "pointer-to-pointer whose pointee cannot be
+           #                  proven" -- the pointee was an interface this
+           #                  roster had simply never seen.
+           "mfmediaengine.h", "evr.h", "evr9.h", "wmsdkidl.h", "wmsbuffer.h")
 
 # Headers scanned for TYPES only -- the enum, scalar-typedef and struct
 # spellings the interfaces above use by name.  mfapi.h holds MFTIME and the

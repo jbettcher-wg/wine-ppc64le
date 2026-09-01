@@ -8,7 +8,8 @@
   "mfmediaengine.h",
   "evr.h",
   "evr9.h",
-  "wmsdkidl.h"
+  "wmsdkidl.h",
+  "wmsbuffer.h"
  ],
  "type_headers": [
   "mfapi.h"
@@ -14715,6 +14716,299 @@
      "params": [
       "DWORD platform_queue",
       "LONG *priority"
+     ]
+    }
+   ]
+  },
+  "INSSBuffer": {
+   "uuid": "e1cd3524-03d7-11d2-9eed-006097d2d7cf",
+   "base": "IUnknown",
+   "header": "wmsbuffer.h",
+   "slots": [
+    {
+     "slot": 0,
+     "owner": "IUnknown",
+     "name": "QueryInterface",
+     "ret": "HRESULT",
+     "params": [
+      "REFIID riid",
+      "void **ppvObject"
+     ]
+    },
+    {
+     "slot": 1,
+     "owner": "IUnknown",
+     "name": "AddRef",
+     "ret": "ULONG",
+     "params": []
+    },
+    {
+     "slot": 2,
+     "owner": "IUnknown",
+     "name": "Release",
+     "ret": "ULONG",
+     "params": []
+    },
+    {
+     "slot": 3,
+     "owner": "INSSBuffer",
+     "name": "GetLength",
+     "ret": "HRESULT",
+     "params": [
+      "DWORD *pdwLength"
+     ]
+    },
+    {
+     "slot": 4,
+     "owner": "INSSBuffer",
+     "name": "SetLength",
+     "ret": "HRESULT",
+     "params": [
+      "DWORD dwLength"
+     ]
+    },
+    {
+     "slot": 5,
+     "owner": "INSSBuffer",
+     "name": "GetMaxLength",
+     "ret": "HRESULT",
+     "params": [
+      "DWORD *pdwLength"
+     ]
+    },
+    {
+     "slot": 6,
+     "owner": "INSSBuffer",
+     "name": "GetBuffer",
+     "ret": "HRESULT",
+     "params": [
+      "BYTE **ppdwBuffer"
+     ]
+    },
+    {
+     "slot": 7,
+     "owner": "INSSBuffer",
+     "name": "GetBufferAndLength",
+     "ret": "HRESULT",
+     "params": [
+      "BYTE **ppdwBuffer",
+      "DWORD *pdwLength"
+     ]
+    }
+   ]
+  },
+  "INSSBuffer2": {
+   "uuid": "4f528693-1035-43fe-b428-757561ad3a68",
+   "base": "INSSBuffer",
+   "header": "wmsbuffer.h",
+   "slots": [
+    {
+     "slot": 0,
+     "owner": "IUnknown",
+     "name": "QueryInterface",
+     "ret": "HRESULT",
+     "params": [
+      "REFIID riid",
+      "void **ppvObject"
+     ]
+    },
+    {
+     "slot": 1,
+     "owner": "IUnknown",
+     "name": "AddRef",
+     "ret": "ULONG",
+     "params": []
+    },
+    {
+     "slot": 2,
+     "owner": "IUnknown",
+     "name": "Release",
+     "ret": "ULONG",
+     "params": []
+    },
+    {
+     "slot": 3,
+     "owner": "INSSBuffer",
+     "name": "GetLength",
+     "ret": "HRESULT",
+     "params": [
+      "DWORD *pdwLength"
+     ]
+    },
+    {
+     "slot": 4,
+     "owner": "INSSBuffer",
+     "name": "SetLength",
+     "ret": "HRESULT",
+     "params": [
+      "DWORD dwLength"
+     ]
+    },
+    {
+     "slot": 5,
+     "owner": "INSSBuffer",
+     "name": "GetMaxLength",
+     "ret": "HRESULT",
+     "params": [
+      "DWORD *pdwLength"
+     ]
+    },
+    {
+     "slot": 6,
+     "owner": "INSSBuffer",
+     "name": "GetBuffer",
+     "ret": "HRESULT",
+     "params": [
+      "BYTE **ppdwBuffer"
+     ]
+    },
+    {
+     "slot": 7,
+     "owner": "INSSBuffer",
+     "name": "GetBufferAndLength",
+     "ret": "HRESULT",
+     "params": [
+      "BYTE **ppdwBuffer",
+      "DWORD *pdwLength"
+     ]
+    },
+    {
+     "slot": 8,
+     "owner": "INSSBuffer2",
+     "name": "GetSampleProperties",
+     "ret": "HRESULT",
+     "params": [
+      "DWORD size",
+      "BYTE *props"
+     ]
+    },
+    {
+     "slot": 9,
+     "owner": "INSSBuffer2",
+     "name": "SetSampleProperties",
+     "ret": "HRESULT",
+     "params": [
+      "DWORD size",
+      "BYTE *props"
+     ]
+    }
+   ]
+  },
+  "INSSBuffer3": {
+   "uuid": "c87ceaaf-75be-4bc4-84eb-ac2798507672",
+   "base": "INSSBuffer2",
+   "header": "wmsbuffer.h",
+   "slots": [
+    {
+     "slot": 0,
+     "owner": "IUnknown",
+     "name": "QueryInterface",
+     "ret": "HRESULT",
+     "params": [
+      "REFIID riid",
+      "void **ppvObject"
+     ]
+    },
+    {
+     "slot": 1,
+     "owner": "IUnknown",
+     "name": "AddRef",
+     "ret": "ULONG",
+     "params": []
+    },
+    {
+     "slot": 2,
+     "owner": "IUnknown",
+     "name": "Release",
+     "ret": "ULONG",
+     "params": []
+    },
+    {
+     "slot": 3,
+     "owner": "INSSBuffer",
+     "name": "GetLength",
+     "ret": "HRESULT",
+     "params": [
+      "DWORD *pdwLength"
+     ]
+    },
+    {
+     "slot": 4,
+     "owner": "INSSBuffer",
+     "name": "SetLength",
+     "ret": "HRESULT",
+     "params": [
+      "DWORD dwLength"
+     ]
+    },
+    {
+     "slot": 5,
+     "owner": "INSSBuffer",
+     "name": "GetMaxLength",
+     "ret": "HRESULT",
+     "params": [
+      "DWORD *pdwLength"
+     ]
+    },
+    {
+     "slot": 6,
+     "owner": "INSSBuffer",
+     "name": "GetBuffer",
+     "ret": "HRESULT",
+     "params": [
+      "BYTE **ppdwBuffer"
+     ]
+    },
+    {
+     "slot": 7,
+     "owner": "INSSBuffer",
+     "name": "GetBufferAndLength",
+     "ret": "HRESULT",
+     "params": [
+      "BYTE **ppdwBuffer",
+      "DWORD *pdwLength"
+     ]
+    },
+    {
+     "slot": 8,
+     "owner": "INSSBuffer2",
+     "name": "GetSampleProperties",
+     "ret": "HRESULT",
+     "params": [
+      "DWORD size",
+      "BYTE *props"
+     ]
+    },
+    {
+     "slot": 9,
+     "owner": "INSSBuffer2",
+     "name": "SetSampleProperties",
+     "ret": "HRESULT",
+     "params": [
+      "DWORD size",
+      "BYTE *props"
+     ]
+    },
+    {
+     "slot": 10,
+     "owner": "INSSBuffer3",
+     "name": "SetProperty",
+     "ret": "HRESULT",
+     "params": [
+      "GUID id",
+      "void *value",
+      "DWORD size"
+     ]
+    },
+    {
+     "slot": 11,
+     "owner": "INSSBuffer3",
+     "name": "GetProperty",
+     "ret": "HRESULT",
+     "params": [
+      "GUID id",
+      "void *value",
+      "DWORD *size"
      ]
     }
    ]

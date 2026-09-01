@@ -26,7 +26,8 @@
 #      and the specific rows this gate depends on still say what it assumes:
 #      SetDouble and SetMasterVolume carry WINECOM_F_REV with the right fpmask
 #      and fpwide, SetUnknown carries an xaux interface type AND the xmask bit
-#      that says the generator wrote it, SetItem is still refused.  Without
+#      that says the generator wrote it, SetItem is HAND-SERVED (the
+#      2026-09-01 PROPVARIANT pass).  Without
 #      this the gate could pass while measuring rows that had quietly changed
 #      shape underneath it.
 #   1  MECHANISM.  The probe runs and reports PASS -- every value checked on
@@ -129,8 +130,10 @@ row_is '{ "IMFAttributes::SetUnknown", NULL, cls_IMFAttributes_27' \
 parameter AND the xmask bit that says the generator wrote it -- without the \
 bit an untouched zero would read as roster index 0, a real interface"
 row_is '{ "IMFAttributes::SetItem",' \
-       'PROPVARIANT is a tagged union' \
-       "IMFAttributes::SetItem is still refused for what its signature IS"
+       'WINECOM_F_HAND' \
+       "IMFAttributes::SetItem is HAND-SERVED (the 2026-09-01 PROPVARIANT \
+completeness pass -- the per-tag walker in dlls/mfplat/mfcom.c); a row that \
+reads any other way means the mf tables changed shape under this gate"
 
 # ---- build: the x86-64 guest probe ---------------------------------------
 # The imports are described by hand rather than taken from a mingw sysroot: the

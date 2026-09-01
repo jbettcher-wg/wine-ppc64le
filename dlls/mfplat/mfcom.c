@@ -86,6 +86,10 @@
 #include "mfreadwrite.h"
 #include "mftransform.h"
 #include "mferror.h"
+/* WM_MEDIA_TYPE for the IWMMediaProps hand walkers -- the same IDL struct
+ * AM_MEDIA_TYPE is, under the WMSDK name, which is why the representation
+ * audit below can use it for both. */
+#include "wmsdkidl.h"
 
 #include "wine/debug.h"
 #include "wine/winecom.h"
@@ -146,57 +150,154 @@ static const WCHAR *const mf_guest_modules[] =
 
 /* ------------------------------------------------------- hand-written slots */
 
-/* A PROPVARIANT is refused by ppc64le/mf/gen_winecom.py wherever it appears,
- * and that is right in general: its `vt` can name an interface pointer that
- * no IID in the signature types, so a blanket rule is the only safe one a
- * table can express.  These two functions are the exception a human can
- * justify, for the three slots a cutscene player actually needs -- SEEK and
- * DURATION.  They serve the call and AUDIT the tag: a VT_I8 position or a
- * VT_UI8 duration crosses (both sides compile PROPVARIANT from the same Wine
- * header), a VT_UNKNOWN is refused with the loudness the blanket rule had.
+/* THE PROPVARIANT FAMILY.  Every PROPVARIANT-bearing slot on the surface is
+ * hand-served through the two helpers below, which TRANSLATE the tag instead
+ * of refusing the slot: the refusal lives per ARM now, at runtime, naming
+ * the VT -- which is what complete means for a tagged union.
+ *
+ *   IN  (guest -> native): the guest owns the PROPVARIANT and everything it
+ *       points at, and nothing here frees any of it -- the callee copies
+ *       what it keeps, the ordinary COM in-parameter rule.  Plain tags pass
+ *       as the guest's own pointer (payload pointers -- VT_LPWSTR's string,
+ *       VT_BLOB's bytes -- are guest memory, which IS host memory on this
+ *       port, read with the same 2-byte WCHAR both sides).  VT_UNKNOWN gets
+ *       a stack-local shallow copy whose punkVal is the HOST object: one of
+ *       our proxies unwraps to its host, a guest-implemented object gets a
+ *       reverse proxy or refuses, exactly the CA_IFACE_IN rule -- borrowed
+ *       for the call and given back after.
+ *
+ *   OUT (native -> guest): the callee fills the guest's PROPVARIANT in
+ *       place; string/blob payloads it CoTaskMemAllocs transfer WHOLE,
+ *       because the guest's eventual PropVariantClear is a thunk that
+ *       crosses back into the same native combase -- one process, one
+ *       allocator, so the pointer the callee wrote is the pointer the free
+ *       will see.  Only the interface arm changes hands: punkVal is wrapped
+ *       as an IUnknown proxy (QueryInterface from there is what a COM
+ *       caller does with an IUnknown anyway), and winecom_wrap CONSUMES the
+ *       callee's reference, so the guest's Clear -> Release balances the
+ *       books.
+ *
+ *   REFUSED ARMS, loudly and per tag: VT_DISPATCH (IDispatch is not on this
+ *       roster) and any VECTOR/ARRAY/BYREF modifier on an interface base --
+ *       an elementwise translation nobody has needed; the FIXME names the
+ *       vt so the day someone does need it, the report says which arm.
  *
  * Argument positions are read straight out of the trap CONTEXT, so the
- * layouts are asserted by the roster and named in gen_winecom.py's HAND_SLOTS
- * comment; nothing infers them. */
+ * layouts are asserted by the roster and named in gen_winecom.py's
+ * HAND_SLOTS comment; nothing infers them.  No hand key on this surface
+ * carries a sub-32-bit by-value argument, so the raw slots pass unwidened
+ * (the auto rows' narrowmask machinery covers the ones that do). */
 
-static BOOL mf_propvariant_carries_iface( const PROPVARIANT *pv )
+struct mf_pv_in_state
 {
-    VARTYPE base;
+    PROPVARIANT copy;
+    void *borrowed;              /* winecom_to_native borrow to give back */
+    const PROPVARIANT *use;      /* what the native callee is handed */
+};
 
-    if (!pv) return FALSE;
-    base = pv->vt & VT_TYPEMASK;
-    return base == VT_UNKNOWN || base == VT_DISPATCH;
+static BOOL mf_pv_iface_arm_untranslatable( VARTYPE vt )
+{
+    VARTYPE base = vt & VT_TYPEMASK;
+    if (base == VT_DISPATCH) return TRUE;
+    return base == VT_UNKNOWN && (vt & ~VT_TYPEMASK) != 0;
 }
 
-/* (this, REFGUID, REFPROPVARIANT) -- IMFSourceReader::SetCurrentPosition and
- * IMFMediaSession::Start, which share the shape exactly. */
-static UINT64 hand_propvariant_in( void *host, UINT slot, AMD64_CONTEXT *ctx )
+static BOOL mf_pv_in( const PROPVARIANT *pv, struct mf_pv_in_state *st, UINT slot )
 {
     static LONG logged;
-    UINT64 args[16] = { 0 };
-    const PROPVARIANT *pv;
 
-    pv = (const PROPVARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 2 );
-    if (mf_propvariant_carries_iface( pv ))
+    st->borrowed = NULL;
+    st->use = pv;
+    if (!pv) return TRUE;
+    if (mf_pv_iface_arm_untranslatable( pv->vt ))
     {
         if (!InterlockedExchange( &logged, 1 ))
-            FIXME( "mf: slot %u was given a PROPVARIANT of type 0x%04x, which "
-                   "carries an interface pointer the guest owns and no IID in "
-                   "the signature types.  Refusing; a VT_I8 seek position is "
-                   "served.\n", slot, pv->vt );
-        return (UINT64)(UINT)E_NOTIMPL;
+            FIXME( "mf: slot %u was given a PROPVARIANT of type 0x%04x -- an "
+                   "interface arm nothing can translate (VT_DISPATCH, or a "
+                   "VECTOR/ARRAY/BYREF of interfaces).  Refusing this call; "
+                   "every other tag is served.\n", slot, pv->vt );
+        return FALSE;
     }
-    args[1] = winecom_read_arg( ctx, 1 );
-    args[2] = (UINT64)(ULONG_PTR)pv;
-    return mf_invoke( host, slot, 3, args );
+    if ((pv->vt & VT_TYPEMASK) == VT_UNKNOWN)
+    {
+        st->copy = *pv;
+        if (pv->punkVal)
+        {
+            void *native;
+            if (!winecom_to_native( pv->punkVal, MF_IFACE_IUnknown, &native ))
+            {
+                WARN( "mf: slot %u: VT_UNKNOWN payload %p has no native "
+                      "identity and no reverse proxy; refusing\n",
+                      slot, pv->punkVal );
+                return FALSE;
+            }
+            st->copy.punkVal = native;
+            st->borrowed = native;
+        }
+        st->use = &st->copy;
+    }
+    return TRUE;
 }
 
-/* (this, DWORD, REFGUID, PROPVARIANT *) --
- * IMFSourceReader::GetPresentationAttribute, which is how a caller asks for
- * MF_PD_DURATION.  Served, then the tag the callee WROTE is audited. */
-static UINT64 hand_propvariant_out( void *host, UINT slot, AMD64_CONTEXT *ctx )
+static void mf_pv_in_end( struct mf_pv_in_state *st )
+{
+    if (st->borrowed) winecom_to_native_end( st->borrowed );
+}
+
+/* Only meaningful after a SUCCEEDED call wrote *pv. */
+static HRESULT mf_pv_out_fixup( PROPVARIANT *pv, UINT slot )
 {
     static LONG logged;
+
+    if (!pv) return S_OK;
+    if (mf_pv_iface_arm_untranslatable( pv->vt ))
+    {
+        if (!InterlockedExchange( &logged, 1 ))
+            FIXME( "mf: slot %u returned a PROPVARIANT of type 0x%04x -- an "
+                   "interface arm nothing can translate; clearing it rather "
+                   "than handing the guest a native vtable.\n", slot, pv->vt );
+        PropVariantClear( pv );
+        return E_NOTIMPL;
+    }
+    if ((pv->vt & VT_TYPEMASK) == VT_UNKNOWN && pv->punkVal)
+    {
+        void *guest = winecom_wrap( pv->punkVal, MF_IFACE_IUnknown );
+        if (!guest)
+        {
+            /* wrap released the object rather than hand out a raw vtable;
+             * scrub the arm so the guest never sees the host pointer. */
+            pv->punkVal = NULL;
+            pv->vt = VT_EMPTY;
+            return E_NOTIMPL;
+        }
+        pv->punkVal = guest;
+    }
+    return S_OK;
+}
+
+/* (this, <plain>, <PROPVARIANT in> @2) -- IMFSourceReader::SetCurrentPosition,
+ * IMFMediaSession::Start, IMFAttributes::SetItem, IMFMetadata::SetProperty. */
+static UINT64 hand_propvariant_in( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    UINT64 args[16] = { 0 };
+    struct mf_pv_in_state st;
+    UINT64 ret;
+
+    if (!mf_pv_in( (const PROPVARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 2 ),
+                   &st, slot ))
+        return (UINT64)(UINT)E_NOTIMPL;
+    args[1] = winecom_read_arg( ctx, 1 );
+    args[2] = (UINT64)(ULONG_PTR)st.use;
+    ret = mf_invoke( host, slot, 3, args );
+    mf_pv_in_end( &st );
+    return ret;
+}
+
+/* (this, <plain>, <plain>, <PROPVARIANT out> @3) --
+ * IMFSourceReader::GetPresentationAttribute, IMFAttributes::GetItemByIndex,
+ * IMFMediaEngineEx::GetStreamAttribute. */
+static UINT64 hand_propvariant_out( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
     UINT64 args[16] = { 0 };
     PROPVARIANT *pv;
     HRESULT hr;
@@ -206,14 +307,333 @@ static UINT64 hand_propvariant_out( void *host, UINT slot, AMD64_CONTEXT *ctx )
     args[2] = winecom_read_arg( ctx, 2 );
     args[3] = (UINT64)(ULONG_PTR)pv;
     hr = (HRESULT)mf_invoke( host, slot, 4, args );
-    if (SUCCEEDED(hr) && mf_propvariant_carries_iface( pv ))
-    {
-        if (!InterlockedExchange( &logged, 1 ))
-            FIXME( "mf: slot %u returned a PROPVARIANT of type 0x%04x, which "
-                   "carries an interface pointer; clearing it rather than "
-                   "handing the guest a native vtable.\n", slot, pv->vt );
-        PropVariantClear( pv );
+    if (SUCCEEDED(hr)) hr = mf_pv_out_fixup( pv, slot );
+    return (UINT64)(UINT)hr;
+}
+
+/* (this, <PROPVARIANT out> @1) -- IMFMediaEvent::GetValue,
+ * IMFMetadata::GetAllLanguages / GetAllPropertyNames.  GetValue is the one
+ * that made translation (rather than the old audit) necessary: a session's
+ * MESessionTopologySet event carries its IMFTopology as VT_UNKNOWN, so
+ * "refuse the interface arm" refused the event loop itself. */
+static UINT64 hand_pv_out_1( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    UINT64 args[16] = { 0 };
+    PROPVARIANT *pv;
+    HRESULT hr;
+
+    pv = (PROPVARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    args[1] = (UINT64)(ULONG_PTR)pv;
+    hr = (HRESULT)mf_invoke( host, slot, 2, args );
+    if (SUCCEEDED(hr)) hr = mf_pv_out_fixup( pv, slot );
+    return (UINT64)(UINT)hr;
+}
+
+/* (this, <plain>, <PROPVARIANT out> @2) -- IMFAttributes::GetItem,
+ * IMFMediaEngineEx::GetPresentationAttribute / GetStatistics,
+ * IMFMetadata::GetProperty. */
+static UINT64 hand_pv_out_2( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    UINT64 args[16] = { 0 };
+    PROPVARIANT *pv;
+    HRESULT hr;
+
+    pv = (PROPVARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    args[1] = winecom_read_arg( ctx, 1 );
+    args[2] = (UINT64)(ULONG_PTR)pv;
+    hr = (HRESULT)mf_invoke( host, slot, 3, args );
+    if (SUCCEEDED(hr)) hr = mf_pv_out_fixup( pv, slot );
+    return (UINT64)(UINT)hr;
+}
+
+/* (this, <plain>, <PROPVARIANT in> @2, <plain out> @3) --
+ * IMFAttributes::CompareItem; the BOOL* is plain guest memory. */
+static UINT64 hand_pv_in_mid( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    UINT64 args[16] = { 0 };
+    struct mf_pv_in_state st;
+    UINT64 ret;
+
+    if (!mf_pv_in( (const PROPVARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 2 ),
+                   &st, slot ))
         return (UINT64)(UINT)E_NOTIMPL;
+    args[1] = winecom_read_arg( ctx, 1 );
+    args[2] = (UINT64)(ULONG_PTR)st.use;
+    args[3] = winecom_read_arg( ctx, 3 );
+    ret = mf_invoke( host, slot, 4, args );
+    mf_pv_in_end( &st );
+    return ret;
+}
+
+/* (this, <plain> x3, <PROPVARIANT in> @4) -- IMFMediaEventGenerator::
+ * QueueEvent and IMFMediaEventQueue::QueueEventParamVar. */
+static UINT64 hand_pv_in_4( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    UINT64 args[16] = { 0 };
+    struct mf_pv_in_state st;
+    UINT64 ret;
+
+    if (!mf_pv_in( (const PROPVARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 4 ),
+                   &st, slot ))
+        return (UINT64)(UINT)E_NOTIMPL;
+    args[1] = winecom_read_arg( ctx, 1 );
+    args[2] = winecom_read_arg( ctx, 2 );
+    args[3] = winecom_read_arg( ctx, 3 );
+    args[4] = (UINT64)(ULONG_PTR)st.use;
+    ret = mf_invoke( host, slot, 5, args );
+    mf_pv_in_end( &st );
+    return ret;
+}
+
+/* (this, <plain>, <PROPVARIANT in> @2, <PROPVARIANT in> @3) --
+ * IMFStreamSink::PlaceMarker (marker value + context value). */
+static UINT64 hand_pv_in_2_3( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    UINT64 args[16] = { 0 };
+    struct mf_pv_in_state st2, st3;
+    UINT64 ret;
+
+    if (!mf_pv_in( (const PROPVARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 2 ),
+                   &st2, slot ))
+        return (UINT64)(UINT)E_NOTIMPL;
+    if (!mf_pv_in( (const PROPVARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 3 ),
+                   &st3, slot ))
+    {
+        mf_pv_in_end( &st2 );
+        return (UINT64)(UINT)E_NOTIMPL;
+    }
+    args[1] = winecom_read_arg( ctx, 1 );
+    args[2] = (UINT64)(ULONG_PTR)st2.use;
+    args[3] = (UINT64)(ULONG_PTR)st3.use;
+    ret = mf_invoke( host, slot, 4, args );
+    mf_pv_in_end( &st3 );
+    mf_pv_in_end( &st2 );
+    return ret;
+}
+
+/* (this, IMFPresentationDescriptor* @1, const GUID* @2, PROPVARIANT in @3)
+ * -- IMFMediaSource::Start: the one PROPVARIANT slot that also carries an
+ * interface IN-parameter, unwrapped by the same CA_IFACE_IN rule the auto
+ * rows use (NULL stays NULL). */
+static UINT64 hand_source_start( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    UINT64 args[16] = { 0 };
+    struct mf_pv_in_state st;
+    void *desc_native;
+    UINT64 ret;
+
+    if (!winecom_to_native( (void *)(ULONG_PTR)winecom_read_arg( ctx, 1 ),
+                            MF_IFACE_IMFPresentationDescriptor, &desc_native ))
+    {
+        WARN( "mf: Start's descriptor has no native identity; refusing\n" );
+        return (UINT64)(UINT)E_NOTIMPL;
+    }
+    if (!mf_pv_in( (const PROPVARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 3 ),
+                   &st, slot ))
+    {
+        winecom_to_native_end( desc_native );
+        return (UINT64)(UINT)E_NOTIMPL;
+    }
+    args[1] = (UINT64)(ULONG_PTR)desc_native;
+    args[2] = winecom_read_arg( ctx, 2 );
+    args[3] = (UINT64)(ULONG_PTR)st.use;
+    ret = mf_invoke( host, slot, 4, args );
+    mf_pv_in_end( &st );
+    winecom_to_native_end( desc_native );
+    return ret;
+}
+
+/* (this, const GUID* @1, PROPVARIANT in @2, PROPVARIANT out @3,
+ * PROPVARIANT out @4) -- IMFSeekInfo::GetNearestKeyFrames. */
+static UINT64 hand_pv_keyframes( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    UINT64 args[16] = { 0 };
+    struct mf_pv_in_state st;
+    PROPVARIANT *prev, *next;
+    HRESULT hr;
+
+    prev = (PROPVARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 3 );
+    next = (PROPVARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 4 );
+    if (!mf_pv_in( (const PROPVARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 2 ),
+                   &st, slot ))
+        return (UINT64)(UINT)E_NOTIMPL;
+    args[1] = winecom_read_arg( ctx, 1 );
+    args[2] = (UINT64)(ULONG_PTR)st.use;
+    args[3] = (UINT64)(ULONG_PTR)prev;
+    args[4] = (UINT64)(ULONG_PTR)next;
+    hr = (HRESULT)mf_invoke( host, slot, 5, args );
+    mf_pv_in_end( &st );
+    if (SUCCEEDED(hr)) hr = mf_pv_out_fixup( prev, slot );
+    if (SUCCEEDED(hr)) hr = mf_pv_out_fixup( next, slot );
+    return (UINT64)(UINT)hr;
+}
+
+/* THE WM_MEDIA_TYPE FAMILY.  The struct's pUnk member is AUDITED rather
+ * than translated, and the audit is a provable no-op today: the only native
+ * producer zeroes it (dlls/mfplat/mediatype.c:4351, the memset in
+ * MFInitAMMediaTypeFromMFMediaType) and no assignment site exists anywhere
+ * in mfplat, wmvcore or winegstreamer outside tests.  A non-NULL pUnk in
+ * either direction is therefore the impossible-today case, refused loudly
+ * so the day an implementation changes, the report names it here instead of
+ * a guest calling through a native vtable.  pbFormat is a plain data
+ * pointer into memory both sides read. */
+
+static BOOL mf_wmt_in_ok( const WM_MEDIA_TYPE *mt, UINT slot )
+{
+    static LONG logged;
+
+    if (!mt || !mt->pUnk) return TRUE;
+    if (!InterlockedExchange( &logged, 1 ))
+        FIXME( "mf: slot %u was given a WM_MEDIA_TYPE whose pUnk is %p; no "
+               "native consumer reads it and nothing translates it -- "
+               "refusing\n", slot, mt->pUnk );
+    return FALSE;
+}
+
+static HRESULT mf_wmt_out_fixup( WM_MEDIA_TYPE *mt, UINT slot )
+{
+    static LONG logged;
+
+    if (!mt || !mt->pUnk) return S_OK;
+    if (!InterlockedExchange( &logged, 1 ))
+        FIXME( "mf: slot %u produced a WM_MEDIA_TYPE with a live pUnk %p, "
+               "which dlls/mfplat/mediatype.c never does; releasing it and "
+               "refusing rather than handing the guest a native vtable\n",
+               slot, mt->pUnk );
+    IUnknown_Release( mt->pUnk );
+    mt->pUnk = NULL;
+    return E_NOTIMPL;
+}
+
+/* (this, WM_MEDIA_TYPE *out @1, DWORD *inout @2) -- IWMMediaProps::
+ * GetMediaType; pType may be NULL for the size query. */
+static UINT64 hand_wmt_out( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    UINT64 args[16] = { 0 };
+    WM_MEDIA_TYPE *mt;
+    HRESULT hr;
+
+    mt = (WM_MEDIA_TYPE *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    args[1] = (UINT64)(ULONG_PTR)mt;
+    args[2] = winecom_read_arg( ctx, 2 );
+    hr = (HRESULT)mf_invoke( host, slot, 3, args );
+    if (SUCCEEDED(hr)) hr = mf_wmt_out_fixup( mt, slot );
+    return (UINT64)(UINT)hr;
+}
+
+/* (this, WM_MEDIA_TYPE *in @1) -- IWMMediaProps::SetMediaType. */
+static UINT64 hand_wmt_in_1( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    UINT64 args[16] = { 0 };
+    const WM_MEDIA_TYPE *mt;
+
+    mt = (const WM_MEDIA_TYPE *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    if (!mf_wmt_in_ok( mt, slot )) return (UINT64)(UINT)E_NOTIMPL;
+    args[1] = (UINT64)(ULONG_PTR)mt;
+    return mf_invoke( host, slot, 2, args );
+}
+
+/* (this, <plain> @1, WM_MEDIA_TYPE *in @2) -- IWMReaderAccelerator::Notify. */
+static UINT64 hand_wmt_in_2( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    UINT64 args[16] = { 0 };
+    const WM_MEDIA_TYPE *mt;
+
+    mt = (const WM_MEDIA_TYPE *)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    if (!mf_wmt_in_ok( mt, slot )) return (UINT64)(UINT)E_NOTIMPL;
+    args[1] = winecom_read_arg( ctx, 1 );
+    args[2] = (UINT64)(ULONG_PTR)mt;
+    return mf_invoke( host, slot, 3, args );
+}
+
+/* (this, <plain> @1, WM_MEDIA_TYPE *in @2, void* @3) --
+ * IWMReaderCallbackAdvanced::OnOutputPropsChanged. */
+static UINT64 hand_wmt_in_2_ctx( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    UINT64 args[16] = { 0 };
+    const WM_MEDIA_TYPE *mt;
+
+    mt = (const WM_MEDIA_TYPE *)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    if (!mf_wmt_in_ok( mt, slot )) return (UINT64)(UINT)E_NOTIMPL;
+    args[1] = winecom_read_arg( ctx, 1 );
+    args[2] = (UINT64)(ULONG_PTR)mt;
+    args[3] = winecom_read_arg( ctx, 3 );
+    return mf_invoke( host, slot, 4, args );
+}
+
+/* THE REPRESENTATION TRIO.  A by-value GUID crosses MS-x64 as a HIDDEN
+ * POINTER to a caller temporary (any aggregate that is not 1/2/4/8 bytes),
+ * so the guest's argument slot holds an address; ELFv2 wants the sixteen
+ * bytes in registers, which a real by-value prototype provides once the
+ * pointer is dereferenced.  That is the whole trick: read the slot, deref,
+ * call with the right C type.
+ *
+ * The blob GetRepresentation yields is always an AM_MEDIA_TYPE --
+ * dlls/mfplat/mediatype.c routes all five supported representation GUIDs
+ * through MFCreateAMMediaTypeFromMFMediaType and fails every other GUID
+ * with MF_E_UNSUPPORTED_REPRESENTATION -- so the pUnk audit above applies
+ * (WM_MEDIA_TYPE and AM_MEDIA_TYPE are the same IDL struct).  On the
+ * impossible-today live pUnk the blob is freed the way FreeRepresentation
+ * frees it (CoTaskMemFree of pbFormat then of the blob -- mediatype.c),
+ * because the guest never saw the pointer and could not free it itself.
+ * FreeRepresentation itself never reads pUnk, so it is a plain
+ * dereference-and-call. */
+
+static UINT64 hand_get_representation( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    void **vtbl = *(void ***)host;
+    const GUID *rep = (const GUID *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    void **out = (void **)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    HRESULT hr;
+
+    hr = ((HRESULT (*)( void *, GUID, void ** ))vtbl[slot])( host, *rep, out );
+    if (SUCCEEDED(hr) && out && *out)
+    {
+        WM_MEDIA_TYPE *mt = *out;
+        if (FAILED(mf_wmt_out_fixup( mt, slot )))
+        {
+            CoTaskMemFree( mt->pbFormat );
+            CoTaskMemFree( mt );
+            *out = NULL;
+            return (UINT64)(UINT)E_NOTIMPL;
+        }
+    }
+    return (UINT64)(UINT)hr;
+}
+
+static UINT64 hand_free_representation( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    void **vtbl = *(void ***)host;
+    const GUID *rep = (const GUID *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    void *blob = (void *)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+
+    return (UINT64)(UINT)((HRESULT (*)( void *, GUID, void * ))vtbl[slot])
+        ( host, *rep, blob );
+}
+
+/* (this, GUID byval @1, LPVOID* @2, LONG @3) -- IMFVideoMediaType::
+ * GetVideoRepresentation, the evr spelling of the same shape with a stride
+ * argument; same audit for the same reason. */
+static UINT64 hand_get_video_representation( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    void **vtbl = *(void ***)host;
+    const GUID *rep = (const GUID *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    void **out = (void **)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    LONG stride = (LONG)winecom_read_arg( ctx, 3 );
+    HRESULT hr;
+
+    hr = ((HRESULT (*)( void *, GUID, void **, LONG ))vtbl[slot])
+        ( host, *rep, out, stride );
+    if (SUCCEEDED(hr) && out && *out)
+    {
+        WM_MEDIA_TYPE *mt = *out;
+        if (FAILED(mf_wmt_out_fixup( mt, slot )))
+        {
+            CoTaskMemFree( mt->pbFormat );
+            CoTaskMemFree( mt );
+            *out = NULL;
+            return (UINT64)(UINT)E_NOTIMPL;
+        }
     }
     return (UINT64)(UINT)hr;
 }
@@ -307,12 +727,51 @@ static UINT64 hand_process_output( void *host, UINT slot, AMD64_CONTEXT *ctx )
     return (UINT64)(UINT)hr;
 }
 
-/* The order here IS gen_winecom.py's HAND_SLOTS order. */
+/* (this, GUID byval @1, void* @2, DWORD* @3) -- INSSBuffer3::GetProperty:
+ * the property GUID by hidden pointer, a plain payload buffer and its size
+ * cell.  And the Set twin, whose @3 is the size BY VALUE. */
+static UINT64 hand_nss_get_property( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    void **vtbl = *(void ***)host;
+    const GUID *prop = (const GUID *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+
+    return (UINT64)(UINT)((HRESULT (*)( void *, GUID, void *, DWORD * ))vtbl[slot])
+        ( host, *prop, (void *)(ULONG_PTR)winecom_read_arg( ctx, 2 ),
+          (DWORD *)(ULONG_PTR)winecom_read_arg( ctx, 3 ) );
+}
+
+static UINT64 hand_nss_set_property( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    void **vtbl = *(void ***)host;
+    const GUID *prop = (const GUID *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+
+    return (UINT64)(UINT)((HRESULT (*)( void *, GUID, void *, DWORD ))vtbl[slot])
+        ( host, *prop, (void *)(ULONG_PTR)winecom_read_arg( ctx, 2 ),
+          (DWORD)winecom_read_arg( ctx, 3 ) );
+}
+
+/* The order here IS gen_winecom.py's HAND_SLOTS order (first appearance). */
 static const winecom_hand_fn mf_hand_funcs[] =
 {
     hand_propvariant_in,
     hand_propvariant_out,
     hand_process_output,
+    hand_pv_out_1,
+    hand_pv_out_2,
+    hand_pv_in_mid,
+    hand_pv_in_4,
+    hand_pv_in_2_3,
+    hand_source_start,
+    hand_pv_keyframes,
+    hand_wmt_out,
+    hand_wmt_in_1,
+    hand_wmt_in_2,
+    hand_wmt_in_2_ctx,
+    hand_get_representation,
+    hand_free_representation,
+    hand_get_video_representation,
+    hand_nss_get_property,
+    hand_nss_set_property,
 };
 
 static const struct winecom_surface mf_surface =

@@ -130,6 +130,14 @@ static void out_guid( const GUID *g )
     out( "}" );
 }
 
+/* PropVariantInit is a memset macro and this build has no CRT. */
+static void pv_zero( PROPVARIANT *p )
+{
+    BYTE *b = (BYTE *)p;
+    UINT i;
+    for (i = 0; i < sizeof(*p); i++) b[i] = 0;
+}
+
 static BOOL guid_eq( const GUID *a, const GUID *b )
 {
     const BYTE *p = (const BYTE *)a, *q = (const BYTE *)b;
@@ -448,6 +456,143 @@ static int mf_smoke_run( void )
             verdict( hr == S_OK && back.bits == want.bits,
                      "the by-value double did not survive the crossing" );
             if (fpstore) IMFMediaType_Release( fpstore );
+        }
+
+        /* THE PROPVARIANT FAMILY (the 2026-09-01 completeness pass).
+         * SetItem/GetItem were WHOLE-SLOT refusals until the per-tag hand
+         * walkers existed; three legs, one per translation class:
+         *
+         *   VT_UI8    plain bits through the union -- the baseline.
+         *   VT_LPWSTR a payload POINTER both ways: in, the callee copies the
+         *             guest's string; out, the callee CoTaskMemAllocs one
+         *             and the guest's PropVariantClear frees it by crossing
+         *             back into the same native allocator -- one process,
+         *             one heap, which is the ownership argument in
+         *             mfcom.c's mf_pv_in banner.
+         *   VT_UNKNOWN the interface arm: the object stored through the
+         *             hand walker's unwrap must come back from GetItem as
+         *             the SAME pointer this leg stored, because
+         *             winecom_wrap interns by host identity -- on the guest
+         *             leg that pointer is a proxy and the equality PROVES
+         *             the round trip went host-object -> same-proxy; then a
+         *             QueryInterface to IMFMediaType proves the proxy is
+         *             live.  Both legs print same=1 qi=1, so the transcript
+         *             stays byte-identical.
+         */
+        begin( "IMFAttributes::SetItem/GetItem PROPVARIANT round trips" );
+        {
+            static const GUID pv_key_u8 =
+                {0x7a01b2c3, 0x11d4, 0x4e55,
+                 {0x8f,0x60,0x71,0x82,0x93,0xa4,0xb5,0xc6}};
+            static const GUID pv_key_str =
+                {0x7a01b2c4, 0x11d4, 0x4e55,
+                 {0x8f,0x60,0x71,0x82,0x93,0xa4,0xb5,0xc6}};
+            static const GUID pv_key_unk =
+                {0x7a01b2c5, 0x11d4, 0x4e55,
+                 {0x8f,0x60,0x71,0x82,0x93,0xa4,0xb5,0xc6}};
+            static const WCHAR text[] = {'p','v','-','l','a','n','e',0};
+            IMFMediaType *store = NULL, *stored = NULL, *qi = NULL;
+            PROPVARIANT pv, got;
+            ULONGLONG u8_bits = 0;
+            ULONG str_ok = 0, same = 0, qi_ok = 0;
+
+            hr = MFCreateMediaType( &store );
+
+            if (SUCCEEDED(hr))                                  /* VT_UI8 */
+            {
+                pv_zero( &pv );
+                pv.vt = VT_UI8;
+                pv.uhVal.QuadPart = 0x1122334455667788ULL;
+                hr = IMFMediaType_SetItem( store, &pv_key_u8, &pv );
+            }
+            if (SUCCEEDED(hr))
+            {
+                pv_zero( &got );
+                hr = IMFMediaType_GetItem( store, &pv_key_u8, &got );
+                if (SUCCEEDED(hr))
+                {
+                    if (got.vt == VT_UI8) u8_bits = got.uhVal.QuadPart;
+                    PropVariantClear( &got );
+                }
+            }
+
+            if (SUCCEEDED(hr))                                  /* VT_LPWSTR */
+            {
+                pv_zero( &pv );
+                pv.vt = VT_LPWSTR;
+                pv.pwszVal = (WCHAR *)text;
+                hr = IMFMediaType_SetItem( store, &pv_key_str, &pv );
+            }
+            if (SUCCEEDED(hr))
+            {
+                pv_zero( &got );
+                hr = IMFMediaType_GetItem( store, &pv_key_str, &got );
+                if (SUCCEEDED(hr))
+                {
+                    UINT i;
+                    str_ok = got.vt == VT_LPWSTR && got.pwszVal != NULL;
+                    for (i = 0; str_ok && i < ARRAYSIZE(text); i++)
+                        if (got.pwszVal[i] != text[i]) str_ok = 0;
+                    PropVariantClear( &got );
+                }
+            }
+
+            if (SUCCEEDED(hr))                                  /* VT_UNKNOWN */
+                hr = MFCreateMediaType( &stored );
+            if (SUCCEEDED(hr))
+            {
+                pv_zero( &pv );
+                pv.vt = VT_UNKNOWN;
+                pv.punkVal = (IUnknown *)stored;
+                hr = IMFMediaType_SetItem( store, &pv_key_unk, &pv );
+            }
+            if (SUCCEEDED(hr))
+            {
+                pv_zero( &got );
+                hr = IMFMediaType_GetItem( store, &pv_key_unk, &got );
+                if (SUCCEEDED(hr))
+                {
+                    /* COM's identity rule: two references are the same
+                     * object iff their QI(IID_IUnknown) answers are EQUAL
+                     * POINTERS.  The raw values may differ legitimately --
+                     * the stored reference was wrapped as IMFMediaType and
+                     * the returned one as IUnknown, two interned proxies
+                     * over one host object -- and proxy_qi canonicalises
+                     * both to the same IUnknown, which is the assertion
+                     * that actually proves host-object identity survived
+                     * the round trip. */
+                    IUnknown *canon_in = NULL, *canon_out = NULL;
+                    if (got.vt == VT_UNKNOWN && got.punkVal &&
+                        SUCCEEDED(IUnknown_QueryInterface( (IUnknown *)stored,
+                                      &IID_IUnknown, (void **)&canon_in )) &&
+                        SUCCEEDED(IUnknown_QueryInterface( got.punkVal,
+                                      &IID_IUnknown, (void **)&canon_out )))
+                        same = canon_in == canon_out;
+                    if (canon_in) IUnknown_Release( canon_in );
+                    if (canon_out) IUnknown_Release( canon_out );
+                    if (got.vt == VT_UNKNOWN && got.punkVal &&
+                        SUCCEEDED(IUnknown_QueryInterface( got.punkVal,
+                                      &IID_IMFMediaType, (void **)&qi )) && qi)
+                    {
+                        qi_ok = 1;
+                        IMFMediaType_Release( qi );
+                    }
+                    PropVariantClear( &got );
+                }
+            }
+
+            out_hr( "hr", hr );
+            out( " u8=" );
+            out_hex( (ULONG)(u8_bits >> 32), 8 );
+            out_hex( (ULONG)u8_bits, 8 );
+            out( str_ok ? " str=1" : " str=0" );
+            out( same ? " same=1" : " same=0" );
+            out( qi_ok ? " qi=1" : " qi=0" );
+            verdict( hr == S_OK && u8_bits == 0x1122334455667788ULL &&
+                     str_ok && same && qi_ok,
+                     "a PROPVARIANT arm did not survive the crossing" );
+            if (stored) IMFMediaType_Release( stored );
+            if (store) IMFMediaType_Release( store );
         }
 
         /* CA_IFACE_IN: a guest-held proxy travelling back INTO native MF as an

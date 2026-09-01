@@ -201,6 +201,11 @@ LIBRARY mfreadwrite.dll
 EXPORTS
 MFCreateSourceReaderFromURL
 EOF
+cat > "$OUT/ole32.def" <<'EOF'
+LIBRARY ole32.dll
+EXPORTS
+PropVariantClear
+EOF
 cat > "$OUT/kernel32.def" <<'EOF'
 LIBRARY kernel32.dll
 EXPORTS
@@ -214,7 +219,7 @@ SetEvent
 CloseHandle
 GetCurrentThreadId
 EOF
-for m in mfplat mfreadwrite kernel32; do
+for m in mfplat mfreadwrite kernel32 ole32; do
     llvm-dlltool -m i386:x86-64 -d "$OUT/$m.def" -l "$OUT/lib$m.a" \
         || skip "llvm-dlltool failed for $m"
 done
@@ -226,7 +231,7 @@ guest_build() {   # <source> <entry> <exe>
     clang -target x86_64-windows-gnu -fuse-ld=lld -nostdlib \
         -Wl,--entry=$2 -Wl,--subsystem,console \
         -o "$3" "$OUT/$2.o" \
-        "$OUT/libmfplat.a" "$OUT/libmfreadwrite.a" "$OUT/libkernel32.a"
+        "$OUT/libmfplat.a" "$OUT/libmfreadwrite.a" "$OUT/libkernel32.a" "$OUT/libole32.a"
 }
 
 guest_build "$HERE/probes/mf_smoke.c" mf_smoke_entry "$OUT/mf_smoke_guest.exe" \
@@ -358,6 +363,8 @@ for want in "materialised .* guest vtable slots" \
             "winecom_dispatch IMFAttributes::GetGUID" \
             "winecom_dispatch IMFAttributes::GetUINT32" \
             "winecom_dispatch IMFAttributes::SetDouble" \
+            "winecom_dispatch IMFAttributes::SetItem" \
+            "winecom_dispatch IMFAttributes::GetItem" \
             "winecom_dispatch IMFSourceReader::SetCurrentMediaType" \
             "winecom_dispatch IMFSourceReader::ReadSample" \
             "winecom_dispatch IMFSample::ConvertToContiguousBuffer" \

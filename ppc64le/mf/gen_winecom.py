@@ -37,9 +37,12 @@ Foundation's own shape rather than an accident of this port:
 
   * PROPVARIANT.  IMFAttributes::GetItem/SetItem and everything spelled
     REFPROPVARIANT carry a tagged union that can hold VT_UNKNOWN -- an
-    interface pointer with no type in the signature at all.  Refused; the
-    typed accessors (GetGUID/GetUINT32/GetUINT64/GetString/GetBlob/GetUnknown)
-    are fully served and are what callers actually use.
+    interface pointer with no type in the signature at all.  SERVED since
+    2026-09-01, by hand and per tag (see the HAND_SLOTS banner): plain tags
+    pass, VT_UNKNOWN translates through the proxy machinery, and only the
+    arms nothing can serve (VT_DISPATCH, interface VECTOR/ARRAY/BYREF)
+    refuse at runtime naming the VT.  The blanket signature-level refusal
+    this paragraph used to describe is gone.
   * nothing about IUnknown.  It is ON the roster (see
     ppc64le/mf/gen_interfaces.py for the three reasons), so `IUnknown *` in
     translates like any other proxy and `IUnknown **` out comes back as a
@@ -195,6 +198,17 @@ POINTER_TYPEDEFS = {
     "LPVOID": "void", "PVOID": "void", "LPCVOID": "void",
     "REFIID": "GUID", "REFGUID": "GUID", "REFCLSID": "GUID",
     "REFPROPVARIANT": "PROPVARIANT",
+    # include/wmsdkidl.h:671 `typedef LPCWSTR LPCWSTR_WMSDK_TYPE_SAFE;` -- a
+    # WCHAR string under a WMSDK guard name.  Ten rows (IWMHeaderInfo's
+    # AddMarker/AddScript/AddCodecInfo, IWMLanguageList, IWMStreamConfig's
+    # two setters) refused as "not provably integer-class" for want of this
+    # line: the string itself is guest memory both sides read with 2-byte
+    # WCHAR (this surface's banner, point one).
+    "LPCWSTR_WMSDK_TYPE_SAFE": "WCHAR",
+    # include/wingdi.h:1866 -- a plain-data struct pointer.  Its one row
+    # (IMFVideoDisplayControl::GetCurrentImage) then classifies on its own
+    # merits: the BYTE** beside it is the PLAIN_PP DIB blob.
+    "LPBITMAPINFOHEADER": "BITMAPINFOHEADER",
 }
 
 # Pointer-to-pointer parameters that really are blocks of plain memory, so
@@ -208,6 +222,10 @@ PLAIN_PP = {
     "UINT8": "IMFAttributes::GetAllocatedBlob -- a CoTaskMemAlloc'd blob",
     "WCHAR": "IMFAttributes::GetAllocatedString -- a CoTaskMemAlloc'd string",
     "char":  "an ANSI string out-parameter",
+    "GUID":  "IMFVideoProcessor::GetAvailableVideoProcessorModes / "
+             "IWMDRMReader3::GetInclusionList -- the callee CoTaskMemAllocs "
+             "an array of plain GUIDs and writes its address; sixteen bytes "
+             "of data per element, no vtable anywhere",
 }
 
 FLOAT_TOKENS = re.compile(r'\b(FLOAT|float|double|DOUBLE)\b')
@@ -242,10 +260,42 @@ CARRIER_STRUCTS = {
 #                                             shape, so the same function
 #   IMFSourceReader::GetPresentationAttribute MF_PD_DURATION -- how long is it
 # --------------------------------------------------------------------------
+#
+# THE PROPVARIANT FAMILY, 2026-09-01: every PROPVARIANT-bearing slot on the
+# surface is hand-served through dlls/mfplat/mfcom.c's mf_pv_in/mf_pv_out
+# helpers, which TRANSLATE the tag instead of merely auditing it: VT_UNKNOWN
+# crosses (unwrapped in, wrapped as an IUnknown proxy out -- QueryInterface
+# from there is what a COM caller does with one anyway), plain-memory tags
+# pass through, and only the genuinely untranslatable tags (VT_DISPATCH --
+# IDispatch is not on this roster -- and VECTOR/ARRAY/BYREF of interfaces)
+# refuse AT RUNTIME, per tag, naming the VT.  That is what complete means
+# for a tagged union: the refusal moved from the whole slot to the one arm
+# nothing can serve.  Each entry names its pv position(s) so the C function
+# choice is an audited statement about the signature, not an inference.
+#
+# The WM_MEDIA_TYPE family crosses with its pUnk member AUDITED: the only
+# native producer zeroes it (dlls/mfplat/mediatype.c:4351 memset in
+# MFInitAMMediaTypeFromMFMediaType) and no assignment site exists anywhere
+# in mfplat/wmvcore/winegstreamer non-test code, so a non-NULL pUnk in
+# either direction is refused loudly as the impossible-today case rather
+# than translated speculatively.
+#
+# The GetRepresentation trio takes a GUID BY VALUE: MS-x64 passes a 16-byte
+# aggregate by hidden pointer, so the hand slot dereferences the guest's
+# slot and calls the native method with a real by-value GUID prototype.
+# The representation blob is always an AM_MEDIA_TYPE from
+# MFCreateAMMediaTypeFromMFMediaType (mediatype.c GetRepresentation routes
+# all five supported GUIDs there), pUnk audited as above;
+# FreeRepresentation frees pbFormat+blob and never reads pUnk (mediatype.c
+# FreeRepresentation), so it is a plain dereference-and-call.
 HAND_SLOTS = [
     ("IMFSourceReader::SetCurrentPosition",       "hand_propvariant_in"),
     ("IMFMediaSession::Start",                    "hand_propvariant_in"),
+    ("IMFAttributes::SetItem",                    "hand_propvariant_in"),
+    ("IMFMetadata::SetProperty",                  "hand_propvariant_in"),
     ("IMFSourceReader::GetPresentationAttribute", "hand_propvariant_out"),
+    ("IMFAttributes::GetItemByIndex",             "hand_propvariant_out"),
+    ("IMFMediaEngineEx::GetStreamAttribute",      "hand_propvariant_out"),
     # MFT_OUTPUT_DATA_BUFFER carries an IMFSample* and an IMFCollection*
     # inside a struct the classifier below refuses by name (see
     # CARRIER_STRUCTS/bearing); this hand slot is the walker dlls/d3d12/
@@ -253,6 +303,40 @@ HAND_SLOTS = [
     # union arm at a time.  Bypasses classify() entirely, exactly like the
     # PROPVARIANT hands above.
     ("IMFTransform::ProcessOutput",               "hand_process_output"),
+    # (this, PROPVARIANT *out)
+    ("IMFMediaEvent::GetValue",                   "hand_pv_out_1"),
+    ("IMFMetadata::GetAllLanguages",              "hand_pv_out_1"),
+    ("IMFMetadata::GetAllPropertyNames",          "hand_pv_out_1"),
+    # (this, <one integer/pointer>, PROPVARIANT *out)
+    ("IMFAttributes::GetItem",                    "hand_pv_out_2"),
+    ("IMFMediaEngineEx::GetPresentationAttribute", "hand_pv_out_2"),
+    ("IMFMediaEngineEx::GetStatistics",           "hand_pv_out_2"),
+    ("IMFMetadata::GetProperty",                  "hand_pv_out_2"),
+    # (this, REFGUID, REFPROPVARIANT in, BOOL *out)
+    ("IMFAttributes::CompareItem",                "hand_pv_in_mid"),
+    # (this, <three plain>, const PROPVARIANT *in)
+    ("IMFMediaEventGenerator::QueueEvent",        "hand_pv_in_4"),
+    ("IMFMediaEventQueue::QueueEventParamVar",    "hand_pv_in_4"),
+    # (this, <one plain>, const PROPVARIANT *in, const PROPVARIANT *in)
+    ("IMFStreamSink::PlaceMarker",                "hand_pv_in_2_3"),
+    # (this, IMFPresentationDescriptor *in, const GUID *, const PROPVARIANT *in)
+    ("IMFMediaSource::Start",                     "hand_source_start"),
+    # (this, const GUID *, const PROPVARIANT *in, PROPVARIANT *out, PROPVARIANT *out)
+    ("IMFSeekInfo::GetNearestKeyFrames",          "hand_pv_keyframes"),
+    # WM_MEDIA_TYPE, pUnk audited (see above)
+    ("IWMMediaProps::GetMediaType",               "hand_wmt_out"),
+    ("IWMMediaProps::SetMediaType",               "hand_wmt_in_1"),
+    ("IWMReaderAccelerator::Notify",              "hand_wmt_in_2"),
+    ("IWMReaderCallbackAdvanced::OnOutputPropsChanged", "hand_wmt_in_2_ctx"),
+    # GUID by value via the hidden pointer (see above)
+    ("IMFMediaType::GetRepresentation",           "hand_get_representation"),
+    ("IMFMediaType::FreeRepresentation",          "hand_free_representation"),
+    ("IMFVideoMediaType::GetVideoRepresentation", "hand_get_video_representation"),
+    # The two rows the INSSBuffer roster growth itself added: the WMSDK
+    # buffer's property pair takes the property GUID by value, and the
+    # payload is a plain void*/size pair.  Same hidden-pointer dereference.
+    ("INSSBuffer3::GetProperty",                  "hand_nss_get_property"),
+    ("INSSBuffer3::SetProperty",                  "hand_nss_set_property"),
 ]
 
 # Refusals decided here rather than derived, each with the reason the runtime
@@ -263,6 +347,18 @@ REFUSALS = {}
 # interface pointers, checked one by one against the headers.  Everything else
 # with a bare void** is refused: the default has to be the safe one.
 VOID_PP_IS_MEMORY = frozenset()
+
+# Slots whose interface out-parameter LOOKS plural to the pp...s name
+# heuristic but is a single pointer, audited against the header: the `s` in
+# `ppProps` is the s of "Props", not of a plural.  Both GetOutputFormat
+# overloads write exactly one IWMOutputMediaProps* (wmsdkidl.h -- one
+# out-param, format picked by the two by-value indices before it), and the
+# heuristic's refusal ("interface array with no count") was a misreading,
+# not a safety catch.  Keyed Owner::Method like every other audited list.
+SINGULAR_IFACE_OUT = frozenset((
+    "IWMReader::GetOutputFormat",
+    "IWMSyncReader::GetOutputFormat",
+))
 
 
 # --------------------------------------------------------------------------
@@ -532,7 +628,8 @@ def classify(key, slot, ifaces, iface_index, byval_ok, bearing, why_bearing):
                 continue
             c = find_count(params, i)
             plural = (p.name or '').startswith("pp") and \
-                     (p.name or '').endswith("s")
+                     (p.name or '').endswith("s") and \
+                     key not in SINGULAR_IFACE_OUT
             if c is not None and plural:
                 cls[i] = CA["IFACE_ARR_OUT_STATIC"]
                 xaux[i] = iface_index[p.base]
