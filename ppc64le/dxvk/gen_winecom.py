@@ -35,10 +35,11 @@ REFUSALS below for the exact texts:
     proxy pointers.  This independently rediscovers the nine
     ID3D11VideoContext slots dxvk-ppc64le/docs/hazard-hunt.md §3.1 measured.
   * raw void** out-parameters with no REFIID to type them.
-  * WCHAR-bearing signatures.  DXVK's native headers say
-    `typedef wchar_t WCHAR` (src/include/native/windows/windows_base.h:30),
-    which is FOUR bytes here; the guest PE's WCHAR is two.  A string crossing
-    unconverted is not a subtle defect, but it is a silent one.
+  * WCHAR-bearing signatures -- NO LONGER REFUSED:
+    dxvk-patches/0005-wchar-is-16-bit makes the native WCHAR two bytes, the
+    guest's own width, so strings cross in place.  (Historical text, kept
+    for the record: with `typedef wchar_t WCHAR` a string crossing
+    unconverted is not a subtle defect, but it is a silent one.)
   * by-value floats in parameter positions past the eighth, where the fp
     masks cannot name them.  Positions 1..8 and float returns are SERVED
     since PPC64EC step C through the surface's floating-point invoker
@@ -103,15 +104,89 @@ BYVAL_INTEGER = frozenset("""
 # name with the reason, never passed.
 BYVAL_OPAQUE = {
     "HANDLE":
-        "takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's "
-        "native side encodes an event as the tagged eventfd "
-        "0x4556464400000000|fd (src/include/native/windows/"
-        "dxvk_native_event.h) and a shared resource as its own key.  Handing "
-        "one namespace's integer to the other is the exact collision "
-        "ppc64le/vkd3d's tagged-handle series was written to prevent -- "
-        "MEASURED there as eight bytes written into a live pipe",
+        "takes a by-value shared-resource HANDLE.  DXVK's native side reads "
+        "these through its own D3DKMT global-share emulation "
+        "(d3d11_device.cpp OpenSharedResource: D3DKMTQueryResourceInfo over "
+        "kmt-tagged integers), and no seam yet carries a Wine shared "
+        "resource into that namespace -- the design and its precise blocker "
+        "are ppc64le/dxvk/docs/shared-resource-handles.md.  EVENT handles "
+        "are NOT refused any more: every event-shaped HANDLE method is "
+        "audited in EVENT_HANDLE_METHODS and crosses through the winecom "
+        "event relay as the tagged eventfd both native libraries understand",
     "HDC":
         "takes an HDC, a GDI object with no meaning on DXVK's native side",
+}
+
+# HANDLE arguments audited METHOD BY METHOD against DXVK's own source; each
+# entry cites the consumer that proves the disposition.  "oneshot" = the
+# callee signals at most once and stores nothing past the operation (no
+# cookie anywhere in the signature) -> WINECOM_CA_EVENT_ONESHOT, relay entry
+# reaped at first payout.  "registered" = a DWORD* cookie rides beside the
+# HANDLE and the callee may keep it -> WINECOM_CA_EVENT, entry lives until
+# the call FAILS (reaped at once -- most of these are E_NOTIMPL in DXVK
+# today, so they cost one mint/reap round trip and stay future-proof for the
+# day DXVK implements them) or forever, bounded by registrations.
+EVENT_HANDLE_METHODS = {
+    "ID3D11Fence::SetEventOnCompletion":
+        ("oneshot", "d3d11_fence.cpp:128 enqueueWait -> SetEvent"),
+    "ID3D11DeviceContext3::Flush1":
+        ("oneshot", "d3d11_context_imm.cpp:171 ExecuteFlush(..., hEvent); "
+                    "deferred contexts warn and ignore"),
+    "IDXGIDevice2::EnqueueSetEvent":
+        ("oneshot", "d3d11_device.cpp:4159 forwards to Flush1"),
+    "IDXGIAdapter3::RegisterVideoMemoryBudgetChangeNotificationEvent":
+        ("registered", "dxgi_adapter.cpp:353 event map + monitor thread + "
+                       "an immediate SetEvent; Unregister erases"),
+    "IDXGIAdapter3::RegisterHardwareContentProtectionTeardownStatusEvent":
+        ("registered", "dxgi_adapter.cpp:347 E_NOTIMPL -- the FAILED return "
+                       "reaps the entry"),
+    "IDXGIFactory2::RegisterOcclusionStatusEvent":
+        ("registered", "dxgi_factory.cpp:463 E_NOTIMPL -- reaped"),
+    "IDXGIFactory2::RegisterStereoStatusEvent":
+        ("registered", "dxgi_factory.cpp:446 E_NOTIMPL -- reaped"),
+    "IDXGIFactory7::RegisterAdaptersChangedEvent":
+        ("registered", "dxgi_factory.cpp:509 E_NOTIMPL -- reaped"),
+    "ID3D11Device4::RegisterDeviceRemovedEvent":
+        ("registered", "d3d11_device.cpp:1974 stub: writes a cookie, never "
+                       "reads the event; the idle entry is bounded by "
+                       "registrations"),
+}
+
+# Rows served AS-IS because DXVK provably never reads the hazardous
+# parameter -- each entry cites the line that proves it, and the d3d11-smoke
+# gate PINS the cited behavior (the canary): if a DXVK update ever starts
+# reading the parameter, the gate goes red and the row comes back here for
+# reclassification.  Values: { param_name: citation } forcing CA_PASS.
+CANARY_SERVE_DXVK = {
+    "IDXGIFactory2::GetSharedResourceAdapterLuid": {
+        "hResource": "dxgi_factory.cpp:418: E_NOTIMPL before the handle is "
+                     "ever read" },
+    "ID3D11VideoContext::ConfigureAuthenticatedChannel": {
+        "input":  "d3d11_video.cpp:1352: stub, E_NOTIMPL before any "
+                  "parameter is read",
+        "output": "same stub -- the HANDLE-bearing OUTPUT struct is never "
+                  "written (and the refusal-scrub already nulled it when "
+                  "this row refused; now the callee's E_NOTIMPL is the "
+                  "guest's own contract for an unwritten output)" },
+    "IDXGIDevice::CreateSurface": {
+        "shared_resource": "d3d11_device.cpp:4002: 'Shared surfaces not "
+                           "supported' -- logged and ignored; the surfaces "
+                           "themselves are served" },
+    "IDXGIFactory2::CreateSwapChainForCoreWindow": {
+        "pWindow": "dxgi_factory.cpp:269: E_NOTIMPL before the CoreWindow "
+                   "is ever read -- there is no HWND behind a CoreWindow "
+                   "on any lane, and DXVK's own answer IS the refusal the "
+                   "guest receives, from the callee instead of from us" },
+    "ID3D11VideoContext::GetDecoderBuffer": {
+        "buffer": "d3d11_video.cpp:508: stub, E_NOTIMPL before any "
+                  "parameter is read; a decoder-buffer caller must check "
+                  "hr before touching the mapped pointer on every "
+                  "platform, and the callee's own E_NOTIMPL is DXVK's "
+                  "native semantics" },
+    "ID3D11VideoContext::DecoderExtension": {
+        "extension": "d3d11_video.cpp:571: stub, E_NOTIMPL before the "
+                     "extension struct (and the ID3D11Resource pointers "
+                     "inside it) is ever read" },
 }
 
 # 8-byte aggregates that are ONE integer register on both the MS-x64 and the
@@ -172,6 +247,12 @@ HAND_SLOTS_DXVK = [
     ("IDXGIFactory2::CreateSwapChainForHwnd",      "hand_create_swapchain_for_hwnd"),
     ("IDXGISwapChain::Present",                    "hand_swapchain_present"),
     ("IDXGISwapChain1::Present1",                  "hand_swapchain_present1"),
+    # D3D11_VIDEO_PROCESSOR_STREAM carries interface-pointer ARRAYS inside
+    # the struct (ppPastSurfaces/ppFutureSurfaces/pInputSurface + the stereo
+    # right-channel trio); no marshal class can walk into a struct, so the
+    # walker unwraps every view proxy into a native copy -- the
+    # hand_resource_barrier shape.
+    ("ID3D11VideoContext::VideoProcessorBlt",      "hand_video_processor_blt"),
 ]
 
 # --------------------------------------------------------------------------
@@ -179,25 +260,34 @@ HAND_SLOTS_DXVK = [
 # prints once.  Keyed "Owner::Method" like HAND_SLOTS.
 # --------------------------------------------------------------------------
 REFUSALS_DXVK = {
-    # The two swapchain routes that have no window at all.  Upstream's
-    # backends answer these by creating a window of their own -- DXVK's DXGI
-    # calls DxgiSurfaceFactory::CreateDummyWindow for exactly that -- and this
-    # lane's backend owns no windows: it presents to windows Wine created, on
-    # behalf of an application that asked for one.  Refused here rather than
-    # left to fail inside DXVK, where the reason would arrive as
-    # VK_ERROR_INITIALIZATION_FAILED with no mention of windows.
-    "IDXGIFactory2::CreateSwapChainForCoreWindow":
-        "creates a swapchain for a WinRT CoreWindow, which has no HWND.  This "
-        "lane presents through win32u's client-surface layer, which is a layer "
-        "over a Wine window handle; there is no window here to attach a "
-        "surface to, and DXVK's own answer would be to fabricate one",
-    "IDXGIFactory2::CreateSwapChainForComposition":
-        "creates a windowless composition swapchain.  DXVK serves it by "
-        "fabricating a dummy window through its WSI backend "
-        "(DxgiSurfaceFactory::CreateDummyWindow), and this lane's backend owns "
-        "no windows -- it presents to windows the application asked Wine for. "
-        " A composition swapchain would render correctly and be visible "
-        "nowhere, which is worse than a refusal",
+    # The windowless swapchain routes are SERVED now (2026-09-01, direction
+    # reversed by the user: a refusal kills an app a dummy swapchain lets
+    # run).  CreateSwapChainForComposition goes DXVK's OWN way -- the
+    # dxgi.enableDummyCompositionSwapchain option unix.c setenvs, a NULL
+    # window into CreateSwapChainBase, and a presenter that defers surface
+    # creation until a Present actually happens (d3d11_swapchain.cpp
+    # CreatePresenter: the factory callback is not invoked at build).
+    # CreateSwapChainForCoreWindow is DXVK's own E_NOTIMPL, served as a
+    # canary row (CANARY_SERVE_DXVK).
+    #
+    # IDXGIFactoryMedia's two composition-surface-handle routes stay refused
+    # for a PROVEN reason: DXVK implements no IDXGIFactoryMedia at all
+    # (`rg FactoryMedia src/` is empty), so the interface can never be
+    # QI'd off any DXVK object and these rows are unreachable upstream of
+    # the call -- and their HANDLE is a DirectComposition surface, the
+    # shared-resource namespace besides (docs/shared-resource-handles.md).
+    "IDXGIFactoryMedia::CreateSwapChainForCompositionSurfaceHandle":
+        "takes a DirectComposition surface HANDLE, and DXVK implements no "
+        "IDXGIFactoryMedia in the first place -- the interface cannot be "
+        "QI'd off any DXVK object, so this row is unreachable; the HANDLE "
+        "itself is the shared-resource namespace "
+        "(ppc64le/dxvk/docs/shared-resource-handles.md)",
+    "IDXGIFactoryMedia::CreateDecodeSwapChainForCompositionSurfaceHandle":
+        "takes a DirectComposition surface HANDLE, and DXVK implements no "
+        "IDXGIFactoryMedia in the first place -- the interface cannot be "
+        "QI'd off any DXVK object, so this row is unreachable; the HANDLE "
+        "itself is the shared-resource namespace "
+        "(ppc64le/dxvk/docs/shared-resource-handles.md)",
 }
 
 # void** out-parameters that are NOT untyped interface pointers but blocks of
@@ -482,7 +572,7 @@ def scrub_masks(params, byval_ok, oracle):
 
 CA = dict(PASS=0, IFACE_IN=1, RIID=2, PPV_OUT=3, RET_PTR=4, EVENT=5,
           IFACE_ARR_IN=6, IFACE_OUT_STATIC=7, IFACE_ARR_OUT_STATIC=8,
-          IFACE_ARR_OUT_COUNTPTR=9)
+          IFACE_ARR_OUT_COUNTPTR=9, EVENT_ONESHOT=10)
 CA_NAME = {v: "WINECOM_CA_" + k for k, v in CA.items()}
 
 
@@ -1096,13 +1186,13 @@ def classify(key, slot, ifaces, iface_index, byval_ok, bearing,
     narrowmask = narrowwide = narrowsign = 0
     dwordmask = dwordsign = 0
 
-    joined = " | ".join(p.raw for p in params) + " | " + slot["ret"]
-    if WCHAR_TOKENS.search(joined):
-        raise Refused(
-            "carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t "
-            "(4 bytes here), the guest PE's WCHAR is 2 -- a string crossing "
-            "unconverted is silent, so this slot waits for the converting "
-            "hand-written form")
+    # WCHAR is NOT refused any more: dxvk-patches/0005-wchar-is-16-bit makes
+    # the native build's WCHAR a uint16_t -- the same two bytes the guest PE
+    # lays out -- and str::fromws transcodes over that WCHAR, so a guest
+    # string pointer is read correctly in place (the annotation family,
+    # d3d11_annotation.cpp, is the live consumer).  The old blanket refusal
+    # predates the patch and survived it by inertia [found 2026-09-01, the
+    # completeness pass].
     fpmask = fpwide = fpret = 0
     if FLOAT_TOKENS.search(slot["ret"]) and "*" not in slot["ret"]:
         # PPC64EC step C: served, not refused.  The surface's floating-point
@@ -1112,7 +1202,21 @@ def classify(key, slot, ifaces, iface_index, byval_ok, bearing,
         fpret = 1 if Param(slot["ret"]).base in ("double", "DOUBLE") else 2
 
     for i, p in enumerate(params):
+        canary = CANARY_SERVE_DXVK.get(key, {}).get(p.name)
+        if canary is not None:
+            # DXVK provably never reads this parameter -- the citation is the
+            # proof and the d3d11-smoke canary leg PINS it (see the table
+            # comment).  Served as a plain slot on that evidence alone.
+            cls[i] = CA["PASS"]
+            continue
         if p.stars == 0:
+            if p.base == "HANDLE" and key in EVENT_HANDLE_METHODS:
+                # audited event HANDLE: crosses through the winecom event
+                # relay as the tagged eventfd; the table entry carries the
+                # DXVK citation.  NULL passes untouched either way.
+                kind = EVENT_HANDLE_METHODS[key][0]
+                cls[i] = CA["EVENT_ONESHOT"] if kind == "oneshot" else CA["EVENT"]
+                continue
             if FLOAT_TOKENS.search(p.raw):
                 # PPC64EC step C: a by-value float is a SERVED position now
                 # (fpmask/fpwide drive the surface's floating-point invoker),

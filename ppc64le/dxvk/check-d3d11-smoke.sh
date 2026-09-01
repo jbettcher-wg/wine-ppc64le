@@ -166,6 +166,9 @@ EXPORTS
 GetStdHandle
 WriteFile
 ExitProcess
+CreateEventW
+WaitForSingleObject
+CloseHandle
 EOF
 cat > "$OUT/d3d11.def" <<'EOF'
 LIBRARY d3d11.dll
@@ -255,6 +258,33 @@ refused out-param, as it must (the scrub is load-bearing)"
     else
         note "sabotage: no refusal.exe from a prior full run; skipping the \
 refusal-hygiene control (run the gate without --sabotage first)"
+    fi
+
+    # part 4: the event relay's negative control.  WINEEMUNOCOMEVENT=1 makes
+    # every non-NULL event argument refuse, so the fence-event step's wait
+    # must NEVER succeed -- if signaled=yes survives the lever, whatever leg
+    # G observed was not the relay.  (The probe itself treats the clean
+    # refusal as its own pass -- both worlds are correct worlds; the LEVER
+    # is what this control tests.)
+    if [ -f "$OUT/events.exe" ]; then
+        timeout -k 5 "$TIMEOUT" \
+            env WINEDEBUG=+winecom WINEDLLOVERRIDES="winedbg.exe=d" \
+            WINEEMUNOCOMEVENT=1 \
+            "$BUILD/wine" "$OUT/events.exe" \
+            > "$OUT/sabotage_event.out" 2>"$OUT/sabotage_event.err"
+        if grep -q "signaled=yes" "$OUT/sabotage_event.out"; then
+            bad "WINEEMUNOCOMEVENT=1 did not stop the event relay \
+(signaled=yes survived the lever)"; ok=0
+        elif ! grep -qi "refus" "$OUT/sabotage_event.err"; then
+            bad "WINEEMUNOCOMEVENT=1 stopped the signal but the +winecom \
+trace never named a refusal; the failure is not the lever's"; ok=0
+        else
+            say "sabotage: WINEEMUNOCOMEVENT=1 refused the event and the \
+wait never paid out, as it must"
+        fi
+    else
+        note "sabotage: no events.exe from a prior full run; skipping the \
+event-relay control (run the gate without --sabotage first)"
     fi
 
     [ "$ok" = 1 ] && say "SABOTAGE PASS"
@@ -383,6 +413,65 @@ and 'OpenSharedResource'; the refusal is either missing or unnamed"
     else
         bad "leg F: the refused OpenSharedResource left its out-param \
 unscrubbed: $(grep -o 'osr_scrubbed=[a-zA-Z]*' "$OUT/refusal.out" | head -1)"
+    fi
+fi
+
+# ---- leg G: events, windowless swapchains, and the canaries (guest-only) ---
+#
+# d3d11_events_smoke.c -- see its header.  GUEST-ONLY by nature: the winecom
+# event relay exists only on the guest dispatch path, so there is no native
+# twin to byte-compare against; the transcript is asserted against expected
+# values instead.  Three families in one leg: the fence event end to end
+# (mint -> DXVK's patched SetEvent -> pump -> NtSetEvent, proven by ONE
+# WaitForSingleObject succeeding), the dummy composition swapchain, and the
+# canary pins (rows served because DXVK provably never reads the hazardous
+# parameter -- if either canary line changes, a DXVK update broke the
+# citation and the row must be reclassified, which is the deal the
+# canary-serve made).
+#
+# First: the tag-coherence assert the dxvk patch and the vkd3d series both
+# promise -- the 'EVFD' constant is respelled per project, so the gate is
+# what keeps the spellings honest (both files are IN THIS TREE; no
+# bootstrapped checkout needed).
+DXVK_TAG=$(grep -o "0x4556464400000000" "$HERE/dxvk-patches/0006-tagged-native-events.patch" | head -1)
+VKD3D_TAG=$(grep -o "0x4556464400000000" "$HERE/../vkd3d/vkd3d-patches/0001-tagged-native-event-handles.patch" | head -1)
+if [ -n "$DXVK_TAG" ] && [ "$DXVK_TAG" = "$VKD3D_TAG" ]; then
+    say "leg G: the native event tag agrees across the dxvk and vkd3d series ($DXVK_TAG)"
+else
+    bad "leg G: the native event tag DIVERGED between dxvk-patches/0006 and \
+vkd3d-patches/0001 -- a handle minted for one library is garbage to the other"
+fi
+
+if ! $GUESTCC -c -o "$OUT/events.o" "$HERE/probes/d3d11_events_smoke.c" \
+        2>"$OUT/events.build.err" \
+     || ! clang -target x86_64-windows-gnu -fuse-ld=lld -nostdlib \
+        -Wl,--entry=d3d11_events_entry -Wl,--subsystem,console \
+        -o "$OUT/events.exe" "$OUT/events.o" \
+        "$OUT/libd3d11.a" "$OUT/libkernel32.a" 2>>"$OUT/events.build.err"; then
+    bad "leg G: the events probe failed to build"
+    tail -5 "$OUT/events.build.err" | sed 's/^/  events| /' >&2
+else
+    timeout -k 5 "$TIMEOUT" \
+        env WINEDEBUG="$WDBG" WINEDLLOVERRIDES="winedbg.exe=d" \
+        "$BUILD/wine" "$OUT/events.exe" > "$OUT/events.out" 2>"$OUT/events.err"
+    est=$?
+    sed 's/^/  events| /' "$OUT/events.out"
+    if [ $est -eq 124 ] || [ $est -eq 137 ]; then
+        bad "leg G: the events probe HUNG"
+    elif ! grep -q "EVENTS-SMOKE PASS 0" "$OUT/events.out"; then
+        tail -10 "$OUT/events.err" | sed 's/^/  events| /' >&2
+        bad "leg G: the events probe failed its own verdicts"
+    elif ! grep -q "signaled=yes" "$OUT/events.out"; then
+        bad "leg G: the fence event never signaled -- the relay is not live"
+    elif ! grep -q "composition hr=0x00000000" "$OUT/events.out"; then
+        bad "leg G: the composition swapchain did not serve"
+    elif ! grep -q "luid_canary hr=0x80004001" "$OUT/events.out" || \
+         ! grep -q "corewindow_canary hr=0x80004001" "$OUT/events.out"; then
+        bad "leg G: a canary moved -- a DXVK behavior a served row cites has \
+changed; reclassify the row (see CANARY_SERVE_DXVK)"
+    else
+        say "leg G: fence event relayed, composition swapchain served, \
+canaries hold, annotations alive"
     fi
 fi
 

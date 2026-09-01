@@ -162,6 +162,7 @@ static UINT64 hand_create_swapchain( void *host, UINT slot, AMD64_CONTEXT *ctx )
 static UINT64 hand_create_swapchain_for_hwnd( void *host, UINT slot, AMD64_CONTEXT *ctx );
 static UINT64 hand_swapchain_present( void *host, UINT slot, AMD64_CONTEXT *ctx );
 static UINT64 hand_swapchain_present1( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static UINT64 hand_video_processor_blt( void *host, UINT slot, AMD64_CONTEXT *ctx );
 
 static UINT64 hand32_get_private_data( void *host, UINT slot, I386_CONTEXT *ctx );
 static UINT64 hand32_set_private_data( void *host, UINT slot, I386_CONTEXT *ctx );
@@ -231,6 +232,7 @@ static const winecom_hand_fn d3d11_hand_funcs[] =
     hand_create_swapchain_for_hwnd,
     hand_swapchain_present,
     hand_swapchain_present1,
+    hand_video_processor_blt,
 };
 
 C_ASSERT( ARRAYSIZE(d3d11_hand_funcs) == D3D11_HAND_COUNT );
@@ -271,6 +273,198 @@ static UINT d3d11_wrap_concrete( void *host, UINT iface )
     return iface;
 }
 
+/* ID3D11VideoContext::VideoProcessorBlt( ID3D11VideoProcessor *proc,
+ *     ID3D11VideoProcessorOutputView *view, UINT OutputFrame,
+ *     UINT StreamCount, const D3D11_VIDEO_PROCESSOR_STREAM *pStreams ).
+ *
+ * The stream struct carries interface-pointer ARRAYS inside itself -- past/
+ * future frame view arrays plus the input view, and the same trio again for
+ * the stereo right channel -- which no marshal class can walk into; the
+ * hand_resource_barrier shape.  Both sides are 64-bit here (the generator
+ * marks the row refuse32), so the layout below is the guest's own; the
+ * C_ASSERTs pin it against header drift. */
+struct vp_stream
+{
+    BOOL   Enable;
+    UINT   OutputIndex;
+    UINT   InputFrameOrField;
+    UINT   PastFrames;
+    UINT   FutureFrames;
+    void **ppPastSurfaces;
+    void  *pInputSurface;
+    void **ppFutureSurfaces;
+    void **ppPastSurfacesRight;
+    void  *pInputSurfaceRight;
+    void **ppFutureSurfacesRight;
+};
+C_ASSERT( sizeof(struct vp_stream) == 72 );
+C_ASSERT( offsetof(struct vp_stream, ppPastSurfaces) == 24 );
+C_ASSERT( offsetof(struct vp_stream, ppFutureSurfacesRight) == 64 );
+
+#define VP_BLT_MAX_STREAMS  8   /* D3D11 video processors rarely exceed one */
+#define VP_BLT_MAX_FRAMES  32   /* per past/future array, per stream */
+
+static BOOL vp_unwrap_views( void *const *guest, UINT count, void **native )
+{
+    UINT i;
+    for (i = 0; i < count; i++)
+    {
+        native[i] = NULL;
+        if (guest[i] && !winecom_translate_in( guest[i], &native[i] )) return FALSE;
+    }
+    return TRUE;
+}
+
+static UINT64 hand_video_processor_blt( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    UINT64 args[D3D11_UNIX_MAX_ARGS] = { 0 };
+    UINT count = (UINT)winecom_read_arg( ctx, 4 ), s;
+    const struct vp_stream *src = (const struct vp_stream *)(ULONG_PTR)winecom_read_arg( ctx, 5 );
+    struct vp_stream streams[VP_BLT_MAX_STREAMS];
+    void *views[VP_BLT_MAX_STREAMS][6 * VP_BLT_MAX_FRAMES]; /* worst-case pool */
+    void *proc = NULL, *view = NULL;
+
+    if (!count || !src || count > VP_BLT_MAX_STREAMS)
+    {
+        if (count > VP_BLT_MAX_STREAMS)
+            FIXME( "VideoProcessorBlt: %u streams exceeds the walker's %u; "
+                   "refusing\n", count, VP_BLT_MAX_STREAMS );
+        return (UINT)E_INVALIDARG;
+    }
+    if (!winecom_translate_in( (void *)(ULONG_PTR)winecom_read_arg( ctx, 1 ), &proc ) ||
+        !winecom_translate_in( (void *)(ULONG_PTR)winecom_read_arg( ctx, 2 ), &view ))
+    {
+        FIXME( "VideoProcessorBlt on a guest-implemented processor/view\n" );
+        return (UINT)E_NOTIMPL;
+    }
+
+    for (s = 0; s < count; s++)
+    {
+        void **pool = views[s];
+        UINT past = src[s].PastFrames, fut = src[s].FutureFrames;
+
+        streams[s] = src[s];
+        if (past > VP_BLT_MAX_FRAMES || fut > VP_BLT_MAX_FRAMES)
+        {
+            FIXME( "VideoProcessorBlt: stream %u wants %u/%u frames, walker "
+                   "cap is %u; refusing\n", s, past, fut, VP_BLT_MAX_FRAMES );
+            return (UINT)E_INVALIDARG;
+        }
+        if (streams[s].pInputSurface &&
+            !winecom_translate_in( streams[s].pInputSurface, &streams[s].pInputSurface ))
+            goto guest_impl;
+        if (streams[s].pInputSurfaceRight &&
+            !winecom_translate_in( streams[s].pInputSurfaceRight, &streams[s].pInputSurfaceRight ))
+            goto guest_impl;
+        if (streams[s].ppPastSurfaces)
+        {
+            if (!vp_unwrap_views( streams[s].ppPastSurfaces, past, pool )) goto guest_impl;
+            streams[s].ppPastSurfaces = pool; pool += past;
+        }
+        if (streams[s].ppFutureSurfaces)
+        {
+            if (!vp_unwrap_views( streams[s].ppFutureSurfaces, fut, pool )) goto guest_impl;
+            streams[s].ppFutureSurfaces = pool; pool += fut;
+        }
+        if (streams[s].ppPastSurfacesRight)
+        {
+            if (!vp_unwrap_views( streams[s].ppPastSurfacesRight, past, pool )) goto guest_impl;
+            streams[s].ppPastSurfacesRight = pool; pool += past;
+        }
+        if (streams[s].ppFutureSurfacesRight)
+        {
+            if (!vp_unwrap_views( streams[s].ppFutureSurfacesRight, fut, pool )) goto guest_impl;
+            streams[s].ppFutureSurfacesRight = pool; pool += fut;
+        }
+    }
+
+    args[0] = (UINT64)(ULONG_PTR)host;
+    args[1] = (UINT64)(ULONG_PTR)proc;
+    args[2] = (UINT64)(ULONG_PTR)view;
+    args[3] = winecom_read_arg( ctx, 3 );
+    args[4] = count;
+    args[5] = (UINT64)(ULONG_PTR)streams;
+    return unix_vtbl_call( host, slot, 6, args );
+
+guest_impl:
+    FIXME( "VideoProcessorBlt with a guest-implemented input view\n" );
+    return (UINT)E_NOTIMPL;
+}
+
+/* ------------------------------------------------------------ event relay
+ *
+ * The PE half of the surface's event_mint/event_reap hooks (winecom.h): a
+ * guest Wine event crossing to DXVK becomes the tagged eventfd the native
+ * sync convention understands, and a process-lifetime pump thread turns
+ * eventfd payouts back into NtSetEvent on the guest's own event.  The unix
+ * half (unix.c) owns the eventfds and the epoll set; THIS side owns a
+ * duplicated reference per entry -- taken before the mint so the relay can
+ * signal an event the guest has since closed, released when the entry dies
+ * (one-shot payout, or a reap after a FAILED call).  DXVK never closes a
+ * caller's event (its native CloseHandle is taught to no-op tagged values --
+ * dxvk-patches), so the fd's life belongs to the relay alone. */
+static LONG event_pump_started;
+
+static DWORD WINAPI event_pump_thread( void *arg )
+{
+    struct d3d11_event_pump_params p;
+
+    for (;;)
+    {
+        p.guest_handle = 0;
+        if (D3D11_UNIX_CALL( event_pump, &p ) || p.shutdown) break;
+        if (!p.guest_handle) continue;
+        NtSetEvent( (HANDLE)(ULONG_PTR)p.guest_handle, NULL );
+        if (p.close_handle) NtClose( (HANDLE)(ULONG_PTR)p.guest_handle );
+    }
+    return 0;
+}
+
+static UINT64 d3d11_event_mint( UINT64 guest_handle, BOOL oneshot )
+{
+    struct d3d11_event_mint_params p;
+    HANDLE dup = NULL;
+
+    if (NtDuplicateObject( GetCurrentProcess(), (HANDLE)(ULONG_PTR)guest_handle,
+                           GetCurrentProcess(), &dup, 0, 0, DUPLICATE_SAME_ACCESS ))
+        return 0;
+    p.guest_handle = (UINT64)(ULONG_PTR)dup;
+    p.oneshot = oneshot;
+    p.native_handle = 0;
+    if (D3D11_UNIX_CALL( event_mint, &p ) || !p.native_handle)
+    {
+        NtClose( dup );
+        return 0;
+    }
+    if (InterlockedCompareExchange( &event_pump_started, 1, 0 ) == 0)
+    {
+        HANDLE thread;
+        if (!NtCreateThreadEx( &thread, THREAD_ALL_ACCESS, NULL, GetCurrentProcess(),
+                               (PRTL_THREAD_START_ROUTINE)event_pump_thread,
+                               NULL, 0, 0, 0, 0, NULL ))
+            NtClose( thread );
+        else
+        {
+            /* no pump = payouts never reach the guest; give the slot back
+             * and refuse rather than serve a signal that cannot arrive */
+            struct d3d11_event_reap_params r = { .native_handle = p.native_handle };
+            event_pump_started = 0;
+            D3D11_UNIX_CALL( event_reap, &r );
+            NtClose( dup );
+            return 0;
+        }
+    }
+    return p.native_handle;
+}
+
+static void d3d11_event_reap( UINT64 native_handle )
+{
+    struct d3d11_event_reap_params p = { .native_handle = native_handle };
+
+    if (!D3D11_UNIX_CALL( event_reap, &p ) && p.guest_handle)
+        NtClose( (HANDLE)(ULONG_PTR)p.guest_handle );
+}
+
 static const struct winecom_surface d3d11_surface =
 {
     .name = "d3d11",
@@ -285,6 +479,8 @@ static const struct winecom_surface d3d11_surface =
     .hand32_count = ARRAYSIZE(d3d11_hand32),
     .wrap_concrete = d3d11_wrap_concrete,
     .invoke_fp = unix_vtbl_call_fp,
+    .event_mint = d3d11_event_mint,
+    .event_reap = d3d11_event_reap,
 };
 
 static LONG com_init_state;            /* 0 = no, 1 = in progress, 2 = ok,
@@ -899,7 +1095,11 @@ static UINT64 present_common( void *host, UINT slot, UINT argc, UINT64 *args )
             logged = TRUE;
             WARN( "presenting swapchain %p, which this module never saw "
                   "created -- no window is known for it, so win32u's client "
-                  "surface will not be updated around the present.  Either the "
+                  "surface will not be updated around the present.  A "
+                  "COMPOSITION swapchain lands here legitimately (it has no "
+                  "window by construction; DXVK's dummy path answers the "
+                  "present itself, usually with a surface-creation failure, "
+                  "which is its native semantics).  Otherwise: the "
                   "application got it from a path that is not "
                   "CreateSwapChain/CreateSwapChainForHwnd/"
                   "D3D11CreateDeviceAndSwapChain, or DXVK stopped answering "

@@ -2321,6 +2321,11 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
      * overwrites the same UINT with the actual count -- which D3D11 lets
      * exceed capacity, while exactly capacity cells were written */
     UINT out_carr_idx[4], out_carr_cap[4], n_out_carr = 0;
+    /* events minted for this call (max two HANDLE args anywhere in the
+     * surface); reaped below if the callee FAILS -- a failing callee kept
+     * nothing */
+    UINT64 minted[2];
+    UINT n_minted = 0;
     UINT borrowed[16], n_borrowed = 0;
     const UINT64 *arr_borrowed = NULL;
     UINT n_arr_borrowed = 0;
@@ -2513,18 +2518,42 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
             riid_idx = sl->aux + 1;
             break;
         case WINECOM_CA_EVENT:
+        case WINECOM_CA_EVENT_ONESHOT:
             if (raw)
             {
-                /* d3d12 only: a real Wine event handle needs the eventfd
-                 * relay; refuse with the reason instead of corrupting. */
-                refuse_once( iface, slot, sl->name,
-                             "non-NULL completion event needs the eventfd "
-                             "relay" );
-                if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
-                release_borrows( args, borrowed, n_borrowed );
-                scrub_refused_outs( sl, rawargs, guest32 );
-                *rax_out = (UINT)E_NOTIMPL;
-                return STATUS_SUCCESS;
+                /* A real Wine event crosses through the surface's mint hook
+                 * into the tagged-eventfd encoding the native side's sync
+                 * convention understands (the vkd3d/dxvk 'EVFD' tag; the
+                 * relay behind the hook signals the guest event on payout).
+                 * No hook -- or the negative-control lever -- refuses
+                 * exactly as the pre-relay runtime did. */
+                static int event_off = -1;
+                UINT64 native;
+
+                if (event_off == -1)
+                {
+                    event_off = com_env_flag( L"WINEEMUNOCOMEVENT" );
+                    if (event_off)
+                        ERR( "WINEEMUNOCOMEVENT=1 -- every non-NULL event "
+                             "argument refuses; the relay is off\n" );
+                }
+                if (event_off || !wc_surface->event_mint ||
+                    !(native = wc_surface->event_mint( raw,
+                          sl->cls[i - 1] == WINECOM_CA_EVENT_ONESHOT )))
+                {
+                    refuse_once( iface, slot, sl->name,
+                                 "non-NULL event with no relay on this "
+                                 "surface (no event_mint hook, the mint "
+                                 "failed, or WINEEMUNOCOMEVENT=1)" );
+                    if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
+                    release_borrows( args, borrowed, n_borrowed );
+                    scrub_refused_outs( sl, rawargs, guest32 );
+                    *rax_out = (UINT)E_NOTIMPL;
+                    return STATUS_SUCCESS;
+                }
+                args[i] = native;
+                if (n_minted < ARRAYSIZE(minted)) minted[n_minted++] = native;
+                break;
             }
             args[i] = 0;
             break;
@@ -2635,6 +2664,18 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
                                      fpret_bits );
     }
     else ret = wc_surface->invoke( proxy->host, slot, sl->argc, args );
+
+    /* A FAILED event-bearing call kept nothing: reap what was minted.  The
+     * HRESULT reading is exact for every event-bearing row in the tables --
+     * all of them return HRESULT or void (Flush1), and a void return is
+     * "kept" by definition.  RET_VIA_ARG rows carry no event args. */
+    if (n_minted && wc_surface->event_reap &&
+        !(sl->flags & (WINECOM_F_RET_VOID | WINECOM_F_RET_VIA_ARG)) &&
+        FAILED((HRESULT)(UINT)ret))
+    {
+        for (n = 0; n < n_minted; n++) wc_surface->event_reap( minted[n] );
+        n_minted = 0;
+    }
 
     release_borrows( args, borrowed, n_borrowed );
     for (n = 0; n < n_arr_borrowed; n++)

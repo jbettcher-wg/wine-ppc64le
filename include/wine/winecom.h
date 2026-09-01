@@ -37,7 +37,25 @@
 #define WINECOM_CA_RIID                 2  /* the REFIID of a PPV_OUT pair */
 #define WINECOM_CA_PPV_OUT              3  /* riid-typed void** out */
 #define WINECOM_CA_RET_PTR              4  /* widl __ret aggregate pointer */
-#define WINECOM_CA_EVENT                5  /* completion-event HANDLE */
+#define WINECOM_CA_EVENT                5  /* event HANDLE the native side
+                                              KEEPS (a Register*Event row --
+                                              the signature has a DWORD*
+                                              cookie out beside it).  NULL
+                                              passes; a real event goes
+                                              through the surface's
+                                              event_mint hook into the
+                                              tagged-eventfd encoding the
+                                              native side understands, and
+                                              the relay entry LIVES ON after
+                                              the call (bounded by
+                                              registrations -- a caller
+                                              registers once, not per
+                                              frame).  If the callee FAILS
+                                              the call, the entry is reaped
+                                              at once: a failing callee kept
+                                              nothing.  No hook = refuse,
+                                              fail closed (the pre-relay
+                                              behavior). */
 #define WINECOM_CA_IFACE_ARR_IN         6  /* iface array + count param */
 #define WINECOM_CA_IFACE_OUT_STATIC     7  /* Iface** out, type in xaux[i] */
 #define WINECOM_CA_IFACE_ARR_OUT_STATIC 8  /* Iface** out ARRAY: element type
@@ -64,6 +82,20 @@
                                               wraps capacity cells after it.
                                               Element type in xaux[i], same
                                               as the by-value-count class. */
+#define WINECOM_CA_EVENT_ONESHOT       10 /* event HANDLE the native side
+                                              signals AT MOST ONCE and never
+                                              stores past the operation
+                                              (SetEventOnCompletion, Flush1,
+                                              EnqueueSetEvent -- no cookie
+                                              anywhere in the signature).
+                                              Same mint/relay road as
+                                              WINECOM_CA_EVENT, but the relay
+                                              entry is reaped at first
+                                              payout, so per-frame completion
+                                              events cost one eventfd for the
+                                              life of ONE wait, not forever.
+                                              NULL passes; no hook = refuse,
+                                              fail closed. */
 
 #define WINECOM_F_RET_VOID    1  /* method returns void */
 #define WINECOM_F_RET_VIA_ARG 2  /* sret: RAX = the __ret argument */
@@ -181,6 +213,7 @@
 #define CA_PPV_OUT       WINECOM_CA_PPV_OUT
 #define CA_RET_PTR       WINECOM_CA_RET_PTR
 #define CA_EVENT         WINECOM_CA_EVENT
+#define CA_EVENT_ONESHOT WINECOM_CA_EVENT_ONESHOT
 #define CA_IFACE_ARR_IN  WINECOM_CA_IFACE_ARR_IN
 #define COMF_RET_VOID    WINECOM_F_RET_VOID
 #define COMF_RET_VIA_ARG WINECOM_F_RET_VIA_ARG
@@ -623,6 +656,34 @@ struct winecom_surface
                                             process-wide -- the negative
                                             control that proves the FP path
                                             is load-bearing.  Appended
+                                            last. */
+    UINT64 (*event_mint)( UINT64 guest_handle, BOOL oneshot );
+                                         /* Turn a guest Wine EVENT handle
+                                            into the value the native side's
+                                            tagged-eventfd convention
+                                            understands (the vkd3d/dxvk
+                                            'EVFD' encoding), owning a
+                                            duplicated reference and a relay
+                                            entry that signals the guest
+                                            event when the native side pays
+                                            the eventfd out.  Returns 0 on
+                                            failure (the row then refuses --
+                                            fail closed).  `oneshot` says
+                                            the entry dies at first payout
+                                            (CA_EVENT_ONESHOT) rather than
+                                            living until reaped
+                                            (CA_EVENT).  NULL hook = every
+                                            non-NULL event refuses, the
+                                            pre-relay behavior.
+                                            WINEEMUNOCOMEVENT=1 makes the
+                                            runtime read this as NULL --
+                                            the negative control.  Appended
+                                            last. */
+    void (*event_reap)( UINT64 native_handle );
+                                         /* Tear down a minted entry -- the
+                                            dispatcher calls it when the
+                                            slot FAILED, because a failing
+                                            callee kept nothing.  Appended
                                             last. */
 };
 

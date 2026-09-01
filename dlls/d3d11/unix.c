@@ -51,6 +51,10 @@
 #include <string.h>
 #include <dlfcn.h>
 #include <pthread.h>
+#include <unistd.h>
+#include <errno.h>
+#include <sys/eventfd.h>
+#include <sys/epoll.h>
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -570,6 +574,31 @@ static NTSTATUS d3d11_unix_init( void *args )
      * prove the offscreen path needs no window system at all, still gets it. */
     setenv( "DXVK_WSI_DRIVER", "Win32u", 0 );
 
+    /* Windowless composition swapchains, served DXVK'S OWN WAY.  Upstream
+     * gates CreateSwapChainForComposition behind this option and passes a
+     * NULL window into CreateSwapChainBase; the presenter takes a surface
+     * FACTORY, not a surface, so nothing tries to realise a null-window
+     * surface until a Present actually happens -- the app runs and renders,
+     * visibly nowhere, exactly Windows-composition-without-a-compositor
+     * semantics.  The old refusal reasoned "visible nowhere is worse than a
+     * refusal"; that judgment is REVERSED by direction (2026-09-01): a
+     * refusal kills an app that would otherwise run.  overwrite = 0 for the
+     * same debuggability reason as the WSI line above -- a user-set
+     * DXVK_CONFIG wins, and loses this option knowingly. */
+    setenv( "DXVK_CONFIG", "dxgi.enableDummyCompositionSwapchain = True; "
+                           "dxgi.deferSurfaceCreation = True", 0 );
+    /* deferSurfaceCreation rides along because the dummy path is only dummy
+     * if nothing asks the WSI for a null-window surface at CREATION time --
+     * the presenter takes a factory callback either way, and this option is
+     * what keeps it from invoking the callback until a Present actually
+     * happens.  [MEASURED] without it the win32u backend (correctly)
+     * refused the null HWND at swapchain build and the composition serve
+     * failed with VK_ERROR_INITIALIZATION_FAILED.  For ordinary windowed
+     * swapchains the option only SHIFTS surface creation from create-time
+     * to first-present -- a timing DXVK itself ships as a per-game default
+     * (config.cpp lists titles pinning it True) -- and the byte-compared
+     * smoke legs hold it to producing identical results. */
+
     /* dxgi first: the other two NEED it, and loading it by our own search
      * rules rather than leaving it to the linker is what makes DXVK_LIB_DIR
      * mean what it says. */
@@ -713,6 +742,157 @@ static NTSTATUS d3d11_unix_fpcall( void *args )
         return status;                                                       \
     }
 
+/* ------------------------------------------------------------ event relay
+ *
+ * The unix half of the event translation (unixlib.h has the flow).  The tag
+ * is the vkd3d/dxvk native event convention -- 'EVFD' over the fd -- spelled
+ * here a third time for the same reason the vkd3d README gives for its own
+ * respellings: the consumers build independently, and the gate asserts the
+ * spellings agree rather than trusting an include path across projects. */
+#define D3D11_NATIVE_EVENT_TAG 0x4556464400000000ull
+
+struct event_relay_entry
+{
+    int    efd;            /* -1 = free slot */
+    UINT64 guest_handle;   /* the PE side's duplicated reference */
+    BOOL   oneshot;
+};
+
+#define EVENT_RELAY_MAX 64
+static struct event_relay_entry event_relay[EVENT_RELAY_MAX];
+static pthread_mutex_t event_relay_lock = PTHREAD_MUTEX_INITIALIZER;
+static int event_epoll = -1;
+
+static NTSTATUS d3d11_unix_event_mint( void *args )
+{
+    struct d3d11_event_mint_params *params = args;
+    int i, efd;
+
+    params->native_handle = 0;
+
+    pthread_mutex_lock( &event_relay_lock );
+    if (event_epoll < 0)
+    {
+        /* first mint: the free-slot sentinel is -1 and a static array is
+         * ZERO-initialized -- and fd 0 is a real fd, so 0 cannot mean free.
+         * [MEASURED] before this loop existed every slot read as occupied
+         * and the first mint refused with "relay table full (64)". */
+        for (i = 0; i < EVENT_RELAY_MAX; i++) event_relay[i].efd = -1;
+        if ((event_epoll = epoll_create1( EPOLL_CLOEXEC )) < 0)
+        {
+            pthread_mutex_unlock( &event_relay_lock );
+            return STATUS_SUCCESS;  /* native_handle 0: the row refuses */
+        }
+    }
+    for (i = 0; i < EVENT_RELAY_MAX; i++) if (event_relay[i].efd < 0) break;
+    if (i == EVENT_RELAY_MAX)
+    {
+        /* Registrations are once-per-app and one-shots reap at payout; a
+         * full table means something is registering in a loop.  Refusing
+         * (fail closed) beats growing without bound. */
+        fprintf( stderr, "d3d11: event relay table full (%u); refusing\n",
+                 EVENT_RELAY_MAX );
+        pthread_mutex_unlock( &event_relay_lock );
+        return STATUS_SUCCESS;
+    }
+    if ((efd = eventfd( 0, EFD_CLOEXEC | EFD_NONBLOCK )) < 0)
+    {
+        pthread_mutex_unlock( &event_relay_lock );
+        return STATUS_SUCCESS;
+    }
+    else
+    {
+        struct epoll_event ev = { .events = EPOLLIN, .data.u32 = (UINT)i };
+
+        if (epoll_ctl( event_epoll, EPOLL_CTL_ADD, efd, &ev ) < 0)
+        {
+            close( efd );
+            pthread_mutex_unlock( &event_relay_lock );
+            return STATUS_SUCCESS;
+        }
+    }
+    event_relay[i].efd = efd;
+    event_relay[i].guest_handle = params->guest_handle;
+    event_relay[i].oneshot = !!params->oneshot;
+    pthread_mutex_unlock( &event_relay_lock );
+
+    params->native_handle = D3D11_NATIVE_EVENT_TAG | (UINT64)(UINT)efd;
+    return STATUS_SUCCESS;
+}
+
+/* Blocks in epoll until some eventfd pays out; called in a loop by the PE
+ * pump thread, which does the NtSetEvent this side cannot.  epoll_ctl from
+ * concurrent mint/reap calls while this thread waits is defined behavior. */
+static NTSTATUS d3d11_unix_event_pump( void *args )
+{
+    struct d3d11_event_pump_params *params = args;
+    struct epoll_event ev;
+    int n, idx;
+    UINT64 v;
+
+    params->guest_handle = 0;
+    params->close_handle = 0;
+    params->shutdown = 0;
+
+    for (;;)
+    {
+        n = epoll_wait( event_epoll, &ev, 1, -1 );
+        if (n < 0)
+        {
+            if (errno == EINTR) continue;
+            params->shutdown = 1;   /* epoll fd itself broke; stop the pump */
+            return STATUS_SUCCESS;
+        }
+        idx = (int)ev.data.u32;
+
+        pthread_mutex_lock( &event_relay_lock );
+        if (idx < 0 || idx >= EVENT_RELAY_MAX || event_relay[idx].efd < 0)
+        {
+            /* reaped between wakeup and lock; nothing to signal */
+            pthread_mutex_unlock( &event_relay_lock );
+            continue;
+        }
+        if (read( event_relay[idx].efd, &v, sizeof(v) ) != sizeof(v))
+        {
+            pthread_mutex_unlock( &event_relay_lock );
+            continue;
+        }
+        params->guest_handle = event_relay[idx].guest_handle;
+        if (event_relay[idx].oneshot)
+        {
+            epoll_ctl( event_epoll, EPOLL_CTL_DEL, event_relay[idx].efd, NULL );
+            close( event_relay[idx].efd );
+            event_relay[idx].efd = -1;
+            params->close_handle = 1;
+        }
+        pthread_mutex_unlock( &event_relay_lock );
+        return STATUS_SUCCESS;
+    }
+}
+
+static NTSTATUS d3d11_unix_event_reap( void *args )
+{
+    struct d3d11_event_reap_params *params = args;
+    int i, efd = (int)(UINT)(params->native_handle & 0xffffffffu);
+
+    params->guest_handle = 0;
+    if ((params->native_handle & ~0xffffffffull) != D3D11_NATIVE_EVENT_TAG)
+        return STATUS_SUCCESS;
+
+    pthread_mutex_lock( &event_relay_lock );
+    for (i = 0; i < EVENT_RELAY_MAX; i++)
+    {
+        if (event_relay[i].efd != efd) continue;
+        epoll_ctl( event_epoll, EPOLL_CTL_DEL, efd, NULL );
+        close( efd );
+        event_relay[i].efd = -1;
+        params->guest_handle = event_relay[i].guest_handle;
+        break;
+    }
+    pthread_mutex_unlock( &event_relay_lock );
+    return STATUS_SUCCESS;
+}
+
 WINE_THREAD_ENTRY( d3d11_enter_init,    d3d11_unix_init )
 WINE_THREAD_ENTRY( d3d11_enter_call,    d3d11_unix_call )
 WINE_THREAD_ENTRY( d3d11_enter_float,   d3d11_unix_float )
@@ -720,6 +900,9 @@ WINE_THREAD_ENTRY( d3d11_enter_flat,    d3d11_unix_flat )
 WINE_THREAD_ENTRY( d3d11_enter_present, d3d11_unix_present )
 WINE_THREAD_ENTRY( d3d11_enter_hwnd,    d3d11_unix_hwnd )
 WINE_THREAD_ENTRY( d3d11_enter_fpcall,  d3d11_unix_fpcall )
+WINE_THREAD_ENTRY( d3d11_enter_event_mint, d3d11_unix_event_mint )
+WINE_THREAD_ENTRY( d3d11_enter_event_pump, d3d11_unix_event_pump )
+WINE_THREAD_ENTRY( d3d11_enter_event_reap, d3d11_unix_event_reap )
 
 const unixlib_entry_t __wine_unix_call_funcs[] =
 {
@@ -730,6 +913,9 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     d3d11_enter_present,
     d3d11_enter_hwnd,
     d3d11_enter_fpcall,
+    d3d11_enter_event_mint,
+    d3d11_enter_event_pump,
+    d3d11_enter_event_reap,
 };
 
 C_ASSERT( ARRAYSIZE(__wine_unix_call_funcs) == unix_funcs_count );

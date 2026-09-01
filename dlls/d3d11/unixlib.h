@@ -179,6 +179,39 @@ struct d3d11_hwnd_params
     UINT   valid;       /* zero once the window is gone or the swapchain went */
 };
 
+/* ------------------------------------------------------------ event relay
+ *
+ * The unix half of the surface's event_mint/event_reap hooks (winecom.h):
+ * Wine events cross to DXVK as the tagged eventfd the native sync convention
+ * understands -- VKD3D_NATIVE_EVENT_TAG in ppc64le/vkd3d/src/include/
+ * vkd3d_native_event_handle.h, 'EVFD' in bits 63..32 over the fd, the SAME
+ * constant our dxvk-patches teach util_win32_compat's SetEvent (the
+ * check-d3d11-smoke gate asserts the two spellings agree).  The PE side owns
+ * a duplicated reference to the guest event and a pump thread; this side
+ * owns the eventfds and the epoll set.  Payout flow: DXVK writes the
+ * eventfd -> the pump's epoll wakes -> unix_event_pump returns the entry's
+ * guest handle -> the PE pump thread NtSetEvent()s it and re-enters. */
+struct d3d11_event_mint_params
+{
+    UINT64 guest_handle;   /* the PE side's OWN duplicated reference */
+    UINT   oneshot;        /* entry dies at first payout */
+    UINT64 native_handle;  /* out: the tagged eventfd value, 0 on failure */
+};
+
+struct d3d11_event_pump_params
+{
+    UINT64 guest_handle;   /* out: signal this event */
+    UINT   close_handle;   /* out: one-shot paid out -- NtClose the ref too */
+    UINT   shutdown;       /* out: never set today; the pump is
+                              process-lifetime by design */
+};
+
+struct d3d11_event_reap_params
+{
+    UINT64 native_handle;
+    UINT64 guest_handle;   /* out: the reference to NtClose, 0 if unknown */
+};
+
 enum d3d11_unix_func
 {
     unix_init,
@@ -188,6 +221,9 @@ enum d3d11_unix_func
     unix_present,
     unix_hwnd,
     unix_fpcall,    /* appended last: existing ids keep their values */
+    unix_event_mint,
+    unix_event_pump,
+    unix_event_reap,
     unix_funcs_count
 };
 

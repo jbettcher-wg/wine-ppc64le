@@ -154,7 +154,7 @@ enum d3d11_iface_index
     D3D11_IFACE_COUNT = 137
 };
 
-#define D3D11_HAND_COUNT 11
+#define D3D11_HAND_COUNT 12
 
 /* hand_funcs[] order in dlls/d3d11/main.c:
      *   0 hand_get_private_data
@@ -168,6 +168,7 @@ enum d3d11_iface_index
      *   8 hand_create_swapchain_for_hwnd
      *   9 hand_swapchain_present
      *   10 hand_swapchain_present1
+     *   11 hand_video_processor_blt
  */
 
 
@@ -512,7 +513,7 @@ static const struct winecom_slot slots_ID3D10Device[98] =
     { "ID3D10Device::CheckCounter", NULL, NULL, NULL, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0156, 0x0000 },
     { "ID3D10Device::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Device::OpenSharedResource",
-      "ID3D10Device::OpenSharedResource: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
+      "ID3D10Device::OpenSharedResource: takes a by-value shared-resource HANDLE.  DXVK's native side reads these through its own D3DKMT global-share emulation (d3d11_device.cpp OpenSharedResource: D3DKMTQueryResourceInfo over kmt-tagged integers), and no seam yet carries a Wine shared resource into that namespace -- the design and its precise blocker are ppc64le/dxvk/docs/shared-resource-handles.md.  EVENT handles are NOT refused any more: every event-shaped HANDLE method is audited in EVENT_HANDLE_METHODS and crosses through the winecom event relay as the tagged eventfd both native libraries understand",
       NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D10Device::SetTextFilterSize", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Device::GetTextFilterSize", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0003, 0x0000 },
@@ -748,7 +749,7 @@ static const struct winecom_slot slots_ID3D10Device1[101] =
     { "ID3D10Device::CheckCounter", NULL, NULL, NULL, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0156, 0x0000 },
     { "ID3D10Device::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Device::OpenSharedResource",
-      "ID3D10Device::OpenSharedResource: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
+      "ID3D10Device::OpenSharedResource: takes a by-value shared-resource HANDLE.  DXVK's native side reads these through its own D3DKMT global-share emulation (d3d11_device.cpp OpenSharedResource: D3DKMTQueryResourceInfo over kmt-tagged integers), and no seam yet carries a Wine shared resource into that namespace -- the design and its precise blocker are ppc64le/dxvk/docs/shared-resource-handles.md.  EVENT handles are NOT refused any more: every event-shaped HANDLE method is audited in EVENT_HANDLE_METHODS and crosses through the winecom event relay as the tagged eventfd both native libraries understand",
       NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D10Device::SetTextFilterSize", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Device::GetTextFilterSize", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0003, 0x0000 },
@@ -1331,7 +1332,7 @@ static const struct winecom_slot slots_ID3D11Device[43] =
     { "ID3D11Device::CreateCounter", NULL, cls_ID3D11Device_26, xaux_ID3D11Device_26, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device::CreateDeferredContext", NULL, cls_ID3D11Device_27, xaux_ID3D11Device_27, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device::OpenSharedResource",
-      "ID3D11Device::OpenSharedResource: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
+      "ID3D11Device::OpenSharedResource: takes a by-value shared-resource HANDLE.  DXVK's native side reads these through its own D3DKMT global-share emulation (d3d11_device.cpp OpenSharedResource: D3DKMTQueryResourceInfo over kmt-tagged integers), and no seam yet carries a Wine shared resource into that namespace -- the design and its precise blocker are ppc64le/dxvk/docs/shared-resource-handles.md.  EVENT handles are NOT refused any more: every event-shaped HANDLE method is audited in EVENT_HANDLE_METHODS and crosses through the winecom event relay as the tagged eventfd both native libraries understand",
       NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
@@ -1417,6 +1418,7 @@ static const unsigned char cls_ID3D11Device1_46[] = { WINECOM_CA_PASS, WINECOM_C
 static const unsigned char xaux_ID3D11Device1_46[] = { 0, 62 };
 static const unsigned char cls_ID3D11Device1_47[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11Device1_47[] = { 0, 0, 0, 0, 0, 0, 91 };
+static const unsigned char cls_ID3D11Device1_49[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const struct winecom_slot slots_ID3D11Device1[50] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
@@ -1451,7 +1453,7 @@ static const struct winecom_slot slots_ID3D11Device1[50] =
     { "ID3D11Device::CreateCounter", NULL, cls_ID3D11Device1_26, xaux_ID3D11Device1_26, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device::CreateDeferredContext", NULL, cls_ID3D11Device1_27, xaux_ID3D11Device1_27, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device::OpenSharedResource",
-      "ID3D11Device::OpenSharedResource: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
+      "ID3D11Device::OpenSharedResource: takes a by-value shared-resource HANDLE.  DXVK's native side reads these through its own D3DKMT global-share emulation (d3d11_device.cpp OpenSharedResource: D3DKMTQueryResourceInfo over kmt-tagged integers), and no seam yet carries a Wine shared resource into that namespace -- the design and its precise blocker are ppc64le/dxvk/docs/shared-resource-handles.md.  EVENT handles are NOT refused any more: every event-shaped HANDLE method is audited in EVENT_HANDLE_METHODS and crosses through the winecom event relay as the tagged eventfd both native libraries understand",
       NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
@@ -1473,11 +1475,10 @@ static const struct winecom_slot slots_ID3D11Device1[50] =
     { "ID3D11Device1::CreateRasterizerState1", NULL, cls_ID3D11Device1_46, xaux_ID3D11Device1_46, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device1::CreateDeviceContextState", NULL, cls_ID3D11Device1_47, xaux_ID3D11Device1_47, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000d, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0040, 0x0020, 0x0000 },
     { "ID3D11Device1::OpenSharedResource1",
-      "ID3D11Device1::OpenSharedResource1: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
+      "ID3D11Device1::OpenSharedResource1: takes a by-value shared-resource HANDLE.  DXVK's native side reads these through its own D3DKMT global-share emulation (d3d11_device.cpp OpenSharedResource: D3DKMTQueryResourceInfo over kmt-tagged integers), and no seam yet carries a Wine shared resource into that namespace -- the design and its precise blocker are ppc64le/dxvk/docs/shared-resource-handles.md.  EVENT handles are NOT refused any more: every event-shaped HANDLE method is audited in EVENT_HANDLE_METHODS and crosses through the winecom event relay as the tagged eventfd both native libraries understand",
       NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
-    { "ID3D11Device1::OpenSharedResourceByName",
-      "ID3D11Device1::OpenSharedResourceByName: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device1::OpenSharedResourceByName", NULL, cls_ID3D11Device1_49, NULL, 5, WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11Device1::OpenSharedResourceByName: parameter `LPCWSTR lpName` points at WCHAR, which the i386 layout roster never audited", 0, 0x0008, 0x0000, 0x0000 },
 };
 
 static const struct winecom_rep reps_ID3D11Device2_3[] =
@@ -1548,6 +1549,7 @@ static const unsigned char cls_ID3D11Device2_46[] = { WINECOM_CA_PASS, WINECOM_C
 static const unsigned char xaux_ID3D11Device2_46[] = { 0, 62 };
 static const unsigned char cls_ID3D11Device2_47[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11Device2_47[] = { 0, 0, 0, 0, 0, 0, 91 };
+static const unsigned char cls_ID3D11Device2_49[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_ID3D11Device2_50[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11Device2_50[] = { 48 };
 static const unsigned char cls_ID3D11Device2_51[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
@@ -1587,7 +1589,7 @@ static const struct winecom_slot slots_ID3D11Device2[54] =
     { "ID3D11Device::CreateCounter", NULL, cls_ID3D11Device2_26, xaux_ID3D11Device2_26, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device::CreateDeferredContext", NULL, cls_ID3D11Device2_27, xaux_ID3D11Device2_27, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device::OpenSharedResource",
-      "ID3D11Device::OpenSharedResource: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
+      "ID3D11Device::OpenSharedResource: takes a by-value shared-resource HANDLE.  DXVK's native side reads these through its own D3DKMT global-share emulation (d3d11_device.cpp OpenSharedResource: D3DKMTQueryResourceInfo over kmt-tagged integers), and no seam yet carries a Wine shared resource into that namespace -- the design and its precise blocker are ppc64le/dxvk/docs/shared-resource-handles.md.  EVENT handles are NOT refused any more: every event-shaped HANDLE method is audited in EVENT_HANDLE_METHODS and crosses through the winecom event relay as the tagged eventfd both native libraries understand",
       NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
@@ -1609,11 +1611,10 @@ static const struct winecom_slot slots_ID3D11Device2[54] =
     { "ID3D11Device1::CreateRasterizerState1", NULL, cls_ID3D11Device2_46, xaux_ID3D11Device2_46, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device1::CreateDeviceContextState", NULL, cls_ID3D11Device2_47, xaux_ID3D11Device2_47, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000d, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0040, 0x0020, 0x0000 },
     { "ID3D11Device1::OpenSharedResource1",
-      "ID3D11Device1::OpenSharedResource1: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
+      "ID3D11Device1::OpenSharedResource1: takes a by-value shared-resource HANDLE.  DXVK's native side reads these through its own D3DKMT global-share emulation (d3d11_device.cpp OpenSharedResource: D3DKMTQueryResourceInfo over kmt-tagged integers), and no seam yet carries a Wine shared resource into that namespace -- the design and its precise blocker are ppc64le/dxvk/docs/shared-resource-handles.md.  EVENT handles are NOT refused any more: every event-shaped HANDLE method is audited in EVENT_HANDLE_METHODS and crosses through the winecom event relay as the tagged eventfd both native libraries understand",
       NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
-    { "ID3D11Device1::OpenSharedResourceByName",
-      "ID3D11Device1::OpenSharedResourceByName: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device1::OpenSharedResourceByName", NULL, cls_ID3D11Device2_49, NULL, 5, WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11Device1::OpenSharedResourceByName: parameter `LPCWSTR lpName` points at WCHAR, which the i386 layout roster never audited", 0, 0x0008, 0x0000, 0x0000 },
     { "ID3D11Device2::GetImmediateContext2", NULL, cls_ID3D11Device2_50, xaux_ID3D11Device2_50, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11Device2::CreateDeferredContext2", NULL, cls_ID3D11Device2_51, xaux_ID3D11Device2_51, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device2::GetResourceTiling", NULL, cls_ID3D11Device2_52, NULL, 8, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0020, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0012, 0x0000 },
@@ -1688,6 +1689,7 @@ static const unsigned char cls_ID3D11Device3_46[] = { WINECOM_CA_PASS, WINECOM_C
 static const unsigned char xaux_ID3D11Device3_46[] = { 0, 62 };
 static const unsigned char cls_ID3D11Device3_47[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11Device3_47[] = { 0, 0, 0, 0, 0, 0, 91 };
+static const unsigned char cls_ID3D11Device3_49[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_ID3D11Device3_50[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11Device3_50[] = { 48 };
 static const unsigned char cls_ID3D11Device3_51[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
@@ -1751,7 +1753,7 @@ static const struct winecom_slot slots_ID3D11Device3[65] =
     { "ID3D11Device::CreateCounter", NULL, cls_ID3D11Device3_26, xaux_ID3D11Device3_26, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device::CreateDeferredContext", NULL, cls_ID3D11Device3_27, xaux_ID3D11Device3_27, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device::OpenSharedResource",
-      "ID3D11Device::OpenSharedResource: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
+      "ID3D11Device::OpenSharedResource: takes a by-value shared-resource HANDLE.  DXVK's native side reads these through its own D3DKMT global-share emulation (d3d11_device.cpp OpenSharedResource: D3DKMTQueryResourceInfo over kmt-tagged integers), and no seam yet carries a Wine shared resource into that namespace -- the design and its precise blocker are ppc64le/dxvk/docs/shared-resource-handles.md.  EVENT handles are NOT refused any more: every event-shaped HANDLE method is audited in EVENT_HANDLE_METHODS and crosses through the winecom event relay as the tagged eventfd both native libraries understand",
       NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
@@ -1773,11 +1775,10 @@ static const struct winecom_slot slots_ID3D11Device3[65] =
     { "ID3D11Device1::CreateRasterizerState1", NULL, cls_ID3D11Device3_46, xaux_ID3D11Device3_46, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device1::CreateDeviceContextState", NULL, cls_ID3D11Device3_47, xaux_ID3D11Device3_47, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000d, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0040, 0x0020, 0x0000 },
     { "ID3D11Device1::OpenSharedResource1",
-      "ID3D11Device1::OpenSharedResource1: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
+      "ID3D11Device1::OpenSharedResource1: takes a by-value shared-resource HANDLE.  DXVK's native side reads these through its own D3DKMT global-share emulation (d3d11_device.cpp OpenSharedResource: D3DKMTQueryResourceInfo over kmt-tagged integers), and no seam yet carries a Wine shared resource into that namespace -- the design and its precise blocker are ppc64le/dxvk/docs/shared-resource-handles.md.  EVENT handles are NOT refused any more: every event-shaped HANDLE method is audited in EVENT_HANDLE_METHODS and crosses through the winecom event relay as the tagged eventfd both native libraries understand",
       NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
-    { "ID3D11Device1::OpenSharedResourceByName",
-      "ID3D11Device1::OpenSharedResourceByName: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device1::OpenSharedResourceByName", NULL, cls_ID3D11Device3_49, NULL, 5, WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11Device1::OpenSharedResourceByName: parameter `LPCWSTR lpName` points at WCHAR, which the i386 layout roster never audited", 0, 0x0008, 0x0000, 0x0000 },
     { "ID3D11Device2::GetImmediateContext2", NULL, cls_ID3D11Device3_50, xaux_ID3D11Device3_50, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11Device2::CreateDeferredContext2", NULL, cls_ID3D11Device3_51, xaux_ID3D11Device3_51, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device2::GetResourceTiling", NULL, cls_ID3D11Device3_52, NULL, 8, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0020, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0012, 0x0000 },
@@ -1863,6 +1864,7 @@ static const unsigned char cls_ID3D11Device4_46[] = { WINECOM_CA_PASS, WINECOM_C
 static const unsigned char xaux_ID3D11Device4_46[] = { 0, 62 };
 static const unsigned char cls_ID3D11Device4_47[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11Device4_47[] = { 0, 0, 0, 0, 0, 0, 91 };
+static const unsigned char cls_ID3D11Device4_49[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_ID3D11Device4_50[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11Device4_50[] = { 48 };
 static const unsigned char cls_ID3D11Device4_51[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
@@ -1892,6 +1894,7 @@ static const unsigned char cls_ID3D11Device4_62[] = { WINECOM_CA_PASS, WINECOM_C
 static const unsigned char xaux_ID3D11Device4_62[] = { 0, 49 };
 static const unsigned char cls_ID3D11Device4_63[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11Device4_64[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
+static const unsigned char cls_ID3D11Device4_65[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
 static const struct winecom_slot slots_ID3D11Device4[67] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
@@ -1926,7 +1929,7 @@ static const struct winecom_slot slots_ID3D11Device4[67] =
     { "ID3D11Device::CreateCounter", NULL, cls_ID3D11Device4_26, xaux_ID3D11Device4_26, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device::CreateDeferredContext", NULL, cls_ID3D11Device4_27, xaux_ID3D11Device4_27, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device::OpenSharedResource",
-      "ID3D11Device::OpenSharedResource: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
+      "ID3D11Device::OpenSharedResource: takes a by-value shared-resource HANDLE.  DXVK's native side reads these through its own D3DKMT global-share emulation (d3d11_device.cpp OpenSharedResource: D3DKMTQueryResourceInfo over kmt-tagged integers), and no seam yet carries a Wine shared resource into that namespace -- the design and its precise blocker are ppc64le/dxvk/docs/shared-resource-handles.md.  EVENT handles are NOT refused any more: every event-shaped HANDLE method is audited in EVENT_HANDLE_METHODS and crosses through the winecom event relay as the tagged eventfd both native libraries understand",
       NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
@@ -1948,11 +1951,10 @@ static const struct winecom_slot slots_ID3D11Device4[67] =
     { "ID3D11Device1::CreateRasterizerState1", NULL, cls_ID3D11Device4_46, xaux_ID3D11Device4_46, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device1::CreateDeviceContextState", NULL, cls_ID3D11Device4_47, xaux_ID3D11Device4_47, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000d, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0040, 0x0020, 0x0000 },
     { "ID3D11Device1::OpenSharedResource1",
-      "ID3D11Device1::OpenSharedResource1: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
+      "ID3D11Device1::OpenSharedResource1: takes a by-value shared-resource HANDLE.  DXVK's native side reads these through its own D3DKMT global-share emulation (d3d11_device.cpp OpenSharedResource: D3DKMTQueryResourceInfo over kmt-tagged integers), and no seam yet carries a Wine shared resource into that namespace -- the design and its precise blocker are ppc64le/dxvk/docs/shared-resource-handles.md.  EVENT handles are NOT refused any more: every event-shaped HANDLE method is audited in EVENT_HANDLE_METHODS and crosses through the winecom event relay as the tagged eventfd both native libraries understand",
       NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
-    { "ID3D11Device1::OpenSharedResourceByName",
-      "ID3D11Device1::OpenSharedResourceByName: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device1::OpenSharedResourceByName", NULL, cls_ID3D11Device4_49, NULL, 5, WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11Device1::OpenSharedResourceByName: parameter `LPCWSTR lpName` points at WCHAR, which the i386 layout roster never audited", 0, 0x0008, 0x0000, 0x0000 },
     { "ID3D11Device2::GetImmediateContext2", NULL, cls_ID3D11Device4_50, xaux_ID3D11Device4_50, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11Device2::CreateDeferredContext2", NULL, cls_ID3D11Device4_51, xaux_ID3D11Device4_51, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device2::GetResourceTiling", NULL, cls_ID3D11Device4_52, NULL, 8, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0020, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0012, 0x0000 },
@@ -1968,9 +1970,7 @@ static const struct winecom_slot slots_ID3D11Device4[67] =
     { "ID3D11Device3::CreateDeferredContext3", NULL, cls_ID3D11Device4_62, xaux_ID3D11Device4_62, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device3::WriteToSubresource", NULL, cls_ID3D11Device4_63, NULL, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0032, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device3::ReadFromSubresource", NULL, cls_ID3D11Device4_64, NULL, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0016, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device4::RegisterDeviceRemovedEvent",
-      "ID3D11Device4::RegisterDeviceRemovedEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "ID3D11Device4::RegisterDeviceRemovedEvent", NULL, cls_ID3D11Device4_65, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11Device4::UnregisterDeviceRemoved", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -2042,6 +2042,7 @@ static const unsigned char cls_ID3D11Device5_46[] = { WINECOM_CA_PASS, WINECOM_C
 static const unsigned char xaux_ID3D11Device5_46[] = { 0, 62 };
 static const unsigned char cls_ID3D11Device5_47[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11Device5_47[] = { 0, 0, 0, 0, 0, 0, 91 };
+static const unsigned char cls_ID3D11Device5_49[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_ID3D11Device5_50[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11Device5_50[] = { 48 };
 static const unsigned char cls_ID3D11Device5_51[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
@@ -2071,6 +2072,7 @@ static const unsigned char cls_ID3D11Device5_62[] = { WINECOM_CA_PASS, WINECOM_C
 static const unsigned char xaux_ID3D11Device5_62[] = { 0, 49 };
 static const unsigned char cls_ID3D11Device5_63[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11Device5_64[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
+static const unsigned char cls_ID3D11Device5_65[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11Device5_68[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const struct winecom_slot slots_ID3D11Device5[69] =
 {
@@ -2106,7 +2108,7 @@ static const struct winecom_slot slots_ID3D11Device5[69] =
     { "ID3D11Device::CreateCounter", NULL, cls_ID3D11Device5_26, xaux_ID3D11Device5_26, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device::CreateDeferredContext", NULL, cls_ID3D11Device5_27, xaux_ID3D11Device5_27, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device::OpenSharedResource",
-      "ID3D11Device::OpenSharedResource: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
+      "ID3D11Device::OpenSharedResource: takes a by-value shared-resource HANDLE.  DXVK's native side reads these through its own D3DKMT global-share emulation (d3d11_device.cpp OpenSharedResource: D3DKMTQueryResourceInfo over kmt-tagged integers), and no seam yet carries a Wine shared resource into that namespace -- the design and its precise blocker are ppc64le/dxvk/docs/shared-resource-handles.md.  EVENT handles are NOT refused any more: every event-shaped HANDLE method is audited in EVENT_HANDLE_METHODS and crosses through the winecom event relay as the tagged eventfd both native libraries understand",
       NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
@@ -2128,11 +2130,10 @@ static const struct winecom_slot slots_ID3D11Device5[69] =
     { "ID3D11Device1::CreateRasterizerState1", NULL, cls_ID3D11Device5_46, xaux_ID3D11Device5_46, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device1::CreateDeviceContextState", NULL, cls_ID3D11Device5_47, xaux_ID3D11Device5_47, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000d, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0040, 0x0020, 0x0000 },
     { "ID3D11Device1::OpenSharedResource1",
-      "ID3D11Device1::OpenSharedResource1: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
+      "ID3D11Device1::OpenSharedResource1: takes a by-value shared-resource HANDLE.  DXVK's native side reads these through its own D3DKMT global-share emulation (d3d11_device.cpp OpenSharedResource: D3DKMTQueryResourceInfo over kmt-tagged integers), and no seam yet carries a Wine shared resource into that namespace -- the design and its precise blocker are ppc64le/dxvk/docs/shared-resource-handles.md.  EVENT handles are NOT refused any more: every event-shaped HANDLE method is audited in EVENT_HANDLE_METHODS and crosses through the winecom event relay as the tagged eventfd both native libraries understand",
       NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
-    { "ID3D11Device1::OpenSharedResourceByName",
-      "ID3D11Device1::OpenSharedResourceByName: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device1::OpenSharedResourceByName", NULL, cls_ID3D11Device5_49, NULL, 5, WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11Device1::OpenSharedResourceByName: parameter `LPCWSTR lpName` points at WCHAR, which the i386 layout roster never audited", 0, 0x0008, 0x0000, 0x0000 },
     { "ID3D11Device2::GetImmediateContext2", NULL, cls_ID3D11Device5_50, xaux_ID3D11Device5_50, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11Device2::CreateDeferredContext2", NULL, cls_ID3D11Device5_51, xaux_ID3D11Device5_51, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device2::GetResourceTiling", NULL, cls_ID3D11Device5_52, NULL, 8, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0020, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0012, 0x0000 },
@@ -2148,12 +2149,10 @@ static const struct winecom_slot slots_ID3D11Device5[69] =
     { "ID3D11Device3::CreateDeferredContext3", NULL, cls_ID3D11Device5_62, xaux_ID3D11Device5_62, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device3::WriteToSubresource", NULL, cls_ID3D11Device5_63, NULL, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0032, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device3::ReadFromSubresource", NULL, cls_ID3D11Device5_64, NULL, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0016, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device4::RegisterDeviceRemovedEvent",
-      "ID3D11Device4::RegisterDeviceRemovedEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "ID3D11Device4::RegisterDeviceRemovedEvent", NULL, cls_ID3D11Device5_65, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11Device4::UnregisterDeviceRemoved", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device5::OpenSharedFence",
-      "ID3D11Device5::OpenSharedFence: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
+      "ID3D11Device5::OpenSharedFence: takes a by-value shared-resource HANDLE.  DXVK's native side reads these through its own D3DKMT global-share emulation (d3d11_device.cpp OpenSharedResource: D3DKMTQueryResourceInfo over kmt-tagged integers), and no seam yet carries a Wine shared resource into that namespace -- the design and its precise blocker are ppc64le/dxvk/docs/shared-resource-handles.md.  EVENT handles are NOT refused any more: every event-shaped HANDLE method is audited in EVENT_HANDLE_METHODS and crosses through the winecom event relay as the tagged eventfd both native libraries understand",
       NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device5::CreateFence", NULL, cls_ID3D11Device5_68, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 2, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0001, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
 };
@@ -3130,12 +3129,10 @@ static const struct winecom_slot slots_ID3D11DeviceContext2[144] =
     { "ID3D11DeviceContext2::ResizeTilePool", NULL, cls_ID3D11DeviceContext2_138, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0002, NULL, 0, NULL },
     { "ID3D11DeviceContext2::TiledResourceBarrier", NULL, cls_ID3D11DeviceContext2_139, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext2::IsAnnotationEnabled", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext2::SetMarkerInt",
-      "ID3D11DeviceContext2::SetMarkerInt: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext2::BeginEventInt",
-      "ID3D11DeviceContext2::BeginEventInt: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11DeviceContext2::SetMarkerInt", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext2::SetMarkerInt: parameter `const WCHAR *label` points at WCHAR, which the i386 layout roster never audited" },
+    { "ID3D11DeviceContext2::BeginEventInt", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext2::BeginEventInt: parameter `const WCHAR *label` points at WCHAR, which the i386 layout roster never audited" },
     { "ID3D11DeviceContext2::EndEvent", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -3333,6 +3330,7 @@ static const unsigned char cls_ID3D11DeviceContext3_136[] = { WINECOM_CA_IFACE_I
 static const unsigned char cls_ID3D11DeviceContext3_137[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11DeviceContext3_138[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11DeviceContext3_139[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
+static const unsigned char cls_ID3D11DeviceContext3_144[] = { WINECOM_CA_PASS, WINECOM_CA_EVENT_ONESHOT };
 static const struct winecom_slot slots_ID3D11DeviceContext3[147] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
@@ -3483,16 +3481,12 @@ static const struct winecom_slot slots_ID3D11DeviceContext3[147] =
     { "ID3D11DeviceContext2::ResizeTilePool", NULL, cls_ID3D11DeviceContext3_138, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0002, NULL, 0, NULL },
     { "ID3D11DeviceContext2::TiledResourceBarrier", NULL, cls_ID3D11DeviceContext3_139, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext2::IsAnnotationEnabled", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext2::SetMarkerInt",
-      "ID3D11DeviceContext2::SetMarkerInt: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext2::BeginEventInt",
-      "ID3D11DeviceContext2::BeginEventInt: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11DeviceContext2::SetMarkerInt", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext2::SetMarkerInt: parameter `const WCHAR *label` points at WCHAR, which the i386 layout roster never audited" },
+    { "ID3D11DeviceContext2::BeginEventInt", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext2::BeginEventInt: parameter `const WCHAR *label` points at WCHAR, which the i386 layout roster never audited" },
     { "ID3D11DeviceContext2::EndEvent", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext3::Flush1",
-      "ID3D11DeviceContext3::Flush1: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11DeviceContext3::Flush1", NULL, cls_ID3D11DeviceContext3_144, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext3::SetHardwareProtectionState", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext3::GetHardwareProtectionState", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
 };
@@ -3691,6 +3685,7 @@ static const unsigned char cls_ID3D11DeviceContext4_136[] = { WINECOM_CA_IFACE_I
 static const unsigned char cls_ID3D11DeviceContext4_137[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11DeviceContext4_138[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11DeviceContext4_139[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
+static const unsigned char cls_ID3D11DeviceContext4_144[] = { WINECOM_CA_PASS, WINECOM_CA_EVENT_ONESHOT };
 static const unsigned char cls_ID3D11DeviceContext4_147[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11DeviceContext4_148[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const struct winecom_slot slots_ID3D11DeviceContext4[149] =
@@ -3843,16 +3838,12 @@ static const struct winecom_slot slots_ID3D11DeviceContext4[149] =
     { "ID3D11DeviceContext2::ResizeTilePool", NULL, cls_ID3D11DeviceContext4_138, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0002, NULL, 0, NULL },
     { "ID3D11DeviceContext2::TiledResourceBarrier", NULL, cls_ID3D11DeviceContext4_139, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext2::IsAnnotationEnabled", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext2::SetMarkerInt",
-      "ID3D11DeviceContext2::SetMarkerInt: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext2::BeginEventInt",
-      "ID3D11DeviceContext2::BeginEventInt: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11DeviceContext2::SetMarkerInt", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext2::SetMarkerInt: parameter `const WCHAR *label` points at WCHAR, which the i386 layout roster never audited" },
+    { "ID3D11DeviceContext2::BeginEventInt", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext2::BeginEventInt: parameter `const WCHAR *label` points at WCHAR, which the i386 layout roster never audited" },
     { "ID3D11DeviceContext2::EndEvent", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext3::Flush1",
-      "ID3D11DeviceContext3::Flush1: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11DeviceContext3::Flush1", NULL, cls_ID3D11DeviceContext4_144, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext3::SetHardwareProtectionState", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext3::GetHardwareProtectionState", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "ID3D11DeviceContext4::Signal", NULL, cls_ID3D11DeviceContext4_147, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0002, NULL, 0, NULL },
@@ -3874,6 +3865,7 @@ static const struct winecom_slot slots_ID3D11DomainShader[7] =
 
 static const unsigned char cls_ID3D11Fence_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11Fence_3[] = { 39 };
+static const unsigned char cls_ID3D11Fence_9[] = { WINECOM_CA_PASS, WINECOM_CA_EVENT_ONESHOT };
 static const struct winecom_slot slots_ID3D11Fence[10] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
@@ -3883,13 +3875,10 @@ static const struct winecom_slot slots_ID3D11Fence[10] =
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Fence::CreateSharedHandle",
-      "ID3D11Fence::CreateSharedHandle: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11Fence::CreateSharedHandle", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11Fence::CreateSharedHandle: parameter `const WCHAR *name` points at WCHAR, which the i386 layout roster never audited" },
     { "ID3D11Fence::GetCompletedValue", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_RET_QWORD|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Fence::SetEventOnCompletion",
-      "ID3D11Fence::SetEventOnCompletion: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0001 },
+    { "ID3D11Fence::SetEventOnCompletion", NULL, cls_ID3D11Fence_9, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0001, NULL, 0, NULL },
 };
 
 static const unsigned char cls_ID3D11GeometryShader_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
@@ -4272,12 +4261,16 @@ static const struct winecom_slot slots_ID3D11VertexShader[7] =
 
 static const unsigned char cls_ID3D11VideoContext_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11VideoContext_3[] = { 39 };
+static const unsigned char cls_ID3D11VideoContext_7[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext_8[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext_9[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext_10[] = { WINECOM_CA_IFACE_IN };
 static const struct winecom_rep reps_ID3D11VideoContext_11[] =
     { { 2, 0xff, 1, 72, 64, wine_repack32_D3D11_VIDEO_DECODER_BUFFER_DESC, wine_repack64_D3D11_VIDEO_DECODER_BUFFER_DESC } };
 static const unsigned char cls_ID3D11VideoContext_11[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
+static const struct winecom_rep reps_ID3D11VideoContext_12[] =
+    { { 1, 0xff, 1, 48, 28, wine_repack32_D3D11_VIDEO_DECODER_EXTENSION, wine_repack64_D3D11_VIDEO_DECODER_EXTENSION } };
+static const unsigned char cls_ID3D11VideoContext_12[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext_13[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext_14[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext_15[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
@@ -4326,6 +4319,9 @@ static const unsigned char cls_ID3D11VideoContext_58[] = { WINECOM_CA_IFACE_IN }
 static const unsigned char cls_ID3D11VideoContext_59[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext_60[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext_61[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
+static const struct winecom_rep reps_ID3D11VideoContext_62[] =
+    { { 3, 0xff, 2, 48, 44, wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_OUTPUT, wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_OUTPUT } };
+static const unsigned char cls_ID3D11VideoContext_62[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext_63[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext_64[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const struct winecom_slot slots_ID3D11VideoContext[65] =
@@ -4337,16 +4333,13 @@ static const struct winecom_slot slots_ID3D11VideoContext[65] =
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11VideoContext::GetDecoderBuffer",
-      "ID3D11VideoContext::GetDecoderBuffer: has a void** out-parameter (`void **buffer`) with no REFIID beside it to type the result; an untyped interface pointer cannot be given a guest vtable",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::GetDecoderBuffer", NULL, cls_ID3D11VideoContext_7, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11VideoContext::GetDecoderBuffer: parameter `void **buffer` is a cell the host fills with a POINTER, and a 32-bit guest's cell is four bytes wide -- the native side would read or write eight. A hand32 walker with a below-4GiB answer must serve this row", 0, 0x0008, 0x0004, 0x0000 },
     { "ID3D11VideoContext::ReleaseDecoderBuffer", NULL, cls_ID3D11VideoContext_8, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::DecoderBeginFrame", NULL, cls_ID3D11VideoContext_9, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::DecoderEndFrame", NULL, cls_ID3D11VideoContext_10, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::SubmitDecoderBuffers", NULL, cls_ID3D11VideoContext_11, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11VideoContext_11, 1, NULL },
-    { "ID3D11VideoContext::DecoderExtension",
-      "ID3D11VideoContext::DecoderExtension: takes D3D11_VIDEO_DECODER_EXTENSION, a struct that reaches an interface pointer through its own members (D3D11_VIDEO_DECODER_EXTENSION -> ID3D11Resource); the pointers inside it would arrive at DXVK as guest proxies.  Needs a hand-written walker, the shape dlls/d3d12/main.c's hand_resource_barrier has",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11VideoContext::DecoderExtension", NULL, cls_ID3D11VideoContext_12, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11VideoContext_12, 1, NULL },
     { "ID3D11VideoContext::VideoProcessorSetOutputTargetRect", NULL, cls_ID3D11VideoContext_13, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetOutputBackgroundColor", NULL, cls_ID3D11VideoContext_14, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetOutputColorSpace", NULL, cls_ID3D11VideoContext_15, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4387,9 +4380,7 @@ static const struct winecom_slot slots_ID3D11VideoContext[65] =
     { "ID3D11VideoContext::VideoProcessorGetStreamAutoProcessingMode", NULL, cls_ID3D11VideoContext_50, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorGetStreamFilter", NULL, cls_ID3D11VideoContext_51, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0018, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorGetStreamExtension", NULL, cls_ID3D11VideoContext_52, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000a, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorBlt",
-      "ID3D11VideoContext::VideoProcessorBlt: takes D3D11_VIDEO_PROCESSOR_STREAM, a struct that reaches an interface pointer through its own members (D3D11_VIDEO_PROCESSOR_STREAM -> ID3D11VideoProcessorInputView); the pointers inside it would arrive at DXVK as guest proxies.  Needs a hand-written walker, the shape dlls/d3d12/main.c's hand_resource_barrier has",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorBlt", NULL, NULL, NULL, 6, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 11, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11VideoContext::NegotiateCryptoSessionKeyExchange", NULL, cls_ID3D11VideoContext_54, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::EncryptionBlt", NULL, cls_ID3D11VideoContext_55, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0008, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::DecryptionBlt", NULL, cls_ID3D11VideoContext_56, NULL, 9, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0050, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4398,21 +4389,23 @@ static const struct winecom_slot slots_ID3D11VideoContext[65] =
     { "ID3D11VideoContext::GetEncryptionBltKey", NULL, cls_ID3D11VideoContext_59, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::NegotiateAuthenticatedChannelKeyExchange", NULL, cls_ID3D11VideoContext_60, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::QueryAuthenticatedChannel", NULL, cls_ID3D11VideoContext_61, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000a, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::ConfigureAuthenticatedChannel",
-      "ID3D11VideoContext::ConfigureAuthenticatedChannel: takes D3D11_AUTHENTICATED_CONFIGURE_OUTPUT, a struct that reaches a kernel or GDI handle through its own members (D3D11_AUTHENTICATED_CONFIGURE_OUTPUT -> HANDLE).  Those integers name Wine objects and DXVK's native side has its own encoding for the same things, so one namespace's integer handed to the other names a different object rather than none.  Window handles are NOT in this set any more -- there is one HWND namespace in the process and this lane presents through it",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11VideoContext::ConfigureAuthenticatedChannel", NULL, cls_ID3D11VideoContext_62, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11VideoContext_62, 1, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamRotation", NULL, cls_ID3D11VideoContext_63, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000e, 0x0004, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorGetStreamRotation", NULL, cls_ID3D11VideoContext_64, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x000c, 0x0000 },
 };
 
 static const unsigned char cls_ID3D11VideoContext1_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11VideoContext1_3[] = { 39 };
+static const unsigned char cls_ID3D11VideoContext1_7[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext1_8[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext1_9[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext1_10[] = { WINECOM_CA_IFACE_IN };
 static const struct winecom_rep reps_ID3D11VideoContext1_11[] =
     { { 2, 0xff, 1, 72, 64, wine_repack32_D3D11_VIDEO_DECODER_BUFFER_DESC, wine_repack64_D3D11_VIDEO_DECODER_BUFFER_DESC } };
 static const unsigned char cls_ID3D11VideoContext1_11[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
+static const struct winecom_rep reps_ID3D11VideoContext1_12[] =
+    { { 1, 0xff, 1, 48, 28, wine_repack32_D3D11_VIDEO_DECODER_EXTENSION, wine_repack64_D3D11_VIDEO_DECODER_EXTENSION } };
+static const unsigned char cls_ID3D11VideoContext1_12[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext1_13[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext1_14[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext1_15[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
@@ -4461,6 +4454,9 @@ static const unsigned char cls_ID3D11VideoContext1_58[] = { WINECOM_CA_IFACE_IN 
 static const unsigned char cls_ID3D11VideoContext1_59[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext1_60[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext1_61[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
+static const struct winecom_rep reps_ID3D11VideoContext1_62[] =
+    { { 3, 0xff, 2, 48, 44, wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_OUTPUT, wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_OUTPUT } };
+static const unsigned char cls_ID3D11VideoContext1_62[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext1_63[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext1_64[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const struct winecom_rep reps_ID3D11VideoContext1_65[] =
@@ -4488,16 +4484,13 @@ static const struct winecom_slot slots_ID3D11VideoContext1[79] =
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11VideoContext::GetDecoderBuffer",
-      "ID3D11VideoContext::GetDecoderBuffer: has a void** out-parameter (`void **buffer`) with no REFIID beside it to type the result; an untyped interface pointer cannot be given a guest vtable",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::GetDecoderBuffer", NULL, cls_ID3D11VideoContext1_7, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11VideoContext::GetDecoderBuffer: parameter `void **buffer` is a cell the host fills with a POINTER, and a 32-bit guest's cell is four bytes wide -- the native side would read or write eight. A hand32 walker with a below-4GiB answer must serve this row", 0, 0x0008, 0x0004, 0x0000 },
     { "ID3D11VideoContext::ReleaseDecoderBuffer", NULL, cls_ID3D11VideoContext1_8, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::DecoderBeginFrame", NULL, cls_ID3D11VideoContext1_9, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::DecoderEndFrame", NULL, cls_ID3D11VideoContext1_10, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::SubmitDecoderBuffers", NULL, cls_ID3D11VideoContext1_11, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11VideoContext1_11, 1, NULL },
-    { "ID3D11VideoContext::DecoderExtension",
-      "ID3D11VideoContext::DecoderExtension: takes D3D11_VIDEO_DECODER_EXTENSION, a struct that reaches an interface pointer through its own members (D3D11_VIDEO_DECODER_EXTENSION -> ID3D11Resource); the pointers inside it would arrive at DXVK as guest proxies.  Needs a hand-written walker, the shape dlls/d3d12/main.c's hand_resource_barrier has",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11VideoContext::DecoderExtension", NULL, cls_ID3D11VideoContext1_12, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11VideoContext1_12, 1, NULL },
     { "ID3D11VideoContext::VideoProcessorSetOutputTargetRect", NULL, cls_ID3D11VideoContext1_13, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetOutputBackgroundColor", NULL, cls_ID3D11VideoContext1_14, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetOutputColorSpace", NULL, cls_ID3D11VideoContext1_15, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4538,9 +4531,7 @@ static const struct winecom_slot slots_ID3D11VideoContext1[79] =
     { "ID3D11VideoContext::VideoProcessorGetStreamAutoProcessingMode", NULL, cls_ID3D11VideoContext1_50, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorGetStreamFilter", NULL, cls_ID3D11VideoContext1_51, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0018, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorGetStreamExtension", NULL, cls_ID3D11VideoContext1_52, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000a, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorBlt",
-      "ID3D11VideoContext::VideoProcessorBlt: takes D3D11_VIDEO_PROCESSOR_STREAM, a struct that reaches an interface pointer through its own members (D3D11_VIDEO_PROCESSOR_STREAM -> ID3D11VideoProcessorInputView); the pointers inside it would arrive at DXVK as guest proxies.  Needs a hand-written walker, the shape dlls/d3d12/main.c's hand_resource_barrier has",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorBlt", NULL, NULL, NULL, 6, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 11, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11VideoContext::NegotiateCryptoSessionKeyExchange", NULL, cls_ID3D11VideoContext1_54, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::EncryptionBlt", NULL, cls_ID3D11VideoContext1_55, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0008, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::DecryptionBlt", NULL, cls_ID3D11VideoContext1_56, NULL, 9, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0050, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4549,9 +4540,7 @@ static const struct winecom_slot slots_ID3D11VideoContext1[79] =
     { "ID3D11VideoContext::GetEncryptionBltKey", NULL, cls_ID3D11VideoContext1_59, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::NegotiateAuthenticatedChannelKeyExchange", NULL, cls_ID3D11VideoContext1_60, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::QueryAuthenticatedChannel", NULL, cls_ID3D11VideoContext1_61, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000a, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::ConfigureAuthenticatedChannel",
-      "ID3D11VideoContext::ConfigureAuthenticatedChannel: takes D3D11_AUTHENTICATED_CONFIGURE_OUTPUT, a struct that reaches a kernel or GDI handle through its own members (D3D11_AUTHENTICATED_CONFIGURE_OUTPUT -> HANDLE).  Those integers name Wine objects and DXVK's native side has its own encoding for the same things, so one namespace's integer handed to the other names a different object rather than none.  Window handles are NOT in this set any more -- there is one HWND namespace in the process and this lane presents through it",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11VideoContext::ConfigureAuthenticatedChannel", NULL, cls_ID3D11VideoContext1_62, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11VideoContext1_62, 1, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamRotation", NULL, cls_ID3D11VideoContext1_63, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000e, 0x0004, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorGetStreamRotation", NULL, cls_ID3D11VideoContext1_64, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x000c, 0x0000 },
     { "ID3D11VideoContext1::SubmitDecoderBuffers1", NULL, cls_ID3D11VideoContext1_65, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11VideoContext1_65, 1, NULL },
@@ -4572,12 +4561,16 @@ static const struct winecom_slot slots_ID3D11VideoContext1[79] =
 
 static const unsigned char cls_ID3D11VideoContext2_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11VideoContext2_3[] = { 39 };
+static const unsigned char cls_ID3D11VideoContext2_7[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext2_8[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext2_9[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext2_10[] = { WINECOM_CA_IFACE_IN };
 static const struct winecom_rep reps_ID3D11VideoContext2_11[] =
     { { 2, 0xff, 1, 72, 64, wine_repack32_D3D11_VIDEO_DECODER_BUFFER_DESC, wine_repack64_D3D11_VIDEO_DECODER_BUFFER_DESC } };
 static const unsigned char cls_ID3D11VideoContext2_11[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
+static const struct winecom_rep reps_ID3D11VideoContext2_12[] =
+    { { 1, 0xff, 1, 48, 28, wine_repack32_D3D11_VIDEO_DECODER_EXTENSION, wine_repack64_D3D11_VIDEO_DECODER_EXTENSION } };
+static const unsigned char cls_ID3D11VideoContext2_12[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext2_13[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext2_14[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext2_15[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
@@ -4626,6 +4619,9 @@ static const unsigned char cls_ID3D11VideoContext2_58[] = { WINECOM_CA_IFACE_IN 
 static const unsigned char cls_ID3D11VideoContext2_59[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext2_60[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext2_61[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
+static const struct winecom_rep reps_ID3D11VideoContext2_62[] =
+    { { 3, 0xff, 2, 48, 44, wine_repack32_D3D11_AUTHENTICATED_CONFIGURE_OUTPUT, wine_repack64_D3D11_AUTHENTICATED_CONFIGURE_OUTPUT } };
+static const unsigned char cls_ID3D11VideoContext2_62[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext2_63[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext2_64[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const struct winecom_rep reps_ID3D11VideoContext2_65[] =
@@ -4657,16 +4653,13 @@ static const struct winecom_slot slots_ID3D11VideoContext2[83] =
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11VideoContext::GetDecoderBuffer",
-      "ID3D11VideoContext::GetDecoderBuffer: has a void** out-parameter (`void **buffer`) with no REFIID beside it to type the result; an untyped interface pointer cannot be given a guest vtable",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::GetDecoderBuffer", NULL, cls_ID3D11VideoContext2_7, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11VideoContext::GetDecoderBuffer: parameter `void **buffer` is a cell the host fills with a POINTER, and a 32-bit guest's cell is four bytes wide -- the native side would read or write eight. A hand32 walker with a below-4GiB answer must serve this row", 0, 0x0008, 0x0004, 0x0000 },
     { "ID3D11VideoContext::ReleaseDecoderBuffer", NULL, cls_ID3D11VideoContext2_8, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::DecoderBeginFrame", NULL, cls_ID3D11VideoContext2_9, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::DecoderEndFrame", NULL, cls_ID3D11VideoContext2_10, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::SubmitDecoderBuffers", NULL, cls_ID3D11VideoContext2_11, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11VideoContext2_11, 1, NULL },
-    { "ID3D11VideoContext::DecoderExtension",
-      "ID3D11VideoContext::DecoderExtension: takes D3D11_VIDEO_DECODER_EXTENSION, a struct that reaches an interface pointer through its own members (D3D11_VIDEO_DECODER_EXTENSION -> ID3D11Resource); the pointers inside it would arrive at DXVK as guest proxies.  Needs a hand-written walker, the shape dlls/d3d12/main.c's hand_resource_barrier has",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11VideoContext::DecoderExtension", NULL, cls_ID3D11VideoContext2_12, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11VideoContext2_12, 1, NULL },
     { "ID3D11VideoContext::VideoProcessorSetOutputTargetRect", NULL, cls_ID3D11VideoContext2_13, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetOutputBackgroundColor", NULL, cls_ID3D11VideoContext2_14, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetOutputColorSpace", NULL, cls_ID3D11VideoContext2_15, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4707,9 +4700,7 @@ static const struct winecom_slot slots_ID3D11VideoContext2[83] =
     { "ID3D11VideoContext::VideoProcessorGetStreamAutoProcessingMode", NULL, cls_ID3D11VideoContext2_50, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorGetStreamFilter", NULL, cls_ID3D11VideoContext2_51, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0018, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorGetStreamExtension", NULL, cls_ID3D11VideoContext2_52, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000a, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorBlt",
-      "ID3D11VideoContext::VideoProcessorBlt: takes D3D11_VIDEO_PROCESSOR_STREAM, a struct that reaches an interface pointer through its own members (D3D11_VIDEO_PROCESSOR_STREAM -> ID3D11VideoProcessorInputView); the pointers inside it would arrive at DXVK as guest proxies.  Needs a hand-written walker, the shape dlls/d3d12/main.c's hand_resource_barrier has",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorBlt", NULL, NULL, NULL, 6, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 11, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11VideoContext::NegotiateCryptoSessionKeyExchange", NULL, cls_ID3D11VideoContext2_54, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::EncryptionBlt", NULL, cls_ID3D11VideoContext2_55, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0008, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::DecryptionBlt", NULL, cls_ID3D11VideoContext2_56, NULL, 9, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0050, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4718,9 +4709,7 @@ static const struct winecom_slot slots_ID3D11VideoContext2[83] =
     { "ID3D11VideoContext::GetEncryptionBltKey", NULL, cls_ID3D11VideoContext2_59, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::NegotiateAuthenticatedChannelKeyExchange", NULL, cls_ID3D11VideoContext2_60, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::QueryAuthenticatedChannel", NULL, cls_ID3D11VideoContext2_61, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000a, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::ConfigureAuthenticatedChannel",
-      "ID3D11VideoContext::ConfigureAuthenticatedChannel: takes D3D11_AUTHENTICATED_CONFIGURE_OUTPUT, a struct that reaches a kernel or GDI handle through its own members (D3D11_AUTHENTICATED_CONFIGURE_OUTPUT -> HANDLE).  Those integers name Wine objects and DXVK's native side has its own encoding for the same things, so one namespace's integer handed to the other names a different object rather than none.  Window handles are NOT in this set any more -- there is one HWND namespace in the process and this lane presents through it",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11VideoContext::ConfigureAuthenticatedChannel", NULL, cls_ID3D11VideoContext2_62, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11VideoContext2_62, 1, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamRotation", NULL, cls_ID3D11VideoContext2_63, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000e, 0x0004, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorGetStreamRotation", NULL, cls_ID3D11VideoContext2_64, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x000c, 0x0000 },
     { "ID3D11VideoContext1::SubmitDecoderBuffers1", NULL, cls_ID3D11VideoContext2_65, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11VideoContext2_65, 1, NULL },
@@ -4985,13 +4974,11 @@ static const struct winecom_slot slots_ID3DUserDefinedAnnotation[7] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3DUserDefinedAnnotation::BeginEvent",
-      "ID3DUserDefinedAnnotation::BeginEvent: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3DUserDefinedAnnotation::BeginEvent", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3DUserDefinedAnnotation::BeginEvent: parameter `LPCWSTR Name` points at WCHAR, which the i386 layout roster never audited" },
     { "ID3DUserDefinedAnnotation::EndEvent", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3DUserDefinedAnnotation::SetMarker",
-      "ID3DUserDefinedAnnotation::SetMarker: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3DUserDefinedAnnotation::SetMarker", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3DUserDefinedAnnotation::SetMarker: parameter `LPCWSTR Name` points at WCHAR, which the i386 layout roster never audited" },
     { "ID3DUserDefinedAnnotation::GetStatus", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -5070,6 +5057,8 @@ static const struct winecom_rep reps_IDXGIAdapter3_10[] =
     { { 0, 0xff, 2, 312, 296, wine_repack32_DXGI_ADAPTER_DESC1, wine_repack64_DXGI_ADAPTER_DESC1 } };
 static const struct winecom_rep reps_IDXGIAdapter3_11[] =
     { { 0, 0xff, 2, 320, 304, wine_repack32_DXGI_ADAPTER_DESC2, wine_repack64_DXGI_ADAPTER_DESC2 } };
+static const unsigned char cls_IDXGIAdapter3_12[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
+static const unsigned char cls_IDXGIAdapter3_16[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
 static const struct winecom_slot slots_IDXGIAdapter3[18] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
@@ -5084,15 +5073,11 @@ static const struct winecom_slot slots_IDXGIAdapter3[18] =
     { "IDXGIAdapter::CheckInterfaceSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIAdapter1::GetDesc1", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIAdapter3_10, 1, NULL },
     { "IDXGIAdapter2::GetDesc2", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIAdapter3_11, 1, NULL },
-    { "IDXGIAdapter3::RegisterHardwareContentProtectionTeardownStatusEvent",
-      "IDXGIAdapter3::RegisterHardwareContentProtectionTeardownStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "IDXGIAdapter3::RegisterHardwareContentProtectionTeardownStatusEvent", NULL, cls_IDXGIAdapter3_12, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIAdapter3::UnregisterHardwareContentProtectionTeardownStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIAdapter3::QueryVideoMemoryInfo", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIAdapter3::SetVideoMemoryReservation", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0004, NULL, 0, NULL },
-    { "IDXGIAdapter3::RegisterVideoMemoryBudgetChangeNotificationEvent",
-      "IDXGIAdapter3::RegisterVideoMemoryBudgetChangeNotificationEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "IDXGIAdapter3::RegisterVideoMemoryBudgetChangeNotificationEvent", NULL, cls_IDXGIAdapter3_16, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIAdapter3::UnregisterVideoMemoryBudgetChangeNotification", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -5105,6 +5090,8 @@ static const struct winecom_rep reps_IDXGIAdapter4_10[] =
     { { 0, 0xff, 2, 312, 296, wine_repack32_DXGI_ADAPTER_DESC1, wine_repack64_DXGI_ADAPTER_DESC1 } };
 static const struct winecom_rep reps_IDXGIAdapter4_11[] =
     { { 0, 0xff, 2, 320, 304, wine_repack32_DXGI_ADAPTER_DESC2, wine_repack64_DXGI_ADAPTER_DESC2 } };
+static const unsigned char cls_IDXGIAdapter4_12[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
+static const unsigned char cls_IDXGIAdapter4_16[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
 static const struct winecom_rep reps_IDXGIAdapter4_18[] =
     { { 0, 0xff, 2, 320, 304, wine_repack32_DXGI_ADAPTER_DESC3, wine_repack64_DXGI_ADAPTER_DESC3 } };
 static const struct winecom_slot slots_IDXGIAdapter4[19] =
@@ -5121,15 +5108,11 @@ static const struct winecom_slot slots_IDXGIAdapter4[19] =
     { "IDXGIAdapter::CheckInterfaceSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIAdapter1::GetDesc1", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIAdapter4_10, 1, NULL },
     { "IDXGIAdapter2::GetDesc2", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIAdapter4_11, 1, NULL },
-    { "IDXGIAdapter3::RegisterHardwareContentProtectionTeardownStatusEvent",
-      "IDXGIAdapter3::RegisterHardwareContentProtectionTeardownStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "IDXGIAdapter3::RegisterHardwareContentProtectionTeardownStatusEvent", NULL, cls_IDXGIAdapter4_12, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIAdapter3::UnregisterHardwareContentProtectionTeardownStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIAdapter3::QueryVideoMemoryInfo", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIAdapter3::SetVideoMemoryReservation", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0004, NULL, 0, NULL },
-    { "IDXGIAdapter3::RegisterVideoMemoryBudgetChangeNotificationEvent",
-      "IDXGIAdapter3::RegisterVideoMemoryBudgetChangeNotificationEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "IDXGIAdapter3::RegisterVideoMemoryBudgetChangeNotificationEvent", NULL, cls_IDXGIAdapter4_16, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIAdapter3::UnregisterVideoMemoryBudgetChangeNotification", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIAdapter4::GetDesc3", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIAdapter4_18, 1, NULL },
 };
@@ -5137,6 +5120,10 @@ static const struct winecom_slot slots_IDXGIAdapter4[19] =
 static const unsigned char cls_IDXGIDevice_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_IDXGIDevice_7[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IDXGIDevice_7[] = { 93 };
+static const struct winecom_rep reps_IDXGIDevice_8[] =
+    { { 3, 0xff, 1, 8, 4, wine_repack32_DXGI_SHARED_RESOURCE, wine_repack64_DXGI_SHARED_RESOURCE } };
+static const unsigned char cls_IDXGIDevice_8[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IDXGIDevice_8[] = { 0, 0, 0, 0, 127 };
 static const unsigned char cls_IDXGIDevice_9[] = { WINECOM_CA_IFACE_ARR_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const struct winecom_slot slots_IDXGIDevice[12] =
 {
@@ -5148,9 +5135,7 @@ static const struct winecom_slot slots_IDXGIDevice[12] =
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetParent", NULL, cls_IDXGIDevice_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIDevice::GetAdapter", NULL, cls_IDXGIDevice_7, xaux_IDXGIDevice_7, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
-    { "IDXGIDevice::CreateSurface",
-      "IDXGIDevice::CreateSurface: takes DXGI_SHARED_RESOURCE, a struct that reaches a kernel or GDI handle through its own members (DXGI_SHARED_RESOURCE -> HANDLE).  Those integers name Wine objects and DXVK's native side has its own encoding for the same things, so one namespace's integer handed to the other names a different object rather than none.  Window handles are NOT in this set any more -- there is one HWND namespace in the process and this lane presents through it",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
+    { "IDXGIDevice::CreateSurface", NULL, cls_IDXGIDevice_8, xaux_IDXGIDevice_8, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, reps_IDXGIDevice_8, 1, NULL, 0, 0x0010, 0x0000, 0x0000 },
     { "IDXGIDevice::QueryResourceResidency", NULL, cls_IDXGIDevice_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIDevice::SetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
     { "IDXGIDevice::GetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
@@ -5159,6 +5144,10 @@ static const struct winecom_slot slots_IDXGIDevice[12] =
 static const unsigned char cls_IDXGIDevice1_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_IDXGIDevice1_7[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IDXGIDevice1_7[] = { 93 };
+static const struct winecom_rep reps_IDXGIDevice1_8[] =
+    { { 3, 0xff, 1, 8, 4, wine_repack32_DXGI_SHARED_RESOURCE, wine_repack64_DXGI_SHARED_RESOURCE } };
+static const unsigned char cls_IDXGIDevice1_8[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IDXGIDevice1_8[] = { 0, 0, 0, 0, 127 };
 static const unsigned char cls_IDXGIDevice1_9[] = { WINECOM_CA_IFACE_ARR_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const struct winecom_slot slots_IDXGIDevice1[14] =
 {
@@ -5170,9 +5159,7 @@ static const struct winecom_slot slots_IDXGIDevice1[14] =
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetParent", NULL, cls_IDXGIDevice1_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIDevice::GetAdapter", NULL, cls_IDXGIDevice1_7, xaux_IDXGIDevice1_7, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
-    { "IDXGIDevice::CreateSurface",
-      "IDXGIDevice::CreateSurface: takes DXGI_SHARED_RESOURCE, a struct that reaches a kernel or GDI handle through its own members (DXGI_SHARED_RESOURCE -> HANDLE).  Those integers name Wine objects and DXVK's native side has its own encoding for the same things, so one namespace's integer handed to the other names a different object rather than none.  Window handles are NOT in this set any more -- there is one HWND namespace in the process and this lane presents through it",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
+    { "IDXGIDevice::CreateSurface", NULL, cls_IDXGIDevice1_8, xaux_IDXGIDevice1_8, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, reps_IDXGIDevice1_8, 1, NULL, 0, 0x0010, 0x0000, 0x0000 },
     { "IDXGIDevice::QueryResourceResidency", NULL, cls_IDXGIDevice1_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIDevice::SetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
     { "IDXGIDevice::GetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
@@ -5183,9 +5170,14 @@ static const struct winecom_slot slots_IDXGIDevice1[14] =
 static const unsigned char cls_IDXGIDevice2_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_IDXGIDevice2_7[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IDXGIDevice2_7[] = { 93 };
+static const struct winecom_rep reps_IDXGIDevice2_8[] =
+    { { 3, 0xff, 1, 8, 4, wine_repack32_DXGI_SHARED_RESOURCE, wine_repack64_DXGI_SHARED_RESOURCE } };
+static const unsigned char cls_IDXGIDevice2_8[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IDXGIDevice2_8[] = { 0, 0, 0, 0, 127 };
 static const unsigned char cls_IDXGIDevice2_9[] = { WINECOM_CA_IFACE_ARR_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_IDXGIDevice2_14[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IDXGIDevice2_15[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_IN, WINECOM_CA_PASS };
+static const unsigned char cls_IDXGIDevice2_16[] = { WINECOM_CA_EVENT_ONESHOT };
 static const struct winecom_slot slots_IDXGIDevice2[17] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
@@ -5196,9 +5188,7 @@ static const struct winecom_slot slots_IDXGIDevice2[17] =
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetParent", NULL, cls_IDXGIDevice2_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIDevice::GetAdapter", NULL, cls_IDXGIDevice2_7, xaux_IDXGIDevice2_7, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
-    { "IDXGIDevice::CreateSurface",
-      "IDXGIDevice::CreateSurface: takes DXGI_SHARED_RESOURCE, a struct that reaches a kernel or GDI handle through its own members (DXGI_SHARED_RESOURCE -> HANDLE).  Those integers name Wine objects and DXVK's native side has its own encoding for the same things, so one namespace's integer handed to the other names a different object rather than none.  Window handles are NOT in this set any more -- there is one HWND namespace in the process and this lane presents through it",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
+    { "IDXGIDevice::CreateSurface", NULL, cls_IDXGIDevice2_8, xaux_IDXGIDevice2_8, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, reps_IDXGIDevice2_8, 1, NULL, 0, 0x0010, 0x0000, 0x0000 },
     { "IDXGIDevice::QueryResourceResidency", NULL, cls_IDXGIDevice2_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIDevice::SetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
     { "IDXGIDevice::GetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
@@ -5206,17 +5196,20 @@ static const struct winecom_slot slots_IDXGIDevice2[17] =
     { "IDXGIDevice1::GetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGIDevice2::OfferResources", NULL, cls_IDXGIDevice2_14, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIDevice2::ReclaimResources", NULL, cls_IDXGIDevice2_15, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
-    { "IDXGIDevice2::EnqueueSetEvent",
-      "IDXGIDevice2::EnqueueSetEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "IDXGIDevice2::EnqueueSetEvent", NULL, cls_IDXGIDevice2_16, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
 static const unsigned char cls_IDXGIDevice3_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_IDXGIDevice3_7[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IDXGIDevice3_7[] = { 93 };
+static const struct winecom_rep reps_IDXGIDevice3_8[] =
+    { { 3, 0xff, 1, 8, 4, wine_repack32_DXGI_SHARED_RESOURCE, wine_repack64_DXGI_SHARED_RESOURCE } };
+static const unsigned char cls_IDXGIDevice3_8[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IDXGIDevice3_8[] = { 0, 0, 0, 0, 127 };
 static const unsigned char cls_IDXGIDevice3_9[] = { WINECOM_CA_IFACE_ARR_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_IDXGIDevice3_14[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IDXGIDevice3_15[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_IN, WINECOM_CA_PASS };
+static const unsigned char cls_IDXGIDevice3_16[] = { WINECOM_CA_EVENT_ONESHOT };
 static const struct winecom_slot slots_IDXGIDevice3[18] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
@@ -5227,9 +5220,7 @@ static const struct winecom_slot slots_IDXGIDevice3[18] =
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetParent", NULL, cls_IDXGIDevice3_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIDevice::GetAdapter", NULL, cls_IDXGIDevice3_7, xaux_IDXGIDevice3_7, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
-    { "IDXGIDevice::CreateSurface",
-      "IDXGIDevice::CreateSurface: takes DXGI_SHARED_RESOURCE, a struct that reaches a kernel or GDI handle through its own members (DXGI_SHARED_RESOURCE -> HANDLE).  Those integers name Wine objects and DXVK's native side has its own encoding for the same things, so one namespace's integer handed to the other names a different object rather than none.  Window handles are NOT in this set any more -- there is one HWND namespace in the process and this lane presents through it",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
+    { "IDXGIDevice::CreateSurface", NULL, cls_IDXGIDevice3_8, xaux_IDXGIDevice3_8, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, reps_IDXGIDevice3_8, 1, NULL, 0, 0x0010, 0x0000, 0x0000 },
     { "IDXGIDevice::QueryResourceResidency", NULL, cls_IDXGIDevice3_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIDevice::SetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
     { "IDXGIDevice::GetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
@@ -5237,18 +5228,21 @@ static const struct winecom_slot slots_IDXGIDevice3[18] =
     { "IDXGIDevice1::GetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGIDevice2::OfferResources", NULL, cls_IDXGIDevice3_14, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIDevice2::ReclaimResources", NULL, cls_IDXGIDevice3_15, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
-    { "IDXGIDevice2::EnqueueSetEvent",
-      "IDXGIDevice2::EnqueueSetEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "IDXGIDevice2::EnqueueSetEvent", NULL, cls_IDXGIDevice3_16, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIDevice3::Trim", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
 static const unsigned char cls_IDXGIDevice4_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_IDXGIDevice4_7[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IDXGIDevice4_7[] = { 93 };
+static const struct winecom_rep reps_IDXGIDevice4_8[] =
+    { { 3, 0xff, 1, 8, 4, wine_repack32_DXGI_SHARED_RESOURCE, wine_repack64_DXGI_SHARED_RESOURCE } };
+static const unsigned char cls_IDXGIDevice4_8[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IDXGIDevice4_8[] = { 0, 0, 0, 0, 127 };
 static const unsigned char cls_IDXGIDevice4_9[] = { WINECOM_CA_IFACE_ARR_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_IDXGIDevice4_14[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IDXGIDevice4_15[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_IN, WINECOM_CA_PASS };
+static const unsigned char cls_IDXGIDevice4_16[] = { WINECOM_CA_EVENT_ONESHOT };
 static const unsigned char cls_IDXGIDevice4_18[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_IDXGIDevice4_19[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_IN, WINECOM_CA_PASS };
 static const struct winecom_slot slots_IDXGIDevice4[20] =
@@ -5261,9 +5255,7 @@ static const struct winecom_slot slots_IDXGIDevice4[20] =
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetParent", NULL, cls_IDXGIDevice4_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIDevice::GetAdapter", NULL, cls_IDXGIDevice4_7, xaux_IDXGIDevice4_7, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
-    { "IDXGIDevice::CreateSurface",
-      "IDXGIDevice::CreateSurface: takes DXGI_SHARED_RESOURCE, a struct that reaches a kernel or GDI handle through its own members (DXGI_SHARED_RESOURCE -> HANDLE).  Those integers name Wine objects and DXVK's native side has its own encoding for the same things, so one namespace's integer handed to the other names a different object rather than none.  Window handles are NOT in this set any more -- there is one HWND namespace in the process and this lane presents through it",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
+    { "IDXGIDevice::CreateSurface", NULL, cls_IDXGIDevice4_8, xaux_IDXGIDevice4_8, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, reps_IDXGIDevice4_8, 1, NULL, 0, 0x0010, 0x0000, 0x0000 },
     { "IDXGIDevice::QueryResourceResidency", NULL, cls_IDXGIDevice4_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIDevice::SetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
     { "IDXGIDevice::GetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
@@ -5271,9 +5263,7 @@ static const struct winecom_slot slots_IDXGIDevice4[20] =
     { "IDXGIDevice1::GetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGIDevice2::OfferResources", NULL, cls_IDXGIDevice4_14, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIDevice2::ReclaimResources", NULL, cls_IDXGIDevice4_15, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
-    { "IDXGIDevice2::EnqueueSetEvent",
-      "IDXGIDevice2::EnqueueSetEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "IDXGIDevice2::EnqueueSetEvent", NULL, cls_IDXGIDevice4_16, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIDevice3::Trim", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIDevice4::OfferResources1", NULL, cls_IDXGIDevice4_18, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000d, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIDevice4::ReclaimResources1", NULL, cls_IDXGIDevice4_19, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
@@ -5346,6 +5336,12 @@ static const unsigned char cls_IDXGIFactory2_11[] = { WINECOM_CA_PASS, WINECOM_C
 static const unsigned char xaux_IDXGIFactory2_11[] = { 0, 93 };
 static const unsigned char cls_IDXGIFactory2_12[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IDXGIFactory2_12[] = { 0, 94 };
+static const unsigned char cls_IDXGIFactory2_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IDXGIFactory2_16[] = { 0, 0, 0, 0, 131 };
+static const unsigned char cls_IDXGIFactory2_19[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
+static const unsigned char cls_IDXGIFactory2_22[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
+static const unsigned char cls_IDXGIFactory2_24[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IDXGIFactory2_24[] = { 0, 0, 0, 131 };
 static const struct winecom_slot slots_IDXGIFactory2[25] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
@@ -5364,25 +5360,16 @@ static const struct winecom_slot slots_IDXGIFactory2[25] =
     { "IDXGIFactory1::IsCurrent", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::IsWindowedStereoEnabled", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::CreateSwapChainForHwnd", NULL, NULL, NULL, 7, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 8, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory2::CreateSwapChainForCoreWindow",
-      "IDXGIFactory2::CreateSwapChainForCoreWindow: creates a swapchain for a WinRT CoreWindow, which has no HWND.  This lane presents through win32u's client-surface layer, which is a layer over a Wine window handle; there is no window here to attach a surface to, and DXVK's own answer would be to fabricate one",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
-    { "IDXGIFactory2::GetSharedResourceAdapterLuid",
-      "IDXGIFactory2::GetSharedResourceAdapterLuid: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "IDXGIFactory2::CreateSwapChainForCoreWindow", NULL, cls_IDXGIFactory2_16, xaux_IDXGIFactory2_16, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "IDXGIFactory2::CreateSwapChainForCoreWindow: parameter `IUnknown *pWindow` points at IUnknown, which the i386 layout roster never audited", 0, 0x0010, 0x0000, 0x0000 },
+    { "IDXGIFactory2::GetSharedResourceAdapterLuid", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::RegisterStereoStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
-    { "IDXGIFactory2::RegisterStereoStatusEvent",
-      "IDXGIFactory2::RegisterStereoStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "IDXGIFactory2::RegisterStereoStatusEvent", NULL, cls_IDXGIFactory2_19, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterStereoStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::RegisterOcclusionStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
-    { "IDXGIFactory2::RegisterOcclusionStatusEvent",
-      "IDXGIFactory2::RegisterOcclusionStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "IDXGIFactory2::RegisterOcclusionStatusEvent", NULL, cls_IDXGIFactory2_22, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterOcclusionStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory2::CreateSwapChainForComposition",
-      "IDXGIFactory2::CreateSwapChainForComposition: creates a windowless composition swapchain.  DXVK serves it by fabricating a dummy window through its WSI backend (DxgiSurfaceFactory::CreateDummyWindow), and this lane's backend owns no windows -- it presents to windows the application asked Wine for.  A composition swapchain would render correctly and be visible nowhere, which is worse than a refusal",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "IDXGIFactory2::CreateSwapChainForComposition", NULL, cls_IDXGIFactory2_24, xaux_IDXGIFactory2_24, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
 };
 
 static const unsigned char cls_IDXGIFactory3_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -5392,6 +5379,12 @@ static const unsigned char cls_IDXGIFactory3_11[] = { WINECOM_CA_PASS, WINECOM_C
 static const unsigned char xaux_IDXGIFactory3_11[] = { 0, 93 };
 static const unsigned char cls_IDXGIFactory3_12[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IDXGIFactory3_12[] = { 0, 94 };
+static const unsigned char cls_IDXGIFactory3_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IDXGIFactory3_16[] = { 0, 0, 0, 0, 131 };
+static const unsigned char cls_IDXGIFactory3_19[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
+static const unsigned char cls_IDXGIFactory3_22[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
+static const unsigned char cls_IDXGIFactory3_24[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IDXGIFactory3_24[] = { 0, 0, 0, 131 };
 static const struct winecom_slot slots_IDXGIFactory3[26] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
@@ -5410,25 +5403,16 @@ static const struct winecom_slot slots_IDXGIFactory3[26] =
     { "IDXGIFactory1::IsCurrent", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::IsWindowedStereoEnabled", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::CreateSwapChainForHwnd", NULL, NULL, NULL, 7, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 8, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory2::CreateSwapChainForCoreWindow",
-      "IDXGIFactory2::CreateSwapChainForCoreWindow: creates a swapchain for a WinRT CoreWindow, which has no HWND.  This lane presents through win32u's client-surface layer, which is a layer over a Wine window handle; there is no window here to attach a surface to, and DXVK's own answer would be to fabricate one",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
-    { "IDXGIFactory2::GetSharedResourceAdapterLuid",
-      "IDXGIFactory2::GetSharedResourceAdapterLuid: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "IDXGIFactory2::CreateSwapChainForCoreWindow", NULL, cls_IDXGIFactory3_16, xaux_IDXGIFactory3_16, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "IDXGIFactory2::CreateSwapChainForCoreWindow: parameter `IUnknown *pWindow` points at IUnknown, which the i386 layout roster never audited", 0, 0x0010, 0x0000, 0x0000 },
+    { "IDXGIFactory2::GetSharedResourceAdapterLuid", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::RegisterStereoStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
-    { "IDXGIFactory2::RegisterStereoStatusEvent",
-      "IDXGIFactory2::RegisterStereoStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "IDXGIFactory2::RegisterStereoStatusEvent", NULL, cls_IDXGIFactory3_19, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterStereoStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::RegisterOcclusionStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
-    { "IDXGIFactory2::RegisterOcclusionStatusEvent",
-      "IDXGIFactory2::RegisterOcclusionStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "IDXGIFactory2::RegisterOcclusionStatusEvent", NULL, cls_IDXGIFactory3_22, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterOcclusionStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory2::CreateSwapChainForComposition",
-      "IDXGIFactory2::CreateSwapChainForComposition: creates a windowless composition swapchain.  DXVK serves it by fabricating a dummy window through its WSI backend (DxgiSurfaceFactory::CreateDummyWindow), and this lane's backend owns no windows -- it presents to windows the application asked Wine for.  A composition swapchain would render correctly and be visible nowhere, which is worse than a refusal",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "IDXGIFactory2::CreateSwapChainForComposition", NULL, cls_IDXGIFactory3_24, xaux_IDXGIFactory3_24, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
     { "IDXGIFactory3::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -5439,6 +5423,12 @@ static const unsigned char cls_IDXGIFactory4_11[] = { WINECOM_CA_PASS, WINECOM_C
 static const unsigned char xaux_IDXGIFactory4_11[] = { 0, 93 };
 static const unsigned char cls_IDXGIFactory4_12[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IDXGIFactory4_12[] = { 0, 94 };
+static const unsigned char cls_IDXGIFactory4_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IDXGIFactory4_16[] = { 0, 0, 0, 0, 131 };
+static const unsigned char cls_IDXGIFactory4_19[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
+static const unsigned char cls_IDXGIFactory4_22[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
+static const unsigned char cls_IDXGIFactory4_24[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IDXGIFactory4_24[] = { 0, 0, 0, 131 };
 static const unsigned char cls_IDXGIFactory4_26[] = { WINECOM_CA_PASS, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_IDXGIFactory4_27[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const struct winecom_slot slots_IDXGIFactory4[28] =
@@ -5459,25 +5449,16 @@ static const struct winecom_slot slots_IDXGIFactory4[28] =
     { "IDXGIFactory1::IsCurrent", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::IsWindowedStereoEnabled", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::CreateSwapChainForHwnd", NULL, NULL, NULL, 7, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 8, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory2::CreateSwapChainForCoreWindow",
-      "IDXGIFactory2::CreateSwapChainForCoreWindow: creates a swapchain for a WinRT CoreWindow, which has no HWND.  This lane presents through win32u's client-surface layer, which is a layer over a Wine window handle; there is no window here to attach a surface to, and DXVK's own answer would be to fabricate one",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
-    { "IDXGIFactory2::GetSharedResourceAdapterLuid",
-      "IDXGIFactory2::GetSharedResourceAdapterLuid: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "IDXGIFactory2::CreateSwapChainForCoreWindow", NULL, cls_IDXGIFactory4_16, xaux_IDXGIFactory4_16, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "IDXGIFactory2::CreateSwapChainForCoreWindow: parameter `IUnknown *pWindow` points at IUnknown, which the i386 layout roster never audited", 0, 0x0010, 0x0000, 0x0000 },
+    { "IDXGIFactory2::GetSharedResourceAdapterLuid", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::RegisterStereoStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
-    { "IDXGIFactory2::RegisterStereoStatusEvent",
-      "IDXGIFactory2::RegisterStereoStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "IDXGIFactory2::RegisterStereoStatusEvent", NULL, cls_IDXGIFactory4_19, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterStereoStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::RegisterOcclusionStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
-    { "IDXGIFactory2::RegisterOcclusionStatusEvent",
-      "IDXGIFactory2::RegisterOcclusionStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "IDXGIFactory2::RegisterOcclusionStatusEvent", NULL, cls_IDXGIFactory4_22, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterOcclusionStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory2::CreateSwapChainForComposition",
-      "IDXGIFactory2::CreateSwapChainForComposition: creates a windowless composition swapchain.  DXVK serves it by fabricating a dummy window through its WSI backend (DxgiSurfaceFactory::CreateDummyWindow), and this lane's backend owns no windows -- it presents to windows the application asked Wine for.  A composition swapchain would render correctly and be visible nowhere, which is worse than a refusal",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "IDXGIFactory2::CreateSwapChainForComposition", NULL, cls_IDXGIFactory4_24, xaux_IDXGIFactory4_24, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
     { "IDXGIFactory3::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory4::EnumAdapterByLuid", NULL, cls_IDXGIFactory4_26, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0001, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "IDXGIFactory4::EnumWarpAdapter", NULL, cls_IDXGIFactory4_27, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
@@ -5490,6 +5471,12 @@ static const unsigned char cls_IDXGIFactory5_11[] = { WINECOM_CA_PASS, WINECOM_C
 static const unsigned char xaux_IDXGIFactory5_11[] = { 0, 93 };
 static const unsigned char cls_IDXGIFactory5_12[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IDXGIFactory5_12[] = { 0, 94 };
+static const unsigned char cls_IDXGIFactory5_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IDXGIFactory5_16[] = { 0, 0, 0, 0, 131 };
+static const unsigned char cls_IDXGIFactory5_19[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
+static const unsigned char cls_IDXGIFactory5_22[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
+static const unsigned char cls_IDXGIFactory5_24[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IDXGIFactory5_24[] = { 0, 0, 0, 131 };
 static const unsigned char cls_IDXGIFactory5_26[] = { WINECOM_CA_PASS, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_IDXGIFactory5_27[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const struct winecom_slot slots_IDXGIFactory5[29] =
@@ -5510,25 +5497,16 @@ static const struct winecom_slot slots_IDXGIFactory5[29] =
     { "IDXGIFactory1::IsCurrent", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::IsWindowedStereoEnabled", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::CreateSwapChainForHwnd", NULL, NULL, NULL, 7, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 8, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory2::CreateSwapChainForCoreWindow",
-      "IDXGIFactory2::CreateSwapChainForCoreWindow: creates a swapchain for a WinRT CoreWindow, which has no HWND.  This lane presents through win32u's client-surface layer, which is a layer over a Wine window handle; there is no window here to attach a surface to, and DXVK's own answer would be to fabricate one",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
-    { "IDXGIFactory2::GetSharedResourceAdapterLuid",
-      "IDXGIFactory2::GetSharedResourceAdapterLuid: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "IDXGIFactory2::CreateSwapChainForCoreWindow", NULL, cls_IDXGIFactory5_16, xaux_IDXGIFactory5_16, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "IDXGIFactory2::CreateSwapChainForCoreWindow: parameter `IUnknown *pWindow` points at IUnknown, which the i386 layout roster never audited", 0, 0x0010, 0x0000, 0x0000 },
+    { "IDXGIFactory2::GetSharedResourceAdapterLuid", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::RegisterStereoStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
-    { "IDXGIFactory2::RegisterStereoStatusEvent",
-      "IDXGIFactory2::RegisterStereoStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "IDXGIFactory2::RegisterStereoStatusEvent", NULL, cls_IDXGIFactory5_19, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterStereoStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::RegisterOcclusionStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
-    { "IDXGIFactory2::RegisterOcclusionStatusEvent",
-      "IDXGIFactory2::RegisterOcclusionStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "IDXGIFactory2::RegisterOcclusionStatusEvent", NULL, cls_IDXGIFactory5_22, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterOcclusionStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory2::CreateSwapChainForComposition",
-      "IDXGIFactory2::CreateSwapChainForComposition: creates a windowless composition swapchain.  DXVK serves it by fabricating a dummy window through its WSI backend (DxgiSurfaceFactory::CreateDummyWindow), and this lane's backend owns no windows -- it presents to windows the application asked Wine for.  A composition swapchain would render correctly and be visible nowhere, which is worse than a refusal",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "IDXGIFactory2::CreateSwapChainForComposition", NULL, cls_IDXGIFactory5_24, xaux_IDXGIFactory5_24, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
     { "IDXGIFactory3::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory4::EnumAdapterByLuid", NULL, cls_IDXGIFactory5_26, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0001, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "IDXGIFactory4::EnumWarpAdapter", NULL, cls_IDXGIFactory5_27, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
@@ -5542,6 +5520,12 @@ static const unsigned char cls_IDXGIFactory6_11[] = { WINECOM_CA_PASS, WINECOM_C
 static const unsigned char xaux_IDXGIFactory6_11[] = { 0, 93 };
 static const unsigned char cls_IDXGIFactory6_12[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IDXGIFactory6_12[] = { 0, 94 };
+static const unsigned char cls_IDXGIFactory6_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IDXGIFactory6_16[] = { 0, 0, 0, 0, 131 };
+static const unsigned char cls_IDXGIFactory6_19[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
+static const unsigned char cls_IDXGIFactory6_22[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
+static const unsigned char cls_IDXGIFactory6_24[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IDXGIFactory6_24[] = { 0, 0, 0, 131 };
 static const unsigned char cls_IDXGIFactory6_26[] = { WINECOM_CA_PASS, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_IDXGIFactory6_27[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_IDXGIFactory6_29[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -5563,25 +5547,16 @@ static const struct winecom_slot slots_IDXGIFactory6[30] =
     { "IDXGIFactory1::IsCurrent", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::IsWindowedStereoEnabled", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::CreateSwapChainForHwnd", NULL, NULL, NULL, 7, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 8, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory2::CreateSwapChainForCoreWindow",
-      "IDXGIFactory2::CreateSwapChainForCoreWindow: creates a swapchain for a WinRT CoreWindow, which has no HWND.  This lane presents through win32u's client-surface layer, which is a layer over a Wine window handle; there is no window here to attach a surface to, and DXVK's own answer would be to fabricate one",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
-    { "IDXGIFactory2::GetSharedResourceAdapterLuid",
-      "IDXGIFactory2::GetSharedResourceAdapterLuid: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "IDXGIFactory2::CreateSwapChainForCoreWindow", NULL, cls_IDXGIFactory6_16, xaux_IDXGIFactory6_16, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "IDXGIFactory2::CreateSwapChainForCoreWindow: parameter `IUnknown *pWindow` points at IUnknown, which the i386 layout roster never audited", 0, 0x0010, 0x0000, 0x0000 },
+    { "IDXGIFactory2::GetSharedResourceAdapterLuid", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::RegisterStereoStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
-    { "IDXGIFactory2::RegisterStereoStatusEvent",
-      "IDXGIFactory2::RegisterStereoStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "IDXGIFactory2::RegisterStereoStatusEvent", NULL, cls_IDXGIFactory6_19, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterStereoStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::RegisterOcclusionStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
-    { "IDXGIFactory2::RegisterOcclusionStatusEvent",
-      "IDXGIFactory2::RegisterOcclusionStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "IDXGIFactory2::RegisterOcclusionStatusEvent", NULL, cls_IDXGIFactory6_22, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterOcclusionStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory2::CreateSwapChainForComposition",
-      "IDXGIFactory2::CreateSwapChainForComposition: creates a windowless composition swapchain.  DXVK serves it by fabricating a dummy window through its WSI backend (DxgiSurfaceFactory::CreateDummyWindow), and this lane's backend owns no windows -- it presents to windows the application asked Wine for.  A composition swapchain would render correctly and be visible nowhere, which is worse than a refusal",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "IDXGIFactory2::CreateSwapChainForComposition", NULL, cls_IDXGIFactory6_24, xaux_IDXGIFactory6_24, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
     { "IDXGIFactory3::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory4::EnumAdapterByLuid", NULL, cls_IDXGIFactory6_26, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0001, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "IDXGIFactory4::EnumWarpAdapter", NULL, cls_IDXGIFactory6_27, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
@@ -5596,9 +5571,16 @@ static const unsigned char cls_IDXGIFactory7_11[] = { WINECOM_CA_PASS, WINECOM_C
 static const unsigned char xaux_IDXGIFactory7_11[] = { 0, 93 };
 static const unsigned char cls_IDXGIFactory7_12[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IDXGIFactory7_12[] = { 0, 94 };
+static const unsigned char cls_IDXGIFactory7_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IDXGIFactory7_16[] = { 0, 0, 0, 0, 131 };
+static const unsigned char cls_IDXGIFactory7_19[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
+static const unsigned char cls_IDXGIFactory7_22[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
+static const unsigned char cls_IDXGIFactory7_24[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IDXGIFactory7_24[] = { 0, 0, 0, 131 };
 static const unsigned char cls_IDXGIFactory7_26[] = { WINECOM_CA_PASS, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_IDXGIFactory7_27[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_IDXGIFactory7_29[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
+static const unsigned char cls_IDXGIFactory7_30[] = { WINECOM_CA_EVENT, WINECOM_CA_PASS };
 static const struct winecom_slot slots_IDXGIFactory7[32] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
@@ -5617,33 +5599,22 @@ static const struct winecom_slot slots_IDXGIFactory7[32] =
     { "IDXGIFactory1::IsCurrent", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::IsWindowedStereoEnabled", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::CreateSwapChainForHwnd", NULL, NULL, NULL, 7, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 8, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory2::CreateSwapChainForCoreWindow",
-      "IDXGIFactory2::CreateSwapChainForCoreWindow: creates a swapchain for a WinRT CoreWindow, which has no HWND.  This lane presents through win32u's client-surface layer, which is a layer over a Wine window handle; there is no window here to attach a surface to, and DXVK's own answer would be to fabricate one",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
-    { "IDXGIFactory2::GetSharedResourceAdapterLuid",
-      "IDXGIFactory2::GetSharedResourceAdapterLuid: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "IDXGIFactory2::CreateSwapChainForCoreWindow", NULL, cls_IDXGIFactory7_16, xaux_IDXGIFactory7_16, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "IDXGIFactory2::CreateSwapChainForCoreWindow: parameter `IUnknown *pWindow` points at IUnknown, which the i386 layout roster never audited", 0, 0x0010, 0x0000, 0x0000 },
+    { "IDXGIFactory2::GetSharedResourceAdapterLuid", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::RegisterStereoStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
-    { "IDXGIFactory2::RegisterStereoStatusEvent",
-      "IDXGIFactory2::RegisterStereoStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "IDXGIFactory2::RegisterStereoStatusEvent", NULL, cls_IDXGIFactory7_19, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterStereoStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::RegisterOcclusionStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
-    { "IDXGIFactory2::RegisterOcclusionStatusEvent",
-      "IDXGIFactory2::RegisterOcclusionStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "IDXGIFactory2::RegisterOcclusionStatusEvent", NULL, cls_IDXGIFactory7_22, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterOcclusionStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory2::CreateSwapChainForComposition",
-      "IDXGIFactory2::CreateSwapChainForComposition: creates a windowless composition swapchain.  DXVK serves it by fabricating a dummy window through its WSI backend (DxgiSurfaceFactory::CreateDummyWindow), and this lane's backend owns no windows -- it presents to windows the application asked Wine for.  A composition swapchain would render correctly and be visible nowhere, which is worse than a refusal",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "IDXGIFactory2::CreateSwapChainForComposition", NULL, cls_IDXGIFactory7_24, xaux_IDXGIFactory7_24, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
     { "IDXGIFactory3::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory4::EnumAdapterByLuid", NULL, cls_IDXGIFactory7_26, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0001, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "IDXGIFactory4::EnumWarpAdapter", NULL, cls_IDXGIFactory7_27, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory5::CheckFeatureSupport", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory6::EnumAdapterByGpuPreference", NULL, cls_IDXGIFactory7_29, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 2, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
-    { "IDXGIFactory7::RegisterAdaptersChangedEvent",
-      "IDXGIFactory7::RegisterAdaptersChangedEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "IDXGIFactory7::RegisterAdaptersChangedEvent", NULL, cls_IDXGIFactory7_30, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory7::UnregisterAdaptersChangedEvent", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -5653,10 +5624,10 @@ static const struct winecom_slot slots_IDXGIFactoryMedia[5] =
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IDXGIFactoryMedia::CreateSwapChainForCompositionSurfaceHandle",
-      "IDXGIFactoryMedia::CreateSwapChainForCompositionSurfaceHandle: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
+      "IDXGIFactoryMedia::CreateSwapChainForCompositionSurfaceHandle: takes a DirectComposition surface HANDLE, and DXVK implements no IDXGIFactoryMedia in the first place -- the interface cannot be QI'd off any DXVK object, so this row is unreachable; the HANDLE itself is the shared-resource namespace (ppc64le/dxvk/docs/shared-resource-handles.md)",
       NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
     { "IDXGIFactoryMedia::CreateDecodeSwapChainForCompositionSurfaceHandle",
-      "IDXGIFactoryMedia::CreateDecodeSwapChainForCompositionSurfaceHandle: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
+      "IDXGIFactoryMedia::CreateDecodeSwapChainForCompositionSurfaceHandle: takes a DirectComposition surface HANDLE, and DXVK implements no IDXGIFactoryMedia in the first place -- the interface cannot be QI'd off any DXVK object, so this row is unreachable; the HANDLE itself is the shared-resource namespace (ppc64le/dxvk/docs/shared-resource-handles.md)",
       NULL, NULL, 7, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0020, 0x0000, 0x0000 },
 };
 
@@ -6039,9 +6010,8 @@ static const struct winecom_slot slots_IDXGIResource1[14] =
     { "IDXGIResource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIResource::GetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGIResource1::CreateSubresourceSurface", NULL, cls_IDXGIResource1_12, xaux_IDXGIResource1_12, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
-    { "IDXGIResource1::CreateSharedHandle",
-      "IDXGIResource1::CreateSharedHandle: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "IDXGIResource1::CreateSharedHandle", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, 
+      "IDXGIResource1::CreateSharedHandle: parameter `const WCHAR *name` points at WCHAR, which the i386 layout roster never audited" },
 };
 
 static const unsigned char cls_IDXGISurface_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -6640,11 +6610,11 @@ static const struct winecom_iface d3d11_com_ifaces[D3D11_IFACE_COUNT] =
       3, NULL },
 };
 
-/* 2078 slot(s) marshalled, 424 hand-written, 91 refused with a named
+/* 2150 slot(s) marshalled, 427 hand-written, 16 refused with a named
  * reason, 411 IUnknown slot(s) served by the runtime; 5 interface(s)
  * carry identity rows only.
  * i386 geometry: 2588 row(s) carry WINECOM_F_I386_GEOM (639 distinct
  * frames re-checked against clang's stdcall @N decoration), 21 with
  * a non-zero qwordmask, 1 returning EDX:EAX; 5 row(s) publish no
- * i386 geometry and a 32-bit lane must fail closed on them; 77
+ * i386 geometry and a 32-bit lane must fail closed on them; 101
  * row(s) refuse on the 32-bit lane only (refuse32). */

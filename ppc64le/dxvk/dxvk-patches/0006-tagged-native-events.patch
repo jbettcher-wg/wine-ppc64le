@@ -1,0 +1,69 @@
+Teach the native win32 shim the tagged-eventfd event convention.
+
+The wine-ppc64le lane hands DXVK real completion events: winecom's
+event relay mints an eventfd per crossing Wine event, tagged the way
+this ecosystem's native sync convention spells an event handle --
+'EVFD' in bits 63..32 over the fd, the SAME constant vkd3d-proton's
+tagged-handle series uses.  SetEvent on a tagged handle pays the
+eventfd out; on anything else it keeps the loud warn-and-fail (the
+collision protection the tag exists for).  CloseHandle on a tagged
+handle is a deliberate no-op: DXVK only ever borrows an event.
+
+diff --git a/src/util/util_win32_compat.h b/src/util/util_win32_compat.h
+index b706dca6..69d7d0a6 100644
+--- a/src/util/util_win32_compat.h
++++ b/src/util/util_win32_compat.h
+@@ -4,9 +4,29 @@
+ 
+ #include <windows.h>
+ #include <dlfcn.h>
++#include <unistd.h>
++#include <cstdint>
+ 
+ #include "log/log.h"
+ 
++/* The native event-handle convention shared with vkd3d-proton's
++ * tagged-handle series: 'EVFD' in bits 63..32 over an eventfd.  A bare
++ * integer (a Wine HANDLE that leaked across untranslated) does not carry
++ * the tag and keeps failing loudly below -- that refusal is the collision
++ * protection the tag exists for.  The constant is respelled per project
++ * (the builds are independent); ppc64le/dxvk/check-d3d11-smoke.sh asserts
++ * the spellings agree. */
++#define DXVK_NATIVE_EVENT_TAG 0x4556464400000000ull
++
++inline bool dxvk_native_event_is_tagged(HANDLE h) {
++  return (reinterpret_cast<uintptr_t>(h) & 0xffffffff00000000ull)
++      == DXVK_NATIVE_EVENT_TAG;
++}
++
++inline int dxvk_native_event_fd(HANDLE h) {
++  return static_cast<int>(reinterpret_cast<uintptr_t>(h) & 0xffffffffu);
++}
++
+ inline HMODULE LoadLibraryA(LPCSTR lpLibFileName) {
+   return dlopen(lpLibFileName, RTLD_NOW);
+ }
+@@ -41,6 +61,11 @@ inline BOOL ReleaseSemaphore(
+ }
+ 
+ inline BOOL SetEvent(HANDLE hEvent) {
++  if (dxvk_native_event_is_tagged(hEvent)) {
++    uint64_t one = 1;
++    ssize_t n = write(dxvk_native_event_fd(hEvent), &one, sizeof(one));
++    return n == sizeof(one);
++  }
+   dxvk::Logger::warn("SetEvent not implemented.");
+   return FALSE;
+ }
+@@ -58,6 +83,11 @@ inline BOOL DuplicateHandle(
+ }
+ 
+ inline BOOL CloseHandle(HANDLE hObject) {
++  if (dxvk_native_event_is_tagged(hObject)) {
++    /* the relay that minted the fd owns it; DXVK only ever BORROWS an
++     * event handle, so closing here would kill a live relay entry */
++    return TRUE;
++  }
+   dxvk::Logger::warn("CloseHandle not implemented.");
+   return FALSE;
+ }
