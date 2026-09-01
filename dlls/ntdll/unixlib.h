@@ -252,12 +252,25 @@ enum ntdll_unix_funcs
 /* One contiguous stub array (flat exports, or one COM interface's vtable
  * stubs): `count` slots of `stride` bytes starting at `first_stub`.  The
  * unix side byte-verifies each slot (only the exact 5-byte trap body is
- * ever registered) and reports what it did. */
+ * ever registered) and reports what it did.
+ *
+ * `cells`, when non-zero, is the PE side's per-slot row-cell array (one
+ * `cell_size`-byte cell per SLOT, index-aligned with the stub array --
+ * skipped slots simply own a cell nobody ever resolves): slot i's cell
+ * address rides to the bridge as that stub's per-rip cookie and comes back
+ * to emu_trap_dispatch on every transition.  Opaque to the unix side.
+ *
+ * A `count` of zero is the arming PROBE: nothing is registered, only
+ * `armed` is answered, so the PE side can skip allocating cells in a
+ * process where EC never arms. */
 struct emu_register_ec_params
 {
     UINT64 first_stub;
     UINT   count;
     UINT   stride;
+    UINT64 cells;        /* PE-side cell array base, or 0 for no cookies */
+    UINT   cell_size;
+    UINT   armed;        /* out: EC registration is live in this process */
     UINT   registered;   /* out */
     UINT   skipped;      /* out: wrong bytes, or the bridge refused */
 };

@@ -1538,13 +1538,17 @@ static void emu_crossing_dump( const struct thread_data *data )
     }
 }
 
-NTSTATUS call_emu_trap_dispatcher( void *func, void *ctx )
+NTSTATUS call_emu_trap_dispatcher( void *func, void *ctx, void *cookie )
 {
     static int on_kernel_stack = -1;
 
     struct thread_data *data = get_thread_data();
     struct syscall_frame *frame = get_syscall_frame( data );
-    ULONG len = sizeof(ctx);
+    /* two pointers: the payload and the EC row-cell cookie (NULL on every
+     * non-EC path).  Both PE-side consumers unpack the first pointer and
+     * emu_trap_dispatch reads the second only when len says it is there. */
+    void *argblock[2];
+    ULONG len = sizeof(argblock);
     ULONG_PTR user_sp = frame->gpr[1];
     struct callback_stack_layout *stack;
     void *ret_ptr;
@@ -1599,8 +1603,10 @@ NTSTATUS call_emu_trap_dispatcher( void *func, void *ctx )
     }
     if (on_kernel_stack) user_sp = (ULONG_PTR)&ret_len;
 
+    argblock[0] = ctx;
+    argblock[1] = cookie;
     sp = (user_sp - PPC64_RED_ZONE -
-          offsetof( struct callback_stack_layout, args_data[sizeof(ctx)] )) & ~15;
+          offsetof( struct callback_stack_layout, args_data[sizeof(argblock)] )) & ~15;
     stack = (struct callback_stack_layout *)sp;
 
     memset( stack->linkage, 0, sizeof(stack->linkage) );
@@ -1611,7 +1617,7 @@ NTSTATUS call_emu_trap_dispatcher( void *func, void *ctx )
     stack->lr   = frame->lr;
     stack->sp   = user_sp;
     stack->pc   = frame->pc;
-    memcpy( stack->args_data, &ctx, len );
+    memcpy( stack->args_data, argblock, len );
     return call_user_mode_callback( sp, &ret_ptr, &ret_len, func, data->teb );
 }
 

@@ -8642,6 +8642,62 @@ done:
 
 
 /***********************************************************************
+ *           EC row cells (NEXT.md item 7, "row cookies")
+ *
+ * A transitioned call's identity is loop-invariant twice over: the RIP is
+ * fixed for the mapping's life AND the bridge already delivers a per-rip
+ * cookie to the EC handler.  So give every registered stub its own private
+ * dispatch cell, resolved lazily on first use and immutable after -- the
+ * cookie IS the cell, and a warm transition reads its row out of one line
+ * with no hash, no key compare, no seqlock and no shared slot to be evicted
+ * from.  [MEASURED, before this existed]: thunk_rip_cache_get was 1.61% of
+ * Witcher 3's D3D11-submission thread with every crossing already
+ * transitioning (/tmp/w3-ec.perf, 2026-08-31).
+ *
+ * The cell caches struct thunk_rip_cache_entry -- the exact payload the
+ * shared cache publishes, stat_row included -- and it is filled FROM that
+ * cache right after the ordinary resolve, never by a parallel resolution
+ * path.  Publication: fields first, then a release-store of state; readers
+ * acquire-load state and read in place (a resolved cell never changes, so
+ * no copy and no seqlock are needed; concurrent first-users both resolve
+ * under the loader lock and write identical bytes).
+ *
+ * THE THREE CACHE LEVERS WIN over the cells, or the levers prove nothing:
+ * WINEEMUNORIPCACHE (resolve every call), WINEEMUPROFILE (count every
+ * crossing in find), and WINEEMURIPCACHEBLIND (the sabotage that must
+ * corrupt dispatch) each mark cells SLOW so every crossing keeps going
+ * through find_guest_thunk_target, where each lever already does its job. */
+struct ec_row_cell
+{
+    LONG state;                      /* EC_CELL_*; release-published */
+    struct thunk_rip_cache_entry e;  /* valid only once RESOLVED */
+};
+enum { EC_CELL_UNRESOLVED = 0, EC_CELL_RESOLVED = 1, EC_CELL_SLOW = 2 };
+
+static void ec_cell_fill( struct ec_row_cell *cell, ULONG_PTR rip )
+{
+    static int cells_off = -1;
+    struct thunk_rip_cache_entry tmp;
+
+    if (ReadNoFence( &cell->state ) != EC_CELL_UNRESOLVED) return;
+    if (cells_off == -1)
+        cells_off = emu_env_flag( L"WINEEMUNORIPCACHE" ) || emu_env_flag( L"WINEEMUPROFILE" );
+    if (cells_off || thunk_rip_cache_blind())
+    {
+        WriteRelease( &cell->state, EC_CELL_SLOW );
+        return;
+    }
+    /* the resolve that just ran filed this RIP in the shared cache; read the
+     * finished entry back rather than re-deriving any of it.  A miss here is
+     * an eviction race (another RIP hashed onto the slot between the resolve
+     * and this read) -- stay UNRESOLVED and let a later call retry. */
+    if (!thunk_rip_cache_get( rip, &tmp ) || tmp.rip != rip) return;
+    cell->e = tmp;
+    WriteRelease( &cell->state, EC_CELL_RESOLVED );
+}
+
+
+/***********************************************************************
  *           ec_arm_module
  *
  * Ask the unix side to register this thunk module's stub arrays as bridge
@@ -8664,6 +8720,24 @@ done:
 static const void *ec_probed[EC_PROBED_MAX];
 static UINT ec_probed_count;
 
+/* Whether EC registration is live in this process, asked ONCE with a
+ * zero-count probe call: cells are real memory (one per stub slot for the
+ * module's life), and allocating them in a process where EC never arms --
+ * ABI < 7 bridge, view off, WINE_PPC64LE_NO_EC=1 -- would spend megabytes
+ * feeding a path that never runs. */
+static int ec_active = -1;
+
+static struct ec_row_cell *ec_alloc_cells( UINT count )
+{
+    /* Module-lifetime, and LEAKED on the rare guest module unload, the same
+     * deliberate bounded leak as the bridge's retired descriptors: an
+     * in-flight transition may hold the cookie while the unmap runs, and a
+     * refcount on the hot path would cost more than the leak.  Zeroed =
+     * every cell starts EC_CELL_UNRESOLVED. */
+    if (ec_active != 1 || !count) return NULL;
+    return RtlAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY, count * sizeof(struct ec_row_cell) );
+}
+
 static void ec_arm_module( LDR_DATA_TABLE_ENTRY *mod, ULONG_PTR base, const struct thunk_info *info )
 {
     struct emu_register_ec_params params;
@@ -8681,9 +8755,19 @@ static void ec_arm_module( LDR_DATA_TABLE_ENTRY *mod, ULONG_PTR base, const stru
     }
     ec_probed[ec_probed_count++] = mod->DllBase;
 
+    if (ec_active == -1)
+    {
+        memset( &params, 0, sizeof(params) );
+        WINE_UNIX_CALL( unix_emu_register_ec, &params );
+        ec_active = params.armed ? 1 : 0;
+    }
+    if (!ec_active) return;
+
     params.first_stub = base + info->stubs_rva;
     params.count      = info->count;
     params.stride     = info->stride;
+    params.cells      = (ULONG_PTR)ec_alloc_cells( info->count );
+    params.cell_size  = sizeof(struct ec_row_cell);
     WINE_UNIX_CALL( unix_emu_register_ec, &params );
     registered += params.registered;
     skipped    += params.skipped;
@@ -8698,6 +8782,8 @@ static void ec_arm_module( LDR_DATA_TABLE_ENTRY *mod, ULONG_PTR base, const stru
             params.first_stub = base + ifaces[i].stubs_rva;
             params.count      = ifaces[i].slot_count;
             params.stride     = cinfo->stride;
+            params.cells      = (ULONG_PTR)ec_alloc_cells( ifaces[i].slot_count );
+            params.cell_size  = sizeof(struct ec_row_cell);
             WINE_UNIX_CALL( unix_emu_register_ec, &params );
             registered += params.registered;
             skipped    += params.skipped;
@@ -9356,6 +9442,10 @@ static ULONG_PTR call_native_thunk( void *proc, const ULONG_PTR *a )
 void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
 {
     AMD64_CONTEXT *ctx = *(AMD64_CONTEXT **)args;
+    /* the second pointer of the args block is the EC registration's cookie:
+     * this stub's own row cell, or NULL on every trap-protocol path (and
+     * from an unextended caller, which the len check keeps honest) */
+    struct ec_row_cell *cell = len >= 2 * sizeof(void *) ? ((void **)args)[1] : NULL;
     AMD64_CONTEXT *prev_trap_ctx = emu_current_trap_ctx;
     BOOL prev_ctx_rewritten = emu_trap_ctx_rewritten;
     thunk_override_func override = NULL;
@@ -9364,7 +9454,8 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
     ULONG_PTR a[THUNK_MAX_ARGS] = { 0 };
     UINT sig = 0, argc, cb_mask = 0, cb_wide = 0, cb_argc = 0, fp = 0, widths = 0, signs = 0;
     ULONG_PTR ret;
-    void *proc;
+    void *proc = NULL;
+    BOOL from_cell = FALSE;
 
     /* raise-style overrides dispatch against this trap's guest state; saved
      * and restored so a nested dispatch (guest handler makes a thunk call)
@@ -9372,7 +9463,40 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
     emu_current_trap_ctx = ctx;
     emu_trap_ctx_rewritten = FALSE;
 
-    proc = find_guest_thunk_target( ctx->Rip, &sig, &override, &com, &cb_mask, &cb_wide, &cb_argc, &fp, &widths, &signs );
+    if (cell && ReadAcquire( &cell->state ) == EC_CELL_RESOLVED)
+    {
+        /* the warm transition: this stub's row, read in place (a resolved
+         * cell is immutable -- see the ec_row_cell note), no lookup at all.
+         * The counting mirrors find_guest_thunk_target's cache-hit path
+         * exactly: same row index, same tick check. */
+        sig      = cell->e.sig;
+        override = cell->e.override;
+        cb_mask  = cell->e.cb_mask;
+        cb_wide  = cell->e.cb_wide;
+        cb_argc  = cell->e.cb_argc;
+        fp       = cell->e.fp;
+        widths   = cell->e.widths;
+        signs    = cell->e.signs;
+        if (cell->e.com.dispatch) com = cell->e.com;
+        proc = cell->e.proc;
+        if (xstat)
+        {
+            xstat_hit( cell->e.stat_row );
+            xstat_tick_check();
+        }
+        /* check-rip-cache layer 4b counts these the way layer 4 counts the
+         * shared cache's "thunk cache hit for" lines */
+        TRACE( "ec cell hit for %p -> proc %p com %p\n",
+               (void *)(ULONG_PTR)ctx->Rip, proc, com.dispatch );
+        from_cell = TRUE;
+    }
+    if (!from_cell)
+    {
+        proc = find_guest_thunk_target( ctx->Rip, &sig, &override, &com, &cb_mask, &cb_wide, &cb_argc, &fp, &widths, &signs );
+        /* first use of this stub's cell: file the freshly-cached row in it
+         * (or mark it SLOW when a cache lever is armed -- the levers win) */
+        if (cell) ec_cell_fill( cell, ctx->Rip );
+    }
     argc = THUNK_SIG_ARGC(sig);
     if (com.dispatch)
     {

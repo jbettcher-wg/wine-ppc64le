@@ -287,7 +287,14 @@ fi
 # ---- 4: the port's own view ----------------------------------------------
 # Fewer iterations: +seh prints a line per crossing, and this leg is counting
 # them rather than racing them.
-rc=$(run_probe "$OUT/trace-on.out" WINEDEBUG=+seh TC_ITERATIONS=20)
+#
+# WINE_PPC64LE_NO_EC=1 is PINNED here, deliberately: with EC transitions
+# armed, every registered stub's warm crossing is served by its own row CELL
+# (see "EC row cells" in signal_ppc64.c) and never consults the shared cache
+# at all -- this layer would then count almost no hits and conclude, wrongly,
+# that the fast path is broken.  The shared cache still serves every non-EC
+# path, and layer 4b below asserts the cells with the same shape.
+rc=$(run_probe "$OUT/trace-on.out" WINE_PPC64LE_NO_EC=1 WINEDEBUG=+seh TC_ITERATIONS=20)
 crossings=$(sed -n "s/.* crossings=\([0-9]*\) .*/\1/p" "$OUT/trace-on.out" | tail -1)
 hits=$(grep -c "thunk cache hit for" "$OUT/trace-on.out.err" 2>/dev/null || true)
 if [ "$rc" != 0 ] || [ -z "$crossings" ]; then
@@ -308,12 +315,43 @@ $floor) -- the fast path is not being taken"
     fi
 fi
 
-rc=$(run_probe "$OUT/trace-off.out" WINEEMUNORIPCACHE=1 WINEDEBUG=+seh TC_ITERATIONS=20)
+rc=$(run_probe "$OUT/trace-off.out" WINE_PPC64LE_NO_EC=1 WINEEMUNORIPCACHE=1 WINEDEBUG=+seh TC_ITERATIONS=20)
 hits_off=$(grep -c "thunk cache hit for" "$OUT/trace-off.out.err" 2>/dev/null || true)
 if [ "${hits_off:-0}" != 0 ]; then
     bad "layer 4: WINEEMUNORIPCACHE=1 still produced $hits_off cache hits"
 else
     say "layer 4: the lever produced no cache hits at all"
+fi
+
+# ---- 4b: the EC row cells, same shape as layer 4 --------------------------
+# Only meaningful when the bridge has EC targets (ABI 7): a warm transitioned
+# crossing must be served by its stub's own cell ("ec cell hit for"), and
+# WINEEMUNORIPCACHE must silence the cells too -- the cache levers WIN over
+# the cells, or layers 1-4 prove nothing about a run where cells serve.
+if nm -D "$WINEFEXBRIDGE" 2>/dev/null | grep -q fexbridge_register_ec_target; then
+    rc=$(run_probe "$OUT/trace-ec.out" WINEDEBUG=+seh TC_ITERATIONS=20)
+    crossings=$(sed -n "s/.* crossings=\([0-9]*\) .*/\1/p" "$OUT/trace-ec.out" | tail -1)
+    cell_hits=$(grep -c "ec cell hit for" "$OUT/trace-ec.out.err" 2>/dev/null || true)
+    if [ "$rc" != 0 ] || [ -z "$crossings" ]; then
+        bad "layer 4b: the ec-traced run exited $rc without reporting its crossing count"
+    else
+        floor=$((crossings / 2))
+        if [ "${cell_hits:-0}" -lt "$floor" ]; then
+            bad "layer 4b: only ${cell_hits:-0} ec cell hits for $crossings crossings (floor \
+$floor) -- the row cells are not serving warm transitions"
+        else
+            say "layer 4b: $cell_hits ec cell hits for $crossings crossings (floor $floor)"
+        fi
+    fi
+    rc=$(run_probe "$OUT/trace-ec-off.out" WINEEMUNORIPCACHE=1 WINEDEBUG=+seh TC_ITERATIONS=20)
+    cell_hits_off=$(grep -c "ec cell hit for" "$OUT/trace-ec-off.out.err" 2>/dev/null || true)
+    if [ "${cell_hits_off:-0}" != 0 ]; then
+        bad "layer 4b: WINEEMUNORIPCACHE=1 still produced $cell_hits_off ec cell hits -- the levers no longer win over the cells"
+    else
+        say "layer 4b: WINEEMUNORIPCACHE silences the cells too (the levers win)"
+    fi
+else
+    say "layer 4b SKIP: $WINEFEXBRIDGE has no EC targets (bridge ABI < 7); the row cells cannot serve here"
 fi
 
 # A crossing that resolved to the wrong function would most often surface as a

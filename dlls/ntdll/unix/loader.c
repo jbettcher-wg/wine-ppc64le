@@ -1068,6 +1068,9 @@ static int  (*p_fexbridge_register_ec_target)( ULONGLONG rip,
 static int  (*p_fexbridge_register_ec_targets)( const ULONGLONG *rips, UINT count,
                                                 int (*handler)( void *thread, void *view, void *cookie ),
                                                 void *cookie );
+static int  (*p_fexbridge_register_ec_targets2)( const ULONGLONG *rips, const void * const *cookies,
+                                                 UINT count,
+                                                 int (*handler)( void *thread, void *view, void *cookie ) );
 static int  (*p_fexbridge_unregister_ec_range)( ULONGLONG start, ULONGLONG length );
 
 /* fexbridge_run results and CONTEXT flags, mirrored from fexbridge.h (the
@@ -1212,6 +1215,7 @@ static void emu_load_bridge(void)
     /* ABI 7, optional the same way: without these every stub keeps trapping. */
     p_fexbridge_register_ec_target    = dlsym( so, "fexbridge_register_ec_target" );
     p_fexbridge_register_ec_targets   = dlsym( so, "fexbridge_register_ec_targets" );
+    p_fexbridge_register_ec_targets2  = dlsym( so, "fexbridge_register_ec_targets2" );
     p_fexbridge_unregister_ec_range   = dlsym( so, "fexbridge_unregister_ec_range" );
     /* ABI 4: the 32-bit (WoW64) lane.  Resolved unconditionally like the
      * rest; their absence is diagnosed where the 32-bit lane starts, not
@@ -1612,7 +1616,7 @@ static void emu_teb_stack_switch( const struct emu_teb_stack *in, struct emu_teb
     teb->DeallocationStack = in->dealloc;
 }
 
-static NTSTATUS emu_trap_dispatch_common( AMD64_CONTEXT *ctx )
+static NTSTATUS emu_trap_dispatch_common( AMD64_CONTEXT *ctx, void *cookie )
 {
     struct thread_data *data = get_thread_data();
     NTSTATUS status;
@@ -1641,7 +1645,7 @@ static NTSTATUS emu_trap_dispatch_common( AMD64_CONTEXT *ctx )
 
     /* everything below this line is native code on the native stack */
     emu_teb_stack_switch( &emu_native_teb_stack, NULL );
-    status = call_emu_trap_dispatcher( p_emu_trap_dispatcher, ctx );
+    status = call_emu_trap_dispatcher( p_emu_trap_dispatcher, ctx, cookie );
     emu_crossing_pop( data );
     /* ...and back to the GUEST stack the run is on NOW, which is not always
      * the one this trap arrived on: a guest fiber switch happens inside the
@@ -1676,7 +1680,7 @@ static NTSTATUS emu_trap_dispatch_common( AMD64_CONTEXT *ctx )
 static int emu_trap_thunk( void *thread, void *ctx, void *user )
 {
     /* FEXBRIDGE_TRAP_CONTINUE / _EXIT */
-    return emu_trap_dispatch_common( ctx ) ? 1 : 0;
+    return emu_trap_dispatch_common( ctx, NULL ) ? 1 : 0;
 }
 
 /* mirror of FEXBRIDGE_TRAP_VIEW (fexbridge.h, bridge ABI 6; the header is
@@ -1725,7 +1729,7 @@ static int emu_ec_sabotage;
  * world, the stats rows, the publish) sees the trap it has always seen.
  * The +3 is safe because registration is byte-verified: only stubs whose
  * five bytes are exactly `49 89 ca 0f 05` are ever registered. */
-static int emu_view_dispatch( void *thread, struct emu_trap_view *view, BOOL ec )
+static int emu_view_dispatch( void *thread, struct emu_trap_view *view, BOOL ec, void *cookie )
 {
     AMD64_CONTEXT shell;    /* deliberately NOT zeroed: only the groups named
                              * by ContextFlags carry values, which is exactly
@@ -1762,7 +1766,7 @@ static int emu_view_dispatch( void *thread, struct emu_trap_view *view, BOOL ec 
         memset( &shell.FltSave, 0xDD, sizeof(shell.FltSave) );
     }
 
-    status = emu_trap_dispatch_common( &shell );
+    status = emu_trap_dispatch_common( &shell, cookie );
 
     /* Write-back, unconditional and on EVERY status: under the CONTEXT
      * protocol the bridge's after-trap load applies the callback's CONTEXT
@@ -1796,7 +1800,7 @@ static int emu_view_dispatch( void *thread, struct emu_trap_view *view, BOOL ec 
 
 static int emu_trap_view_thunk( void *thread, void *view_ptr, void *user )
 {
-    return emu_view_dispatch( thread, view_ptr, FALSE );
+    return emu_view_dispatch( thread, view_ptr, FALSE, NULL );
 }
 
 /* The ABI 7 EC transition handler.  The gregs write-back in the shared body
@@ -1805,7 +1809,11 @@ static int emu_trap_view_thunk( void *thread, void *view_ptr, void *user )
  * (SYSCALL architecturally clobbers RCX, so no MS-x64 caller reads it). */
 static int emu_ec_thunk( void *thread, void *view_ptr, void *cookie )
 {
-    return emu_view_dispatch( thread, view_ptr, TRUE );
+    /* the cookie is this stub's own PE-side row cell (registered per rip by
+     * unixcall_emu_register_ec below); the PE dispatcher serves the row from
+     * it without re-resolving the RIP.  NULL when the module armed without
+     * cells, which only costs the lookup it always cost. */
+    return emu_view_dispatch( thread, view_ptr, TRUE, cookie );
 }
 
 
@@ -1972,9 +1980,13 @@ static NTSTATUS unixcall_emu_register_ec( void *args )
     struct emu_register_ec_params *params = args;
     ULONG_PTR stub = (ULONG_PTR)params->first_stub;
     ULONGLONG *rips;
+    const void **cookies = NULL;
     UINT i, verified = 0;
 
+    params->armed = emu_ec_armed ? 1 : 0;
     params->registered = params->skipped = 0;
+    /* count == 0 is the PE side's arming PROBE: it asks whether cells are
+     * worth allocating before it allocates any (see emu_register_ec_params). */
     if (!emu_ec_armed || !params->count) return STATUS_SUCCESS;
 
     /* Verify first, register in ONE batch: the bridge's per-target form
@@ -1982,8 +1994,18 @@ static NTSTATUS unixcall_emu_register_ec( void *args )
      * (ntdll: ~2400) registered that way cost a measured ~1.1 ms inside
      * whatever the guest was timing when the module armed -- the QPC
      * interval gate caught it.  The batch form pays one invalidation and
-     * one thread walk for the whole array. */
+     * one thread walk for the whole array.
+     *
+     * The cookie for slot i is that slot's PE-side row cell -- cells is
+     * INDEX-aligned with the stub array, so the cell address is computed
+     * from the slot index before byte-verification can shift anything. */
     if (!(rips = malloc( params->count * sizeof(*rips) ))) return STATUS_NO_MEMORY;
+    if (params->cells && params->cell_size &&
+        !(cookies = malloc( params->count * sizeof(*cookies) )))
+    {
+        free( rips );
+        return STATUS_NO_MEMORY;
+    }
     for (i = 0; i < params->count; i++, stub += params->stride)
     {
         if (memcmp( (const void *)stub, emu_ec_stub_body, sizeof(emu_ec_stub_body) ))
@@ -1991,25 +2013,38 @@ static NTSTATUS unixcall_emu_register_ec( void *args )
             params->skipped++;
             continue;
         }
+        if (cookies)
+            cookies[verified] = (const void *)(ULONG_PTR)(params->cells + (ULONGLONG)i * params->cell_size);
         rips[verified++] = stub;
     }
     if (verified)
     {
         int registered;
 
-        if (p_fexbridge_register_ec_targets)
+        if (cookies && p_fexbridge_register_ec_targets2)
+            registered = p_fexbridge_register_ec_targets2( rips, cookies, verified, emu_ec_thunk );
+        else if (p_fexbridge_register_ec_targets)
+            /* a bridge without the _targets2 form: register WITHOUT cookies
+             * rather than per-target WITH them -- the per-target loop's
+             * registration stall (~1.1 ms, caught by the QPC interval gate)
+             * is a measured bug and the cells are only an optimization;
+             * cookie NULL just keeps every call on the find path it always
+             * had.  The allocated cells go unused, which is the cheap arm
+             * of that trade. */
             registered = p_fexbridge_register_ec_targets( rips, verified, emu_ec_thunk, NULL );
         else
         {
             registered = 0;
             for (i = 0; i < verified; i++)
-                if (!p_fexbridge_register_ec_target( rips[i], emu_ec_thunk, NULL )) registered++;
+                if (!p_fexbridge_register_ec_target( rips[i], emu_ec_thunk,
+                                                     cookies ? (void *)cookies[i] : NULL )) registered++;
         }
         if (registered < 0) registered = 0;
         params->registered = registered;
         params->skipped += verified - registered;
     }
     free( rips );
+    free( cookies );
     if (params->registered && !emu_ec_banner_done)
     {
         emu_ec_banner_done = 1;
@@ -2293,7 +2328,7 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
              * call returns, on every one of its outcomes, same as the trap
              * path in emu_trap_thunk(). */
             emu_crossing_push( data, EMU_CROSSING_TRAP, ctx.Rip );
-            status = call_emu_trap_dispatcher( params->exception_dispatcher, &exc );
+            status = call_emu_trap_dispatcher( params->exception_dispatcher, &exc, NULL );
             emu_crossing_pop( data );
             if (status == STATUS_SUCCESS) continue;   /* handled: resume the edited CONTEXT */
             if (status != STATUS_EMU_GUEST_EXCEPTION)
