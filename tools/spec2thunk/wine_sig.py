@@ -1238,6 +1238,602 @@ class WineHeaders:
                     qualtype=d['qualtype'])
 
 
+# ---------------------------------------------------------------------------
+# THE SOURCE-DEFINITION TIER.  Wine's implementing C source is a signature
+# authority; "no corpus consumer" is not a refusal reason.
+# ---------------------------------------------------------------------------
+# 3,418 of the flat lane's 3,817 refusals said "no declaration found in Wine
+# headers" -- ucrtbase's _Cbuild, kernelbase's AddAccessAllowedObjectAce,
+# ntdll's A_SHAInit.  Every one of those exports HAS an exact signature: the
+# defining function in the module's own dlls/<mod>/*.c, the very code the
+# native ppc64 module was built from, read by the same clang that reads the
+# headers.  Refusing them was reporting a tooling gap as an ABI fact -- the
+# one thing this file must never do (its own words, PROBE_SRC note).
+#
+# THE PRINCIPLE IS KEPT, NOT RELAXED.  Nothing is guessed:
+#   * The definition is located by name in the module's own sources (honoring
+#     Makefile.in's PARENTSRC -- msvcr120 is built FROM dlls/msvcrt -- and its
+#     SOURCES list and EXTRADEFS), parsed with clang for the guest target.
+#   * The stage-2 probe is the SAME non-vacuous construction as the header
+#     oracle's, made non-vacuous the same way: the reconstruction is appended
+#     to a COPY OF THE DEFINING FILE ITSELF and ASSIGNED the real function,
+#     so a wrong reconstruction is a hard compile error against the real
+#     definition, in the one translation unit where its private types exist.
+#   * widths / signedness / floating-point are measured in that same TU by
+#     the same array-length trick, and every acceptance rule (integer class,
+#     <= 64 bits, <= 16 args, the FP position limits) applies verbatim
+#     downstream.
+#   * A definition that cannot be found, or whose file does not parse for the
+#     guest target, or that is #ifdef'd out, stays refused WITH THAT REASON.
+#
+# WHAT THIS TIER MUST NEVER SERVE, because service is the bug:
+#   * The C++ exception machinery.  __CxxFrameHandler4 has a perfectly
+#     readable C definition in dlls/msvcrt/handler4.c and serving it flat
+#     would hand the native runtime a GUEST DISPATCHER_CONTEXT: language
+#     handlers on this port are entered AS GUEST CODE by the SEH dispatcher
+#     (dlls/ntdll/signal_ppc64.c), and every name in this family was a hole
+#     ON PURPOSE -- previously enforced only by the accident of having no
+#     header declaration.  The deny set below makes the hole explicit,
+#     reviewed, and carries the reason into the report.
+#   * Register-contract entry points (setjmp family, _chkstk): a trap stub
+#     saves the wrong machine's registers.  Mostly asm-defined (so no C
+#     definition is found anyway) or FORWARD'd to dlls/guestcrt; the deny
+#     set is the belt to that suspenders.
+#   * Anything that takes or returns a FUNCTION POINTER.  A flat serve hands
+#     native code a guest code address (or the guest a native one) -- the
+#     native-pc-in-guest-image crash class.  Detected on the DESUGARED
+#     parameter types, so a typedef'd callback (PVECTORED_EXCEPTION_HANDLER)
+#     is caught, not just a spelled-out one.  These refuse with a reason
+#     naming the fix: an interception row (thunk_overrides + the callback
+#     audit), not a flat thunk.
+
+# Exact names and prefixes whose flat service would break the port's own
+# execution contracts.  Each entry is a reviewed fact with its authority.
+SOURCE_TIER_DENY_EXACT = frozenset((
+    # SEH/unwind surface the port serves through its own dispatcher; a flat
+    # trap would bypass the identity fast-path and the guest-entry contract.
+    '__C_specific_handler',
+    # Raises carry guest EH state; the guest C++ EH lane owns them.
+    '_CxxThrowException', '__CxxThrowException',
+    # Unwind helpers that walk guest frames.
+    '_local_unwind', '_global_unwind2',
+    # Register contracts (also FORWARD'd to guestcrt where listed by hand).
+    'setjmp', '_setjmp', 'longjmp', '_longjmp', 'setjmpex', '_setjmpex',
+    '_chkstk', '__chkstk', '_alloca_probe',
+))
+SOURCE_TIER_DENY_PREFIX = ('__Cxx', '_except_handler', '__GSHandlerCheck')
+SOURCE_TIER_DENY_SUBSTR = ('FrameHandler', 'HandlerCheck')
+SOURCE_TIER_DENY_REASON = (
+    'guest execution contract: C++/SEH exception machinery (or a register-'
+    'contract entry) must run as guest code or through the port\'s own '
+    'dispatcher (dlls/ntdll/signal_ppc64.c); a flat native serve is the bug, '
+    'not the fix')
+
+
+def source_tier_denied(name):
+    if name in SOURCE_TIER_DENY_EXACT:
+        return True
+    if any(name.startswith(p) for p in SOURCE_TIER_DENY_PREFIX):
+        return True
+    return any(s in name for s in SOURCE_TIER_DENY_SUBSTR)
+
+
+class WineSourceDefs:
+    """Signature authority for exports Wine declares in NO header: the
+    module's OWN implementing C source.  See the tier banner above."""
+
+    def __init__(self, source_root, dll, include_dir, generated_dir=None,
+                 clang='clang', target='x86_64-windows-gnu', workdir=None,
+                 defines=(), builddir=None):
+        self.root = os.path.abspath(os.path.expanduser(source_root))
+        self.dll = dll
+        self.stem = os.path.splitext(os.path.basename(dll))[0].lower()
+        self.include_dir = os.path.abspath(include_dir)
+        self.generated_dir = (os.path.abspath(generated_dir)
+                              if generated_dir else None)
+        self.clang = clang
+        self.target = target
+        self.workdir = workdir or tempfile.mkdtemp(prefix='winesrcdef-')
+        os.makedirs(self.workdir, exist_ok=True)
+        self.builddir = os.path.abspath(builddir) if builddir else os.getcwd()
+        self.defines = list(defines) + ['-D__WINESRC__']
+        self.moddirs = []      # [module dir, parentsrc dir, ...]
+        self.extra_incs = []   # harvested from the build Makefile's own rule
+        self.files = []        # candidate .c paths, module's own first
+        self._file_text = {}   # path -> text (for the name prefilter)
+        self._file_defs = {}   # path -> {name: decl} or Refused for the file
+        self._sig_cache = {}   # name -> sig dict or Refused
+        self._file_batched = set()   # files whose export batch already ran
+        self._probe_memo = {}  # (file, name) -> dict(ok/reason/sizes/fp)
+        self._sign_memo = {}   # (file, name) -> signs list
+        moddir = os.path.join(self.root, 'dlls', self.stem)
+        if not os.path.isdir(moddir):
+            return                       # tier inactive for this module
+        self.moddirs = [moddir]
+        extradefs, sources = self._read_makefile(moddir)
+        # The BUILD tree's generated Makefile knows the module's exact
+        # -I/-D set (makedep synthesizes -D_NTSYSTEM_ and the libs/
+        # include dirs from IMPORTLIB/EXTRAINCL -- Makefile.in's EXTRADEFS
+        # alone is an undercount, and a missing -Ilibs/symcrypt/inc turns a
+        # servable sha.c into a parse refusal).  Harvested from the first
+        # object rule for this module; falls back to EXTRADEFS when the
+        # Makefile has no such rule.  -I/-D only: the target stays this
+        # oracle's own.
+        mf_inc, mf_def = self._build_makefile_flags()
+        if mf_inc or mf_def:
+            self.defines += mf_def
+            self.extra_incs = mf_inc
+        else:
+            self.defines += extradefs
+            self.extra_incs = []
+        parent = self._parentsrc(moddir)
+        if parent:
+            self.moddirs.append(parent)
+            pd, ps = self._read_makefile(parent)
+            # PARENTSRC modules list their sources in their OWN Makefile.in
+            # (resolved against the parent dir); the parent's EXTRADEFS do
+            # not apply to this module's build and are not taken.
+            del pd, ps
+        self.files = self._candidate_files(sources)
+
+    # ------------------------------------------------------------ discovery
+
+    def _build_makefile_flags(self):
+        """(-I dirs, -D flags) from the build Makefile's first compile rule
+        for this module's objects.  Only -I and -D are taken; paths are
+        resolved against the build dir the rule is written for."""
+        mk = os.path.join(self.builddir, 'Makefile')
+        if not os.path.isfile(mk):
+            return [], []
+        want = re.compile(r'^dlls/%s/[A-Za-z0-9_.-]+\.o:'
+                          % re.escape(self.stem))
+        try:
+            with open(mk, errors='replace') as f:
+                text = f.read().replace('\\\n', ' ')
+        except OSError:
+            return [], []
+        lines = text.splitlines()
+        for i, line in enumerate(lines):
+            if not want.match(line):
+                continue
+            for j in range(i + 1, min(i + 3, len(lines))):
+                cmd = lines[j]
+                if '-c ' not in cmd:
+                    continue
+                incs, defs = [], []
+                for tok in cmd.split():
+                    if tok.startswith('-I'):
+                        d = tok[2:]
+                        incs.append(d if os.path.isabs(d)
+                                    else os.path.join(self.builddir, d))
+                    elif tok.startswith('-D'):
+                        defs.append(tok)
+                if incs or defs:
+                    return incs, defs
+        return [], []
+
+    @staticmethod
+    def _parentsrc(moddir):
+        mk = os.path.join(moddir, 'Makefile.in')
+        if not os.path.isfile(mk):
+            return None
+        with open(mk, errors='replace') as f:
+            for line in f:
+                m = re.match(r'\s*PARENTSRC\s*=\s*(\S+)', line)
+                if m:
+                    return os.path.normpath(os.path.join(moddir, m.group(1)))
+        return None
+
+    @staticmethod
+    def _read_makefile(moddir):
+        """-> (EXTRADEFS -D flags, SOURCES basenames) from Makefile.in."""
+        mk = os.path.join(moddir, 'Makefile.in')
+        extradefs, sources = [], []
+        if not os.path.isfile(mk):
+            return extradefs, sources
+        with open(mk, errors='replace') as f:
+            text = f.read().replace('\\\n', ' ')
+        m = re.search(r'^\s*EXTRADEFS\s*=\s*(.*)$', text, re.M)
+        if m:
+            extradefs = [t for t in m.group(1).split() if t.startswith('-D')]
+        m = re.search(r'^\s*SOURCES\s*=\s*(.*)$', text, re.M)
+        if m:
+            sources = m.group(1).split()
+        return extradefs, sources
+
+    def _candidate_files(self, sources):
+        """The module's PE-side .c files, module dir shadowing PARENTSRC.
+
+        The unix half of a module is not a candidate: it compiles for the
+        HOST and its declarations describe the unix boundary, not the PE
+        export.  Modern Wine keeps it under <mod>/unix/ or in files that
+        include config.h / wine/unixlib-shaped private headers; both marks
+        are cheap to test and a false skip only costs a refusal that names
+        the missing definition, never a wrong answer.
+        """
+        names = [s for s in sources if s.endswith('.c')]
+        if not names:
+            for d in self.moddirs:
+                try:
+                    names += sorted(os.listdir(d))
+                except OSError:
+                    pass
+            names = [n for n in names if n.endswith('.c')]
+        out, seen = [], set()
+        for n in names:
+            if n in seen or n.startswith('unix/'):
+                continue
+            seen.add(n)
+            for d in self.moddirs:
+                p = os.path.join(d, n)
+                if os.path.isfile(p):
+                    try:
+                        with open(p, errors='replace') as f:
+                            text = f.read()
+                    except OSError:
+                        break
+                    if re.search(r'#\s*include\s+"config\.h"', text[:2000]):
+                        break            # unix-side compilation unit
+                    self._file_text[p] = text
+                    out.append(p)
+                    break
+        return out
+
+    # ------------------------------------------------------------ clang
+
+    def _base(self):
+        a = [self.clang, '-target', self.target, '-fsyntax-only',
+             '-nostdlibinc'] + self.defines
+        # The build Makefile's own -I set first (it already leads with the
+        # module dir and include/); the constructed set follows as a
+        # fallback for a tree whose Makefile had no rule to harvest.
+        # A duplicate -I costs nothing.
+        a += ['-I' + d for d in self.extra_incs]
+        a += ['-I' + d for d in self.moddirs]
+        a += ['-I' + os.path.join(self.builddir, 'dlls', self.stem)]
+        if self.generated_dir:
+            a += ['-I' + self.generated_dir]
+        a += ['-I' + self.include_dir,
+              '-I' + os.path.join(self.include_dir, 'msvcrt')]
+        return a
+
+    @staticmethod
+    def _def_from_node(obj, name):
+        """The tier's own node reader: DEFINITIONS only (a body present),
+        external linkage only, and BOTH the sugared and desugared parameter
+        spellings -- the desugared one is what the function-pointer guard
+        reads, so a typedef'd callback type cannot slip past it."""
+        if obj.get('kind') != 'FunctionDecl' or obj.get('name') != name:
+            return None
+        if obj.get('isImplicit') or obj.get('storageClass') == 'static':
+            return None
+        inner = obj.get('inner', ())
+        if not any(c.get('kind') == 'CompoundStmt' for c in inner):
+            return None                  # a declaration, not the definition
+        ty = obj.get('type', {})
+        qt = ty.get('qualType', '')
+        rt = ty.get('desugaredQualType') or qt
+        params, dparams = [], []
+        for c in inner:
+            if c.get('kind') != 'ParmVarDecl':
+                continue
+            pt = c.get('type', {})
+            params.append(pt.get('qualType'))
+            dparams.append(pt.get('desugaredQualType') or pt.get('qualType'))
+        loc = obj.get('loc', {})
+        file_, line = loc.get('file'), loc.get('line')
+        if file_ is None:
+            beg = obj.get('range', {}).get('begin', {})
+            exp = beg.get('expansionLoc', beg)
+            file_, line = exp.get('file'), exp.get('line')
+        return dict(file=file_, line=line, qualtype=qt, rettype=rt,
+                    params=params, dparams=dparams, variadic=_is_variadic(rt))
+
+    def _defs_of(self, path):
+        """{name: decl} for every external definition in `path`, cached.
+        A file that does not parse caches a Refused naming the first error."""
+        hit = self._file_defs.get(path)
+        if hit is not None:
+            return hit
+        cmd = self._base() + ['-Xclang', '-ast-dump=json', path]
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if not r.stdout.strip():
+            first = next((l for l in r.stderr.splitlines() if 'error:' in l),
+                         r.stderr.strip()[:200])
+            self._file_defs[path] = Refused(
+                'definition file %s does not parse for the guest target (%s)'
+                % (self._rel(path), first.strip()[:160]))
+            return self._file_defs[path]
+        try:
+            tu = json.loads(r.stdout)
+        except ValueError as e:
+            self._file_defs[path] = Refused(
+                'cannot parse clang AST for %s (%s)' % (self._rel(path), e))
+            return self._file_defs[path]
+        WineHeaders._fill_omitted_locations(tu)
+        defs = {}
+        for obj in tu.get('inner', ()):
+            if obj.get('kind') != 'FunctionDecl':
+                continue
+            n = obj.get('name')
+            if not n:
+                continue
+            d = self._def_from_node(obj, n)
+            if d is not None:
+                defs[n] = d
+        self._file_defs[path] = defs
+        return defs
+
+    def _rel(self, path):
+        rp = os.path.relpath(path, self.root)
+        return rp if not rp.startswith('..') else path
+
+    def find_definition(self, name):
+        """-> (path, decl) or raises Refused.  Grep-prefiltered."""
+        word = re.compile(r'\b%s\b' % re.escape(name))
+        hits = []
+        parse_fails = []
+        for p in self.files:
+            if not word.search(self._file_text.get(p, '')):
+                continue
+            defs = self._defs_of(p)
+            if isinstance(defs, Refused):
+                parse_fails.append(defs.reason)
+                continue
+            d = defs.get(name)
+            if d is not None:
+                hits.append((p, d))
+        if len(hits) > 1:
+            raise Refused('multiple external definitions of %s: %s'
+                          % (name, ', '.join(self._rel(p) for p, _ in hits)))
+        if not hits:
+            if parse_fails:
+                raise Refused('no readable definition: ' + parse_fails[0])
+            raise Refused('no definition found in the module\'s own C sources '
+                          '(dlls/%s%s) -- assembly, generated, or #ifdef\'d '
+                          'out for this target'
+                          % (self.stem,
+                             ' + PARENTSRC' if len(self.moddirs) > 1 else ''))
+        return hits[0]
+
+    # ------------------------------------------------------------ the probe
+
+    def _shape(self, name):
+        if source_tier_denied(name):
+            raise Refused(SOURCE_TIER_DENY_REASON)
+        path, d = self.find_definition(name)
+        if d['variadic']:
+            raise Refused('variadic definition; the source tier serves no '
+                          'variadic (cite a header and variadic=<v-variant>)')
+        if any(p is None for p in d['params']):
+            raise Refused('unreadable parameter type in %s' % d['qualtype'])
+        for sp in list(d['dparams']) + [d['rettype']]:
+            if sp and '(*' in sp:
+                raise Refused(
+                    'takes or returns a function pointer (%s): a flat serve '
+                    'hands one machine the other\'s code address -- the '
+                    'native-pc-in-guest-image class.  Needs an interception '
+                    'row (thunk_overrides + the callback audit), not a thunk'
+                    % sp.strip()[:80])
+        ret = _respell(WineHeaders._return_spelling(d.get('rettype')
+                                                    or d['qualtype']))
+        params = [_respell(p) for p in d['params']]
+        if len(params) > 16:
+            raise Refused('%d arguments, descriptor field holds at most 16'
+                          % len(params))
+        return path, d, ret, params
+
+    def _tu_with(self, path, chunks):
+        """A COPY of the defining file with probe chunks appended -- the
+        non-vacuous construction: &name resolves against the real definition
+        in its own translation unit."""
+        return self._file_text[path] + '\n\n/* spec2thunk source-tier probe */\n' \
+            + ''.join(chunks)
+
+    def _compile(self, src, out_ll=None):
+        p = os.path.join(self.workdir, 'wt_srcdef.c')
+        with open(p, 'w') as f:
+            f.write(src)
+        # NOT the header probe's blanket -Werror: this TU contains the whole
+        # module source file, whose pre-existing warning-level style (a '/*'
+        # inside a block comment in combase's syscom.c was the live case)
+        # must not masquerade as an ABI refusal.  Warnings are silenced
+        # wholesale and exactly the diagnostics the probe's soundness rests
+        # on are promoted back to errors: an incompatible reconstruction, an
+        # undeclared name, a bad conversion.  The _Static_asserts are errors
+        # regardless.
+        cmd = self._base() + [
+            '-w',
+            '-Werror=incompatible-pointer-types',
+            '-Werror=incompatible-function-pointer-types',
+            '-Werror=implicit-function-declaration',
+            '-Werror=int-conversion',
+            '-ferror-limit=0']
+        if out_ll:
+            cmd = [c for c in cmd if c != '-fsyntax-only']
+            cmd += ['-S', '-emit-llvm', '-o', out_ll]
+        r = subprocess.run(cmd + [p], capture_output=True, text=True)
+        return r.returncode, r.stderr
+
+    def _probe_one(self, path, name, ret, params, tag):
+        """Probe chunk: reconstruction + class/width asserts (byte-compatible
+        with WineHeaders._probe_chunk semantics) + width and fp arrays."""
+        L = []
+        arglist = ', '.join(params) if params else 'void'
+        L.append('static %s (*wt_srec%s)(%s) = &%s;\n'
+                 % (ret, tag, arglist, name))
+        L.append('void wt_suse%s(void) { (void)wt_srec%s; }\n' % (tag, tag))
+
+        def intcheck(what, spelling):
+            classes = INTEGER_CLASSES + (REAL_CLASS,)
+            if _bare_type(spelling) in AGGREGATE_SLOT_TYPES:
+                classes = (RECORD_CLASS, UNION_CLASS)
+            ors = ' || '.join('__builtin_classify_type(*(%s)0) == %d'
+                              % (_ptr_to(spelling), c) for c in classes)
+            L.append('_Static_assert(%s, "%s: %s is not integer/pointer class");\n'
+                     % (ors, name, what))
+            L.append('_Static_assert(sizeof(%s) <= 8, "%s: %s is wider than '
+                     '64 bits");\n' % (spelling, name, what))
+        for i, p in enumerate(params):
+            intcheck('argument %d (%s)' % (i, p), p)
+        if ret.strip() != 'void':
+            intcheck('return value (%s)' % ret, ret)
+        for i, p in enumerate(params):
+            L.append('char wt_ssz%s_%d[sizeof(%s)];\n' % (tag, i, p))
+        fpt = list(params) + ([ret] if ret.strip() != 'void' else [])
+        for i, t in enumerate(fpt):
+            L.append('char wt_sfp%s_%d[1 + (__builtin_classify_type(*(%s)0) == 8)'
+                     ' + 2 * ((__builtin_classify_type(*(%s)0) == 8) '
+                     '&& sizeof(%s) == 4)];\n'
+                     % (tag, i, _ptr_to(t), _ptr_to(t), t))
+        return L
+
+    def _run_batch(self, path, items):
+        """items: [(name, ret, params)].  One compile; on failure, bisect --
+        one bad export must not cost the file's others their answers, and a
+        refusal is produced by the export's own single probe with the
+        compiler's own message (the same accept-in-bulk/refuse-one-at-a-time
+        contract as WineHeaders.prefetch)."""
+        chunks, tags = [], []
+        for i, (name, ret, params) in enumerate(items):
+            tag = '_%d' % i
+            chunks += self._probe_one(path, name, ret, params, tag)
+            tags.append(tag)
+        out_ll = os.path.join(self.workdir, 'wt_srcdef.ll')
+        rc, err = self._compile(self._tu_with(path, chunks), out_ll)
+        if rc == 0:
+            found = {}
+            with open(out_ll) as f:
+                text = f.read()
+            for m in re.finditer(r'@wt_ssz(_\d+)_(\d+)\s*=[^\[]*\[(\d+) x i8\]',
+                                 text):
+                found.setdefault(('sz', m.group(1)), {})[int(m.group(2))] = \
+                    int(m.group(3))
+            for m in re.finditer(r'@wt_sfp(_\d+)_(\d+)\s*=[^\[]*\[(\d+) x i8\]',
+                                 text):
+                found.setdefault(('fp', m.group(1)), {})[int(m.group(2))] = \
+                    int(m.group(3))
+            for i, (name, ret, params) in enumerate(items):
+                tag = '_%d' % i
+                szd = found.get(('sz', tag), {})
+                sizes = [szd.get(j) for j in range(len(params))]
+                fpd = found.get(('fp', tag), {})
+                nfp = len(params) + (1 if ret.strip() != 'void' else 0)
+                fplens = [fpd.get(j) for j in range(nfp)]
+                ok_sz = None not in sizes
+                ok_fp = (None not in fplens
+                         and all(l in (1, 2, 4) for l in fplens))
+                if ok_sz and ok_fp:
+                    self._probe_memo[(path, name)] = dict(
+                        ok=True, sizes=sizes,
+                        fp=[{1: 0, 2: 1, 4: 2}[l] for l in fplens])
+                else:
+                    # No widths => the host would read a 32-bit slot as 64
+                    # (the mspatcha class); no fp answer => a double could
+                    # land in a GPR.  Both are the wrong-number class, so a
+                    # measurement this TU could not produce is a refusal,
+                    # never a default.
+                    self._probe_memo[(path, name)] = dict(
+                        ok=False,
+                        reason='width/fp measurement failed in the source '
+                               'TU; refusing rather than publishing an '
+                               'unmasked descriptor')
+            return
+        if len(items) == 1:
+            name, ret, params = items[0]
+            self._probe_memo[(path, name)] = dict(
+                ok=False, reason=WineHeaders._first_reason(err))
+            return
+        mid = len(items) // 2
+        self._run_batch(path, items[:mid])
+        self._run_batch(path, items[mid:])
+
+    def _signs_for(self, path, name, params, sizes):
+        sub = [(j, params[j]) for j, sz in enumerate(sizes or [])
+               if sz in (1, 2)]
+        if not sub:
+            return 0
+        hit = self._sign_memo.get((path, name))
+        if hit is not None:
+            return hit
+        chunks = ['char wt_ssg_%d[1 + ((%s)-1 < (%s)0)];\n' % (j, t, t)
+                  for j, t in sub]
+        out_ll = os.path.join(self.workdir, 'wt_srcsign.ll')
+        rc, _err = self._compile(self._tu_with(path, chunks), out_ll)
+        signs = 0
+        if rc == 0:
+            with open(out_ll) as f:
+                text = f.read()
+            for m in re.finditer(r'@wt_ssg_(\d+)\s*=[^\[]*\[(\d+) x i8\]',
+                                 text):
+                if int(m.group(2)) == 2:
+                    signs |= 1 << int(m.group(1))
+        self._sign_memo[(path, name)] = signs
+        return signs
+
+    # ------------------------------------------------------------------ API
+
+    def prefetch(self, names):
+        """Group the module's source-tier candidates by defining file and
+        probe each file's batch once.  Purely a batching accelerator, like
+        WineHeaders.prefetch: it can only save compiles, never decide."""
+        by_file = {}
+        for name in names:
+            try:
+                path, _d, ret, params = self._shape(name)
+            except Refused:
+                continue
+            by_file.setdefault(path, []).append((name, ret, params))
+        for path, items in by_file.items():
+            todo = [(n, r, p) for (n, r, p) in items
+                    if (path, n) not in self._probe_memo]
+            if todo:
+                self._run_batch(path, todo)
+
+    def signature(self, name):
+        """-> the same sig dict WineHeaders.signature returns, plus
+        provenance='source-definition' and the measured sidecars
+        (src_sizes / src_fp / src_signs) resolve_signatures overlays into
+        its width/sign/fp stages so every downstream rule applies verbatim.
+        Raises Refused with the real reason otherwise."""
+        hit = self._sig_cache.get(name)
+        if hit is not None:
+            if isinstance(hit, Refused):
+                raise hit
+            return hit
+        try:
+            sig = self._signature_uncached(name)
+        except Refused as ex:
+            self._sig_cache[name] = ex
+            raise
+        self._sig_cache[name] = sig
+        return sig
+
+    def _signature_uncached(self, name):
+        path, d, ret, params = self._shape(name)
+        memo = self._probe_memo.get((path, name))
+        if memo is None:
+            self._run_batch(path, [(name, ret, params)])
+            memo = self._probe_memo[(path, name)]
+        if not memo['ok']:
+            raise Refused(memo['reason'])
+        rel = self._rel(path)
+        return dict(nargs=len(params),
+                    returns_void=(ret.strip() == 'void'),
+                    variadic=False,
+                    header=os.path.basename(rel),
+                    header_path=rel,
+                    line=d['line'],
+                    ret=ret,
+                    params=params,
+                    qualtype=d['qualtype'],
+                    provenance='source-definition',
+                    src_sizes=memo['sizes'],
+                    src_fp=memo['fp'],
+                    src_signs=self._signs_for(path, name, params,
+                                              memo['sizes']))
+
+
 class WineSpecs:
     """LAST-RESORT arity oracle for exports Wine declares in NO header.
 

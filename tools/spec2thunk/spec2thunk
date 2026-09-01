@@ -1292,11 +1292,35 @@ def audit_guest_com_flat(exports, com_json_path, extra, native_spec_path):
             errs.append('GUEST-IMPL %s: cannot combine with variadic='
                         % e['name'])
 
+    # An interface-bearing export the SOURCE TIER newly made servable is
+    # exactly what the GUEST-* classification exists to govern -- and until a
+    # human writes that row, the export REFUSES (fail closed, per export,
+    # reason naming the missing directive) rather than the whole module
+    # fataling.  A HEADER-tier offender keeps the fatal: those were always
+    # emitted, so an unclassified one is a broken module promise, not new
+    # coverage arriving faster than its classification.
+    tier_refused = []
     if unclassified:
-        lines = ['  %-36s %s' % (n, '; '.join(h)) for n, h in unclassified]
-        errs.append('%d interface-bearing flat export(s) with no '
-                    'GUEST-IMPL/GUEST-REFUSE/GUEST-PASS classification:\n%s'
-                    % (len(unclassified), '\n'.join(lines)))
+        by_name2 = {e['name']: e for e in exports}
+        hard = []
+        for n, h in unclassified:
+            e = by_name2.get(n)
+            if e is not None and e['sig'].get('provenance') == 'source-definition':
+                tier_refused.append(
+                    (n, 'interface-bearing flat export (%s): newly servable '
+                        'by the source-definition tier, but wrapping needs a '
+                        'GUEST-IMPL/GUEST-REFUSE/GUEST-PASS row first'
+                        % '; '.join(h)))
+            else:
+                hard.append((n, h))
+        if hard:
+            lines = ['  %-36s %s' % (n, '; '.join(h)) for n, h in hard]
+            errs.append('%d interface-bearing flat export(s) with no '
+                        'GUEST-IMPL/GUEST-REFUSE/GUEST-PASS classification:\n%s'
+                        % (len(hard), '\n'.join(lines)))
+        if tier_refused:
+            drop = {n for n, _ in tier_refused}
+            exports[:] = [e for e in exports if e['name'] not in drop]
 
     # the wrapper symbols must exist in the native namesake's .spec
     with open(native_spec_path) as f:
@@ -1325,7 +1349,11 @@ def audit_guest_com_flat(exports, com_json_path, extra, native_spec_path):
           'refused, %d audited pass-throughs; %d clean pass-throughs'
           % (n_bearing, len(extra['guest_impl']), len(extra['guest_refuse']),
              len(extra['guest_pass']), len(exports) - n_bearing))
+    if tier_refused:
+        print('  %d source-tier export(s) held back pending GUEST-* rows '
+              '(refused by name; see --report)' % len(tier_refused))
     print()
+    return tier_refused
 
 
 def emit_com_asm(a, com_ifaces, machine='x86_64'):
@@ -1365,7 +1393,7 @@ def emit_com_asm(a, com_ifaces, machine='x86_64'):
 # signature resolution against Wine's headers
 # --------------------------------------------------------------------------
 
-def resolve_signatures(exports, headers, specs=None):
+def resolve_signatures(exports, headers, specs=None, srcdefs=None):
     """-> (accepted, refused).  Hard-fails on a spec/header disagreement.
 
     The location column normally names a Wine HEADER, and that entry is fully
@@ -1395,6 +1423,29 @@ def resolve_signatures(exports, headers, specs=None):
         + [(e['spec_alias'], False)
            for e in exports if e.get('spec_alias')
            and not (e['header'] or '').endswith('.spec')])
+
+    # Source-tier prefetch: batch the per-file probes for every export the
+    # header index already says it has never heard of.  Pure batching, like
+    # headers.prefetch -- the decisions are made one export at a time below,
+    # by exactly the same code, whether or not this ran.
+    if srcdefs is not None:
+        cand = []
+        for e in exports:
+            if (e.get('asserted', True) or e.get('variadic_impl')
+                    or (e['header'] or '').endswith('.spec')
+                    or e['name'] in RAW_BODY_EXPORTS):
+                continue
+            for n in filter(None, (e['name'], e.get('spec_alias'))):
+                try:
+                    headers._shape(n)
+                    break              # header (or alias) serves it; no tier
+                except Refused as ex:
+                    if not ex.reason.startswith('no declaration found'):
+                        break
+            else:
+                cand += [n for n in (e['name'], e.get('spec_alias')) if n]
+        if cand:
+            srcdefs.prefetch(cand)
 
     accepted, refused, mismatches = [], [], []
     for e in exports:
@@ -1476,8 +1527,28 @@ def resolve_signatures(exports, headers, specs=None):
                     sig = headers.signature(e['spec_alias'],
                                             allow_variadic=want_variadic)
         except Refused as ex:
-            refused.append((e['name'], ex.reason))
-            continue
+            # THE SOURCE-DEFINITION TIER (wine_sig.WineSourceDefs -- read its
+            # banner).  Applies ONLY where today's answer would be the
+            # 'no declaration found in Wine headers' refusal, and only to
+            # entries with no hand-written assertion columns (a broken
+            # hand-written header citation stays the broken promise it is).
+            # The name's own definition is tried first, then the same-module
+            # alias target's, mirroring the header path's rescue order.  Any
+            # OTHER refusal -- including the tier's own deny reasons -- stands
+            # with its reason.
+            sig = None
+            if (srcdefs is not None and not e.get('asserted', True)
+                    and not want_variadic
+                    and ex.reason.startswith('no declaration found')):
+                for cand in filter(None, (e['name'], e.get('spec_alias'))):
+                    try:
+                        sig = srcdefs.signature(cand)
+                        break
+                    except Refused as sx:
+                        ex = sx
+            if sig is None:
+                refused.append((e['name'], ex.reason))
+                continue
         # ------------------------------------------------------------------
         # variadic= is an ASSERTION like every other column, and it is checked
         # in BOTH directions.  A variadic with no variadic= never gets here at
@@ -1575,6 +1646,17 @@ def resolve_signatures(exports, headers, specs=None):
     def spec_cited(e):
         return str(e['sig'].get('header') or '').endswith('.spec')
 
+    # A SOURCE-TIER entry's param types exist only in its defining file's own
+    # translation unit, so it must be held out of every header-TU probe below
+    # for exactly the reason .spec-cited entries are: one private type would
+    # cost the whole batch its answers.  Its widths/signs/fp were measured in
+    # the right TU already (WineSourceDefs sidecars) and are OVERLAID into the
+    # same dicts, so the narrow-mask arithmetic, the signedness word and every
+    # FP acceptance rule below apply to them verbatim -- one rulebook, two
+    # measurement TUs.
+    def src_tier(e):
+        return e['sig'].get('provenance') == 'source-definition'
+
     # ------------------------------------------------------------------
     # Argument WIDTHS, from the same headers that supplied the signatures.
     # An MS-x64 caller stores a 32-bit argument with a 32-bit store and
@@ -1611,7 +1693,10 @@ def resolve_signatures(exports, headers, specs=None):
     # done the same to ucrtbase and vcruntime140.
     widths = headers.widths(
         [(i, e['sig'].get('params')) for i, e in enumerate(accepted)
-         if not spec_cited(e)])
+         if not spec_cited(e) and not src_tier(e)])
+    for i, e in enumerate(accepted):
+        if src_tier(e) and e['sig'].get('src_sizes'):
+            widths[i] = e['sig']['src_sizes']
     for i, e in enumerate(accepted):
         sizes = widths.get(i)
         if not sizes or len(sizes) != e['sig']['nargs']:
@@ -1666,6 +1751,10 @@ def resolve_signatures(exports, headers, specs=None):
     # by surface.
     sign_req = []
     for i, e in enumerate(accepted):
+        if src_tier(e):
+            if e['sig'].get('src_signs'):
+                e['signs'] = e['sig']['src_signs']
+            continue
         sizes = widths.get(i)
         if not sizes or len(sizes) != e['sig']['nargs'] or spec_cited(e):
             continue
@@ -1713,11 +1802,14 @@ def resolve_signatures(exports, headers, specs=None):
     fp_types = []
     for i, e in enumerate(accepted):
         params = e['sig'].get('params')
-        if params is None or spec_cited(e):
+        if params is None or spec_cited(e) or src_tier(e):
             continue
         ret = e['sig'].get('ret')
         fp_types.append((i, list(params) + ([ret] if ret and ret.strip() != 'void' else [])))
     fp_answer = headers.fp_classes(fp_types) if fp_types else {}
+    for i, e in enumerate(accepted):
+        if src_tier(e) and e['sig'].get('src_fp') is not None:
+            fp_answer[i] = e['sig']['src_fp']
 
     still, newly_refused = [], []
     for i, e in enumerate(accepted):
@@ -2546,9 +2638,12 @@ def main():
 
     # ---------------- where the export list comes from
     dll, spec_exports, from_spec, excludes = None, [], None, []
+    # The same key set parse_spec returns: the pure --from-spec path (no
+    # .thunks file at all -- the check-source-tier fixture is the first
+    # caller to exercise it) crashed on the missing guest_* keys.
     extra = dict(from_def=None, com_json=None, probe_includes=[],
                  probe_extra=[], probe_defines=[], include_dirs=[],
-                 forwards={})
+                 guest_impl={}, guest_refuse={}, guest_pass={}, forwards={})
     if args.spec:
         dll, spec_exports, from_spec, excludes, extra = parse_spec(args.spec)
 
@@ -2698,8 +2793,22 @@ def main():
                                                    extra['include_dirs']])
     headers.sanity()
     specs = wine_sig.WineSpecs(args.wine_source)
+    # The source-definition tier (wine_sig.WineSourceDefs, read its banner):
+    # for exports the header oracle refuses as declared-nowhere, the module's
+    # own implementing C source is the signature authority.  x86_64 guest
+    # only -- the i386 lane's modules are .def/COM-mode and its geometry has
+    # its own oracle.  A module with no dlls/<stem> source dir (a .def-mode
+    # graphics module) leaves the tier inactive and nothing changes.
+    srcdefs = None
+    if args.machine == 'x86_64' and dll:
+        srcdefs = wine_sig.WineSourceDefs(
+            args.wine_source, dll, args.wine_include, args.wine_generated,
+            clang=args.clang,
+            workdir=os.path.join(args.builddir, 'sigprobe', 'srcdef'),
+            defines=all_defines, builddir=os.getcwd())
     t0 = time.time()
-    exports, refused = resolve_signatures(spec_exports, headers, specs)
+    exports, refused = resolve_signatures(spec_exports, headers, specs,
+                                          srcdefs=srcdefs)
     resolve_secs = time.time() - t0
 
     unverified = [e for e in exports if e['sig'].get('return_verified') is False]
@@ -2711,6 +2820,22 @@ def main():
             print("  %-28s %-4s  %s:%d" % (e['name'],
                                            'void' if e['returns_void'] else 'int',
                                            e['sig']['header'], e['sig']['line']))
+        print()
+
+    srcdef_served = [e for e in exports
+                     if e['sig'].get('provenance') == 'source-definition']
+    if srcdef_served:
+        print("SOURCE-DEFINITION TIER (%d): declared in no Wine header; the "
+              "signature is the module's own" % len(srcdef_served))
+        print("implementing C definition, clang-verified in that file's own "
+              "translation unit and cross-checked")
+        print("against the .spec arity (wine_sig.WineSourceDefs; per-export "
+              "citations in --report):")
+        for e in (srcdef_served if len(srcdef_served) <= 40 else srcdef_served[:8]):
+            print("  %-30s %s:%s" % (e['name'], e['sig']['header_path'],
+                                     e['sig']['line']))
+        if len(srcdef_served) > 40:
+            print("  ... and %d more (see --report)" % (len(srcdef_served) - 8))
         print()
 
     if wine_spec_dropped:
@@ -2771,8 +2896,8 @@ def main():
                  'with COM-JSON: the audit that makes them sound only runs '
                  'there')
     if com_ifaces and from_spec:
-        audit_guest_com_flat(exports, spec_relative(extra['com_json']),
-                             extra, from_spec)
+        refused += audit_guest_com_flat(exports, spec_relative(extra['com_json']),
+                                        extra, from_spec) or []
     elif extra['guest_impl']:
         apply_guest_impl(exports, extra, from_spec or args.spec)
 
@@ -2810,15 +2935,22 @@ def main():
                 f.write('%s\texcluded\tEXCLUDE line in %s\n' % (n, args.spec))
             for e in exports:
                 s = e['sig']
+                # Provenance rides in the detail column.  Header-tier lines
+                # keep their exact historical spelling: the regeneration-
+                # stability check (old emitted lines must reappear verbatim)
+                # is what proves this tier changed nothing it did not add.
+                prov = ('source-definition %s:%s '
+                        % (s.get('header_path'), s.get('line'))
+                        if s.get('provenance') == 'source-definition' else '')
                 if e.get('fp'):
-                    f.write('%s\temitted\tfp=0x%08X %d args, %s, %s:%s\n'
-                            % (e['name'], e['fp'], e['sig']['nargs'],
+                    f.write('%s\temitted\t%sfp=0x%08X %d args, %s, %s:%s\n'
+                            % (e['name'], prov, e['fp'], e['sig']['nargs'],
                                'void' if e['sig']['returns_void'] else 'value',
                                os.path.basename(str(e['sig'].get('header'))),
                                e['sig'].get('line')))
                     continue
-                f.write('%s\temitted\t%d args, %s, %s:%s\n'
-                        % (e['name'], s['nargs'],
+                f.write('%s\temitted\t%s%d args, %s, %s:%s\n'
+                        % (e['name'], prov, s['nargs'],
                            'void' if s['returns_void'] else 'value',
                            s['header'], s['line']))
             for e in forward_exports:
