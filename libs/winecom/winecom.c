@@ -442,12 +442,18 @@ static BOOL com_env_flag( const WCHAR *name )
  *
  * A NAME THAT MATCHES NOTHING IS LOUD.  A typo in a bisect leg that passed
  * silently would be recorded as "tested, clean" and would take the leg's
- * conclusion with it.  Every target that matched no row on any attached
- * surface gets one ERR naming it. */
+ * conclusion with it.  Every HAND-TYPED target that matched no row here gets
+ * one ERR naming it.  Wave-expanded targets do not, and must not: a wave names
+ * rows across several surfaces and this library is one instance per linkee, so
+ * every name in the syscom wave "misses" on the d3d11 surface by design --
+ * 158 ERRs saying nothing.  Those are covered by the per-surface count line
+ * instead, which is the honest aggregate. */
 
 static char **row_targets;             /* "Iface::Slot", NUL-terminated */
 static unsigned char *row_target_hit;  /* per target: matched at least one row */
 static UINT row_target_count;
+static UINT row_targets_typed;         /* the first N came from WINEEMUNOCOMROWS
+                                          by hand; the rest from a wave */
 static unsigned char *forced_refuse;   /* per (iface, slot); NULL = UNARMED,
                                           and that NULL is the hot-path test */
 
@@ -795,6 +801,7 @@ static void arm_row_kill_switches( void )
     if (!rows && !iids && !waves) return;
 
     if (rows) parse_row_targets( rows, add_row_target, 0 );
+    row_targets_typed = row_target_count;   /* everything after this is a wave */
     if (iids) parse_row_targets( iids, add_blocked_iid, 0 );
     if (waves)
     {
@@ -887,20 +894,21 @@ static void arm_row_kill_switches( void )
          "to refuse (%u of them scrub only partially)\n", wc_surface->name,
          forced, partial );
 
-    /* A target that matched nothing HERE may well match on another surface's
-     * runtime (this library is one instance per linkee), so the report names
-     * the surface and stays a warning; a target that matches nowhere shows up
-     * once per attached surface, which is the loudest a per-instance runtime
-     * can be about it. */
+    /* Hand-typed targets only, for the reason in this section's banner.  A
+     * name that misses HERE may still match on another surface's runtime
+     * (one instance per linkee), so the line names the surface -- a name that
+     * matches nowhere prints once per attached surface, which is the loudest
+     * a per-instance runtime can honestly be about it. */
     if (row_target_hit)
-        for (t = 0; t < row_target_count; t++)
+        for (t = 0; t < row_targets_typed; t++)
             if (!row_target_hit[t])
-                WARN( "%s: WINEEMUNOCOMROWS names '%s', which matches no row on "
-                      "this surface -- if no surface claims it, it is a TYPO and "
-                      "this leg tested nothing\n", wc_surface->name, row_targets[t] );
+                ERR( "%s: WINEEMUNOCOMROWS names '%s', which matches no row on "
+                     "this surface -- if no surface claims it, it is a TYPO and "
+                     "this leg tested NOTHING\n", wc_surface->name, row_targets[t] );
     if (!forced)
-        ERR( "%s: every name given to WINEEMUNOCOMROWS/WAVE missed; NOTHING is "
-             "forced on this surface\n", wc_surface->name );
+        ERR( "%s: nothing given to WINEEMUNOCOMROWS/WAVE matched a row on this "
+             "surface; NOTHING is forced here (another surface may still claim "
+             "them -- check its own count line)\n", wc_surface->name );
 }
 
 /* The dispatch-time question, both lanes.  Unarmed: one NULL test. */
