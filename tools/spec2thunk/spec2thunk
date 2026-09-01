@@ -1394,7 +1394,10 @@ def emit_com_asm(a, com_ifaces, machine='x86_64'):
 # --------------------------------------------------------------------------
 
 def resolve_signatures(exports, headers, specs=None, srcdefs=None):
-    """-> (accepted, refused).  Hard-fails on a spec/header disagreement.
+    """-> (accepted, refused, flat_names).  Hard-fails on a spec/header
+    disagreement.  `flat_names` is the FLAT POPULATION: every export the
+    header oracle declared it had never heard of, whether the source tier
+    then served it or not -- the denominator the census prints.
 
     The location column normally names a Wine HEADER, and that entry is fully
     verified by clang.  If it names a Wine `.spec` file instead, the entry
@@ -1447,7 +1450,7 @@ def resolve_signatures(exports, headers, specs=None, srcdefs=None):
         if cand:
             srcdefs.prefetch(cand)
 
-    accepted, refused, mismatches = [], [], []
+    accepted, refused, mismatches, flat_names = [], [], [], set()
     for e in exports:
         # Register-contract exports carry their own guest body and never meet
         # the oracle: there is no C declaration to find and no call to
@@ -1537,6 +1540,14 @@ def resolve_signatures(exports, headers, specs=None, srcdefs=None):
             # OTHER refusal -- including the tier's own deny reasons -- stands
             # with its reason.
             sig = None
+            # THE FLAT POPULATION, recorded where it is known for certain.
+            # "Declared in no Wine header" is what the header oracle has just
+            # said, before the tier answers -- so this is the only place the
+            # census can name that set without re-deriving it from refusal
+            # TEXT afterwards, which would misfile every reason the two tiers
+            # share.  See the FLAT TIER CENSUS block in main().
+            if ex.reason.startswith('no declaration found'):
+                flat_names.add(e['name'])
             if (srcdefs is not None and not e.get('asserted', True)
                     and not want_variadic
                     and ex.reason.startswith('no declaration found')):
@@ -1860,7 +1871,7 @@ def resolve_signatures(exports, headers, specs=None, srcdefs=None):
 
     accepted = still
     refused = refused + newly_refused
-    return accepted, refused
+    return accepted, refused, flat_names
 
 
 # --------------------------------------------------------------------------
@@ -1896,6 +1907,35 @@ _REFUSAL_CLASSES = (
     (r'^unknown \.spec argument type',   'unknown .spec argument type'),
 )
 
+# THE FLAT REMAINDER'S OWN MECHANISMS.  A flat refusal is one the header
+# oracle has never heard of AND the source-definition tier could not read, so
+# _REFUSAL_CLASSES -- which classes what a HEADER said -- files most of them
+# under "other".  The census below needs the mechanism by name, because that
+# is the whole claim being made about the remainder: every one accounted, and
+# a class that MOVES is a tooling gap somebody can go and close (the -I/-D
+# harvest was exactly that: 86 "defining TU does not parse" rows, one root
+# cause).  Order matters -- first match wins, as in every table here.
+_FLAT_REFUSAL_CLASSES = (
+    (r'^no readable definition: ',
+     'the defining TU does not parse for the guest target (a tooling gap)'),
+    (r"^no definition found in the module's own C sources",
+     'no C definition in-module (forwarded out, assembly, generated, '
+     "or #ifdef'd out)"),
+    (r'^multiple external definitions of',
+     'more than one external definition in-module'),
+    (r'^guest execution contract:',
+     'deny family: C++/SEH/register contract, held open deliberately'),
+    (r'^variadic definition; the source tier',
+     'variadic definition (no variadic= v-variant)'),
+    (r'^varargs ',                       'variadic with no variadic=<v-variant>'),
+    (r'^interface-bearing flat export',
+     'interface-bearing, pending its GUEST-* classification row'),
+    (r'^takes or returns a function pointer',
+     'function-pointer row needing interception, not a thunk'),
+    (r'^no declaration found in Wine headers$',
+     'declared nowhere, and the source tier never ran on it'),
+)
+
 _SKIP_CLASSES = (
     (r'^stub ',                  '`@ stub` -- Wine has no implementation'),
     (r'^not exported for ',      'not exported for this machine (-arch=/-i386)'),
@@ -1915,6 +1955,11 @@ def _classify(text, table, fallback):
 
 def refusal_class(why):
     return _classify(why, _REFUSAL_CLASSES, 'other (see --report)')
+
+
+def flat_refusal_class(why):
+    return _classify(why, _FLAT_REFUSAL_CLASSES,
+                     _classify(why, _REFUSAL_CLASSES, 'other (see --report)'))
 
 
 def skip_class(why):
@@ -2813,8 +2858,8 @@ def main():
             workdir=os.path.join(args.builddir, 'sigprobe', 'srcdef'),
             defines=all_defines, builddir=os.getcwd())
     t0 = time.time()
-    exports, refused = resolve_signatures(spec_exports, headers, specs,
-                                          srcdefs=srcdefs)
+    exports, refused, flat_names = resolve_signatures(spec_exports, headers,
+                                                      specs, srcdefs=srcdefs)
     resolve_secs = time.time() - t0
 
     unverified = [e for e in exports if e['sig'].get('return_verified') is False]
@@ -2930,6 +2975,42 @@ def main():
             for e in forward_exports:
                 print("         %-28s -> %s  @%d"
                       % (e['name'], e['forward_to'], e['ordinal']))
+        # ------------------------------------------------------------------
+        # THE FLAT TIER CENSUS, PRINTED BY THE BUILD THAT MADE THE ARTIFACT.
+        # The tier's whole claim is a number -- "N declared in no header, M of
+        # them served from the module's own C definition, the rest by
+        # mechanism" -- and until now that number could only be recovered by
+        # running the tool a SECOND time with --report, against a tree that
+        # may have moved.  It is three lines of arithmetic over sets this
+        # function already holds, so the run that emits the DLL now also says
+        # what it covered.  ppc64le/thunks/flat-tier-rows.py reads the served
+        # half back out of the shipped PE; this is the half no artifact can
+        # carry, because a refused export is exactly the one that is not
+        # there.
+        # ------------------------------------------------------------------
+        if flat_names:
+            flat_refused = [(n, why) for n, why in refused if n in flat_names]
+            flat_served = [e for e in exports
+                           if e['sig'].get('provenance') == 'source-definition']
+            print("  %5d  FLAT TIER: declared in no Wine header"
+                  % len(flat_names))
+            print("         %5d  served from the module's own C definition"
+                  % len(flat_served))
+            print("         %5d  remain, by mechanism:"
+                  % (len(flat_names) - len(flat_served)))
+            hist = {}
+            for _n, why in flat_refused:
+                hist.setdefault(flat_refusal_class(why), 0)
+                hist[flat_refusal_class(why)] += 1
+            # A census that can lose a row is not one.  Served and refused are
+            # disjoint subsets of the population by construction, so anything
+            # left over is a row that left the run by some third path, and it
+            # says so rather than quietly shrinking the denominator.
+            lost = len(flat_names) - len(flat_served) - len(flat_refused)
+            if lost:
+                hist['UNACCOUNTED -- neither emitted nor refused'] = lost
+            for cls, n in sorted(hist.items(), key=lambda kv: -kv[1]):
+                print("                %5d  %s" % (n, cls))
         print()
 
     if args.report:
