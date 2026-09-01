@@ -535,7 +535,7 @@ extern NTSTATUS call_user_exception_dispatcher( struct thread_data *data, EXCEPT
                                                 CONTEXT *context );
 extern void call_raise_user_exception_dispatcher( struct thread_data *data );
 #ifdef __powerpc64__
-extern NTSTATUS call_emu_trap_dispatcher( void *func, void *ctx, void *cookie );
+extern NTSTATUS call_emu_trap_dispatcher( struct thread_data *data, void *func, void *ctx, void *cookie );
 extern BOOL emu_handle_fault( void *sigcontext, EXCEPTION_RECORD *rec );
 extern void emu_invalidate_code_range( const void *addr, SIZE_T size );
 extern void emu_unregister_ec_range( const void *addr, SIZE_T size );

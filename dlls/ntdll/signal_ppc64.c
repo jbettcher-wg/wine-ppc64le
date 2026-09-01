@@ -4700,6 +4700,14 @@ static NTSTATUS dispatch_guest_exception( EXCEPTION_RECORD *rec, AMD64_CONTEXT *
 void WINAPI emu_exception_dispatch( ULONG id, void *args, ULONG len )
 {
     struct emu_exception_params *exc = *(struct emu_exception_params **)args;
+    /* The len-gated lean return the trap dispatcher got in the same shape:
+     * pointer three of the args block, NULL under WINE_PPC64LE_NO_LEAN_RETURN
+     * and from any caller that predates it -- the NtCallbackReturn tail below
+     * is always the fallback.  Adopted for UNIFORMITY, not speed: guest
+     * faults are cold, but a return path that exists only to be different
+     * from the hot one is a review burden every time either changes. */
+    NTSTATUS (*lean_return)( NTSTATUS, TEB * ) =
+        len >= 3 * sizeof(void *) ? (NTSTATUS (*)( NTSTATUS, TEB * ))((void **)args)[2] : NULL;
     /* The fault path resumes FROM the context either way, so it has no use for
      * the distinction the raise path turns on. */
     BOOL ctx_rewritten;
@@ -4714,6 +4722,12 @@ void WINAPI emu_exception_dispatch( ULONG id, void *args, ULONG len )
         guest_exc_rec = *exc->rec;
         guest_exc_pending = TRUE;
         status = STATUS_EMU_GUEST_EXCEPTION;
+    }
+    if (lean_return)
+    {
+        NTSTATUS lr = lean_return( status, NtCurrentTeb() );
+        if (lr != EMU_LEAN_RETURN_FALLBACK) RtlRaiseStatus( STATUS_INTERNAL_ERROR );
+        TRACE( "lean return fell back to NtCallbackReturn (restore_flags stash or no frame)\n" );
     }
     status = NtCallbackReturn( NULL, 0, status );
     RtlRaiseStatus( status );

@@ -1689,25 +1689,18 @@ static void emu_crossing_dump( const struct thread_data *data )
     }
 }
 
-NTSTATUS call_emu_trap_dispatcher( void *func, void *ctx, void *cookie )
+NTSTATUS call_emu_trap_dispatcher( struct thread_data *data, void *func, void *ctx, void *cookie )
 {
     static int on_kernel_stack = -1;
     static int no_lean_return = -1;
 
-    struct thread_data *data = get_thread_data();
     struct syscall_frame *frame = get_syscall_frame( data );
-    /* three pointers: the payload, the EC row-cell cookie (NULL on every
-     * non-EC path), and the lean-return stub emu_trap_dispatch calls on its
-     * normal end instead of NtCallbackReturn (NULL under the lever, and for
-     * every consumer that predates it).  Consumers unpack the first pointer
-     * and read the rest only when len says it is there. */
-    void *argblock[3];
-    ULONG len = sizeof(argblock);
     ULONG_PTR user_sp = frame->gpr[1];
     struct callback_stack_layout *stack;
     void *ret_ptr;
     ULONG ret_len;
     ULONG_PTR sp;
+    void **args;
 
     if (!func)
     {
@@ -1765,22 +1758,36 @@ NTSTATUS call_emu_trap_dispatcher( void *func, void *ctx, void *cookie )
             ERR( "WINE_PPC64LE_NO_LEAN_RETURN: every trap dispatch returns "
                  "through the NtCallbackReturn syscall\n" );
     }
-    argblock[0] = ctx;
-    argblock[1] = cookie;
-    argblock[2] = no_lean_return ? NULL : (void *)emu_trap_return_direct;
     sp = (user_sp - PPC64_RED_ZONE -
-          offsetof( struct callback_stack_layout, args_data[sizeof(argblock)] )) & ~15;
+          offsetof( struct callback_stack_layout, args_data[3 * sizeof(void *)] )) & ~15;
     stack = (struct callback_stack_layout *)sp;
 
-    memset( stack->linkage, 0, sizeof(stack->linkage) );
+    /* Only the linkage slots a back-chain walker reads are written: the
+     * chain word and the CR/LR save doublewords beside it.  The rest of the
+     * block -- the TOC save and the parameter save area -- is callee-scratch
+     * by ELFv2 (the same clause the trap-op frame notes cite), and the full
+     * 96-byte memset the generic KeUserModeCallback path keeps was per-
+     * crossing cost here.  That path stays whole: it is cold, and Windows-
+     * shaped cleanliness there costs nothing. */
     stack->linkage[0] = user_sp;        /* back chain, so an unwind walks out */
+    stack->linkage[1] = 0;              /* CR save slot */
+    stack->linkage[2] = 0;              /* LR save slot */
     stack->args = stack->args_data;
-    stack->len  = len;
+    stack->len  = 3 * sizeof(void *);
     stack->id   = 0;
     stack->lr   = frame->lr;
     stack->sp   = user_sp;
     stack->pc   = frame->pc;
-    memcpy( stack->args_data, argblock, len );
+    /* The three pointers land directly in the frame: the payload, the EC
+     * row-cell cookie (NULL on every non-EC path), and the lean-return stub
+     * emu_trap_dispatch and emu_exception_dispatch call on their normal end
+     * instead of NtCallbackReturn (NULL under the lever, and for every
+     * consumer that predates it).  Consumers unpack the first pointer and
+     * read the rest only when len says it is there. */
+    args = (void **)stack->args_data;
+    args[0] = ctx;
+    args[1] = cookie;
+    args[2] = no_lean_return ? NULL : (void *)emu_trap_return_direct;
     return call_user_mode_callback( sp, &ret_ptr, &ret_len, func, data->teb );
 }
 

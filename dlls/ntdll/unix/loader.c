@@ -1591,17 +1591,13 @@ static void emu_capture_native_teb_stack(void)
     emu_native_teb_stack.dealloc = teb->DeallocationStack;
 }
 
-/* install `in`, reading what was there into `out` (which may be NULL) */
-static void emu_teb_stack_switch( const struct emu_teb_stack *in, struct emu_teb_stack *out )
+/* The install half, ONE spelling shared by the hot per-crossing sites (which
+ * already hold the TEB through thread_data) and the cold run-entry switch
+ * below.  Inline because the out-of-line pair sat at 5.4% of the bench
+ * crossing [MEASURED 2026-09-01]: two calls per trap, each re-deriving
+ * NtCurrentTeb() to do three loads or stores. */
+static inline void emu_teb_stack_install( TEB *teb, const struct emu_teb_stack *in )
 {
-    TEB *teb = NtCurrentTeb();
-
-    if (out)
-    {
-        out->base    = teb->Tib.StackBase;
-        out->limit   = teb->Tib.StackLimit;
-        out->dealloc = teb->DeallocationStack;
-    }
     if (!in->base)
     {
         /* Only reachable if a trap fired on a thread that never entered
@@ -1614,6 +1610,20 @@ static void emu_teb_stack_switch( const struct emu_teb_stack *in, struct emu_teb
     teb->Tib.StackBase     = in->base;
     teb->Tib.StackLimit    = in->limit;
     teb->DeallocationStack = in->dealloc;
+}
+
+/* install `in`, reading what was there into `out` (which may be NULL) */
+static void emu_teb_stack_switch( const struct emu_teb_stack *in, struct emu_teb_stack *out )
+{
+    TEB *teb = NtCurrentTeb();
+
+    if (out)
+    {
+        out->base    = teb->Tib.StackBase;
+        out->limit   = teb->Tib.StackLimit;
+        out->dealloc = teb->DeallocationStack;
+    }
+    emu_teb_stack_install( teb, in );
 }
 
 static NTSTATUS emu_trap_dispatch_common( AMD64_CONTEXT *ctx, void *cookie )
@@ -1644,8 +1654,8 @@ static NTSTATUS emu_trap_dispatch_common( AMD64_CONTEXT *ctx, void *cookie )
     emu_publish_guest_context( ctx, EMU_GUEST_TRAP );
 
     /* everything below this line is native code on the native stack */
-    emu_teb_stack_switch( &emu_native_teb_stack, NULL );
-    status = call_emu_trap_dispatcher( p_emu_trap_dispatcher, ctx, cookie );
+    emu_teb_stack_install( data->teb, &emu_native_teb_stack );
+    status = call_emu_trap_dispatcher( data, p_emu_trap_dispatcher, ctx, cookie );
     emu_crossing_pop( data );
     /* ...and back to the GUEST stack the run is on NOW, which is not always
      * the one this trap arrived on: a guest fiber switch happens inside the
@@ -1656,7 +1666,7 @@ static NTSTATUS emu_trap_dispatch_common( AMD64_CONTEXT *ctx, void *cookie )
      * first deep frame or its first exception.  emu_guest_teb_stack is the
      * run's own record and a switch updates it, so it is the one to install;
      * with no switch it holds exactly what the snapshot does. */
-    emu_teb_stack_switch( &emu_guest_teb_stack, NULL );
+    emu_teb_stack_install( data->teb, &emu_guest_teb_stack );
 
     emu_publish_guest_state( EMU_GUEST_RUNNING );
 
@@ -2328,7 +2338,7 @@ static NTSTATUS emu_run_loop( struct emu_run_entry_params *params, void *thread 
              * call returns, on every one of its outcomes, same as the trap
              * path in emu_trap_thunk(). */
             emu_crossing_push( data, EMU_CROSSING_TRAP, ctx.Rip );
-            status = call_emu_trap_dispatcher( params->exception_dispatcher, &exc, NULL );
+            status = call_emu_trap_dispatcher( data, params->exception_dispatcher, &exc, NULL );
             emu_crossing_pop( data );
             if (status == STATUS_SUCCESS) continue;   /* handled: resume the edited CONTEXT */
             if (status != STATUS_EMU_GUEST_EXCEPTION)
