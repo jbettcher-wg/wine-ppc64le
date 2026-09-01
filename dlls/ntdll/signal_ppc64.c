@@ -8642,6 +8642,75 @@ done:
 
 
 /***********************************************************************
+ *           ec_arm_module
+ *
+ * Ask the unix side to register this thunk module's stub arrays as bridge
+ * ABI 7 EC targets (ppc64le/docs/ppc64ec.md step B): the flat array from
+ * __wine_thunk_info, plus every COM interface's vtable stub array from
+ * __wine_com_thunk_info when the module has one.  Same seam and same
+ * cadence as qpc_arm_module above -- the FIRST trap into a module arms the
+ * whole module, under the loader lock, once -- so no eager module walk and
+ * no second parser exist anywhere.  The unix side byte-verifies every slot
+ * and silently does nothing when EC is not armed (no ABI 7 bridge, view
+ * off, WINE_PPC64LE_NO_EC=1), so this costs one unixcall per module in the
+ * worst case and nothing per trap ever.
+ *
+ * The probed[] cadence has one accepted consequence, stated where it is
+ * decided: if a module is UNMAPPED (the unix side drops its registrations
+ * at the unmap seam) and the same module is mapped again AT THE SAME BASE,
+ * this list still names it and the module keeps trapping -- correct, just
+ * slower.  A different base arms fresh. */
+#define EC_PROBED_MAX 64
+static const void *ec_probed[EC_PROBED_MAX];
+static UINT ec_probed_count;
+
+static void ec_arm_module( LDR_DATA_TABLE_ENTRY *mod, ULONG_PTR base, const struct thunk_info *info )
+{
+    struct emu_register_ec_params params;
+    const struct com_thunk_info *cinfo;
+    UINT i, registered = 0, skipped = 0;
+    ANSI_STRING name;
+
+    for (i = 0; i < ec_probed_count; i++)
+        if (ec_probed[i] == mod->DllBase) return;
+    if (ec_probed_count >= EC_PROBED_MAX)
+    {
+        ERR( "more than %u thunk modules; %s keeps trapping\n",
+             EC_PROBED_MAX, debugstr_w(mod->BaseDllName.Buffer) );
+        return;
+    }
+    ec_probed[ec_probed_count++] = mod->DllBase;
+
+    params.first_stub = base + info->stubs_rva;
+    params.count      = info->count;
+    params.stride     = info->stride;
+    WINE_UNIX_CALL( unix_emu_register_ec, &params );
+    registered += params.registered;
+    skipped    += params.skipped;
+
+    RtlInitAnsiString( &name, "__wine_com_thunk_info" );
+    if (!LdrGetProcedureAddress( mod->DllBase, &name, 0, (void **)&cinfo ) &&
+        cinfo->version == COM_THUNK_INFO_VERSION && cinfo->stride)
+    {
+        const struct com_thunk_iface *ifaces = (const struct com_thunk_iface *)(base + cinfo->ifaces_rva);
+        for (i = 0; i < cinfo->iface_count; i++)
+        {
+            params.first_stub = base + ifaces[i].stubs_rva;
+            params.count      = ifaces[i].slot_count;
+            params.stride     = cinfo->stride;
+            WINE_UNIX_CALL( unix_emu_register_ec, &params );
+            registered += params.registered;
+            skipped    += params.skipped;
+        }
+    }
+
+    if (registered || skipped)
+        TRACE( "%s: %u stubs registered as ec targets, %u skipped\n",
+               debugstr_w(mod->BaseDllName.Buffer), registered, skipped );
+}
+
+
+/***********************************************************************
  *           find_guest_thunk_target
  *
  * Resolve a trapping guest address to the native function it stands for, or
@@ -8756,6 +8825,7 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
         /* Once per module, and only from a module that really is a thunk
          * module: see qpc_arm_module above. */
         qpc_arm_module( mod );
+        ec_arm_module( mod, base, info );
 
         /* The stub rescues the guest's first argument before trapping, so the
          * trap is at a fixed offset inside the stub rather than at its start;

@@ -242,6 +242,24 @@ enum ntdll_unix_funcs
      * reads or rewrites them.  A no-op when the lazy declaration is off or
      * the bridge predates ABI 5.  See emu_ctx_materialize_full(). */
     unix_emu_ctx_materialize,
+    /* args is a struct emu_register_ec_params: register one contiguous
+     * stub array's byte-verified trap stubs as bridge ABI 7 EC targets.
+     * A no-op (counts zero) when EC is not armed -- no ABI 7 bridge, no
+     * live view protocol, or WINE_PPC64LE_NO_EC=1. */
+    unix_emu_register_ec,
+};
+
+/* One contiguous stub array (flat exports, or one COM interface's vtable
+ * stubs): `count` slots of `stride` bytes starting at `first_stub`.  The
+ * unix side byte-verifies each slot (only the exact 5-byte trap body is
+ * ever registered) and reports what it did. */
+struct emu_register_ec_params
+{
+    UINT64 first_stub;
+    UINT   count;
+    UINT   stride;
+    UINT   registered;   /* out */
+    UINT   skipped;      /* out: wrong bytes, or the bridge refused */
 };
 
 extern unixlib_handle_t __wine_unixlib_handle;

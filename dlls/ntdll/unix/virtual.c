@@ -6670,6 +6670,12 @@ static NTSTATUS unmap_view_of_section( HANDLE process, PVOID addr, ULONG flags )
         if (view->protect & SEC_IMAGE) release_builtin_module( view->base );
         if (flags & MEM_PRESERVE_PLACEHOLDER) free_pages_preserve_placeholder( view, view->base, view->size );
         else delete_view( view );
+        /* EC registrations are keyed to stub addresses inside this view;
+         * they must not survive the addresses (a later mapping over this
+         * range must never transition into the old module's handler).  Only
+         * here, at real unmap -- the protect/flush funnel over-invalidates
+         * routinely and must not drop live registrations. */
+        emu_unregister_ec_range( inval_base, inval_size );
         emu_invalidate_code_range( inval_base, inval_size );
     }
     else FIXME( "failed to unmap %p %x\n", view->base, status );

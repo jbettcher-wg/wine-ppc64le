@@ -1056,6 +1056,19 @@ static void (*p_fexbridge_set_trap_view_handler)( int (*cb)( void *thread, void 
                                                   void *user );
 static int  (*p_fexbridge_view_pull)( void *thread, void *amd64_ctx, UINT flags );
 static int  (*p_fexbridge_view_push)( void *thread, const void *amd64_ctx, UINT flags );
+/* ABI 7, optional: EC targets.  A registered stub RIP compiles to a direct
+ * host call to the handler instead of decoding the stub's bytes; the bytes
+ * stay in guest memory as the always-correct fallback.  See the 6->7
+ * changelog in fexbridge.h -- especially that the transition fires BEFORE
+ * the stub's `mov r10,rcx`, so arg0 is in RCX and the view's rip is the
+ * stub BASE, not the trap site. */
+static int  (*p_fexbridge_register_ec_target)( ULONGLONG rip,
+                                               int (*handler)( void *thread, void *view, void *cookie ),
+                                               void *cookie );
+static int  (*p_fexbridge_register_ec_targets)( const ULONGLONG *rips, UINT count,
+                                                int (*handler)( void *thread, void *view, void *cookie ),
+                                                void *cookie );
+static int  (*p_fexbridge_unregister_ec_range)( ULONGLONG start, ULONGLONG length );
 
 /* fexbridge_run results and CONTEXT flags, mirrored from fexbridge.h (the
  * header is not vendored into the tree; the values are ABI). */
@@ -1196,6 +1209,10 @@ static void emu_load_bridge(void)
     p_fexbridge_set_trap_view_handler = dlsym( so, "fexbridge_set_trap_view_handler" );
     p_fexbridge_view_pull             = dlsym( so, "fexbridge_view_pull" );
     p_fexbridge_view_push             = dlsym( so, "fexbridge_view_push" );
+    /* ABI 7, optional the same way: without these every stub keeps trapping. */
+    p_fexbridge_register_ec_target    = dlsym( so, "fexbridge_register_ec_target" );
+    p_fexbridge_register_ec_targets   = dlsym( so, "fexbridge_register_ec_targets" );
+    p_fexbridge_unregister_ec_range   = dlsym( so, "fexbridge_unregister_ec_range" );
     /* ABI 4: the 32-bit (WoW64) lane.  Resolved unconditionally like the
      * rest; their absence is diagnosed where the 32-bit lane starts, not
      * here, so a 64-bit-only bridge keeps serving the AMD64 lane exactly as
@@ -1691,9 +1708,25 @@ C_ASSERT( offsetof(AMD64_CONTEXT, Rip) == 0xf8 );
  * writes, so the check-lazy-ctx sabotage stays byte-exact on this protocol. */
 static int emu_trap_view_poison;
 
-static int emu_trap_view_thunk( void *thread, void *view_ptr, void *user )
+/* WINE_PPC64LE_EC_SABOTAGE=1, sampled at arming (outside signal context):
+ * the EC handler stops simulating the stub's `mov r10,rcx`, so every
+ * transitioned call reads garbage for argument 0.  The negative control
+ * that proves the simulation is load-bearing: with it armed, a value gate
+ * (winepath's output) must go visibly wrong, and lifting the lever must
+ * restore it. */
+static int emu_ec_sabotage;
+
+/* One body for both the ABI 6 view trap and the ABI 7 EC transition.  The
+ * only difference is WHERE the guest stopped: a trap fired at stub+3 with
+ * the stub's `mov r10,rcx` already executed; an EC transition fires at the
+ * stub BASE with nothing executed.  `ec` makes this body perform the two
+ * instructions the guest never ran -- the rescue and the advance to the
+ * trap site -- so everything downstream (the dispatcher's whole RIP-keyed
+ * world, the stats rows, the publish) sees the trap it has always seen.
+ * The +3 is safe because registration is byte-verified: only stubs whose
+ * five bytes are exactly `49 89 ca 0f 05` are ever registered. */
+static int emu_view_dispatch( void *thread, struct emu_trap_view *view, BOOL ec )
 {
-    struct emu_trap_view *view = view_ptr;
     AMD64_CONTEXT shell;    /* deliberately NOT zeroed: only the groups named
                              * by ContextFlags carry values, which is exactly
                              * the claim an ABI 5 lazy trap CONTEXT makes --
@@ -1707,6 +1740,11 @@ static int emu_trap_view_thunk( void *thread, void *view_ptr, void *user )
      * UINT64[16] in view->gregs order. */
     memcpy( &shell.Rax, view->gregs, 16 * sizeof(UINT64) );
     shell.Rip = *view->rip;
+    if (ec)
+    {
+        if (!emu_ec_sabotage) shell.R10 = shell.Rcx;  /* the mov r10,rcx */
+        shell.Rip += 3;                               /* the trap site   */
+    }
     /* Dr0-Dr7 are zeroed even though no lazy group names them: the bridge's
      * CONTEXT protocol handed out a zero-initialized frame, so a debugger --
      * or a DRM reading CONTEXT_DEBUG_REGISTERS to look for hardware
@@ -1754,6 +1792,20 @@ static int emu_trap_view_thunk( void *thread, void *view_ptr, void *user )
 
     /* FEXBRIDGE_TRAP_CONTINUE / _EXIT */
     return status ? 1 : 0;
+}
+
+static int emu_trap_view_thunk( void *thread, void *view_ptr, void *user )
+{
+    return emu_view_dispatch( thread, view_ptr, FALSE );
+}
+
+/* The ABI 7 EC transition handler.  The gregs write-back in the shared body
+ * covers R10 too, which is exactly what the real stub would have left
+ * behind; RCX keeps the argument it held, which the real path also permits
+ * (SYSCALL architecturally clobbers RCX, so no MS-x64 caller reads it). */
+static int emu_ec_thunk( void *thread, void *view_ptr, void *cookie )
+{
+    return emu_view_dispatch( thread, view_ptr, TRUE );
 }
 
 
@@ -1894,6 +1946,96 @@ void emu_invalidate_code_range( const void *addr, SIZE_T size )
 {
     if (p_fexbridge_invalidate_code_range)
         p_fexbridge_invalidate_code_range( (ULONG_PTR)addr, size );
+}
+
+
+/***********************************************************************
+ *           EC targets (bridge ABI 7, ppc64le/docs/ppc64ec.md step B)
+ *
+ * Armed at view registration (unixcall_emu_run_entry): the EC handler
+ * consumes the view contract, so no view means no EC.  The PE side asks for
+ * registration through unix_emu_register_ec the first time a trap resolves
+ * into a thunk module (the qpc_arm_module seam) -- so the FIRST call of a
+ * module's export traps, and every later call to any of its verified stubs
+ * transitions.  Registration is BYTE-VERIFIED per stub: only the exact
+ * 5-byte trap body `49 89 ca 0f 05` (mov r10,rcx; syscall) is registered,
+ * which excludes PE forwarders, FAST_PATH_EXPORTS bodies, --body=direct
+ * stubs and RAW_BODY exports by construction, and is what makes the EC
+ * handler's fixed +3 trap-site simulation self-verifying. */
+static BOOL emu_ec_armed;
+static int  emu_ec_banner_done;
+
+static const UCHAR emu_ec_stub_body[5] = { 0x49, 0x89, 0xca, 0x0f, 0x05 };
+
+static NTSTATUS unixcall_emu_register_ec( void *args )
+{
+    struct emu_register_ec_params *params = args;
+    ULONG_PTR stub = (ULONG_PTR)params->first_stub;
+    ULONGLONG *rips;
+    UINT i, verified = 0;
+
+    params->registered = params->skipped = 0;
+    if (!emu_ec_armed || !params->count) return STATUS_SUCCESS;
+
+    /* Verify first, register in ONE batch: the bridge's per-target form
+     * takes the code-invalidation locks per rip, and a large module's array
+     * (ntdll: ~2400) registered that way cost a measured ~1.1 ms inside
+     * whatever the guest was timing when the module armed -- the QPC
+     * interval gate caught it.  The batch form pays one invalidation and
+     * one thread walk for the whole array. */
+    if (!(rips = malloc( params->count * sizeof(*rips) ))) return STATUS_NO_MEMORY;
+    for (i = 0; i < params->count; i++, stub += params->stride)
+    {
+        if (memcmp( (const void *)stub, emu_ec_stub_body, sizeof(emu_ec_stub_body) ))
+        {
+            params->skipped++;
+            continue;
+        }
+        rips[verified++] = stub;
+    }
+    if (verified)
+    {
+        int registered;
+
+        if (p_fexbridge_register_ec_targets)
+            registered = p_fexbridge_register_ec_targets( rips, verified, emu_ec_thunk, NULL );
+        else
+        {
+            registered = 0;
+            for (i = 0; i < verified; i++)
+                if (!p_fexbridge_register_ec_target( rips[i], emu_ec_thunk, NULL )) registered++;
+        }
+        if (registered < 0) registered = 0;
+        params->registered = registered;
+        params->skipped += verified - registered;
+    }
+    free( rips );
+    if (params->registered && !emu_ec_banner_done)
+    {
+        emu_ec_banner_done = 1;
+        /* unconditional stderr, bridge-banner style: the line
+         * check-ec-transition asserts on. */
+        fprintf( stderr, "wine-emu: ec targets live: direct transitions (bridge ABI 7)\n" );
+    }
+    return STATUS_SUCCESS;
+}
+
+/***********************************************************************
+ *           emu_unregister_ec_range
+ *
+ * Called from the UNMAP seam only (NtUnmapViewOfSection in virtual.c), not
+ * from the protect/flush funnel: invalidation is routinely over-broad and
+ * harmless, but dropping a live registration downgrades its stubs to traps
+ * for the life of the mapping (the PE side's once-per-module arming never
+ * re-runs), so this fires only when the addresses really go away.  The
+ * hazard it closes is address REUSE: a later mapping over this range must
+ * not transition into a handler keyed to the old module's stubs.  Guest
+ * thunk modules are rarely unloaded in practice, but FreeLibrary of one is
+ * legal and games do unload d3d-family modules. */
+void emu_unregister_ec_range( const void *addr, SIZE_T size )
+{
+    if (emu_ec_armed && p_fexbridge_unregister_ec_range)
+        p_fexbridge_unregister_ec_range( (ULONG_PTR)addr, size );
 }
 
 
@@ -2318,6 +2460,29 @@ static NTSTATUS unixcall_emu_run_entry( void *args )
                      * contexts live"): once per process, and the line the
                      * check-lazy-ctx view leg asserts on. */
                     fprintf( stderr, "wine-emu: trap view live: zero-copy crossings (bridge ABI 6)\n" );
+
+                    /* EC targets (ABI 7) arm only on top of a live view --
+                     * the handler consumes the view contract.  Registration
+                     * itself is asked for by the PE side per thunk module;
+                     * this only opens the door. */
+                    if (p_fexbridge_register_ec_target && p_fexbridge_unregister_ec_range)
+                    {
+                        str = getenv( "WINE_PPC64LE_NO_EC" );
+                        if (str && *str == '1')
+                            ERR( "WINE_PPC64LE_NO_EC: stub RIPs stay on the trap "
+                                 "protocol; no ec targets will be registered\n" );
+                        else
+                        {
+                            str = getenv( "WINE_PPC64LE_EC_SABOTAGE" );
+                            emu_ec_sabotage = (str && *str == '1');
+                            if (emu_ec_sabotage)
+                                ERR( "SABOTAGE: ec transitions will not simulate the "
+                                     "stub's mov r10,rcx; every transitioned call reads "
+                                     "garbage for argument 0, which is what the gate's "
+                                     "negative control requires\n" );
+                            emu_ec_armed = TRUE;
+                        }
+                    }
                 }
             }
         }
@@ -3038,6 +3203,7 @@ static const unixlib_entry_t unix_call_funcs[] =
     unixcall_emu_xstat_init,
     unixcall_emu_xstat_dump,
     unixcall_emu_ctx_materialize,
+    unixcall_emu_register_ec,
 };
 
 
@@ -3071,6 +3237,7 @@ const unixlib_entry_t unix_call_wow64_funcs[] =
                               crossings, which a wow64 caller does not make */
     wow64_emu_run_entry,   /* unix_emu_xstat_dump */
     wow64_emu_run_entry,   /* unix_emu_ctx_materialize: 64-bit trap frames only */
+    wow64_emu_run_entry,   /* unix_emu_register_ec: 64-bit stub arrays only */
 };
 
 #endif  /* _WIN64 */

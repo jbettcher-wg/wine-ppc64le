@@ -538,6 +538,7 @@ extern void call_raise_user_exception_dispatcher( struct thread_data *data );
 extern NTSTATUS call_emu_trap_dispatcher( void *func, void *ctx );
 extern BOOL emu_handle_fault( void *sigcontext, EXCEPTION_RECORD *rec );
 extern void emu_invalidate_code_range( const void *addr, SIZE_T size );
+extern void emu_unregister_ec_range( const void *addr, SIZE_T size );
 extern BOOL emu_get_guest_context( AMD64_CONTEXT *ctx );
 /* PROT_SAO hardware TSO: loader.c owns the bridge seam, virtual.c owns the
  * pages.  virtual_enable_hwtso starts carrying the bit (and retro-applies
