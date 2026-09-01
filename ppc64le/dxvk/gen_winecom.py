@@ -423,12 +423,57 @@ def find_count(params, idx):
 
 
 def ptr_count(params, idx):
-    """True if some parameter is a UINT* whose name reads like the element
-    count for the array at `idx` -- the XSGetShader(ppClassInstances,
-    UINT *pNumClassInstances) shape, which has no winecom class."""
-    return any(p.stars == 1 and p.base == "UINT" and
-               re.match(r'^p?Num\w*$', p.name or '')
-               for i, p in enumerate(params) if i != idx)
+    """Index of the UINT* parameter whose name reads like the element count
+    for the array at `idx` -- the XSGetShader(ppClassInstances,
+    UINT *pNumClassInstances) shape, served by CA_IFACE_ARR_OUT_COUNTPTR --
+    or None."""
+    for i, p in enumerate(params):
+        if i != idx and p.stars == 1 and p.base == "UINT" and \
+                re.match(r'^p?Num\w*$', p.name or ''):
+            return i
+    return None
+
+
+CONST_RE = re.compile(r'\bconst\b')
+
+
+def scrub_masks(params, byval_ok, oracle):
+    """(scrubptr, scrubdw, scrubq): the out-pointee positions a REFUSAL of
+    this slot must zero before answering -- refused means INERT, the
+    Witcher 3 GetShader lesson (winecom.h has the field banners and the
+    measurement).  IN-ness is the COM constness convention: const anywhere
+    in the spelling (or a REFIID) marks an input, never scrubbed.  Widths
+    are never guessed: a multi-star parameter's pointee is a pointer by
+    construction -- (8,4) on the two guests -- and a single-star scalar
+    pointee is MEASURED by the clang oracle, restricted to the by-value
+    integer set (+FLOAT) so a struct pointee can neither break the probe
+    nor be zeroed at a width the masks cannot spell."""
+    sp = sdw = sq = 0
+    need = sorted({p.base for p in params
+                   if p.stars == 1 and not p.array
+                   and not CONST_RE.search(p.raw) and not p.is_riid()
+                   and (p.base in byval_ok or p.base == "FLOAT")})
+    if need:
+        oracle.measure(need)
+    for i, p in enumerate(params):
+        if i >= 16:
+            break
+        if not p.stars or p.array or p.is_riid() or CONST_RE.search(p.raw):
+            continue
+        if p.stars >= 2:
+            if not p.inner_const:
+                sp |= 1 << i
+            continue
+        if p.base not in need:
+            continue
+        w64, w32 = oracle.width64(p.base), oracle.width32(p.base)
+        if (w64, w32) == (8, 4):
+            sp |= 1 << i
+        elif (w64, w32) == (4, 4):
+            sdw |= 1 << i
+        elif (w64, w32) == (8, 8):
+            sq |= 1 << i
+    return sp, sdw, sq
 
 
 # --------------------------------------------------------------------------
@@ -436,7 +481,8 @@ def ptr_count(params, idx):
 # --------------------------------------------------------------------------
 
 CA = dict(PASS=0, IFACE_IN=1, RIID=2, PPV_OUT=3, RET_PTR=4, EVENT=5,
-          IFACE_ARR_IN=6, IFACE_OUT_STATIC=7, IFACE_ARR_OUT_STATIC=8)
+          IFACE_ARR_IN=6, IFACE_OUT_STATIC=7, IFACE_ARR_OUT_STATIC=8,
+          IFACE_ARR_OUT_COUNTPTR=9)
 CA_NAME = {v: "WINECOM_CA_" + k for k, v in CA.items()}
 
 
@@ -1201,12 +1247,18 @@ def classify(key, slot, ifaces, iface_index, byval_ok, bearing,
                 xaux[i] = iface_index[p.base]
                 caux[i] = c
                 continue
-            if plural and ptr_count(params, i):
-                raise Refused(
-                    "writes the interface array `%s` whose element count "
-                    "arrives through a UINT* rather than a by-value count; "
-                    "winecom has no class for a count it must read back "
-                    "through a pointer" % p.raw)
+            pc = ptr_count(params, i) if plural else None
+            if pc is not None:
+                # The XSGetShader shape, served: capacity in through the
+                # UINT*, actual count out through the same UINT*, the array
+                # written in place.  The runtime snapshots capacity before
+                # the call (libs/winecom CA_IFACE_ARR_OUT_COUNTPTR).  The
+                # 32-bit lane has no staging for it yet: refuse32, forced at
+                # the emission site off this class.
+                cls[i] = CA["IFACE_ARR_OUT_COUNTPTR"]
+                xaux[i] = iface_index[p.base]
+                caux[i] = pc
+                continue
             if plural:
                 raise Refused(
                     "writes the interface array `%s` with no count parameter "
@@ -1382,6 +1434,12 @@ def generate(roster, prefix, header_dir=HEADERS, surface=None,
                 interesting = True
                 continue
             reason = surface["refuse"].get(key)
+            # Refusal hygiene: the scrub masks come from the SIGNATURE alone,
+            # so a refused row still carries them and the dispatcher can zero
+            # the caller's out-params (winecom.h scrubptr banner -- the
+            # Witcher 3 GetShader lesson).
+            scrubp, scrubd, scrubqm = scrub_masks(
+                [Param(x) for x in s["params"]], byval_ok, oracle)
             if reason is None:
                 try:
                     cls, xaux, caux, aux, aux2, masks = classify(
@@ -1391,12 +1449,16 @@ def generate(roster, prefix, header_dir=HEADERS, surface=None,
                 except Refused as e:
                     reason = str(e)
             if reason is not None:
+                scrub_tail = ""
+                if scrubp | scrubd | scrubqm:
+                    scrub_tail = (", NULL, 0, NULL, 0, 0x%04x, 0x%04x, 0x%04x"
+                                  % (scrubp, scrubd, scrubqm))
                 rows.append('    { "%s",\n      "%s::%s: %s",\n'
                             '      NULL, NULL, %d, %s, 0, 0, NULL, 0, 0, 0,'
-                            ' 0, 0, 0, 0, 0, 0x%04x },'
+                            ' 0, 0, 0, 0, 0, 0x%04x%s },'
                             % (label, s["owner"], s["name"],
                                reason.replace('"', "'"), argc,
-                               "|".join(gflags) or "0", qm))
+                               "|".join(gflags) or "0", qm, scrub_tail))
                 istats["refused"] += 1
                 refusal_log.append((n, s["slot"], key, reason))
                 interesting = True
@@ -1409,6 +1471,12 @@ def generate(roster, prefix, header_dir=HEADERS, surface=None,
             # [MEASURED: check-d3d11-smoke went red at step 3, the texture
             # unrecognizable one call later].  Only the LAST field differs.
             reps, refuse32 = audit_i386(key, s, cls, layouts, byval_ok)
+            if refuse32 is None and CA["IFACE_ARR_OUT_COUNTPTR"] in cls:
+                # served on the 64-bit lane only: the class writes 8-byte
+                # cells in place and the 32-bit lane has no 4-byte staging
+                # for it yet -- the refuse32 discipline, same as the FP rows.
+                refuse32 = ("the count-through-pointer out-array has no "
+                            "32-bit staging (4-byte cells) yet")
             r32 = "NULL"
             if refuse32 is not None:
                 r32 = '\n      "%s::%s: %s"' % (s["owner"], s["name"],
@@ -1448,7 +1516,16 @@ def generate(roster, prefix, header_dir=HEADERS, surface=None,
                 xname = "xaux_%s_%d" % (n, s["slot"])
                 decls.append("static const unsigned char %s[] = { %s };"
                              % (xname, ", ".join(str(x) for x in xaux)))
-            if any(caux):
+            # Emitted whenever an ARR_OUT class NEEDS it, not when the
+            # VALUES are nonzero: a count parameter at index 0 is a real
+            # index and an all-zero caux is a real table.  [MEASURED] The
+            # any(caux) spelling left OMGetRenderTargets -- count at param
+            # 0 -- without its table, and the runtime refused it fail-closed
+            # from the day the class landed; the GetShader gate's identity
+            # leg was the first caller to notice.
+            needs_caux = any(c in (CA["IFACE_ARR_OUT_STATIC"],
+                                   CA["IFACE_ARR_OUT_COUNTPTR"]) for c in cls)
+            if needs_caux or any(caux):
                 kname = "caux_%s_%d" % (n, s["slot"])
                 decls.append("static const unsigned char %s[] = { %s };"
                              % (kname, ", ".join(str(x) for x in caux)))
@@ -1463,24 +1540,34 @@ def generate(roster, prefix, header_dir=HEADERS, surface=None,
                     r32 = ('"the 32-bit lane has not adopted the FP invoker; '
                            "a hand32 walker or the lane's own FP path comes "
                            'first"')
+                scrub_tail = ""
+                if scrubp | scrubd | scrubqm:
+                    scrub_tail = (", 0x%04x, 0x%04x, 0x%04x"
+                                  % (scrubp, scrubd, scrubqm))
                 rows.append('    { "%s", NULL, %s, %s, %d, %s, %d, %d, %s,'
                             ' 0x%02x, 0x%02x,'
                             ' 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%04x, 0x%04x,'
-                            ' 0x%04x, %s, %d, %s, %d },'
+                            ' 0x%04x, %s, %d, %s, %d%s },'
                             % (label, cname, xname, argc,
                                "|".join(flags + gflags) or "0", aux, aux2, kname,
                                fpm, fpw,
-                               0, nm, nw, ns, dm, ds, qm, rname, repn, r32, fpr))
+                               0, nm, nw, ns, dm, ds, qm, rname, repn, r32, fpr,
+                               scrub_tail))
                 istats["marshalled"] += 1
                 istats["fp_served"] += 1
                 interesting = True
             else:
+                scrub_tail = ""
+                if scrubp | scrubd | scrubqm:
+                    scrub_tail = (", 0, 0x%04x, 0x%04x, 0x%04x"
+                                  % (scrubp, scrubd, scrubqm))
                 rows.append('    { "%s", NULL, %s, %s, %d, %s, %d, %d, %s, 0, 0,'
                             ' 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%04x, 0x%04x,'
-                            ' 0x%04x, %s, %d, %s },'
+                            ' 0x%04x, %s, %d, %s%s },'
                             % (label, cname, xname, argc,
                                "|".join(flags + gflags) or "0", aux, aux2, kname,
-                               0, nm, nw, ns, dm, ds, qm, rname, repn, r32))
+                               0, nm, nw, ns, dm, ds, qm, rname, repn, r32,
+                               scrub_tail))
                 istats["marshalled"] += 1
 
         if not interesting:

@@ -418,7 +418,80 @@ static int d3d11_smoke_run( void )
     }
 
 done:
-    /* ---- step 7: release everything in reverse order --------------------- */
+#ifndef D3D11_SMOKE_NO_GETSHADER
+    /* ---- step 7: the GetShader family (CA_IFACE_ARR_OUT_COUNTPTR) --------
+     * COMPILED OUT of check-d3d11-smoke32.sh's pair (-DD3D11_SMOKE_NO_GETSHADER
+     * on BOTH its native reference and its i386 guest): the 32-bit lane
+     * refuses this family by design (refuse32 -- no 4-byte staging yet), and
+     * the refusal HYGIENE there scrubs cells that DXVK's served semantics
+     * leave untouched, so a byte-identical-to-native transcript is exactly
+     * what a correct 32-bit lane cannot produce for this step.  The 64-bit
+     * gate asserts the served semantics; the refusal gate (leg F) asserts
+     * the hygiene.
+     * -------------------------------------------------------------------
+     * The Witcher 3 crash class, asserted from the caller's chair: every
+     * out-param must be WRITTEN.  Locals are seeded with a sentinel that
+     * looks like the stack residue W3 actually called through; if any
+     * survives the call, the class (or the refusal hygiene under it) is not
+     * doing its job.  No shader is ever created -- this probe is
+     * deliberately DXBC-free -- so the served answers are the NULL-bound
+     * state, which is exactly what an unchecked caller reads back and
+     * crashes on when nothing writes it.  DXVK's own corner-case contract
+     * (GetClassInstances): a NULL count pointer means NOTHING is touched,
+     * array included; a live count means exactly CAPACITY cells written
+     * (instances then NULL padding) and the actual count stored.  Proxy
+     * IDENTITY (same guest proxy back) is asserted through
+     * OMGet/SetRenderTargets, which shares the winecom_wrap interning the
+     * countptr class uses -- a real shader would be needed to assert it
+     * through PSGetShader itself, and this probe has none by design. */
+    if (device && context && rtv)
+    {
+#define SMOKE_SENTINEL ((void *)(UINT_PTR)0x5AB07A6E5AB07A6EULL)
+        ID3D11PixelShader *ps = (ID3D11PixelShader *)SMOKE_SENTINEL;
+        ID3D11ClassInstance *inst[4];
+        ID3D11ClassInstance *inst_nc[2];
+        ID3D11RenderTargetView *got_rtv = (ID3D11RenderTargetView *)SMOKE_SENTINEL;
+        UINT ninst = 4, ninst_null = 0xDEADBEEF;
+        UINT i, pad_nulls = 0, nc_survived = 0;
+        BOOL ok;
+
+        begin( "PSGetShader family: every out-param written, DXVK's corner cases exact" );
+        for (i = 0; i < 4; i++) inst[i] = (ID3D11ClassInstance *)SMOKE_SENTINEL;
+        for (i = 0; i < 2; i++) inst_nc[i] = (ID3D11ClassInstance *)SMOKE_SENTINEL;
+
+        /* the full shape: shader out + capacity-4 array + live count */
+        ID3D11DeviceContext_PSGetShader( context, &ps, inst, &ninst );
+        for (i = 0; i < 4; i++) pad_nulls += (inst[i] == NULL);
+        out( "ps_written=" ); out( ps == (ID3D11PixelShader *)SMOKE_SENTINEL ? "no" : "yes" );
+        out( " ps_null=" ); out( ps == NULL ? "yes" : "no" );
+        out( " count=" ); out_dec( ninst );
+        out( " padded_nulls=" ); out_dec( pad_nulls );
+
+        /* NULL array + live count: count still written */
+        ID3D11DeviceContext_PSGetShader( context, &ps, NULL, &ninst_null );
+        out( " nullarr_count=" ); out_dec( ninst_null );
+
+        /* NULL count: DXVK touches NOTHING -- the sentinels must SURVIVE */
+        ID3D11DeviceContext_PSGetShader( context, &ps, inst_nc, NULL );
+        for (i = 0; i < 2; i++)
+            nc_survived += (inst_nc[i] == (ID3D11ClassInstance *)SMOKE_SENTINEL);
+        out( " nullcount_untouched=" ); out_dec( nc_survived );
+
+        /* proxy identity through the shared wrap/intern machinery */
+        ID3D11DeviceContext_OMSetRenderTargets( context, 1, &rtv, NULL );
+        ID3D11DeviceContext_OMGetRenderTargets( context, 1, &got_rtv, NULL );
+        out( " omget_identity=" ); out( got_rtv == rtv ? "yes" : "no" );
+        if (got_rtv && got_rtv != (ID3D11RenderTargetView *)SMOKE_SENTINEL)
+            ID3D11RenderTargetView_Release( got_rtv );
+
+        ok = ps == NULL && ninst == 0 && pad_nulls == 4 &&
+             ninst_null == 0 && nc_survived == 2 && got_rtv == rtv;
+        verdict( ok, "a GetShader out-param kept its sentinel or a corner case diverged" );
+#undef SMOKE_SENTINEL
+    }
+#endif /* D3D11_SMOKE_NO_GETSHADER */
+
+    /* ---- step 8 (7 in the smoke32 pair): release everything -------------- */
     begin( "release everything (reverse order)" );
     if (staging) ID3D11Texture2D_Release( staging );
     if (rtv) ID3D11RenderTargetView_Release( rtv );
@@ -447,10 +520,18 @@ done:
              * refused before the integer could matter, because a Wine HANDLE
              * and DXVK's tagged-eventfd encoding are two namespaces over one
              * integer. */
-            void *res = NULL;
+            /* Seeded with the sentinel, not NULL: refusal hygiene says a
+             * refused slot must WRITE its out-params (NULL here) before
+             * answering E_NOTIMPL -- the Witcher 3 GetShader lesson.  The
+             * gate's leg F asserts osr_scrubbed=yes, and its sabotage
+             * (WINEEMUNOREFUSESCRUB=1) requires the sentinel to SURVIVE,
+             * which proves the scrub was ever load-bearing at all. */
+            void *res = (void *)(UINT_PTR)0x5AB07A6E5AB07A6EULL;
             HRESULT ohr = ID3D11Device_OpenSharedResource(
                 rdev, (HANDLE)(UINT_PTR)0x1, &smoke_IID_ID3D11Texture2D, &res );
             out( " osr_hr=0x" ); out_hex( (ULONG)ohr, 8 );
+            out( " osr_scrubbed=" );
+            out( res == NULL ? "yes" : res == (void *)(UINT_PTR)0x5AB07A6E5AB07A6EULL ? "no" : "GARBAGE" );
             if (rctx) ID3D11DeviceContext_Release( rctx );
             ID3D11Device_Release( rdev );
         }

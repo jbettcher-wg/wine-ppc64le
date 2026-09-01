@@ -3228,6 +3228,39 @@ static NTSTATUS unixcall_emu_xstat_dump( void *args )
 }
 
 
+/***********************************************************************
+ *           unixcall_emu_name_host_addr
+ *
+ * dladdr over an address the PE-side fault reporter could not place in any
+ * loader-list image: names the dlopened unix .so (DXVK, the wine .so's) a
+ * leaked host pointer landed in.  Diagnostic only, called at most a handful
+ * of times per process (the reporter self-limits), so the dladdr cost is
+ * nothing and failure is an honest found=0.
+ */
+static NTSTATUS unixcall_emu_name_host_addr( void *args )
+{
+    struct emu_name_host_addr_params *params = args;
+    Dl_info info;
+
+    params->found = 0;
+    params->name[0] = 0;
+    params->base = 0;
+    if (dladdr( (void *)(ULONG_PTR)params->addr, &info ) && info.dli_fname)
+    {
+        const char *tail = strrchr( info.dli_fname, '/' );
+        size_t n;
+
+        tail = tail ? tail + 1 : info.dli_fname;
+        n = strlen( tail );
+        if (n >= sizeof(params->name)) n = sizeof(params->name) - 1;
+        memcpy( params->name, tail, n );
+        params->name[n] = 0;
+        params->base = (UINT64)(ULONG_PTR)info.dli_fbase;
+        params->found = 1;
+    }
+    return STATUS_SUCCESS;
+}
+
 static const unixlib_entry_t unix_call_funcs[] =
 {
     load_so_dll,
@@ -3249,6 +3282,7 @@ static const unixlib_entry_t unix_call_funcs[] =
     unixcall_emu_xstat_dump,
     unixcall_emu_ctx_materialize,
     unixcall_emu_register_ec,
+    unixcall_emu_name_host_addr,
 };
 
 
@@ -3283,6 +3317,7 @@ const unixlib_entry_t unix_call_wow64_funcs[] =
     wow64_emu_run_entry,   /* unix_emu_xstat_dump */
     wow64_emu_run_entry,   /* unix_emu_ctx_materialize: 64-bit trap frames only */
     wow64_emu_run_entry,   /* unix_emu_register_ec: 64-bit stub arrays only */
+    wow64_emu_run_entry,   /* unix_emu_name_host_addr: 64-bit diagnostics only */
 };
 
 #endif  /* _WIN64 */

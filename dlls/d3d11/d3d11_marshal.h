@@ -178,7 +178,7 @@ static const struct winecom_slot slots_ID3D10Asynchronous[11] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10Asynchronous_3, xaux_ID3D10Asynchronous_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10Asynchronous_3, xaux_ID3D10Asynchronous_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -195,7 +195,7 @@ static const struct winecom_slot slots_ID3D10BlendState[8] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10BlendState_3, xaux_ID3D10BlendState_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10BlendState_3, xaux_ID3D10BlendState_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -209,7 +209,7 @@ static const struct winecom_slot slots_ID3D10BlendState1[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10BlendState1_3, xaux_ID3D10BlendState1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10BlendState1_3, xaux_ID3D10BlendState1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -224,15 +224,15 @@ static const struct winecom_slot slots_ID3D10Buffer[13] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10Buffer_3, xaux_ID3D10Buffer_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10Buffer_3, xaux_ID3D10Buffer_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D10Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "ID3D10Resource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Resource::GetEvictionPriority", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Buffer::Map", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, 
-      "ID3D10Buffer::Map: parameter `void **ppData` is a cell the host fills with a POINTER, and a 32-bit guest's cell is four bytes wide -- the native side would read or write eight. A hand32 walker with a below-4GiB answer must serve this row" },
+      "ID3D10Buffer::Map: parameter `void **ppData` is a cell the host fills with a POINTER, and a 32-bit guest's cell is four bytes wide -- the native side would read or write eight. A hand32 walker with a below-4GiB answer must serve this row", 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D10Buffer::Unmap", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Buffer::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
@@ -244,7 +244,7 @@ static const struct winecom_slot slots_ID3D10Counter[12] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10Counter_3, xaux_ID3D10Counter_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10Counter_3, xaux_ID3D10Counter_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -262,7 +262,7 @@ static const struct winecom_slot slots_ID3D10DepthStencilState[8] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10DepthStencilState_3, xaux_ID3D10DepthStencilState_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10DepthStencilState_3, xaux_ID3D10DepthStencilState_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -278,11 +278,11 @@ static const struct winecom_slot slots_ID3D10DepthStencilView[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10DepthStencilView_3, xaux_ID3D10DepthStencilView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10DepthStencilView_3, xaux_ID3D10DepthStencilView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D10View::GetResource", NULL, cls_ID3D10DepthStencilView_7, xaux_ID3D10DepthStencilView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10View::GetResource", NULL, cls_ID3D10DepthStencilView_7, xaux_ID3D10DepthStencilView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DepthStencilView::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -357,12 +357,14 @@ static const unsigned char xaux_ID3D10Device_55[] = { 0, 0, 18 };
 static const unsigned char caux_ID3D10Device_55[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D10Device_56[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D10Device_56[] = { 0, 16, 6 };
+static const unsigned char caux_ID3D10Device_56[] = { 0, 0, 0 };
 static const unsigned char cls_ID3D10Device_57[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char xaux_ID3D10Device_57[] = { 1, 0, 0 };
 static const unsigned char cls_ID3D10Device_58[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS };
 static const unsigned char xaux_ID3D10Device_58[] = { 5, 0 };
 static const unsigned char cls_ID3D10Device_59[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC, WINECOM_CA_PASS };
 static const unsigned char xaux_ID3D10Device_59[] = { 0, 3, 0 };
+static const unsigned char caux_ID3D10Device_59[] = { 0, 0, 0 };
 static const unsigned char cls_ID3D10Device_60[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D10Device_60[] = { 15 };
 static const struct winecom_rep reps_ID3D10Device_71[] =
@@ -450,30 +452,30 @@ static const struct winecom_slot slots_ID3D10Device[98] =
     { "ID3D10Device::ClearDepthStencilView", NULL, NULL, NULL, 5, WINECOM_F_HAND|WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 6, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10Device::GenerateMips", NULL, cls_ID3D10Device_37, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Device::ResolveSubresource", NULL, cls_ID3D10Device_38, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001a, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::VSGetConstantBuffers", NULL, cls_ID3D10Device_39, xaux_ID3D10Device_39, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_39, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::PSGetShaderResources", NULL, cls_ID3D10Device_40, xaux_ID3D10Device_40, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_40, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::PSGetShader", NULL, cls_ID3D10Device_41, xaux_ID3D10Device_41, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::PSGetSamplers", NULL, cls_ID3D10Device_42, xaux_ID3D10Device_42, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_42, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::VSGetShader", NULL, cls_ID3D10Device_43, xaux_ID3D10Device_43, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::PSGetConstantBuffers", NULL, cls_ID3D10Device_44, xaux_ID3D10Device_44, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_44, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::IAGetInputLayout", NULL, cls_ID3D10Device_45, xaux_ID3D10Device_45, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::IAGetVertexBuffers", NULL, cls_ID3D10Device_46, xaux_ID3D10Device_46, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_46, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::IAGetIndexBuffer", NULL, cls_ID3D10Device_47, xaux_ID3D10Device_47, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::GSGetConstantBuffers", NULL, cls_ID3D10Device_48, xaux_ID3D10Device_48, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_48, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::GSGetShader", NULL, cls_ID3D10Device_49, xaux_ID3D10Device_49, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::IAGetPrimitiveTopology", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::VSGetShaderResources", NULL, cls_ID3D10Device_51, xaux_ID3D10Device_51, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_51, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::VSGetSamplers", NULL, cls_ID3D10Device_52, xaux_ID3D10Device_52, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_52, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::GetPredication", NULL, cls_ID3D10Device_53, xaux_ID3D10Device_53, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::GSGetShaderResources", NULL, cls_ID3D10Device_54, xaux_ID3D10Device_54, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_54, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::GSGetSamplers", NULL, cls_ID3D10Device_55, xaux_ID3D10Device_55, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_55, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::OMGetRenderTargets", NULL, cls_ID3D10Device_56, xaux_ID3D10Device_56, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::OMGetBlendState", NULL, cls_ID3D10Device_57, xaux_ID3D10Device_57, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::OMGetDepthStencilState", NULL, cls_ID3D10Device_58, xaux_ID3D10Device_58, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::SOGetTargets", NULL, cls_ID3D10Device_59, xaux_ID3D10Device_59, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::RSGetState", NULL, cls_ID3D10Device_60, xaux_ID3D10Device_60, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::RSGetViewports", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::RSGetScissorRects", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10Device::VSGetConstantBuffers", NULL, cls_ID3D10Device_39, xaux_ID3D10Device_39, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_39, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::PSGetShaderResources", NULL, cls_ID3D10Device_40, xaux_ID3D10Device_40, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_40, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::PSGetShader", NULL, cls_ID3D10Device_41, xaux_ID3D10Device_41, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D10Device::PSGetSamplers", NULL, cls_ID3D10Device_42, xaux_ID3D10Device_42, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_42, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::VSGetShader", NULL, cls_ID3D10Device_43, xaux_ID3D10Device_43, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D10Device::PSGetConstantBuffers", NULL, cls_ID3D10Device_44, xaux_ID3D10Device_44, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_44, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::IAGetInputLayout", NULL, cls_ID3D10Device_45, xaux_ID3D10Device_45, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D10Device::IAGetVertexBuffers", NULL, cls_ID3D10Device_46, xaux_ID3D10Device_46, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_46, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D10Device::IAGetIndexBuffer", NULL, cls_ID3D10Device_47, xaux_ID3D10Device_47, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0006, 0x0000 },
+    { "ID3D10Device::GSGetConstantBuffers", NULL, cls_ID3D10Device_48, xaux_ID3D10Device_48, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_48, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::GSGetShader", NULL, cls_ID3D10Device_49, xaux_ID3D10Device_49, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D10Device::IAGetPrimitiveTopology", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D10Device::VSGetShaderResources", NULL, cls_ID3D10Device_51, xaux_ID3D10Device_51, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_51, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::VSGetSamplers", NULL, cls_ID3D10Device_52, xaux_ID3D10Device_52, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_52, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::GetPredication", NULL, cls_ID3D10Device_53, xaux_ID3D10Device_53, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0002, 0x0000 },
+    { "ID3D10Device::GSGetShaderResources", NULL, cls_ID3D10Device_54, xaux_ID3D10Device_54, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_54, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::GSGetSamplers", NULL, cls_ID3D10Device_55, xaux_ID3D10Device_55, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_55, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::OMGetRenderTargets", NULL, cls_ID3D10Device_56, xaux_ID3D10Device_56, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_56, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0006, 0x0000, 0x0000 },
+    { "ID3D10Device::OMGetBlendState", NULL, cls_ID3D10Device_57, xaux_ID3D10Device_57, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0004, 0x0000 },
+    { "ID3D10Device::OMGetDepthStencilState", NULL, cls_ID3D10Device_58, xaux_ID3D10Device_58, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0002, 0x0000 },
+    { "ID3D10Device::SOGetTargets", NULL, cls_ID3D10Device_59, xaux_ID3D10Device_59, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device_59, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0004, 0x0000 },
+    { "ID3D10Device::RSGetState", NULL, cls_ID3D10Device_60, xaux_ID3D10Device_60, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D10Device::RSGetViewports", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D10Device::RSGetScissorRects", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "ID3D10Device::GetDeviceRemovedReason", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Device::SetExceptionMode", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Device::GetExceptionMode", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -482,38 +484,38 @@ static const struct winecom_slot slots_ID3D10Device[98] =
     { "ID3D10Device::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10Device::ClearState", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Device::Flush", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateBuffer", NULL, cls_ID3D10Device_71, xaux_ID3D10Device_71, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D10Device_71, 1, NULL },
+    { "ID3D10Device::CreateBuffer", NULL, cls_ID3D10Device_71, xaux_ID3D10Device_71, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D10Device_71, 1, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D10Device::CreateTexture1D", NULL, cls_ID3D10Device_72, xaux_ID3D10Device_72, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D10Device::CreateTexture1D: `pInitialData` is an array of the divergent D3D10_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
+      "ID3D10Device::CreateTexture1D: `pInitialData` is an array of the divergent D3D10_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D10Device::CreateTexture2D", NULL, cls_ID3D10Device_73, xaux_ID3D10Device_73, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D10Device::CreateTexture2D: `pInitialData` is an array of the divergent D3D10_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
+      "ID3D10Device::CreateTexture2D: `pInitialData` is an array of the divergent D3D10_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D10Device::CreateTexture3D", NULL, cls_ID3D10Device_74, xaux_ID3D10Device_74, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D10Device::CreateTexture3D: `pInitialData` is an array of the divergent D3D10_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
-    { "ID3D10Device::CreateShaderResourceView", NULL, cls_ID3D10Device_75, xaux_ID3D10Device_75, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateRenderTargetView", NULL, cls_ID3D10Device_76, xaux_ID3D10Device_76, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateDepthStencilView", NULL, cls_ID3D10Device_77, xaux_ID3D10Device_77, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateInputLayout", NULL, cls_ID3D10Device_78, xaux_ID3D10Device_78, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D10Device_78, 1, NULL },
-    { "ID3D10Device::CreateVertexShader", NULL, cls_ID3D10Device_79, xaux_ID3D10Device_79, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateGeometryShader", NULL, cls_ID3D10Device_80, xaux_ID3D10Device_80, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateGeometryShaderWithStreamOutput", NULL, cls_ID3D10Device_81, xaux_ID3D10Device_81, 7, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0018, 0x0000, 0x0000, reps_ID3D10Device_81, 1, NULL },
-    { "ID3D10Device::CreatePixelShader", NULL, cls_ID3D10Device_82, xaux_ID3D10Device_82, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateBlendState", NULL, cls_ID3D10Device_83, xaux_ID3D10Device_83, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateDepthStencilState", NULL, cls_ID3D10Device_84, xaux_ID3D10Device_84, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateRasterizerState", NULL, cls_ID3D10Device_85, xaux_ID3D10Device_85, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateSamplerState", NULL, cls_ID3D10Device_86, xaux_ID3D10Device_86, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateQuery", NULL, cls_ID3D10Device_87, xaux_ID3D10Device_87, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreatePredicate", NULL, cls_ID3D10Device_88, xaux_ID3D10Device_88, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateCounter", NULL, cls_ID3D10Device_89, xaux_ID3D10Device_89, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+      "ID3D10Device::CreateTexture3D: `pInitialData` is an array of the divergent D3D10_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateShaderResourceView", NULL, cls_ID3D10Device_75, xaux_ID3D10Device_75, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateRenderTargetView", NULL, cls_ID3D10Device_76, xaux_ID3D10Device_76, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateDepthStencilView", NULL, cls_ID3D10Device_77, xaux_ID3D10Device_77, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateInputLayout", NULL, cls_ID3D10Device_78, xaux_ID3D10Device_78, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D10Device_78, 1, NULL, 0, 0x0010, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateVertexShader", NULL, cls_ID3D10Device_79, xaux_ID3D10Device_79, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateGeometryShader", NULL, cls_ID3D10Device_80, xaux_ID3D10Device_80, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateGeometryShaderWithStreamOutput", NULL, cls_ID3D10Device_81, xaux_ID3D10Device_81, 7, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0018, 0x0000, 0x0000, reps_ID3D10Device_81, 1, NULL, 0, 0x0020, 0x0000, 0x0000 },
+    { "ID3D10Device::CreatePixelShader", NULL, cls_ID3D10Device_82, xaux_ID3D10Device_82, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateBlendState", NULL, cls_ID3D10Device_83, xaux_ID3D10Device_83, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateDepthStencilState", NULL, cls_ID3D10Device_84, xaux_ID3D10Device_84, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateRasterizerState", NULL, cls_ID3D10Device_85, xaux_ID3D10Device_85, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateSamplerState", NULL, cls_ID3D10Device_86, xaux_ID3D10Device_86, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateQuery", NULL, cls_ID3D10Device_87, xaux_ID3D10Device_87, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D10Device::CreatePredicate", NULL, cls_ID3D10Device_88, xaux_ID3D10Device_88, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateCounter", NULL, cls_ID3D10Device_89, xaux_ID3D10Device_89, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D10Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "ID3D10Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "ID3D10Device::CheckCounterInfo", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CheckCounter", NULL, NULL, NULL, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10Device::CheckCounter", NULL, NULL, NULL, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0156, 0x0000 },
     { "ID3D10Device::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Device::OpenSharedResource",
       "ID3D10Device::OpenSharedResource: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D10Device::SetTextFilterSize", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::GetTextFilterSize", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10Device::GetTextFilterSize", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0003, 0x0000 },
 };
 
 static const unsigned char cls_ID3D10Device1_3[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_IN };
@@ -587,12 +589,14 @@ static const unsigned char xaux_ID3D10Device1_55[] = { 0, 0, 18 };
 static const unsigned char caux_ID3D10Device1_55[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D10Device1_56[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D10Device1_56[] = { 0, 16, 6 };
+static const unsigned char caux_ID3D10Device1_56[] = { 0, 0, 0 };
 static const unsigned char cls_ID3D10Device1_57[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char xaux_ID3D10Device1_57[] = { 1, 0, 0 };
 static const unsigned char cls_ID3D10Device1_58[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS };
 static const unsigned char xaux_ID3D10Device1_58[] = { 5, 0 };
 static const unsigned char cls_ID3D10Device1_59[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC, WINECOM_CA_PASS };
 static const unsigned char xaux_ID3D10Device1_59[] = { 0, 3, 0 };
+static const unsigned char caux_ID3D10Device1_59[] = { 0, 0, 0 };
 static const unsigned char cls_ID3D10Device1_60[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D10Device1_60[] = { 15 };
 static const struct winecom_rep reps_ID3D10Device1_71[] =
@@ -684,30 +688,30 @@ static const struct winecom_slot slots_ID3D10Device1[101] =
     { "ID3D10Device::ClearDepthStencilView", NULL, NULL, NULL, 5, WINECOM_F_HAND|WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 6, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10Device::GenerateMips", NULL, cls_ID3D10Device1_37, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Device::ResolveSubresource", NULL, cls_ID3D10Device1_38, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001a, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::VSGetConstantBuffers", NULL, cls_ID3D10Device1_39, xaux_ID3D10Device1_39, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_39, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::PSGetShaderResources", NULL, cls_ID3D10Device1_40, xaux_ID3D10Device1_40, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_40, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::PSGetShader", NULL, cls_ID3D10Device1_41, xaux_ID3D10Device1_41, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::PSGetSamplers", NULL, cls_ID3D10Device1_42, xaux_ID3D10Device1_42, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_42, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::VSGetShader", NULL, cls_ID3D10Device1_43, xaux_ID3D10Device1_43, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::PSGetConstantBuffers", NULL, cls_ID3D10Device1_44, xaux_ID3D10Device1_44, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_44, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::IAGetInputLayout", NULL, cls_ID3D10Device1_45, xaux_ID3D10Device1_45, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::IAGetVertexBuffers", NULL, cls_ID3D10Device1_46, xaux_ID3D10Device1_46, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_46, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::IAGetIndexBuffer", NULL, cls_ID3D10Device1_47, xaux_ID3D10Device1_47, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::GSGetConstantBuffers", NULL, cls_ID3D10Device1_48, xaux_ID3D10Device1_48, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_48, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::GSGetShader", NULL, cls_ID3D10Device1_49, xaux_ID3D10Device1_49, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::IAGetPrimitiveTopology", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::VSGetShaderResources", NULL, cls_ID3D10Device1_51, xaux_ID3D10Device1_51, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_51, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::VSGetSamplers", NULL, cls_ID3D10Device1_52, xaux_ID3D10Device1_52, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_52, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::GetPredication", NULL, cls_ID3D10Device1_53, xaux_ID3D10Device1_53, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::GSGetShaderResources", NULL, cls_ID3D10Device1_54, xaux_ID3D10Device1_54, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_54, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::GSGetSamplers", NULL, cls_ID3D10Device1_55, xaux_ID3D10Device1_55, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_55, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::OMGetRenderTargets", NULL, cls_ID3D10Device1_56, xaux_ID3D10Device1_56, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::OMGetBlendState", NULL, cls_ID3D10Device1_57, xaux_ID3D10Device1_57, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::OMGetDepthStencilState", NULL, cls_ID3D10Device1_58, xaux_ID3D10Device1_58, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::SOGetTargets", NULL, cls_ID3D10Device1_59, xaux_ID3D10Device1_59, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::RSGetState", NULL, cls_ID3D10Device1_60, xaux_ID3D10Device1_60, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::RSGetViewports", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::RSGetScissorRects", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10Device::VSGetConstantBuffers", NULL, cls_ID3D10Device1_39, xaux_ID3D10Device1_39, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_39, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::PSGetShaderResources", NULL, cls_ID3D10Device1_40, xaux_ID3D10Device1_40, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_40, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::PSGetShader", NULL, cls_ID3D10Device1_41, xaux_ID3D10Device1_41, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D10Device::PSGetSamplers", NULL, cls_ID3D10Device1_42, xaux_ID3D10Device1_42, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_42, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::VSGetShader", NULL, cls_ID3D10Device1_43, xaux_ID3D10Device1_43, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D10Device::PSGetConstantBuffers", NULL, cls_ID3D10Device1_44, xaux_ID3D10Device1_44, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_44, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::IAGetInputLayout", NULL, cls_ID3D10Device1_45, xaux_ID3D10Device1_45, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D10Device::IAGetVertexBuffers", NULL, cls_ID3D10Device1_46, xaux_ID3D10Device1_46, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_46, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D10Device::IAGetIndexBuffer", NULL, cls_ID3D10Device1_47, xaux_ID3D10Device1_47, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0006, 0x0000 },
+    { "ID3D10Device::GSGetConstantBuffers", NULL, cls_ID3D10Device1_48, xaux_ID3D10Device1_48, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_48, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::GSGetShader", NULL, cls_ID3D10Device1_49, xaux_ID3D10Device1_49, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D10Device::IAGetPrimitiveTopology", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D10Device::VSGetShaderResources", NULL, cls_ID3D10Device1_51, xaux_ID3D10Device1_51, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_51, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::VSGetSamplers", NULL, cls_ID3D10Device1_52, xaux_ID3D10Device1_52, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_52, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::GetPredication", NULL, cls_ID3D10Device1_53, xaux_ID3D10Device1_53, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0002, 0x0000 },
+    { "ID3D10Device::GSGetShaderResources", NULL, cls_ID3D10Device1_54, xaux_ID3D10Device1_54, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_54, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::GSGetSamplers", NULL, cls_ID3D10Device1_55, xaux_ID3D10Device1_55, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_55, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::OMGetRenderTargets", NULL, cls_ID3D10Device1_56, xaux_ID3D10Device1_56, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_56, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0006, 0x0000, 0x0000 },
+    { "ID3D10Device::OMGetBlendState", NULL, cls_ID3D10Device1_57, xaux_ID3D10Device1_57, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0004, 0x0000 },
+    { "ID3D10Device::OMGetDepthStencilState", NULL, cls_ID3D10Device1_58, xaux_ID3D10Device1_58, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0002, 0x0000 },
+    { "ID3D10Device::SOGetTargets", NULL, cls_ID3D10Device1_59, xaux_ID3D10Device1_59, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D10Device1_59, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0004, 0x0000 },
+    { "ID3D10Device::RSGetState", NULL, cls_ID3D10Device1_60, xaux_ID3D10Device1_60, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D10Device::RSGetViewports", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D10Device::RSGetScissorRects", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "ID3D10Device::GetDeviceRemovedReason", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Device::SetExceptionMode", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Device::GetExceptionMode", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -716,40 +720,40 @@ static const struct winecom_slot slots_ID3D10Device1[101] =
     { "ID3D10Device::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10Device::ClearState", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Device::Flush", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateBuffer", NULL, cls_ID3D10Device1_71, xaux_ID3D10Device1_71, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D10Device1_71, 1, NULL },
+    { "ID3D10Device::CreateBuffer", NULL, cls_ID3D10Device1_71, xaux_ID3D10Device1_71, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D10Device1_71, 1, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D10Device::CreateTexture1D", NULL, cls_ID3D10Device1_72, xaux_ID3D10Device1_72, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D10Device::CreateTexture1D: `pInitialData` is an array of the divergent D3D10_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
+      "ID3D10Device::CreateTexture1D: `pInitialData` is an array of the divergent D3D10_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D10Device::CreateTexture2D", NULL, cls_ID3D10Device1_73, xaux_ID3D10Device1_73, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D10Device::CreateTexture2D: `pInitialData` is an array of the divergent D3D10_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
+      "ID3D10Device::CreateTexture2D: `pInitialData` is an array of the divergent D3D10_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D10Device::CreateTexture3D", NULL, cls_ID3D10Device1_74, xaux_ID3D10Device1_74, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D10Device::CreateTexture3D: `pInitialData` is an array of the divergent D3D10_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
-    { "ID3D10Device::CreateShaderResourceView", NULL, cls_ID3D10Device1_75, xaux_ID3D10Device1_75, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateRenderTargetView", NULL, cls_ID3D10Device1_76, xaux_ID3D10Device1_76, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateDepthStencilView", NULL, cls_ID3D10Device1_77, xaux_ID3D10Device1_77, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateInputLayout", NULL, cls_ID3D10Device1_78, xaux_ID3D10Device1_78, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D10Device1_78, 1, NULL },
-    { "ID3D10Device::CreateVertexShader", NULL, cls_ID3D10Device1_79, xaux_ID3D10Device1_79, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateGeometryShader", NULL, cls_ID3D10Device1_80, xaux_ID3D10Device1_80, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateGeometryShaderWithStreamOutput", NULL, cls_ID3D10Device1_81, xaux_ID3D10Device1_81, 7, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0018, 0x0000, 0x0000, reps_ID3D10Device1_81, 1, NULL },
-    { "ID3D10Device::CreatePixelShader", NULL, cls_ID3D10Device1_82, xaux_ID3D10Device1_82, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateBlendState", NULL, cls_ID3D10Device1_83, xaux_ID3D10Device1_83, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateDepthStencilState", NULL, cls_ID3D10Device1_84, xaux_ID3D10Device1_84, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateRasterizerState", NULL, cls_ID3D10Device1_85, xaux_ID3D10Device1_85, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateSamplerState", NULL, cls_ID3D10Device1_86, xaux_ID3D10Device1_86, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateQuery", NULL, cls_ID3D10Device1_87, xaux_ID3D10Device1_87, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreatePredicate", NULL, cls_ID3D10Device1_88, xaux_ID3D10Device1_88, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CreateCounter", NULL, cls_ID3D10Device1_89, xaux_ID3D10Device1_89, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+      "ID3D10Device::CreateTexture3D: `pInitialData` is an array of the divergent D3D10_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateShaderResourceView", NULL, cls_ID3D10Device1_75, xaux_ID3D10Device1_75, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateRenderTargetView", NULL, cls_ID3D10Device1_76, xaux_ID3D10Device1_76, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateDepthStencilView", NULL, cls_ID3D10Device1_77, xaux_ID3D10Device1_77, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateInputLayout", NULL, cls_ID3D10Device1_78, xaux_ID3D10Device1_78, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D10Device1_78, 1, NULL, 0, 0x0010, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateVertexShader", NULL, cls_ID3D10Device1_79, xaux_ID3D10Device1_79, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateGeometryShader", NULL, cls_ID3D10Device1_80, xaux_ID3D10Device1_80, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateGeometryShaderWithStreamOutput", NULL, cls_ID3D10Device1_81, xaux_ID3D10Device1_81, 7, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0018, 0x0000, 0x0000, reps_ID3D10Device1_81, 1, NULL, 0, 0x0020, 0x0000, 0x0000 },
+    { "ID3D10Device::CreatePixelShader", NULL, cls_ID3D10Device1_82, xaux_ID3D10Device1_82, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateBlendState", NULL, cls_ID3D10Device1_83, xaux_ID3D10Device1_83, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateDepthStencilState", NULL, cls_ID3D10Device1_84, xaux_ID3D10Device1_84, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateRasterizerState", NULL, cls_ID3D10Device1_85, xaux_ID3D10Device1_85, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateSamplerState", NULL, cls_ID3D10Device1_86, xaux_ID3D10Device1_86, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateQuery", NULL, cls_ID3D10Device1_87, xaux_ID3D10Device1_87, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D10Device::CreatePredicate", NULL, cls_ID3D10Device1_88, xaux_ID3D10Device1_88, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D10Device::CreateCounter", NULL, cls_ID3D10Device1_89, xaux_ID3D10Device1_89, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D10Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "ID3D10Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "ID3D10Device::CheckCounterInfo", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::CheckCounter", NULL, NULL, NULL, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10Device::CheckCounter", NULL, NULL, NULL, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0156, 0x0000 },
     { "ID3D10Device::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Device::OpenSharedResource",
       "ID3D10Device::OpenSharedResource: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D10Device::SetTextFilterSize", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device::GetTextFilterSize", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device1::CreateShaderResourceView1", NULL, cls_ID3D10Device1_98, xaux_ID3D10Device1_98, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D10Device1::CreateBlendState1", NULL, cls_ID3D10Device1_99, xaux_ID3D10Device1_99, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10Device::GetTextFilterSize", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0003, 0x0000 },
+    { "ID3D10Device1::CreateShaderResourceView1", NULL, cls_ID3D10Device1_98, xaux_ID3D10Device1_98, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D10Device1::CreateBlendState1", NULL, cls_ID3D10Device1_99, xaux_ID3D10Device1_99, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D10Device1::GetFeatureLevel", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -760,7 +764,7 @@ static const struct winecom_slot slots_ID3D10DeviceChild[7] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10DeviceChild_3, xaux_ID3D10DeviceChild_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10DeviceChild_3, xaux_ID3D10DeviceChild_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -773,7 +777,7 @@ static const struct winecom_slot slots_ID3D10GeometryShader[7] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10GeometryShader_3, xaux_ID3D10GeometryShader_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10GeometryShader_3, xaux_ID3D10GeometryShader_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -786,7 +790,7 @@ static const struct winecom_slot slots_ID3D10InputLayout[7] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10InputLayout_3, xaux_ID3D10InputLayout_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10InputLayout_3, xaux_ID3D10InputLayout_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -799,7 +803,7 @@ static const struct winecom_slot slots_ID3D10PixelShader[7] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10PixelShader_3, xaux_ID3D10PixelShader_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10PixelShader_3, xaux_ID3D10PixelShader_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -812,7 +816,7 @@ static const struct winecom_slot slots_ID3D10Predicate[12] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10Predicate_3, xaux_ID3D10Predicate_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10Predicate_3, xaux_ID3D10Predicate_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -830,7 +834,7 @@ static const struct winecom_slot slots_ID3D10Query[12] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10Query_3, xaux_ID3D10Query_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10Query_3, xaux_ID3D10Query_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -848,7 +852,7 @@ static const struct winecom_slot slots_ID3D10RasterizerState[8] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10RasterizerState_3, xaux_ID3D10RasterizerState_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10RasterizerState_3, xaux_ID3D10RasterizerState_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -864,11 +868,11 @@ static const struct winecom_slot slots_ID3D10RenderTargetView[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10RenderTargetView_3, xaux_ID3D10RenderTargetView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10RenderTargetView_3, xaux_ID3D10RenderTargetView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D10View::GetResource", NULL, cls_ID3D10RenderTargetView_7, xaux_ID3D10RenderTargetView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10View::GetResource", NULL, cls_ID3D10RenderTargetView_7, xaux_ID3D10RenderTargetView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10RenderTargetView::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -879,11 +883,11 @@ static const struct winecom_slot slots_ID3D10Resource[10] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10Resource_3, xaux_ID3D10Resource_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10Resource_3, xaux_ID3D10Resource_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D10Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "ID3D10Resource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Resource::GetEvictionPriority", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
@@ -895,7 +899,7 @@ static const struct winecom_slot slots_ID3D10SamplerState[8] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10SamplerState_3, xaux_ID3D10SamplerState_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10SamplerState_3, xaux_ID3D10SamplerState_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -911,11 +915,11 @@ static const struct winecom_slot slots_ID3D10ShaderResourceView[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10ShaderResourceView_3, xaux_ID3D10ShaderResourceView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10ShaderResourceView_3, xaux_ID3D10ShaderResourceView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D10View::GetResource", NULL, cls_ID3D10ShaderResourceView_7, xaux_ID3D10ShaderResourceView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10View::GetResource", NULL, cls_ID3D10ShaderResourceView_7, xaux_ID3D10ShaderResourceView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10ShaderResourceView::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -928,11 +932,11 @@ static const struct winecom_slot slots_ID3D10ShaderResourceView1[10] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10ShaderResourceView1_3, xaux_ID3D10ShaderResourceView1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10ShaderResourceView1_3, xaux_ID3D10ShaderResourceView1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D10View::GetResource", NULL, cls_ID3D10ShaderResourceView1_7, xaux_ID3D10ShaderResourceView1_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10View::GetResource", NULL, cls_ID3D10ShaderResourceView1_7, xaux_ID3D10ShaderResourceView1_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10ShaderResourceView::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10ShaderResourceView1::GetDesc1", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
@@ -944,15 +948,15 @@ static const struct winecom_slot slots_ID3D10Texture1D[13] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10Texture1D_3, xaux_ID3D10Texture1D_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10Texture1D_3, xaux_ID3D10Texture1D_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D10Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "ID3D10Resource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Resource::GetEvictionPriority", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Texture1D::Map", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0007, 0x0000, 0x0000, NULL, 0, 
-      "ID3D10Texture1D::Map: parameter `void **ppData` is a cell the host fills with a POINTER, and a 32-bit guest's cell is four bytes wide -- the native side would read or write eight. A hand32 walker with a below-4GiB answer must serve this row" },
+      "ID3D10Texture1D::Map: parameter `void **ppData` is a cell the host fills with a POINTER, and a 32-bit guest's cell is four bytes wide -- the native side would read or write eight. A hand32 walker with a below-4GiB answer must serve this row", 0, 0x0008, 0x0000, 0x0000 },
     { "ID3D10Texture1D::Unmap", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Texture1D::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
@@ -964,11 +968,11 @@ static const struct winecom_slot slots_ID3D10Texture2D[13] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10Texture2D_3, xaux_ID3D10Texture2D_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10Texture2D_3, xaux_ID3D10Texture2D_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D10Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "ID3D10Resource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Resource::GetEvictionPriority", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Texture2D::Map", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0007, 0x0000, 0x0000, NULL, 0, 
@@ -984,11 +988,11 @@ static const struct winecom_slot slots_ID3D10Texture3D[13] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10Texture3D_3, xaux_ID3D10Texture3D_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10Texture3D_3, xaux_ID3D10Texture3D_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D10Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "ID3D10Resource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Resource::GetEvictionPriority", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D10Texture3D::Map", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0007, 0x0000, 0x0000, NULL, 0, 
@@ -1004,7 +1008,7 @@ static const struct winecom_slot slots_ID3D10VertexShader[7] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10VertexShader_3, xaux_ID3D10VertexShader_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10VertexShader_3, xaux_ID3D10VertexShader_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -1019,11 +1023,11 @@ static const struct winecom_slot slots_ID3D10View[8] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10View_3, xaux_ID3D10View_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10DeviceChild::GetDevice", NULL, cls_ID3D10View_3, xaux_ID3D10View_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D10DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D10DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D10View::GetResource", NULL, cls_ID3D10View_7, xaux_ID3D10View_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D10View::GetResource", NULL, cls_ID3D10View_7, xaux_ID3D10View_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
 };
 
 static const unsigned char cls_ID3D11Asynchronous_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
@@ -1033,7 +1037,7 @@ static const struct winecom_slot slots_ID3D11Asynchronous[8] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Asynchronous_3, xaux_ID3D11Asynchronous_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Asynchronous_3, xaux_ID3D11Asynchronous_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -1049,11 +1053,11 @@ static const struct winecom_slot slots_ID3D11AuthenticatedChannel[10] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11AuthenticatedChannel_3, xaux_ID3D11AuthenticatedChannel_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11AuthenticatedChannel_3, xaux_ID3D11AuthenticatedChannel_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11AuthenticatedChannel::GetCertificateSize", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11AuthenticatedChannel::GetCertificateSize", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "ID3D11AuthenticatedChannel::GetCertificate", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11AuthenticatedChannel::GetChannelHandle", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11AuthenticatedChannel_9, 1, NULL },
 };
@@ -1065,7 +1069,7 @@ static const struct winecom_slot slots_ID3D11BlendState[8] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11BlendState_3, xaux_ID3D11BlendState_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11BlendState_3, xaux_ID3D11BlendState_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -1079,7 +1083,7 @@ static const struct winecom_slot slots_ID3D11BlendState1[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11BlendState1_3, xaux_ID3D11BlendState1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11BlendState1_3, xaux_ID3D11BlendState1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -1094,11 +1098,11 @@ static const struct winecom_slot slots_ID3D11Buffer[11] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Buffer_3, xaux_ID3D11Buffer_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Buffer_3, xaux_ID3D11Buffer_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "ID3D11Resource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Resource::GetEvictionPriority", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Buffer::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -1113,14 +1117,14 @@ static const struct winecom_slot slots_ID3D11ClassInstance[11] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11ClassInstance_3, xaux_ID3D11ClassInstance_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11ClassInstance_3, xaux_ID3D11ClassInstance_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11ClassInstance::GetClassLinkage", NULL, cls_ID3D11ClassInstance_7, xaux_ID3D11ClassInstance_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11ClassInstance::GetClassLinkage", NULL, cls_ID3D11ClassInstance_7, xaux_ID3D11ClassInstance_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11ClassInstance::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11ClassInstance::GetInstanceName", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11ClassInstance::GetTypeName", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11ClassInstance::GetInstanceName", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11ClassInstance::GetTypeName", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
 };
 
 static const unsigned char cls_ID3D11ClassLinkage_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
@@ -1134,12 +1138,12 @@ static const struct winecom_slot slots_ID3D11ClassLinkage[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11ClassLinkage_3, xaux_ID3D11ClassLinkage_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11ClassLinkage_3, xaux_ID3D11ClassLinkage_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11ClassLinkage::GetClassInstance", NULL, cls_ID3D11ClassLinkage_7, xaux_ID3D11ClassLinkage_7, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11ClassLinkage::CreateClassInstance", NULL, cls_ID3D11ClassLinkage_8, xaux_ID3D11ClassLinkage_8, 7, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001e, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11ClassLinkage::GetClassInstance", NULL, cls_ID3D11ClassLinkage_7, xaux_ID3D11ClassLinkage_7, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11ClassLinkage::CreateClassInstance", NULL, cls_ID3D11ClassLinkage_8, xaux_ID3D11ClassLinkage_8, 7, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001e, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0020, 0x0000, 0x0000 },
 };
 
 static const unsigned char cls_ID3D11CommandList_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
@@ -1149,7 +1153,7 @@ static const struct winecom_slot slots_ID3D11CommandList[8] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11CommandList_3, xaux_ID3D11CommandList_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11CommandList_3, xaux_ID3D11CommandList_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -1163,7 +1167,7 @@ static const struct winecom_slot slots_ID3D11ComputeShader[7] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11ComputeShader_3, xaux_ID3D11ComputeShader_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11ComputeShader_3, xaux_ID3D11ComputeShader_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -1176,7 +1180,7 @@ static const struct winecom_slot slots_ID3D11Counter[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Counter_3, xaux_ID3D11Counter_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Counter_3, xaux_ID3D11Counter_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -1193,13 +1197,13 @@ static const struct winecom_slot slots_ID3D11CryptoSession[12] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11CryptoSession_3, xaux_ID3D11CryptoSession_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11CryptoSession_3, xaux_ID3D11CryptoSession_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11CryptoSession::GetCryptoType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11CryptoSession::GetDecoderProfile", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11CryptoSession::GetCertificateSize", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11CryptoSession::GetCertificateSize", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "ID3D11CryptoSession::GetCertificate", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11CryptoSession::GetCryptoSessionHandle", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11CryptoSession_11, 1, NULL },
 };
@@ -1211,7 +1215,7 @@ static const struct winecom_slot slots_ID3D11DepthStencilState[8] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11DepthStencilState_3, xaux_ID3D11DepthStencilState_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11DepthStencilState_3, xaux_ID3D11DepthStencilState_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -1227,11 +1231,11 @@ static const struct winecom_slot slots_ID3D11DepthStencilView[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11DepthStencilView_3, xaux_ID3D11DepthStencilView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11DepthStencilView_3, xaux_ID3D11DepthStencilView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11View::GetResource", NULL, cls_ID3D11DepthStencilView_7, xaux_ID3D11DepthStencilView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11View::GetResource", NULL, cls_ID3D11DepthStencilView_7, xaux_ID3D11DepthStencilView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DepthStencilView::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -1298,41 +1302,41 @@ static const struct winecom_slot slots_ID3D11Device[43] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11Device::CreateBuffer", NULL, cls_ID3D11Device_3, xaux_ID3D11Device_3, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device_3, 1, NULL },
+    { "ID3D11Device::CreateBuffer", NULL, cls_ID3D11Device_3, xaux_ID3D11Device_3, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device_3, 1, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CreateTexture1D", NULL, cls_ID3D11Device_4, xaux_ID3D11Device_4, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11Device::CreateTexture1D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
+      "ID3D11Device::CreateTexture1D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CreateTexture2D", NULL, cls_ID3D11Device_5, xaux_ID3D11Device_5, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11Device::CreateTexture2D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
+      "ID3D11Device::CreateTexture2D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CreateTexture3D", NULL, cls_ID3D11Device_6, xaux_ID3D11Device_6, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11Device::CreateTexture3D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
-    { "ID3D11Device::CreateShaderResourceView", NULL, cls_ID3D11Device_7, xaux_ID3D11Device_7, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateUnorderedAccessView", NULL, cls_ID3D11Device_8, xaux_ID3D11Device_8, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateRenderTargetView", NULL, cls_ID3D11Device_9, xaux_ID3D11Device_9, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDepthStencilView", NULL, cls_ID3D11Device_10, xaux_ID3D11Device_10, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateInputLayout", NULL, cls_ID3D11Device_11, xaux_ID3D11Device_11, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11Device_11, 1, NULL },
-    { "ID3D11Device::CreateVertexShader", NULL, cls_ID3D11Device_12, xaux_ID3D11Device_12, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateGeometryShader", NULL, cls_ID3D11Device_13, xaux_ID3D11Device_13, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateGeometryShaderWithStreamOutput", NULL, cls_ID3D11Device_14, xaux_ID3D11Device_14, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0068, 0x0000, 0x0000, reps_ID3D11Device_14, 1, NULL },
-    { "ID3D11Device::CreatePixelShader", NULL, cls_ID3D11Device_15, xaux_ID3D11Device_15, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateHullShader", NULL, cls_ID3D11Device_16, xaux_ID3D11Device_16, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDomainShader", NULL, cls_ID3D11Device_17, xaux_ID3D11Device_17, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateComputeShader", NULL, cls_ID3D11Device_18, xaux_ID3D11Device_18, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateClassLinkage", NULL, cls_ID3D11Device_19, xaux_ID3D11Device_19, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateBlendState", NULL, cls_ID3D11Device_20, xaux_ID3D11Device_20, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDepthStencilState", NULL, cls_ID3D11Device_21, xaux_ID3D11Device_21, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateRasterizerState", NULL, cls_ID3D11Device_22, xaux_ID3D11Device_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateSamplerState", NULL, cls_ID3D11Device_23, xaux_ID3D11Device_23, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateQuery", NULL, cls_ID3D11Device_24, xaux_ID3D11Device_24, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreatePredicate", NULL, cls_ID3D11Device_25, xaux_ID3D11Device_25, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateCounter", NULL, cls_ID3D11Device_26, xaux_ID3D11Device_26, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDeferredContext", NULL, cls_ID3D11Device_27, xaux_ID3D11Device_27, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+      "ID3D11Device::CreateTexture3D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateShaderResourceView", NULL, cls_ID3D11Device_7, xaux_ID3D11Device_7, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateUnorderedAccessView", NULL, cls_ID3D11Device_8, xaux_ID3D11Device_8, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateRenderTargetView", NULL, cls_ID3D11Device_9, xaux_ID3D11Device_9, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDepthStencilView", NULL, cls_ID3D11Device_10, xaux_ID3D11Device_10, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateInputLayout", NULL, cls_ID3D11Device_11, xaux_ID3D11Device_11, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11Device_11, 1, NULL, 0, 0x0010, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateVertexShader", NULL, cls_ID3D11Device_12, xaux_ID3D11Device_12, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateGeometryShader", NULL, cls_ID3D11Device_13, xaux_ID3D11Device_13, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateGeometryShaderWithStreamOutput", NULL, cls_ID3D11Device_14, xaux_ID3D11Device_14, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0068, 0x0000, 0x0000, reps_ID3D11Device_14, 1, NULL, 0, 0x0100, 0x0000, 0x0000 },
+    { "ID3D11Device::CreatePixelShader", NULL, cls_ID3D11Device_15, xaux_ID3D11Device_15, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateHullShader", NULL, cls_ID3D11Device_16, xaux_ID3D11Device_16, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDomainShader", NULL, cls_ID3D11Device_17, xaux_ID3D11Device_17, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateComputeShader", NULL, cls_ID3D11Device_18, xaux_ID3D11Device_18, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateClassLinkage", NULL, cls_ID3D11Device_19, xaux_ID3D11Device_19, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateBlendState", NULL, cls_ID3D11Device_20, xaux_ID3D11Device_20, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDepthStencilState", NULL, cls_ID3D11Device_21, xaux_ID3D11Device_21, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateRasterizerState", NULL, cls_ID3D11Device_22, xaux_ID3D11Device_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateSamplerState", NULL, cls_ID3D11Device_23, xaux_ID3D11Device_23, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateQuery", NULL, cls_ID3D11Device_24, xaux_ID3D11Device_24, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreatePredicate", NULL, cls_ID3D11Device_25, xaux_ID3D11Device_25, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateCounter", NULL, cls_ID3D11Device_26, xaux_ID3D11Device_26, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDeferredContext", NULL, cls_ID3D11Device_27, xaux_ID3D11Device_27, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device::OpenSharedResource",
       "ID3D11Device::OpenSharedResource: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "ID3D11Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "ID3D11Device::CheckCounterInfo", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CheckCounter", NULL, NULL, NULL, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Device::CheckCounter", NULL, NULL, NULL, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0156, 0x0000 },
     { "ID3D11Device::CheckFeatureSupport", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11Device::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -1340,7 +1344,7 @@ static const struct winecom_slot slots_ID3D11Device[43] =
     { "ID3D11Device::GetFeatureLevel", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetDeviceRemovedReason", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::GetImmediateContext", NULL, cls_ID3D11Device_40, xaux_ID3D11Device_40, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Device::GetImmediateContext", NULL, cls_ID3D11Device_40, xaux_ID3D11Device_40, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11Device::SetExceptionMode", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetExceptionMode", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
@@ -1418,41 +1422,41 @@ static const struct winecom_slot slots_ID3D11Device1[50] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11Device::CreateBuffer", NULL, cls_ID3D11Device1_3, xaux_ID3D11Device1_3, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device1_3, 1, NULL },
+    { "ID3D11Device::CreateBuffer", NULL, cls_ID3D11Device1_3, xaux_ID3D11Device1_3, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device1_3, 1, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CreateTexture1D", NULL, cls_ID3D11Device1_4, xaux_ID3D11Device1_4, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11Device::CreateTexture1D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
+      "ID3D11Device::CreateTexture1D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CreateTexture2D", NULL, cls_ID3D11Device1_5, xaux_ID3D11Device1_5, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11Device::CreateTexture2D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
+      "ID3D11Device::CreateTexture2D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CreateTexture3D", NULL, cls_ID3D11Device1_6, xaux_ID3D11Device1_6, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11Device::CreateTexture3D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
-    { "ID3D11Device::CreateShaderResourceView", NULL, cls_ID3D11Device1_7, xaux_ID3D11Device1_7, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateUnorderedAccessView", NULL, cls_ID3D11Device1_8, xaux_ID3D11Device1_8, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateRenderTargetView", NULL, cls_ID3D11Device1_9, xaux_ID3D11Device1_9, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDepthStencilView", NULL, cls_ID3D11Device1_10, xaux_ID3D11Device1_10, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateInputLayout", NULL, cls_ID3D11Device1_11, xaux_ID3D11Device1_11, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11Device1_11, 1, NULL },
-    { "ID3D11Device::CreateVertexShader", NULL, cls_ID3D11Device1_12, xaux_ID3D11Device1_12, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateGeometryShader", NULL, cls_ID3D11Device1_13, xaux_ID3D11Device1_13, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateGeometryShaderWithStreamOutput", NULL, cls_ID3D11Device1_14, xaux_ID3D11Device1_14, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0068, 0x0000, 0x0000, reps_ID3D11Device1_14, 1, NULL },
-    { "ID3D11Device::CreatePixelShader", NULL, cls_ID3D11Device1_15, xaux_ID3D11Device1_15, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateHullShader", NULL, cls_ID3D11Device1_16, xaux_ID3D11Device1_16, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDomainShader", NULL, cls_ID3D11Device1_17, xaux_ID3D11Device1_17, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateComputeShader", NULL, cls_ID3D11Device1_18, xaux_ID3D11Device1_18, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateClassLinkage", NULL, cls_ID3D11Device1_19, xaux_ID3D11Device1_19, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateBlendState", NULL, cls_ID3D11Device1_20, xaux_ID3D11Device1_20, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDepthStencilState", NULL, cls_ID3D11Device1_21, xaux_ID3D11Device1_21, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateRasterizerState", NULL, cls_ID3D11Device1_22, xaux_ID3D11Device1_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateSamplerState", NULL, cls_ID3D11Device1_23, xaux_ID3D11Device1_23, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateQuery", NULL, cls_ID3D11Device1_24, xaux_ID3D11Device1_24, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreatePredicate", NULL, cls_ID3D11Device1_25, xaux_ID3D11Device1_25, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateCounter", NULL, cls_ID3D11Device1_26, xaux_ID3D11Device1_26, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDeferredContext", NULL, cls_ID3D11Device1_27, xaux_ID3D11Device1_27, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+      "ID3D11Device::CreateTexture3D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateShaderResourceView", NULL, cls_ID3D11Device1_7, xaux_ID3D11Device1_7, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateUnorderedAccessView", NULL, cls_ID3D11Device1_8, xaux_ID3D11Device1_8, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateRenderTargetView", NULL, cls_ID3D11Device1_9, xaux_ID3D11Device1_9, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDepthStencilView", NULL, cls_ID3D11Device1_10, xaux_ID3D11Device1_10, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateInputLayout", NULL, cls_ID3D11Device1_11, xaux_ID3D11Device1_11, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11Device1_11, 1, NULL, 0, 0x0010, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateVertexShader", NULL, cls_ID3D11Device1_12, xaux_ID3D11Device1_12, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateGeometryShader", NULL, cls_ID3D11Device1_13, xaux_ID3D11Device1_13, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateGeometryShaderWithStreamOutput", NULL, cls_ID3D11Device1_14, xaux_ID3D11Device1_14, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0068, 0x0000, 0x0000, reps_ID3D11Device1_14, 1, NULL, 0, 0x0100, 0x0000, 0x0000 },
+    { "ID3D11Device::CreatePixelShader", NULL, cls_ID3D11Device1_15, xaux_ID3D11Device1_15, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateHullShader", NULL, cls_ID3D11Device1_16, xaux_ID3D11Device1_16, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDomainShader", NULL, cls_ID3D11Device1_17, xaux_ID3D11Device1_17, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateComputeShader", NULL, cls_ID3D11Device1_18, xaux_ID3D11Device1_18, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateClassLinkage", NULL, cls_ID3D11Device1_19, xaux_ID3D11Device1_19, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateBlendState", NULL, cls_ID3D11Device1_20, xaux_ID3D11Device1_20, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDepthStencilState", NULL, cls_ID3D11Device1_21, xaux_ID3D11Device1_21, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateRasterizerState", NULL, cls_ID3D11Device1_22, xaux_ID3D11Device1_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateSamplerState", NULL, cls_ID3D11Device1_23, xaux_ID3D11Device1_23, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateQuery", NULL, cls_ID3D11Device1_24, xaux_ID3D11Device1_24, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreatePredicate", NULL, cls_ID3D11Device1_25, xaux_ID3D11Device1_25, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateCounter", NULL, cls_ID3D11Device1_26, xaux_ID3D11Device1_26, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDeferredContext", NULL, cls_ID3D11Device1_27, xaux_ID3D11Device1_27, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device::OpenSharedResource",
       "ID3D11Device::OpenSharedResource: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "ID3D11Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "ID3D11Device::CheckCounterInfo", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CheckCounter", NULL, NULL, NULL, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Device::CheckCounter", NULL, NULL, NULL, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0156, 0x0000 },
     { "ID3D11Device::CheckFeatureSupport", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11Device::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -1460,20 +1464,20 @@ static const struct winecom_slot slots_ID3D11Device1[50] =
     { "ID3D11Device::GetFeatureLevel", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetDeviceRemovedReason", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::GetImmediateContext", NULL, cls_ID3D11Device1_40, xaux_ID3D11Device1_40, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Device::GetImmediateContext", NULL, cls_ID3D11Device1_40, xaux_ID3D11Device1_40, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11Device::SetExceptionMode", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetExceptionMode", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::GetImmediateContext1", NULL, cls_ID3D11Device1_43, xaux_ID3D11Device1_43, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateDeferredContext1", NULL, cls_ID3D11Device1_44, xaux_ID3D11Device1_44, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateBlendState1", NULL, cls_ID3D11Device1_45, xaux_ID3D11Device1_45, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateRasterizerState1", NULL, cls_ID3D11Device1_46, xaux_ID3D11Device1_46, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateDeviceContextState", NULL, cls_ID3D11Device1_47, xaux_ID3D11Device1_47, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000d, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Device1::GetImmediateContext1", NULL, cls_ID3D11Device1_43, xaux_ID3D11Device1_43, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateDeferredContext1", NULL, cls_ID3D11Device1_44, xaux_ID3D11Device1_44, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateBlendState1", NULL, cls_ID3D11Device1_45, xaux_ID3D11Device1_45, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateRasterizerState1", NULL, cls_ID3D11Device1_46, xaux_ID3D11Device1_46, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateDeviceContextState", NULL, cls_ID3D11Device1_47, xaux_ID3D11Device1_47, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000d, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0040, 0x0020, 0x0000 },
     { "ID3D11Device1::OpenSharedResource1",
       "ID3D11Device1::OpenSharedResource1: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device1::OpenSharedResourceByName",
       "ID3D11Device1::OpenSharedResourceByName: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
 };
 
 static const struct winecom_rep reps_ID3D11Device2_3[] =
@@ -1554,41 +1558,41 @@ static const struct winecom_slot slots_ID3D11Device2[54] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11Device::CreateBuffer", NULL, cls_ID3D11Device2_3, xaux_ID3D11Device2_3, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device2_3, 1, NULL },
+    { "ID3D11Device::CreateBuffer", NULL, cls_ID3D11Device2_3, xaux_ID3D11Device2_3, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device2_3, 1, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CreateTexture1D", NULL, cls_ID3D11Device2_4, xaux_ID3D11Device2_4, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11Device::CreateTexture1D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
+      "ID3D11Device::CreateTexture1D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CreateTexture2D", NULL, cls_ID3D11Device2_5, xaux_ID3D11Device2_5, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11Device::CreateTexture2D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
+      "ID3D11Device::CreateTexture2D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CreateTexture3D", NULL, cls_ID3D11Device2_6, xaux_ID3D11Device2_6, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11Device::CreateTexture3D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
-    { "ID3D11Device::CreateShaderResourceView", NULL, cls_ID3D11Device2_7, xaux_ID3D11Device2_7, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateUnorderedAccessView", NULL, cls_ID3D11Device2_8, xaux_ID3D11Device2_8, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateRenderTargetView", NULL, cls_ID3D11Device2_9, xaux_ID3D11Device2_9, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDepthStencilView", NULL, cls_ID3D11Device2_10, xaux_ID3D11Device2_10, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateInputLayout", NULL, cls_ID3D11Device2_11, xaux_ID3D11Device2_11, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11Device2_11, 1, NULL },
-    { "ID3D11Device::CreateVertexShader", NULL, cls_ID3D11Device2_12, xaux_ID3D11Device2_12, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateGeometryShader", NULL, cls_ID3D11Device2_13, xaux_ID3D11Device2_13, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateGeometryShaderWithStreamOutput", NULL, cls_ID3D11Device2_14, xaux_ID3D11Device2_14, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0068, 0x0000, 0x0000, reps_ID3D11Device2_14, 1, NULL },
-    { "ID3D11Device::CreatePixelShader", NULL, cls_ID3D11Device2_15, xaux_ID3D11Device2_15, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateHullShader", NULL, cls_ID3D11Device2_16, xaux_ID3D11Device2_16, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDomainShader", NULL, cls_ID3D11Device2_17, xaux_ID3D11Device2_17, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateComputeShader", NULL, cls_ID3D11Device2_18, xaux_ID3D11Device2_18, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateClassLinkage", NULL, cls_ID3D11Device2_19, xaux_ID3D11Device2_19, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateBlendState", NULL, cls_ID3D11Device2_20, xaux_ID3D11Device2_20, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDepthStencilState", NULL, cls_ID3D11Device2_21, xaux_ID3D11Device2_21, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateRasterizerState", NULL, cls_ID3D11Device2_22, xaux_ID3D11Device2_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateSamplerState", NULL, cls_ID3D11Device2_23, xaux_ID3D11Device2_23, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateQuery", NULL, cls_ID3D11Device2_24, xaux_ID3D11Device2_24, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreatePredicate", NULL, cls_ID3D11Device2_25, xaux_ID3D11Device2_25, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateCounter", NULL, cls_ID3D11Device2_26, xaux_ID3D11Device2_26, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDeferredContext", NULL, cls_ID3D11Device2_27, xaux_ID3D11Device2_27, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+      "ID3D11Device::CreateTexture3D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateShaderResourceView", NULL, cls_ID3D11Device2_7, xaux_ID3D11Device2_7, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateUnorderedAccessView", NULL, cls_ID3D11Device2_8, xaux_ID3D11Device2_8, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateRenderTargetView", NULL, cls_ID3D11Device2_9, xaux_ID3D11Device2_9, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDepthStencilView", NULL, cls_ID3D11Device2_10, xaux_ID3D11Device2_10, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateInputLayout", NULL, cls_ID3D11Device2_11, xaux_ID3D11Device2_11, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11Device2_11, 1, NULL, 0, 0x0010, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateVertexShader", NULL, cls_ID3D11Device2_12, xaux_ID3D11Device2_12, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateGeometryShader", NULL, cls_ID3D11Device2_13, xaux_ID3D11Device2_13, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateGeometryShaderWithStreamOutput", NULL, cls_ID3D11Device2_14, xaux_ID3D11Device2_14, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0068, 0x0000, 0x0000, reps_ID3D11Device2_14, 1, NULL, 0, 0x0100, 0x0000, 0x0000 },
+    { "ID3D11Device::CreatePixelShader", NULL, cls_ID3D11Device2_15, xaux_ID3D11Device2_15, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateHullShader", NULL, cls_ID3D11Device2_16, xaux_ID3D11Device2_16, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDomainShader", NULL, cls_ID3D11Device2_17, xaux_ID3D11Device2_17, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateComputeShader", NULL, cls_ID3D11Device2_18, xaux_ID3D11Device2_18, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateClassLinkage", NULL, cls_ID3D11Device2_19, xaux_ID3D11Device2_19, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateBlendState", NULL, cls_ID3D11Device2_20, xaux_ID3D11Device2_20, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDepthStencilState", NULL, cls_ID3D11Device2_21, xaux_ID3D11Device2_21, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateRasterizerState", NULL, cls_ID3D11Device2_22, xaux_ID3D11Device2_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateSamplerState", NULL, cls_ID3D11Device2_23, xaux_ID3D11Device2_23, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateQuery", NULL, cls_ID3D11Device2_24, xaux_ID3D11Device2_24, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreatePredicate", NULL, cls_ID3D11Device2_25, xaux_ID3D11Device2_25, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateCounter", NULL, cls_ID3D11Device2_26, xaux_ID3D11Device2_26, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDeferredContext", NULL, cls_ID3D11Device2_27, xaux_ID3D11Device2_27, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device::OpenSharedResource",
       "ID3D11Device::OpenSharedResource: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "ID3D11Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "ID3D11Device::CheckCounterInfo", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CheckCounter", NULL, NULL, NULL, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Device::CheckCounter", NULL, NULL, NULL, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0156, 0x0000 },
     { "ID3D11Device::CheckFeatureSupport", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11Device::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -1596,24 +1600,24 @@ static const struct winecom_slot slots_ID3D11Device2[54] =
     { "ID3D11Device::GetFeatureLevel", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetDeviceRemovedReason", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::GetImmediateContext", NULL, cls_ID3D11Device2_40, xaux_ID3D11Device2_40, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Device::GetImmediateContext", NULL, cls_ID3D11Device2_40, xaux_ID3D11Device2_40, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11Device::SetExceptionMode", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetExceptionMode", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::GetImmediateContext1", NULL, cls_ID3D11Device2_43, xaux_ID3D11Device2_43, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateDeferredContext1", NULL, cls_ID3D11Device2_44, xaux_ID3D11Device2_44, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateBlendState1", NULL, cls_ID3D11Device2_45, xaux_ID3D11Device2_45, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateRasterizerState1", NULL, cls_ID3D11Device2_46, xaux_ID3D11Device2_46, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateDeviceContextState", NULL, cls_ID3D11Device2_47, xaux_ID3D11Device2_47, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000d, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Device1::GetImmediateContext1", NULL, cls_ID3D11Device2_43, xaux_ID3D11Device2_43, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateDeferredContext1", NULL, cls_ID3D11Device2_44, xaux_ID3D11Device2_44, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateBlendState1", NULL, cls_ID3D11Device2_45, xaux_ID3D11Device2_45, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateRasterizerState1", NULL, cls_ID3D11Device2_46, xaux_ID3D11Device2_46, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateDeviceContextState", NULL, cls_ID3D11Device2_47, xaux_ID3D11Device2_47, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000d, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0040, 0x0020, 0x0000 },
     { "ID3D11Device1::OpenSharedResource1",
       "ID3D11Device1::OpenSharedResource1: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device1::OpenSharedResourceByName",
       "ID3D11Device1::OpenSharedResourceByName: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Device2::GetImmediateContext2", NULL, cls_ID3D11Device2_50, xaux_ID3D11Device2_50, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device2::CreateDeferredContext2", NULL, cls_ID3D11Device2_51, xaux_ID3D11Device2_51, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device2::GetResourceTiling", NULL, cls_ID3D11Device2_52, NULL, 8, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0020, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device2::CheckMultisampleQualityLevels1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0007, 0x0000, 0x0000, NULL, 0, NULL },
+      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device2::GetImmediateContext2", NULL, cls_ID3D11Device2_50, xaux_ID3D11Device2_50, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11Device2::CreateDeferredContext2", NULL, cls_ID3D11Device2_51, xaux_ID3D11Device2_51, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device2::GetResourceTiling", NULL, cls_ID3D11Device2_52, NULL, 8, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0020, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0012, 0x0000 },
+    { "ID3D11Device2::CheckMultisampleQualityLevels1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0007, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0008, 0x0000 },
 };
 
 static const struct winecom_rep reps_ID3D11Device3_3[] =
@@ -1718,41 +1722,41 @@ static const struct winecom_slot slots_ID3D11Device3[65] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11Device::CreateBuffer", NULL, cls_ID3D11Device3_3, xaux_ID3D11Device3_3, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device3_3, 1, NULL },
+    { "ID3D11Device::CreateBuffer", NULL, cls_ID3D11Device3_3, xaux_ID3D11Device3_3, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device3_3, 1, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CreateTexture1D", NULL, cls_ID3D11Device3_4, xaux_ID3D11Device3_4, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11Device::CreateTexture1D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
+      "ID3D11Device::CreateTexture1D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CreateTexture2D", NULL, cls_ID3D11Device3_5, xaux_ID3D11Device3_5, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11Device::CreateTexture2D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
+      "ID3D11Device::CreateTexture2D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CreateTexture3D", NULL, cls_ID3D11Device3_6, xaux_ID3D11Device3_6, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11Device::CreateTexture3D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
-    { "ID3D11Device::CreateShaderResourceView", NULL, cls_ID3D11Device3_7, xaux_ID3D11Device3_7, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateUnorderedAccessView", NULL, cls_ID3D11Device3_8, xaux_ID3D11Device3_8, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateRenderTargetView", NULL, cls_ID3D11Device3_9, xaux_ID3D11Device3_9, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDepthStencilView", NULL, cls_ID3D11Device3_10, xaux_ID3D11Device3_10, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateInputLayout", NULL, cls_ID3D11Device3_11, xaux_ID3D11Device3_11, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11Device3_11, 1, NULL },
-    { "ID3D11Device::CreateVertexShader", NULL, cls_ID3D11Device3_12, xaux_ID3D11Device3_12, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateGeometryShader", NULL, cls_ID3D11Device3_13, xaux_ID3D11Device3_13, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateGeometryShaderWithStreamOutput", NULL, cls_ID3D11Device3_14, xaux_ID3D11Device3_14, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0068, 0x0000, 0x0000, reps_ID3D11Device3_14, 1, NULL },
-    { "ID3D11Device::CreatePixelShader", NULL, cls_ID3D11Device3_15, xaux_ID3D11Device3_15, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateHullShader", NULL, cls_ID3D11Device3_16, xaux_ID3D11Device3_16, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDomainShader", NULL, cls_ID3D11Device3_17, xaux_ID3D11Device3_17, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateComputeShader", NULL, cls_ID3D11Device3_18, xaux_ID3D11Device3_18, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateClassLinkage", NULL, cls_ID3D11Device3_19, xaux_ID3D11Device3_19, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateBlendState", NULL, cls_ID3D11Device3_20, xaux_ID3D11Device3_20, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDepthStencilState", NULL, cls_ID3D11Device3_21, xaux_ID3D11Device3_21, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateRasterizerState", NULL, cls_ID3D11Device3_22, xaux_ID3D11Device3_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateSamplerState", NULL, cls_ID3D11Device3_23, xaux_ID3D11Device3_23, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateQuery", NULL, cls_ID3D11Device3_24, xaux_ID3D11Device3_24, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreatePredicate", NULL, cls_ID3D11Device3_25, xaux_ID3D11Device3_25, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateCounter", NULL, cls_ID3D11Device3_26, xaux_ID3D11Device3_26, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDeferredContext", NULL, cls_ID3D11Device3_27, xaux_ID3D11Device3_27, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+      "ID3D11Device::CreateTexture3D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateShaderResourceView", NULL, cls_ID3D11Device3_7, xaux_ID3D11Device3_7, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateUnorderedAccessView", NULL, cls_ID3D11Device3_8, xaux_ID3D11Device3_8, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateRenderTargetView", NULL, cls_ID3D11Device3_9, xaux_ID3D11Device3_9, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDepthStencilView", NULL, cls_ID3D11Device3_10, xaux_ID3D11Device3_10, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateInputLayout", NULL, cls_ID3D11Device3_11, xaux_ID3D11Device3_11, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11Device3_11, 1, NULL, 0, 0x0010, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateVertexShader", NULL, cls_ID3D11Device3_12, xaux_ID3D11Device3_12, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateGeometryShader", NULL, cls_ID3D11Device3_13, xaux_ID3D11Device3_13, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateGeometryShaderWithStreamOutput", NULL, cls_ID3D11Device3_14, xaux_ID3D11Device3_14, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0068, 0x0000, 0x0000, reps_ID3D11Device3_14, 1, NULL, 0, 0x0100, 0x0000, 0x0000 },
+    { "ID3D11Device::CreatePixelShader", NULL, cls_ID3D11Device3_15, xaux_ID3D11Device3_15, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateHullShader", NULL, cls_ID3D11Device3_16, xaux_ID3D11Device3_16, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDomainShader", NULL, cls_ID3D11Device3_17, xaux_ID3D11Device3_17, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateComputeShader", NULL, cls_ID3D11Device3_18, xaux_ID3D11Device3_18, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateClassLinkage", NULL, cls_ID3D11Device3_19, xaux_ID3D11Device3_19, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateBlendState", NULL, cls_ID3D11Device3_20, xaux_ID3D11Device3_20, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDepthStencilState", NULL, cls_ID3D11Device3_21, xaux_ID3D11Device3_21, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateRasterizerState", NULL, cls_ID3D11Device3_22, xaux_ID3D11Device3_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateSamplerState", NULL, cls_ID3D11Device3_23, xaux_ID3D11Device3_23, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateQuery", NULL, cls_ID3D11Device3_24, xaux_ID3D11Device3_24, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreatePredicate", NULL, cls_ID3D11Device3_25, xaux_ID3D11Device3_25, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateCounter", NULL, cls_ID3D11Device3_26, xaux_ID3D11Device3_26, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDeferredContext", NULL, cls_ID3D11Device3_27, xaux_ID3D11Device3_27, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device::OpenSharedResource",
       "ID3D11Device::OpenSharedResource: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "ID3D11Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "ID3D11Device::CheckCounterInfo", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CheckCounter", NULL, NULL, NULL, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Device::CheckCounter", NULL, NULL, NULL, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0156, 0x0000 },
     { "ID3D11Device::CheckFeatureSupport", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11Device::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -1760,33 +1764,33 @@ static const struct winecom_slot slots_ID3D11Device3[65] =
     { "ID3D11Device::GetFeatureLevel", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetDeviceRemovedReason", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::GetImmediateContext", NULL, cls_ID3D11Device3_40, xaux_ID3D11Device3_40, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Device::GetImmediateContext", NULL, cls_ID3D11Device3_40, xaux_ID3D11Device3_40, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11Device::SetExceptionMode", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetExceptionMode", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::GetImmediateContext1", NULL, cls_ID3D11Device3_43, xaux_ID3D11Device3_43, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateDeferredContext1", NULL, cls_ID3D11Device3_44, xaux_ID3D11Device3_44, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateBlendState1", NULL, cls_ID3D11Device3_45, xaux_ID3D11Device3_45, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateRasterizerState1", NULL, cls_ID3D11Device3_46, xaux_ID3D11Device3_46, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateDeviceContextState", NULL, cls_ID3D11Device3_47, xaux_ID3D11Device3_47, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000d, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Device1::GetImmediateContext1", NULL, cls_ID3D11Device3_43, xaux_ID3D11Device3_43, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateDeferredContext1", NULL, cls_ID3D11Device3_44, xaux_ID3D11Device3_44, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateBlendState1", NULL, cls_ID3D11Device3_45, xaux_ID3D11Device3_45, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateRasterizerState1", NULL, cls_ID3D11Device3_46, xaux_ID3D11Device3_46, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateDeviceContextState", NULL, cls_ID3D11Device3_47, xaux_ID3D11Device3_47, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000d, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0040, 0x0020, 0x0000 },
     { "ID3D11Device1::OpenSharedResource1",
       "ID3D11Device1::OpenSharedResource1: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device1::OpenSharedResourceByName",
       "ID3D11Device1::OpenSharedResourceByName: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Device2::GetImmediateContext2", NULL, cls_ID3D11Device3_50, xaux_ID3D11Device3_50, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device2::CreateDeferredContext2", NULL, cls_ID3D11Device3_51, xaux_ID3D11Device3_51, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device2::GetResourceTiling", NULL, cls_ID3D11Device3_52, NULL, 8, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0020, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device2::CheckMultisampleQualityLevels1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0007, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::CreateTexture2D1", NULL, cls_ID3D11Device3_54, xaux_ID3D11Device3_54, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device3_54, 1, NULL },
-    { "ID3D11Device3::CreateTexture3D1", NULL, cls_ID3D11Device3_55, xaux_ID3D11Device3_55, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device3_55, 1, NULL },
-    { "ID3D11Device3::CreateRasterizerState2", NULL, cls_ID3D11Device3_56, xaux_ID3D11Device3_56, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::CreateShaderResourceView1", NULL, cls_ID3D11Device3_57, xaux_ID3D11Device3_57, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::CreateUnorderedAccessView1", NULL, cls_ID3D11Device3_58, xaux_ID3D11Device3_58, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::CreateRenderTargetView1", NULL, cls_ID3D11Device3_59, xaux_ID3D11Device3_59, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::CreateQuery1", NULL, cls_ID3D11Device3_60, xaux_ID3D11Device3_60, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::GetImmediateContext3", NULL, cls_ID3D11Device3_61, xaux_ID3D11Device3_61, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::CreateDeferredContext3", NULL, cls_ID3D11Device3_62, xaux_ID3D11Device3_62, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device2::GetImmediateContext2", NULL, cls_ID3D11Device3_50, xaux_ID3D11Device3_50, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11Device2::CreateDeferredContext2", NULL, cls_ID3D11Device3_51, xaux_ID3D11Device3_51, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device2::GetResourceTiling", NULL, cls_ID3D11Device3_52, NULL, 8, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0020, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0012, 0x0000 },
+    { "ID3D11Device2::CheckMultisampleQualityLevels1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0007, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0008, 0x0000 },
+    { "ID3D11Device3::CreateTexture2D1", NULL, cls_ID3D11Device3_54, xaux_ID3D11Device3_54, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device3_54, 1, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateTexture3D1", NULL, cls_ID3D11Device3_55, xaux_ID3D11Device3_55, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device3_55, 1, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateRasterizerState2", NULL, cls_ID3D11Device3_56, xaux_ID3D11Device3_56, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateShaderResourceView1", NULL, cls_ID3D11Device3_57, xaux_ID3D11Device3_57, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateUnorderedAccessView1", NULL, cls_ID3D11Device3_58, xaux_ID3D11Device3_58, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateRenderTargetView1", NULL, cls_ID3D11Device3_59, xaux_ID3D11Device3_59, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateQuery1", NULL, cls_ID3D11Device3_60, xaux_ID3D11Device3_60, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device3::GetImmediateContext3", NULL, cls_ID3D11Device3_61, xaux_ID3D11Device3_61, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateDeferredContext3", NULL, cls_ID3D11Device3_62, xaux_ID3D11Device3_62, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device3::WriteToSubresource", NULL, cls_ID3D11Device3_63, NULL, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0032, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device3::ReadFromSubresource", NULL, cls_ID3D11Device3_64, NULL, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0016, 0x0000, 0x0000, NULL, 0, NULL },
 };
@@ -1893,41 +1897,41 @@ static const struct winecom_slot slots_ID3D11Device4[67] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11Device::CreateBuffer", NULL, cls_ID3D11Device4_3, xaux_ID3D11Device4_3, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device4_3, 1, NULL },
+    { "ID3D11Device::CreateBuffer", NULL, cls_ID3D11Device4_3, xaux_ID3D11Device4_3, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device4_3, 1, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CreateTexture1D", NULL, cls_ID3D11Device4_4, xaux_ID3D11Device4_4, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11Device::CreateTexture1D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
+      "ID3D11Device::CreateTexture1D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CreateTexture2D", NULL, cls_ID3D11Device4_5, xaux_ID3D11Device4_5, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11Device::CreateTexture2D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
+      "ID3D11Device::CreateTexture2D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CreateTexture3D", NULL, cls_ID3D11Device4_6, xaux_ID3D11Device4_6, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11Device::CreateTexture3D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
-    { "ID3D11Device::CreateShaderResourceView", NULL, cls_ID3D11Device4_7, xaux_ID3D11Device4_7, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateUnorderedAccessView", NULL, cls_ID3D11Device4_8, xaux_ID3D11Device4_8, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateRenderTargetView", NULL, cls_ID3D11Device4_9, xaux_ID3D11Device4_9, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDepthStencilView", NULL, cls_ID3D11Device4_10, xaux_ID3D11Device4_10, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateInputLayout", NULL, cls_ID3D11Device4_11, xaux_ID3D11Device4_11, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11Device4_11, 1, NULL },
-    { "ID3D11Device::CreateVertexShader", NULL, cls_ID3D11Device4_12, xaux_ID3D11Device4_12, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateGeometryShader", NULL, cls_ID3D11Device4_13, xaux_ID3D11Device4_13, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateGeometryShaderWithStreamOutput", NULL, cls_ID3D11Device4_14, xaux_ID3D11Device4_14, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0068, 0x0000, 0x0000, reps_ID3D11Device4_14, 1, NULL },
-    { "ID3D11Device::CreatePixelShader", NULL, cls_ID3D11Device4_15, xaux_ID3D11Device4_15, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateHullShader", NULL, cls_ID3D11Device4_16, xaux_ID3D11Device4_16, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDomainShader", NULL, cls_ID3D11Device4_17, xaux_ID3D11Device4_17, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateComputeShader", NULL, cls_ID3D11Device4_18, xaux_ID3D11Device4_18, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateClassLinkage", NULL, cls_ID3D11Device4_19, xaux_ID3D11Device4_19, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateBlendState", NULL, cls_ID3D11Device4_20, xaux_ID3D11Device4_20, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDepthStencilState", NULL, cls_ID3D11Device4_21, xaux_ID3D11Device4_21, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateRasterizerState", NULL, cls_ID3D11Device4_22, xaux_ID3D11Device4_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateSamplerState", NULL, cls_ID3D11Device4_23, xaux_ID3D11Device4_23, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateQuery", NULL, cls_ID3D11Device4_24, xaux_ID3D11Device4_24, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreatePredicate", NULL, cls_ID3D11Device4_25, xaux_ID3D11Device4_25, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateCounter", NULL, cls_ID3D11Device4_26, xaux_ID3D11Device4_26, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDeferredContext", NULL, cls_ID3D11Device4_27, xaux_ID3D11Device4_27, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+      "ID3D11Device::CreateTexture3D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateShaderResourceView", NULL, cls_ID3D11Device4_7, xaux_ID3D11Device4_7, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateUnorderedAccessView", NULL, cls_ID3D11Device4_8, xaux_ID3D11Device4_8, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateRenderTargetView", NULL, cls_ID3D11Device4_9, xaux_ID3D11Device4_9, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDepthStencilView", NULL, cls_ID3D11Device4_10, xaux_ID3D11Device4_10, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateInputLayout", NULL, cls_ID3D11Device4_11, xaux_ID3D11Device4_11, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11Device4_11, 1, NULL, 0, 0x0010, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateVertexShader", NULL, cls_ID3D11Device4_12, xaux_ID3D11Device4_12, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateGeometryShader", NULL, cls_ID3D11Device4_13, xaux_ID3D11Device4_13, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateGeometryShaderWithStreamOutput", NULL, cls_ID3D11Device4_14, xaux_ID3D11Device4_14, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0068, 0x0000, 0x0000, reps_ID3D11Device4_14, 1, NULL, 0, 0x0100, 0x0000, 0x0000 },
+    { "ID3D11Device::CreatePixelShader", NULL, cls_ID3D11Device4_15, xaux_ID3D11Device4_15, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateHullShader", NULL, cls_ID3D11Device4_16, xaux_ID3D11Device4_16, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDomainShader", NULL, cls_ID3D11Device4_17, xaux_ID3D11Device4_17, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateComputeShader", NULL, cls_ID3D11Device4_18, xaux_ID3D11Device4_18, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateClassLinkage", NULL, cls_ID3D11Device4_19, xaux_ID3D11Device4_19, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateBlendState", NULL, cls_ID3D11Device4_20, xaux_ID3D11Device4_20, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDepthStencilState", NULL, cls_ID3D11Device4_21, xaux_ID3D11Device4_21, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateRasterizerState", NULL, cls_ID3D11Device4_22, xaux_ID3D11Device4_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateSamplerState", NULL, cls_ID3D11Device4_23, xaux_ID3D11Device4_23, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateQuery", NULL, cls_ID3D11Device4_24, xaux_ID3D11Device4_24, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreatePredicate", NULL, cls_ID3D11Device4_25, xaux_ID3D11Device4_25, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateCounter", NULL, cls_ID3D11Device4_26, xaux_ID3D11Device4_26, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDeferredContext", NULL, cls_ID3D11Device4_27, xaux_ID3D11Device4_27, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device::OpenSharedResource",
       "ID3D11Device::OpenSharedResource: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "ID3D11Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "ID3D11Device::CheckCounterInfo", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CheckCounter", NULL, NULL, NULL, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Device::CheckCounter", NULL, NULL, NULL, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0156, 0x0000 },
     { "ID3D11Device::CheckFeatureSupport", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11Device::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -1935,38 +1939,38 @@ static const struct winecom_slot slots_ID3D11Device4[67] =
     { "ID3D11Device::GetFeatureLevel", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetDeviceRemovedReason", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::GetImmediateContext", NULL, cls_ID3D11Device4_40, xaux_ID3D11Device4_40, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Device::GetImmediateContext", NULL, cls_ID3D11Device4_40, xaux_ID3D11Device4_40, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11Device::SetExceptionMode", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetExceptionMode", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::GetImmediateContext1", NULL, cls_ID3D11Device4_43, xaux_ID3D11Device4_43, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateDeferredContext1", NULL, cls_ID3D11Device4_44, xaux_ID3D11Device4_44, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateBlendState1", NULL, cls_ID3D11Device4_45, xaux_ID3D11Device4_45, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateRasterizerState1", NULL, cls_ID3D11Device4_46, xaux_ID3D11Device4_46, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateDeviceContextState", NULL, cls_ID3D11Device4_47, xaux_ID3D11Device4_47, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000d, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Device1::GetImmediateContext1", NULL, cls_ID3D11Device4_43, xaux_ID3D11Device4_43, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateDeferredContext1", NULL, cls_ID3D11Device4_44, xaux_ID3D11Device4_44, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateBlendState1", NULL, cls_ID3D11Device4_45, xaux_ID3D11Device4_45, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateRasterizerState1", NULL, cls_ID3D11Device4_46, xaux_ID3D11Device4_46, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateDeviceContextState", NULL, cls_ID3D11Device4_47, xaux_ID3D11Device4_47, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000d, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0040, 0x0020, 0x0000 },
     { "ID3D11Device1::OpenSharedResource1",
       "ID3D11Device1::OpenSharedResource1: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device1::OpenSharedResourceByName",
       "ID3D11Device1::OpenSharedResourceByName: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Device2::GetImmediateContext2", NULL, cls_ID3D11Device4_50, xaux_ID3D11Device4_50, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device2::CreateDeferredContext2", NULL, cls_ID3D11Device4_51, xaux_ID3D11Device4_51, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device2::GetResourceTiling", NULL, cls_ID3D11Device4_52, NULL, 8, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0020, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device2::CheckMultisampleQualityLevels1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0007, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::CreateTexture2D1", NULL, cls_ID3D11Device4_54, xaux_ID3D11Device4_54, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device4_54, 1, NULL },
-    { "ID3D11Device3::CreateTexture3D1", NULL, cls_ID3D11Device4_55, xaux_ID3D11Device4_55, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device4_55, 1, NULL },
-    { "ID3D11Device3::CreateRasterizerState2", NULL, cls_ID3D11Device4_56, xaux_ID3D11Device4_56, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::CreateShaderResourceView1", NULL, cls_ID3D11Device4_57, xaux_ID3D11Device4_57, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::CreateUnorderedAccessView1", NULL, cls_ID3D11Device4_58, xaux_ID3D11Device4_58, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::CreateRenderTargetView1", NULL, cls_ID3D11Device4_59, xaux_ID3D11Device4_59, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::CreateQuery1", NULL, cls_ID3D11Device4_60, xaux_ID3D11Device4_60, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::GetImmediateContext3", NULL, cls_ID3D11Device4_61, xaux_ID3D11Device4_61, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::CreateDeferredContext3", NULL, cls_ID3D11Device4_62, xaux_ID3D11Device4_62, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device2::GetImmediateContext2", NULL, cls_ID3D11Device4_50, xaux_ID3D11Device4_50, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11Device2::CreateDeferredContext2", NULL, cls_ID3D11Device4_51, xaux_ID3D11Device4_51, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device2::GetResourceTiling", NULL, cls_ID3D11Device4_52, NULL, 8, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0020, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0012, 0x0000 },
+    { "ID3D11Device2::CheckMultisampleQualityLevels1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0007, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0008, 0x0000 },
+    { "ID3D11Device3::CreateTexture2D1", NULL, cls_ID3D11Device4_54, xaux_ID3D11Device4_54, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device4_54, 1, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateTexture3D1", NULL, cls_ID3D11Device4_55, xaux_ID3D11Device4_55, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device4_55, 1, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateRasterizerState2", NULL, cls_ID3D11Device4_56, xaux_ID3D11Device4_56, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateShaderResourceView1", NULL, cls_ID3D11Device4_57, xaux_ID3D11Device4_57, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateUnorderedAccessView1", NULL, cls_ID3D11Device4_58, xaux_ID3D11Device4_58, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateRenderTargetView1", NULL, cls_ID3D11Device4_59, xaux_ID3D11Device4_59, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateQuery1", NULL, cls_ID3D11Device4_60, xaux_ID3D11Device4_60, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device3::GetImmediateContext3", NULL, cls_ID3D11Device4_61, xaux_ID3D11Device4_61, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateDeferredContext3", NULL, cls_ID3D11Device4_62, xaux_ID3D11Device4_62, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device3::WriteToSubresource", NULL, cls_ID3D11Device4_63, NULL, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0032, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device3::ReadFromSubresource", NULL, cls_ID3D11Device4_64, NULL, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0016, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device4::RegisterDeviceRemovedEvent",
       "ID3D11Device4::RegisterDeviceRemovedEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11Device4::UnregisterDeviceRemoved", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -2073,41 +2077,41 @@ static const struct winecom_slot slots_ID3D11Device5[69] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11Device::CreateBuffer", NULL, cls_ID3D11Device5_3, xaux_ID3D11Device5_3, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device5_3, 1, NULL },
+    { "ID3D11Device::CreateBuffer", NULL, cls_ID3D11Device5_3, xaux_ID3D11Device5_3, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device5_3, 1, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CreateTexture1D", NULL, cls_ID3D11Device5_4, xaux_ID3D11Device5_4, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11Device::CreateTexture1D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
+      "ID3D11Device::CreateTexture1D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CreateTexture2D", NULL, cls_ID3D11Device5_5, xaux_ID3D11Device5_5, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11Device::CreateTexture2D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
+      "ID3D11Device::CreateTexture2D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device::CreateTexture3D", NULL, cls_ID3D11Device5_6, xaux_ID3D11Device5_6, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
-      "ID3D11Device::CreateTexture3D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row" },
-    { "ID3D11Device::CreateShaderResourceView", NULL, cls_ID3D11Device5_7, xaux_ID3D11Device5_7, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateUnorderedAccessView", NULL, cls_ID3D11Device5_8, xaux_ID3D11Device5_8, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateRenderTargetView", NULL, cls_ID3D11Device5_9, xaux_ID3D11Device5_9, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDepthStencilView", NULL, cls_ID3D11Device5_10, xaux_ID3D11Device5_10, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateInputLayout", NULL, cls_ID3D11Device5_11, xaux_ID3D11Device5_11, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11Device5_11, 1, NULL },
-    { "ID3D11Device::CreateVertexShader", NULL, cls_ID3D11Device5_12, xaux_ID3D11Device5_12, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateGeometryShader", NULL, cls_ID3D11Device5_13, xaux_ID3D11Device5_13, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateGeometryShaderWithStreamOutput", NULL, cls_ID3D11Device5_14, xaux_ID3D11Device5_14, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0068, 0x0000, 0x0000, reps_ID3D11Device5_14, 1, NULL },
-    { "ID3D11Device::CreatePixelShader", NULL, cls_ID3D11Device5_15, xaux_ID3D11Device5_15, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateHullShader", NULL, cls_ID3D11Device5_16, xaux_ID3D11Device5_16, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDomainShader", NULL, cls_ID3D11Device5_17, xaux_ID3D11Device5_17, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateComputeShader", NULL, cls_ID3D11Device5_18, xaux_ID3D11Device5_18, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateClassLinkage", NULL, cls_ID3D11Device5_19, xaux_ID3D11Device5_19, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateBlendState", NULL, cls_ID3D11Device5_20, xaux_ID3D11Device5_20, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDepthStencilState", NULL, cls_ID3D11Device5_21, xaux_ID3D11Device5_21, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateRasterizerState", NULL, cls_ID3D11Device5_22, xaux_ID3D11Device5_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateSamplerState", NULL, cls_ID3D11Device5_23, xaux_ID3D11Device5_23, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateQuery", NULL, cls_ID3D11Device5_24, xaux_ID3D11Device5_24, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreatePredicate", NULL, cls_ID3D11Device5_25, xaux_ID3D11Device5_25, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateCounter", NULL, cls_ID3D11Device5_26, xaux_ID3D11Device5_26, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CreateDeferredContext", NULL, cls_ID3D11Device5_27, xaux_ID3D11Device5_27, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+      "ID3D11Device::CreateTexture3D: `pInitialData` is an array of the divergent D3D11_SUBRESOURCE_DATA whose element count is not a by-value parameter; a hand32 walker must serve this row", 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateShaderResourceView", NULL, cls_ID3D11Device5_7, xaux_ID3D11Device5_7, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateUnorderedAccessView", NULL, cls_ID3D11Device5_8, xaux_ID3D11Device5_8, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateRenderTargetView", NULL, cls_ID3D11Device5_9, xaux_ID3D11Device5_9, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDepthStencilView", NULL, cls_ID3D11Device5_10, xaux_ID3D11Device5_10, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateInputLayout", NULL, cls_ID3D11Device5_11, xaux_ID3D11Device5_11, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11Device5_11, 1, NULL, 0, 0x0010, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateVertexShader", NULL, cls_ID3D11Device5_12, xaux_ID3D11Device5_12, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateGeometryShader", NULL, cls_ID3D11Device5_13, xaux_ID3D11Device5_13, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateGeometryShaderWithStreamOutput", NULL, cls_ID3D11Device5_14, xaux_ID3D11Device5_14, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0068, 0x0000, 0x0000, reps_ID3D11Device5_14, 1, NULL, 0, 0x0100, 0x0000, 0x0000 },
+    { "ID3D11Device::CreatePixelShader", NULL, cls_ID3D11Device5_15, xaux_ID3D11Device5_15, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateHullShader", NULL, cls_ID3D11Device5_16, xaux_ID3D11Device5_16, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDomainShader", NULL, cls_ID3D11Device5_17, xaux_ID3D11Device5_17, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateComputeShader", NULL, cls_ID3D11Device5_18, xaux_ID3D11Device5_18, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateClassLinkage", NULL, cls_ID3D11Device5_19, xaux_ID3D11Device5_19, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateBlendState", NULL, cls_ID3D11Device5_20, xaux_ID3D11Device5_20, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDepthStencilState", NULL, cls_ID3D11Device5_21, xaux_ID3D11Device5_21, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateRasterizerState", NULL, cls_ID3D11Device5_22, xaux_ID3D11Device5_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateSamplerState", NULL, cls_ID3D11Device5_23, xaux_ID3D11Device5_23, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateQuery", NULL, cls_ID3D11Device5_24, xaux_ID3D11Device5_24, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreatePredicate", NULL, cls_ID3D11Device5_25, xaux_ID3D11Device5_25, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateCounter", NULL, cls_ID3D11Device5_26, xaux_ID3D11Device5_26, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device::CreateDeferredContext", NULL, cls_ID3D11Device5_27, xaux_ID3D11Device5_27, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device::OpenSharedResource",
       "ID3D11Device::OpenSharedResource: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device::CheckFormatSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "ID3D11Device::CheckMultisampleQualityLevels", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "ID3D11Device::CheckCounterInfo", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::CheckCounter", NULL, NULL, NULL, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Device::CheckCounter", NULL, NULL, NULL, 10, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0156, 0x0000 },
     { "ID3D11Device::CheckFeatureSupport", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11Device::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -2115,43 +2119,43 @@ static const struct winecom_slot slots_ID3D11Device5[69] =
     { "ID3D11Device::GetFeatureLevel", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetDeviceRemovedReason", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device::GetImmediateContext", NULL, cls_ID3D11Device5_40, xaux_ID3D11Device5_40, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Device::GetImmediateContext", NULL, cls_ID3D11Device5_40, xaux_ID3D11Device5_40, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11Device::SetExceptionMode", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device::GetExceptionMode", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::GetImmediateContext1", NULL, cls_ID3D11Device5_43, xaux_ID3D11Device5_43, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateDeferredContext1", NULL, cls_ID3D11Device5_44, xaux_ID3D11Device5_44, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateBlendState1", NULL, cls_ID3D11Device5_45, xaux_ID3D11Device5_45, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateRasterizerState1", NULL, cls_ID3D11Device5_46, xaux_ID3D11Device5_46, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device1::CreateDeviceContextState", NULL, cls_ID3D11Device5_47, xaux_ID3D11Device5_47, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000d, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Device1::GetImmediateContext1", NULL, cls_ID3D11Device5_43, xaux_ID3D11Device5_43, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateDeferredContext1", NULL, cls_ID3D11Device5_44, xaux_ID3D11Device5_44, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateBlendState1", NULL, cls_ID3D11Device5_45, xaux_ID3D11Device5_45, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateRasterizerState1", NULL, cls_ID3D11Device5_46, xaux_ID3D11Device5_46, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device1::CreateDeviceContextState", NULL, cls_ID3D11Device5_47, xaux_ID3D11Device5_47, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000d, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0040, 0x0020, 0x0000 },
     { "ID3D11Device1::OpenSharedResource1",
       "ID3D11Device1::OpenSharedResource1: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11Device1::OpenSharedResourceByName",
       "ID3D11Device1::OpenSharedResourceByName: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Device2::GetImmediateContext2", NULL, cls_ID3D11Device5_50, xaux_ID3D11Device5_50, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device2::CreateDeferredContext2", NULL, cls_ID3D11Device5_51, xaux_ID3D11Device5_51, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device2::GetResourceTiling", NULL, cls_ID3D11Device5_52, NULL, 8, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0020, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device2::CheckMultisampleQualityLevels1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0007, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::CreateTexture2D1", NULL, cls_ID3D11Device5_54, xaux_ID3D11Device5_54, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device5_54, 1, NULL },
-    { "ID3D11Device3::CreateTexture3D1", NULL, cls_ID3D11Device5_55, xaux_ID3D11Device5_55, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device5_55, 1, NULL },
-    { "ID3D11Device3::CreateRasterizerState2", NULL, cls_ID3D11Device5_56, xaux_ID3D11Device5_56, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::CreateShaderResourceView1", NULL, cls_ID3D11Device5_57, xaux_ID3D11Device5_57, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::CreateUnorderedAccessView1", NULL, cls_ID3D11Device5_58, xaux_ID3D11Device5_58, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::CreateRenderTargetView1", NULL, cls_ID3D11Device5_59, xaux_ID3D11Device5_59, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::CreateQuery1", NULL, cls_ID3D11Device5_60, xaux_ID3D11Device5_60, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::GetImmediateContext3", NULL, cls_ID3D11Device5_61, xaux_ID3D11Device5_61, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11Device3::CreateDeferredContext3", NULL, cls_ID3D11Device5_62, xaux_ID3D11Device5_62, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11Device2::GetImmediateContext2", NULL, cls_ID3D11Device5_50, xaux_ID3D11Device5_50, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11Device2::CreateDeferredContext2", NULL, cls_ID3D11Device5_51, xaux_ID3D11Device5_51, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device2::GetResourceTiling", NULL, cls_ID3D11Device5_52, NULL, 8, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0020, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0012, 0x0000 },
+    { "ID3D11Device2::CheckMultisampleQualityLevels1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0007, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0008, 0x0000 },
+    { "ID3D11Device3::CreateTexture2D1", NULL, cls_ID3D11Device5_54, xaux_ID3D11Device5_54, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device5_54, 1, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateTexture3D1", NULL, cls_ID3D11Device5_55, xaux_ID3D11Device5_55, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_ID3D11Device5_55, 1, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateRasterizerState2", NULL, cls_ID3D11Device5_56, xaux_ID3D11Device5_56, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateShaderResourceView1", NULL, cls_ID3D11Device5_57, xaux_ID3D11Device5_57, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateUnorderedAccessView1", NULL, cls_ID3D11Device5_58, xaux_ID3D11Device5_58, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateRenderTargetView1", NULL, cls_ID3D11Device5_59, xaux_ID3D11Device5_59, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateQuery1", NULL, cls_ID3D11Device5_60, xaux_ID3D11Device5_60, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11Device3::GetImmediateContext3", NULL, cls_ID3D11Device5_61, xaux_ID3D11Device5_61, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11Device3::CreateDeferredContext3", NULL, cls_ID3D11Device5_62, xaux_ID3D11Device5_62, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11Device3::WriteToSubresource", NULL, cls_ID3D11Device5_63, NULL, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0032, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device3::ReadFromSubresource", NULL, cls_ID3D11Device5_64, NULL, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0016, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device4::RegisterDeviceRemovedEvent",
       "ID3D11Device4::RegisterDeviceRemovedEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11Device4::UnregisterDeviceRemoved", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Device5::OpenSharedFence",
       "ID3D11Device5::OpenSharedFence: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Device5::CreateFence", NULL, cls_ID3D11Device5_68, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 2, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0001, NULL, 0, NULL },
+      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11Device5::CreateFence", NULL, cls_ID3D11Device5_68, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 2, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0001, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
 };
 
 static const unsigned char cls_ID3D11DeviceChild_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
@@ -2161,7 +2165,7 @@ static const struct winecom_slot slots_ID3D11DeviceChild[7] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11DeviceChild_3, xaux_ID3D11DeviceChild_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11DeviceChild_3, xaux_ID3D11DeviceChild_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -2228,9 +2232,15 @@ static const unsigned char caux_ID3D11DeviceContext_72[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext_73[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext_73[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext_73[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext_74[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext_74[] = { 57, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext_74[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext_75[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext_75[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext_75[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext_76[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext_76[] = { 77, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext_76[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext_77[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext_77[] = { 0, 0, 30 };
 static const unsigned char caux_ID3D11DeviceContext_77[] = { 0, 0, 1 };
@@ -2244,6 +2254,9 @@ static const unsigned char xaux_ID3D11DeviceContext_80[] = { 30, 0, 0 };
 static const unsigned char cls_ID3D11DeviceContext_81[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext_81[] = { 0, 0, 30 };
 static const unsigned char caux_ID3D11DeviceContext_81[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext_82[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext_82[] = { 53, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext_82[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext_84[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext_84[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext_84[] = { 0, 0, 1 };
@@ -2260,6 +2273,7 @@ static const unsigned char xaux_ID3D11DeviceContext_88[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext_88[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext_89[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext_89[] = { 0, 64, 38 };
+static const unsigned char caux_ID3D11DeviceContext_89[] = { 0, 0, 0 };
 static const unsigned char cls_ID3D11DeviceContext_90[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext_90[] = { 0, 64, 38, 0, 0, 75 };
 static const unsigned char caux_ID3D11DeviceContext_90[] = { 0, 0, 0, 0, 0, 4 };
@@ -2269,11 +2283,15 @@ static const unsigned char cls_ID3D11DeviceContext_92[] = { WINECOM_CA_IFACE_OUT
 static const unsigned char xaux_ID3D11DeviceContext_92[] = { 37, 0 };
 static const unsigned char cls_ID3D11DeviceContext_93[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext_93[] = { 0, 30 };
+static const unsigned char caux_ID3D11DeviceContext_93[] = { 0, 0 };
 static const unsigned char cls_ID3D11DeviceContext_94[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext_94[] = { 61 };
 static const unsigned char cls_ID3D11DeviceContext_97[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext_97[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext_97[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext_98[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext_98[] = { 54, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext_98[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext_99[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext_99[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext_99[] = { 0, 0, 1 };
@@ -2283,6 +2301,9 @@ static const unsigned char caux_ID3D11DeviceContext_100[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext_101[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext_101[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext_101[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext_102[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext_102[] = { 51, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext_102[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext_103[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext_103[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext_103[] = { 0, 0, 1 };
@@ -2295,6 +2316,9 @@ static const unsigned char caux_ID3D11DeviceContext_105[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext_106[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext_106[] = { 0, 0, 75 };
 static const unsigned char caux_ID3D11DeviceContext_106[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext_107[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext_107[] = { 34, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext_107[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext_108[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext_108[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext_108[] = { 0, 0, 1 };
@@ -2308,7 +2332,7 @@ static const struct winecom_slot slots_ID3D11DeviceContext[115] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11DeviceContext_3, xaux_ID3D11DeviceContext_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11DeviceContext_3, xaux_ID3D11DeviceContext_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -2378,61 +2402,55 @@ static const struct winecom_slot slots_ID3D11DeviceContext[115] =
     { "ID3D11DeviceContext::CSSetShader", NULL, cls_ID3D11DeviceContext_69, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::CSSetSamplers", NULL, cls_ID3D11DeviceContext_70, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::CSSetConstantBuffers", NULL, cls_ID3D11DeviceContext_71, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetConstantBuffers", NULL, cls_ID3D11DeviceContext_72, xaux_ID3D11DeviceContext_72, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_72, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::PSGetShaderResources", NULL, cls_ID3D11DeviceContext_73, xaux_ID3D11DeviceContext_73, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_73, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::PSGetShader",
-      "ID3D11DeviceContext::PSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::PSGetSamplers", NULL, cls_ID3D11DeviceContext_75, xaux_ID3D11DeviceContext_75, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_75, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetShader",
-      "ID3D11DeviceContext::VSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::PSGetConstantBuffers", NULL, cls_ID3D11DeviceContext_77, xaux_ID3D11DeviceContext_77, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_77, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::IAGetInputLayout", NULL, cls_ID3D11DeviceContext_78, xaux_ID3D11DeviceContext_78, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::IAGetVertexBuffers", NULL, cls_ID3D11DeviceContext_79, xaux_ID3D11DeviceContext_79, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_79, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::IAGetIndexBuffer", NULL, cls_ID3D11DeviceContext_80, xaux_ID3D11DeviceContext_80, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetConstantBuffers", NULL, cls_ID3D11DeviceContext_81, xaux_ID3D11DeviceContext_81, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_81, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetShader",
-      "ID3D11DeviceContext::GSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::IAGetPrimitiveTopology", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetShaderResources", NULL, cls_ID3D11DeviceContext_84, xaux_ID3D11DeviceContext_84, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_84, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetSamplers", NULL, cls_ID3D11DeviceContext_85, xaux_ID3D11DeviceContext_85, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_85, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GetPredication", NULL, cls_ID3D11DeviceContext_86, xaux_ID3D11DeviceContext_86, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetShaderResources", NULL, cls_ID3D11DeviceContext_87, xaux_ID3D11DeviceContext_87, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_87, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetSamplers", NULL, cls_ID3D11DeviceContext_88, xaux_ID3D11DeviceContext_88, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_88, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetRenderTargets", NULL, cls_ID3D11DeviceContext_89, xaux_ID3D11DeviceContext_89, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetRenderTargetsAndUnorderedAccessViews", NULL, cls_ID3D11DeviceContext_90, xaux_ID3D11DeviceContext_90, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_90, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0019, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetBlendState", NULL, cls_ID3D11DeviceContext_91, xaux_ID3D11DeviceContext_91, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetDepthStencilState", NULL, cls_ID3D11DeviceContext_92, xaux_ID3D11DeviceContext_92, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::SOGetTargets", NULL, cls_ID3D11DeviceContext_93, xaux_ID3D11DeviceContext_93, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::RSGetState", NULL, cls_ID3D11DeviceContext_94, xaux_ID3D11DeviceContext_94, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::RSGetViewports", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::RSGetScissorRects", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::HSGetShaderResources", NULL, cls_ID3D11DeviceContext_97, xaux_ID3D11DeviceContext_97, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_97, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::HSGetShader",
-      "ID3D11DeviceContext::HSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::HSGetSamplers", NULL, cls_ID3D11DeviceContext_99, xaux_ID3D11DeviceContext_99, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_99, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::HSGetConstantBuffers", NULL, cls_ID3D11DeviceContext_100, xaux_ID3D11DeviceContext_100, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_100, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::DSGetShaderResources", NULL, cls_ID3D11DeviceContext_101, xaux_ID3D11DeviceContext_101, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_101, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::DSGetShader",
-      "ID3D11DeviceContext::DSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::DSGetSamplers", NULL, cls_ID3D11DeviceContext_103, xaux_ID3D11DeviceContext_103, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_103, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::DSGetConstantBuffers", NULL, cls_ID3D11DeviceContext_104, xaux_ID3D11DeviceContext_104, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_104, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetShaderResources", NULL, cls_ID3D11DeviceContext_105, xaux_ID3D11DeviceContext_105, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_105, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetUnorderedAccessViews", NULL, cls_ID3D11DeviceContext_106, xaux_ID3D11DeviceContext_106, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_106, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetShader",
-      "ID3D11DeviceContext::CSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::CSGetSamplers", NULL, cls_ID3D11DeviceContext_108, xaux_ID3D11DeviceContext_108, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_108, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetConstantBuffers", NULL, cls_ID3D11DeviceContext_109, xaux_ID3D11DeviceContext_109, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_109, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceContext::VSGetConstantBuffers", NULL, cls_ID3D11DeviceContext_72, xaux_ID3D11DeviceContext_72, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_72, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::PSGetShaderResources", NULL, cls_ID3D11DeviceContext_73, xaux_ID3D11DeviceContext_73, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_73, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::PSGetShader", NULL, cls_ID3D11DeviceContext_74, xaux_ID3D11DeviceContext_74, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext_74, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::PSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::PSGetSamplers", NULL, cls_ID3D11DeviceContext_75, xaux_ID3D11DeviceContext_75, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_75, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::VSGetShader", NULL, cls_ID3D11DeviceContext_76, xaux_ID3D11DeviceContext_76, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext_76, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::VSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::PSGetConstantBuffers", NULL, cls_ID3D11DeviceContext_77, xaux_ID3D11DeviceContext_77, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_77, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::IAGetInputLayout", NULL, cls_ID3D11DeviceContext_78, xaux_ID3D11DeviceContext_78, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::IAGetVertexBuffers", NULL, cls_ID3D11DeviceContext_79, xaux_ID3D11DeviceContext_79, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_79, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext::IAGetIndexBuffer", NULL, cls_ID3D11DeviceContext_80, xaux_ID3D11DeviceContext_80, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0006, 0x0000 },
+    { "ID3D11DeviceContext::GSGetConstantBuffers", NULL, cls_ID3D11DeviceContext_81, xaux_ID3D11DeviceContext_81, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_81, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::GSGetShader", NULL, cls_ID3D11DeviceContext_82, xaux_ID3D11DeviceContext_82, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext_82, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::GSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::IAGetPrimitiveTopology", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D11DeviceContext::VSGetShaderResources", NULL, cls_ID3D11DeviceContext_84, xaux_ID3D11DeviceContext_84, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_84, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::VSGetSamplers", NULL, cls_ID3D11DeviceContext_85, xaux_ID3D11DeviceContext_85, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_85, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::GetPredication", NULL, cls_ID3D11DeviceContext_86, xaux_ID3D11DeviceContext_86, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0002, 0x0000 },
+    { "ID3D11DeviceContext::GSGetShaderResources", NULL, cls_ID3D11DeviceContext_87, xaux_ID3D11DeviceContext_87, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_87, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::GSGetSamplers", NULL, cls_ID3D11DeviceContext_88, xaux_ID3D11DeviceContext_88, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_88, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::OMGetRenderTargets", NULL, cls_ID3D11DeviceContext_89, xaux_ID3D11DeviceContext_89, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_89, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0006, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::OMGetRenderTargetsAndUnorderedAccessViews", NULL, cls_ID3D11DeviceContext_90, xaux_ID3D11DeviceContext_90, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_90, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0019, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0026, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::OMGetBlendState", NULL, cls_ID3D11DeviceContext_91, xaux_ID3D11DeviceContext_91, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::OMGetDepthStencilState", NULL, cls_ID3D11DeviceContext_92, xaux_ID3D11DeviceContext_92, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0002, 0x0000 },
+    { "ID3D11DeviceContext::SOGetTargets", NULL, cls_ID3D11DeviceContext_93, xaux_ID3D11DeviceContext_93, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_93, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::RSGetState", NULL, cls_ID3D11DeviceContext_94, xaux_ID3D11DeviceContext_94, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::RSGetViewports", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D11DeviceContext::RSGetScissorRects", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D11DeviceContext::HSGetShaderResources", NULL, cls_ID3D11DeviceContext_97, xaux_ID3D11DeviceContext_97, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_97, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::HSGetShader", NULL, cls_ID3D11DeviceContext_98, xaux_ID3D11DeviceContext_98, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext_98, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::HSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::HSGetSamplers", NULL, cls_ID3D11DeviceContext_99, xaux_ID3D11DeviceContext_99, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_99, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::HSGetConstantBuffers", NULL, cls_ID3D11DeviceContext_100, xaux_ID3D11DeviceContext_100, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_100, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::DSGetShaderResources", NULL, cls_ID3D11DeviceContext_101, xaux_ID3D11DeviceContext_101, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_101, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::DSGetShader", NULL, cls_ID3D11DeviceContext_102, xaux_ID3D11DeviceContext_102, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext_102, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::DSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::DSGetSamplers", NULL, cls_ID3D11DeviceContext_103, xaux_ID3D11DeviceContext_103, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_103, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::DSGetConstantBuffers", NULL, cls_ID3D11DeviceContext_104, xaux_ID3D11DeviceContext_104, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_104, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetShaderResources", NULL, cls_ID3D11DeviceContext_105, xaux_ID3D11DeviceContext_105, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_105, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetUnorderedAccessViews", NULL, cls_ID3D11DeviceContext_106, xaux_ID3D11DeviceContext_106, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_106, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetShader", NULL, cls_ID3D11DeviceContext_107, xaux_ID3D11DeviceContext_107, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext_107, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::CSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::CSGetSamplers", NULL, cls_ID3D11DeviceContext_108, xaux_ID3D11DeviceContext_108, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_108, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetConstantBuffers", NULL, cls_ID3D11DeviceContext_109, xaux_ID3D11DeviceContext_109, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext_109, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11DeviceContext::ClearState", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::Flush", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::GetType", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::GetContextFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::FinishCommandList", NULL, cls_ID3D11DeviceContext_114, xaux_ID3D11DeviceContext_114, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceContext::FinishCommandList", NULL, cls_ID3D11DeviceContext_114, xaux_ID3D11DeviceContext_114, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
 };
 
 static const unsigned char cls_ID3D11DeviceContext1_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
@@ -2496,9 +2514,15 @@ static const unsigned char caux_ID3D11DeviceContext1_72[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext1_73[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext1_73[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext1_73[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext1_74[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext1_74[] = { 57, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext1_74[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext1_75[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext1_75[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext1_75[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext1_76[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext1_76[] = { 77, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext1_76[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext1_77[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext1_77[] = { 0, 0, 30 };
 static const unsigned char caux_ID3D11DeviceContext1_77[] = { 0, 0, 1 };
@@ -2512,6 +2536,9 @@ static const unsigned char xaux_ID3D11DeviceContext1_80[] = { 30, 0, 0 };
 static const unsigned char cls_ID3D11DeviceContext1_81[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext1_81[] = { 0, 0, 30 };
 static const unsigned char caux_ID3D11DeviceContext1_81[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext1_82[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext1_82[] = { 53, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext1_82[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext1_84[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext1_84[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext1_84[] = { 0, 0, 1 };
@@ -2528,6 +2555,7 @@ static const unsigned char xaux_ID3D11DeviceContext1_88[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext1_88[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext1_89[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext1_89[] = { 0, 64, 38 };
+static const unsigned char caux_ID3D11DeviceContext1_89[] = { 0, 0, 0 };
 static const unsigned char cls_ID3D11DeviceContext1_90[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext1_90[] = { 0, 64, 38, 0, 0, 75 };
 static const unsigned char caux_ID3D11DeviceContext1_90[] = { 0, 0, 0, 0, 0, 4 };
@@ -2537,11 +2565,15 @@ static const unsigned char cls_ID3D11DeviceContext1_92[] = { WINECOM_CA_IFACE_OU
 static const unsigned char xaux_ID3D11DeviceContext1_92[] = { 37, 0 };
 static const unsigned char cls_ID3D11DeviceContext1_93[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext1_93[] = { 0, 30 };
+static const unsigned char caux_ID3D11DeviceContext1_93[] = { 0, 0 };
 static const unsigned char cls_ID3D11DeviceContext1_94[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext1_94[] = { 61 };
 static const unsigned char cls_ID3D11DeviceContext1_97[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext1_97[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext1_97[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext1_98[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext1_98[] = { 54, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext1_98[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext1_99[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext1_99[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext1_99[] = { 0, 0, 1 };
@@ -2551,6 +2583,9 @@ static const unsigned char caux_ID3D11DeviceContext1_100[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext1_101[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext1_101[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext1_101[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext1_102[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext1_102[] = { 51, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext1_102[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext1_103[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext1_103[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext1_103[] = { 0, 0, 1 };
@@ -2563,6 +2598,9 @@ static const unsigned char caux_ID3D11DeviceContext1_105[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext1_106[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext1_106[] = { 0, 0, 75 };
 static const unsigned char caux_ID3D11DeviceContext1_106[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext1_107[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext1_107[] = { 34, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext1_107[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext1_108[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext1_108[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext1_108[] = { 0, 0, 1 };
@@ -2608,7 +2646,7 @@ static const struct winecom_slot slots_ID3D11DeviceContext1[134] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11DeviceContext1_3, xaux_ID3D11DeviceContext1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11DeviceContext1_3, xaux_ID3D11DeviceContext1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -2678,61 +2716,55 @@ static const struct winecom_slot slots_ID3D11DeviceContext1[134] =
     { "ID3D11DeviceContext::CSSetShader", NULL, cls_ID3D11DeviceContext1_69, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::CSSetSamplers", NULL, cls_ID3D11DeviceContext1_70, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::CSSetConstantBuffers", NULL, cls_ID3D11DeviceContext1_71, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetConstantBuffers", NULL, cls_ID3D11DeviceContext1_72, xaux_ID3D11DeviceContext1_72, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_72, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::PSGetShaderResources", NULL, cls_ID3D11DeviceContext1_73, xaux_ID3D11DeviceContext1_73, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_73, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::PSGetShader",
-      "ID3D11DeviceContext::PSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::PSGetSamplers", NULL, cls_ID3D11DeviceContext1_75, xaux_ID3D11DeviceContext1_75, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_75, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetShader",
-      "ID3D11DeviceContext::VSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::PSGetConstantBuffers", NULL, cls_ID3D11DeviceContext1_77, xaux_ID3D11DeviceContext1_77, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_77, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::IAGetInputLayout", NULL, cls_ID3D11DeviceContext1_78, xaux_ID3D11DeviceContext1_78, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::IAGetVertexBuffers", NULL, cls_ID3D11DeviceContext1_79, xaux_ID3D11DeviceContext1_79, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_79, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::IAGetIndexBuffer", NULL, cls_ID3D11DeviceContext1_80, xaux_ID3D11DeviceContext1_80, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetConstantBuffers", NULL, cls_ID3D11DeviceContext1_81, xaux_ID3D11DeviceContext1_81, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_81, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetShader",
-      "ID3D11DeviceContext::GSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::IAGetPrimitiveTopology", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetShaderResources", NULL, cls_ID3D11DeviceContext1_84, xaux_ID3D11DeviceContext1_84, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_84, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetSamplers", NULL, cls_ID3D11DeviceContext1_85, xaux_ID3D11DeviceContext1_85, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_85, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GetPredication", NULL, cls_ID3D11DeviceContext1_86, xaux_ID3D11DeviceContext1_86, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetShaderResources", NULL, cls_ID3D11DeviceContext1_87, xaux_ID3D11DeviceContext1_87, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_87, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetSamplers", NULL, cls_ID3D11DeviceContext1_88, xaux_ID3D11DeviceContext1_88, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_88, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetRenderTargets", NULL, cls_ID3D11DeviceContext1_89, xaux_ID3D11DeviceContext1_89, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetRenderTargetsAndUnorderedAccessViews", NULL, cls_ID3D11DeviceContext1_90, xaux_ID3D11DeviceContext1_90, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_90, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0019, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetBlendState", NULL, cls_ID3D11DeviceContext1_91, xaux_ID3D11DeviceContext1_91, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetDepthStencilState", NULL, cls_ID3D11DeviceContext1_92, xaux_ID3D11DeviceContext1_92, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::SOGetTargets", NULL, cls_ID3D11DeviceContext1_93, xaux_ID3D11DeviceContext1_93, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::RSGetState", NULL, cls_ID3D11DeviceContext1_94, xaux_ID3D11DeviceContext1_94, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::RSGetViewports", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::RSGetScissorRects", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::HSGetShaderResources", NULL, cls_ID3D11DeviceContext1_97, xaux_ID3D11DeviceContext1_97, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_97, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::HSGetShader",
-      "ID3D11DeviceContext::HSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::HSGetSamplers", NULL, cls_ID3D11DeviceContext1_99, xaux_ID3D11DeviceContext1_99, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_99, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::HSGetConstantBuffers", NULL, cls_ID3D11DeviceContext1_100, xaux_ID3D11DeviceContext1_100, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_100, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::DSGetShaderResources", NULL, cls_ID3D11DeviceContext1_101, xaux_ID3D11DeviceContext1_101, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_101, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::DSGetShader",
-      "ID3D11DeviceContext::DSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::DSGetSamplers", NULL, cls_ID3D11DeviceContext1_103, xaux_ID3D11DeviceContext1_103, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_103, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::DSGetConstantBuffers", NULL, cls_ID3D11DeviceContext1_104, xaux_ID3D11DeviceContext1_104, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_104, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetShaderResources", NULL, cls_ID3D11DeviceContext1_105, xaux_ID3D11DeviceContext1_105, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_105, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetUnorderedAccessViews", NULL, cls_ID3D11DeviceContext1_106, xaux_ID3D11DeviceContext1_106, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_106, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetShader",
-      "ID3D11DeviceContext::CSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::CSGetSamplers", NULL, cls_ID3D11DeviceContext1_108, xaux_ID3D11DeviceContext1_108, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_108, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetConstantBuffers", NULL, cls_ID3D11DeviceContext1_109, xaux_ID3D11DeviceContext1_109, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_109, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceContext::VSGetConstantBuffers", NULL, cls_ID3D11DeviceContext1_72, xaux_ID3D11DeviceContext1_72, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_72, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::PSGetShaderResources", NULL, cls_ID3D11DeviceContext1_73, xaux_ID3D11DeviceContext1_73, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_73, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::PSGetShader", NULL, cls_ID3D11DeviceContext1_74, xaux_ID3D11DeviceContext1_74, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext1_74, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::PSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::PSGetSamplers", NULL, cls_ID3D11DeviceContext1_75, xaux_ID3D11DeviceContext1_75, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_75, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::VSGetShader", NULL, cls_ID3D11DeviceContext1_76, xaux_ID3D11DeviceContext1_76, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext1_76, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::VSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::PSGetConstantBuffers", NULL, cls_ID3D11DeviceContext1_77, xaux_ID3D11DeviceContext1_77, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_77, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::IAGetInputLayout", NULL, cls_ID3D11DeviceContext1_78, xaux_ID3D11DeviceContext1_78, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::IAGetVertexBuffers", NULL, cls_ID3D11DeviceContext1_79, xaux_ID3D11DeviceContext1_79, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_79, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext::IAGetIndexBuffer", NULL, cls_ID3D11DeviceContext1_80, xaux_ID3D11DeviceContext1_80, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0006, 0x0000 },
+    { "ID3D11DeviceContext::GSGetConstantBuffers", NULL, cls_ID3D11DeviceContext1_81, xaux_ID3D11DeviceContext1_81, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_81, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::GSGetShader", NULL, cls_ID3D11DeviceContext1_82, xaux_ID3D11DeviceContext1_82, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext1_82, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::GSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::IAGetPrimitiveTopology", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D11DeviceContext::VSGetShaderResources", NULL, cls_ID3D11DeviceContext1_84, xaux_ID3D11DeviceContext1_84, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_84, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::VSGetSamplers", NULL, cls_ID3D11DeviceContext1_85, xaux_ID3D11DeviceContext1_85, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_85, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::GetPredication", NULL, cls_ID3D11DeviceContext1_86, xaux_ID3D11DeviceContext1_86, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0002, 0x0000 },
+    { "ID3D11DeviceContext::GSGetShaderResources", NULL, cls_ID3D11DeviceContext1_87, xaux_ID3D11DeviceContext1_87, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_87, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::GSGetSamplers", NULL, cls_ID3D11DeviceContext1_88, xaux_ID3D11DeviceContext1_88, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_88, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::OMGetRenderTargets", NULL, cls_ID3D11DeviceContext1_89, xaux_ID3D11DeviceContext1_89, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_89, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0006, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::OMGetRenderTargetsAndUnorderedAccessViews", NULL, cls_ID3D11DeviceContext1_90, xaux_ID3D11DeviceContext1_90, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_90, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0019, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0026, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::OMGetBlendState", NULL, cls_ID3D11DeviceContext1_91, xaux_ID3D11DeviceContext1_91, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::OMGetDepthStencilState", NULL, cls_ID3D11DeviceContext1_92, xaux_ID3D11DeviceContext1_92, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0002, 0x0000 },
+    { "ID3D11DeviceContext::SOGetTargets", NULL, cls_ID3D11DeviceContext1_93, xaux_ID3D11DeviceContext1_93, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_93, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::RSGetState", NULL, cls_ID3D11DeviceContext1_94, xaux_ID3D11DeviceContext1_94, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::RSGetViewports", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D11DeviceContext::RSGetScissorRects", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D11DeviceContext::HSGetShaderResources", NULL, cls_ID3D11DeviceContext1_97, xaux_ID3D11DeviceContext1_97, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_97, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::HSGetShader", NULL, cls_ID3D11DeviceContext1_98, xaux_ID3D11DeviceContext1_98, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext1_98, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::HSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::HSGetSamplers", NULL, cls_ID3D11DeviceContext1_99, xaux_ID3D11DeviceContext1_99, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_99, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::HSGetConstantBuffers", NULL, cls_ID3D11DeviceContext1_100, xaux_ID3D11DeviceContext1_100, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_100, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::DSGetShaderResources", NULL, cls_ID3D11DeviceContext1_101, xaux_ID3D11DeviceContext1_101, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_101, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::DSGetShader", NULL, cls_ID3D11DeviceContext1_102, xaux_ID3D11DeviceContext1_102, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext1_102, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::DSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::DSGetSamplers", NULL, cls_ID3D11DeviceContext1_103, xaux_ID3D11DeviceContext1_103, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_103, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::DSGetConstantBuffers", NULL, cls_ID3D11DeviceContext1_104, xaux_ID3D11DeviceContext1_104, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_104, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetShaderResources", NULL, cls_ID3D11DeviceContext1_105, xaux_ID3D11DeviceContext1_105, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_105, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetUnorderedAccessViews", NULL, cls_ID3D11DeviceContext1_106, xaux_ID3D11DeviceContext1_106, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_106, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetShader", NULL, cls_ID3D11DeviceContext1_107, xaux_ID3D11DeviceContext1_107, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext1_107, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::CSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::CSGetSamplers", NULL, cls_ID3D11DeviceContext1_108, xaux_ID3D11DeviceContext1_108, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_108, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetConstantBuffers", NULL, cls_ID3D11DeviceContext1_109, xaux_ID3D11DeviceContext1_109, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_109, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11DeviceContext::ClearState", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::Flush", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::GetType", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::GetContextFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::FinishCommandList", NULL, cls_ID3D11DeviceContext1_114, xaux_ID3D11DeviceContext1_114, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceContext::FinishCommandList", NULL, cls_ID3D11DeviceContext1_114, xaux_ID3D11DeviceContext1_114, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11DeviceContext1::CopySubresourceRegion1", NULL, cls_ID3D11DeviceContext1_115, NULL, 10, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x015e, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::UpdateSubresource1", NULL, cls_ID3D11DeviceContext1_116, NULL, 8, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0072, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::DiscardResource", NULL, cls_ID3D11DeviceContext1_117, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -2743,13 +2775,13 @@ static const struct winecom_slot slots_ID3D11DeviceContext1[134] =
     { "ID3D11DeviceContext1::GSSetConstantBuffers1", NULL, cls_ID3D11DeviceContext1_122, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::PSSetConstantBuffers1", NULL, cls_ID3D11DeviceContext1_123, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::CSSetConstantBuffers1", NULL, cls_ID3D11DeviceContext1_124, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::VSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext1_125, xaux_ID3D11DeviceContext1_125, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_125, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::HSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext1_126, xaux_ID3D11DeviceContext1_126, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_126, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::DSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext1_127, xaux_ID3D11DeviceContext1_127, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_127, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::GSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext1_128, xaux_ID3D11DeviceContext1_128, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_128, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::PSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext1_129, xaux_ID3D11DeviceContext1_129, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_129, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::CSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext1_130, xaux_ID3D11DeviceContext1_130, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_130, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::SwapDeviceContextState", NULL, cls_ID3D11DeviceContext1_131, xaux_ID3D11DeviceContext1_131, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceContext1::VSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext1_125, xaux_ID3D11DeviceContext1_125, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_125, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::HSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext1_126, xaux_ID3D11DeviceContext1_126, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_126, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::DSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext1_127, xaux_ID3D11DeviceContext1_127, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_127, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::GSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext1_128, xaux_ID3D11DeviceContext1_128, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_128, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::PSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext1_129, xaux_ID3D11DeviceContext1_129, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_129, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::CSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext1_130, xaux_ID3D11DeviceContext1_130, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext1_130, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::SwapDeviceContextState", NULL, cls_ID3D11DeviceContext1_131, xaux_ID3D11DeviceContext1_131, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11DeviceContext1::ClearView", NULL, cls_ID3D11DeviceContext1_132, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0008, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::DiscardView1", NULL, cls_ID3D11DeviceContext1_133, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
 };
@@ -2815,9 +2847,15 @@ static const unsigned char caux_ID3D11DeviceContext2_72[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext2_73[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext2_73[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext2_73[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext2_74[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext2_74[] = { 57, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext2_74[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext2_75[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext2_75[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext2_75[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext2_76[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext2_76[] = { 77, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext2_76[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext2_77[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext2_77[] = { 0, 0, 30 };
 static const unsigned char caux_ID3D11DeviceContext2_77[] = { 0, 0, 1 };
@@ -2831,6 +2869,9 @@ static const unsigned char xaux_ID3D11DeviceContext2_80[] = { 30, 0, 0 };
 static const unsigned char cls_ID3D11DeviceContext2_81[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext2_81[] = { 0, 0, 30 };
 static const unsigned char caux_ID3D11DeviceContext2_81[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext2_82[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext2_82[] = { 53, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext2_82[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext2_84[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext2_84[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext2_84[] = { 0, 0, 1 };
@@ -2847,6 +2888,7 @@ static const unsigned char xaux_ID3D11DeviceContext2_88[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext2_88[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext2_89[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext2_89[] = { 0, 64, 38 };
+static const unsigned char caux_ID3D11DeviceContext2_89[] = { 0, 0, 0 };
 static const unsigned char cls_ID3D11DeviceContext2_90[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext2_90[] = { 0, 64, 38, 0, 0, 75 };
 static const unsigned char caux_ID3D11DeviceContext2_90[] = { 0, 0, 0, 0, 0, 4 };
@@ -2856,11 +2898,15 @@ static const unsigned char cls_ID3D11DeviceContext2_92[] = { WINECOM_CA_IFACE_OU
 static const unsigned char xaux_ID3D11DeviceContext2_92[] = { 37, 0 };
 static const unsigned char cls_ID3D11DeviceContext2_93[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext2_93[] = { 0, 30 };
+static const unsigned char caux_ID3D11DeviceContext2_93[] = { 0, 0 };
 static const unsigned char cls_ID3D11DeviceContext2_94[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext2_94[] = { 61 };
 static const unsigned char cls_ID3D11DeviceContext2_97[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext2_97[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext2_97[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext2_98[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext2_98[] = { 54, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext2_98[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext2_99[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext2_99[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext2_99[] = { 0, 0, 1 };
@@ -2870,6 +2916,9 @@ static const unsigned char caux_ID3D11DeviceContext2_100[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext2_101[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext2_101[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext2_101[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext2_102[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext2_102[] = { 51, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext2_102[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext2_103[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext2_103[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext2_103[] = { 0, 0, 1 };
@@ -2882,6 +2931,9 @@ static const unsigned char caux_ID3D11DeviceContext2_105[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext2_106[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext2_106[] = { 0, 0, 75 };
 static const unsigned char caux_ID3D11DeviceContext2_106[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext2_107[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext2_107[] = { 34, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext2_107[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext2_108[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext2_108[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext2_108[] = { 0, 0, 1 };
@@ -2933,7 +2985,7 @@ static const struct winecom_slot slots_ID3D11DeviceContext2[144] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11DeviceContext2_3, xaux_ID3D11DeviceContext2_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11DeviceContext2_3, xaux_ID3D11DeviceContext2_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -3003,61 +3055,55 @@ static const struct winecom_slot slots_ID3D11DeviceContext2[144] =
     { "ID3D11DeviceContext::CSSetShader", NULL, cls_ID3D11DeviceContext2_69, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::CSSetSamplers", NULL, cls_ID3D11DeviceContext2_70, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::CSSetConstantBuffers", NULL, cls_ID3D11DeviceContext2_71, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetConstantBuffers", NULL, cls_ID3D11DeviceContext2_72, xaux_ID3D11DeviceContext2_72, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_72, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::PSGetShaderResources", NULL, cls_ID3D11DeviceContext2_73, xaux_ID3D11DeviceContext2_73, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_73, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::PSGetShader",
-      "ID3D11DeviceContext::PSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::PSGetSamplers", NULL, cls_ID3D11DeviceContext2_75, xaux_ID3D11DeviceContext2_75, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_75, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetShader",
-      "ID3D11DeviceContext::VSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::PSGetConstantBuffers", NULL, cls_ID3D11DeviceContext2_77, xaux_ID3D11DeviceContext2_77, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_77, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::IAGetInputLayout", NULL, cls_ID3D11DeviceContext2_78, xaux_ID3D11DeviceContext2_78, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::IAGetVertexBuffers", NULL, cls_ID3D11DeviceContext2_79, xaux_ID3D11DeviceContext2_79, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_79, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::IAGetIndexBuffer", NULL, cls_ID3D11DeviceContext2_80, xaux_ID3D11DeviceContext2_80, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetConstantBuffers", NULL, cls_ID3D11DeviceContext2_81, xaux_ID3D11DeviceContext2_81, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_81, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetShader",
-      "ID3D11DeviceContext::GSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::IAGetPrimitiveTopology", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetShaderResources", NULL, cls_ID3D11DeviceContext2_84, xaux_ID3D11DeviceContext2_84, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_84, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetSamplers", NULL, cls_ID3D11DeviceContext2_85, xaux_ID3D11DeviceContext2_85, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_85, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GetPredication", NULL, cls_ID3D11DeviceContext2_86, xaux_ID3D11DeviceContext2_86, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetShaderResources", NULL, cls_ID3D11DeviceContext2_87, xaux_ID3D11DeviceContext2_87, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_87, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetSamplers", NULL, cls_ID3D11DeviceContext2_88, xaux_ID3D11DeviceContext2_88, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_88, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetRenderTargets", NULL, cls_ID3D11DeviceContext2_89, xaux_ID3D11DeviceContext2_89, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetRenderTargetsAndUnorderedAccessViews", NULL, cls_ID3D11DeviceContext2_90, xaux_ID3D11DeviceContext2_90, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_90, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0019, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetBlendState", NULL, cls_ID3D11DeviceContext2_91, xaux_ID3D11DeviceContext2_91, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetDepthStencilState", NULL, cls_ID3D11DeviceContext2_92, xaux_ID3D11DeviceContext2_92, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::SOGetTargets", NULL, cls_ID3D11DeviceContext2_93, xaux_ID3D11DeviceContext2_93, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::RSGetState", NULL, cls_ID3D11DeviceContext2_94, xaux_ID3D11DeviceContext2_94, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::RSGetViewports", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::RSGetScissorRects", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::HSGetShaderResources", NULL, cls_ID3D11DeviceContext2_97, xaux_ID3D11DeviceContext2_97, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_97, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::HSGetShader",
-      "ID3D11DeviceContext::HSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::HSGetSamplers", NULL, cls_ID3D11DeviceContext2_99, xaux_ID3D11DeviceContext2_99, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_99, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::HSGetConstantBuffers", NULL, cls_ID3D11DeviceContext2_100, xaux_ID3D11DeviceContext2_100, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_100, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::DSGetShaderResources", NULL, cls_ID3D11DeviceContext2_101, xaux_ID3D11DeviceContext2_101, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_101, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::DSGetShader",
-      "ID3D11DeviceContext::DSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::DSGetSamplers", NULL, cls_ID3D11DeviceContext2_103, xaux_ID3D11DeviceContext2_103, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_103, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::DSGetConstantBuffers", NULL, cls_ID3D11DeviceContext2_104, xaux_ID3D11DeviceContext2_104, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_104, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetShaderResources", NULL, cls_ID3D11DeviceContext2_105, xaux_ID3D11DeviceContext2_105, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_105, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetUnorderedAccessViews", NULL, cls_ID3D11DeviceContext2_106, xaux_ID3D11DeviceContext2_106, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_106, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetShader",
-      "ID3D11DeviceContext::CSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::CSGetSamplers", NULL, cls_ID3D11DeviceContext2_108, xaux_ID3D11DeviceContext2_108, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_108, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetConstantBuffers", NULL, cls_ID3D11DeviceContext2_109, xaux_ID3D11DeviceContext2_109, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_109, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceContext::VSGetConstantBuffers", NULL, cls_ID3D11DeviceContext2_72, xaux_ID3D11DeviceContext2_72, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_72, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::PSGetShaderResources", NULL, cls_ID3D11DeviceContext2_73, xaux_ID3D11DeviceContext2_73, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_73, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::PSGetShader", NULL, cls_ID3D11DeviceContext2_74, xaux_ID3D11DeviceContext2_74, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext2_74, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::PSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::PSGetSamplers", NULL, cls_ID3D11DeviceContext2_75, xaux_ID3D11DeviceContext2_75, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_75, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::VSGetShader", NULL, cls_ID3D11DeviceContext2_76, xaux_ID3D11DeviceContext2_76, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext2_76, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::VSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::PSGetConstantBuffers", NULL, cls_ID3D11DeviceContext2_77, xaux_ID3D11DeviceContext2_77, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_77, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::IAGetInputLayout", NULL, cls_ID3D11DeviceContext2_78, xaux_ID3D11DeviceContext2_78, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::IAGetVertexBuffers", NULL, cls_ID3D11DeviceContext2_79, xaux_ID3D11DeviceContext2_79, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_79, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext::IAGetIndexBuffer", NULL, cls_ID3D11DeviceContext2_80, xaux_ID3D11DeviceContext2_80, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0006, 0x0000 },
+    { "ID3D11DeviceContext::GSGetConstantBuffers", NULL, cls_ID3D11DeviceContext2_81, xaux_ID3D11DeviceContext2_81, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_81, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::GSGetShader", NULL, cls_ID3D11DeviceContext2_82, xaux_ID3D11DeviceContext2_82, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext2_82, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::GSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::IAGetPrimitiveTopology", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D11DeviceContext::VSGetShaderResources", NULL, cls_ID3D11DeviceContext2_84, xaux_ID3D11DeviceContext2_84, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_84, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::VSGetSamplers", NULL, cls_ID3D11DeviceContext2_85, xaux_ID3D11DeviceContext2_85, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_85, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::GetPredication", NULL, cls_ID3D11DeviceContext2_86, xaux_ID3D11DeviceContext2_86, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0002, 0x0000 },
+    { "ID3D11DeviceContext::GSGetShaderResources", NULL, cls_ID3D11DeviceContext2_87, xaux_ID3D11DeviceContext2_87, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_87, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::GSGetSamplers", NULL, cls_ID3D11DeviceContext2_88, xaux_ID3D11DeviceContext2_88, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_88, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::OMGetRenderTargets", NULL, cls_ID3D11DeviceContext2_89, xaux_ID3D11DeviceContext2_89, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_89, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0006, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::OMGetRenderTargetsAndUnorderedAccessViews", NULL, cls_ID3D11DeviceContext2_90, xaux_ID3D11DeviceContext2_90, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_90, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0019, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0026, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::OMGetBlendState", NULL, cls_ID3D11DeviceContext2_91, xaux_ID3D11DeviceContext2_91, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::OMGetDepthStencilState", NULL, cls_ID3D11DeviceContext2_92, xaux_ID3D11DeviceContext2_92, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0002, 0x0000 },
+    { "ID3D11DeviceContext::SOGetTargets", NULL, cls_ID3D11DeviceContext2_93, xaux_ID3D11DeviceContext2_93, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_93, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::RSGetState", NULL, cls_ID3D11DeviceContext2_94, xaux_ID3D11DeviceContext2_94, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::RSGetViewports", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D11DeviceContext::RSGetScissorRects", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D11DeviceContext::HSGetShaderResources", NULL, cls_ID3D11DeviceContext2_97, xaux_ID3D11DeviceContext2_97, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_97, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::HSGetShader", NULL, cls_ID3D11DeviceContext2_98, xaux_ID3D11DeviceContext2_98, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext2_98, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::HSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::HSGetSamplers", NULL, cls_ID3D11DeviceContext2_99, xaux_ID3D11DeviceContext2_99, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_99, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::HSGetConstantBuffers", NULL, cls_ID3D11DeviceContext2_100, xaux_ID3D11DeviceContext2_100, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_100, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::DSGetShaderResources", NULL, cls_ID3D11DeviceContext2_101, xaux_ID3D11DeviceContext2_101, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_101, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::DSGetShader", NULL, cls_ID3D11DeviceContext2_102, xaux_ID3D11DeviceContext2_102, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext2_102, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::DSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::DSGetSamplers", NULL, cls_ID3D11DeviceContext2_103, xaux_ID3D11DeviceContext2_103, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_103, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::DSGetConstantBuffers", NULL, cls_ID3D11DeviceContext2_104, xaux_ID3D11DeviceContext2_104, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_104, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetShaderResources", NULL, cls_ID3D11DeviceContext2_105, xaux_ID3D11DeviceContext2_105, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_105, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetUnorderedAccessViews", NULL, cls_ID3D11DeviceContext2_106, xaux_ID3D11DeviceContext2_106, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_106, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetShader", NULL, cls_ID3D11DeviceContext2_107, xaux_ID3D11DeviceContext2_107, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext2_107, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::CSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::CSGetSamplers", NULL, cls_ID3D11DeviceContext2_108, xaux_ID3D11DeviceContext2_108, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_108, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetConstantBuffers", NULL, cls_ID3D11DeviceContext2_109, xaux_ID3D11DeviceContext2_109, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_109, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11DeviceContext::ClearState", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::Flush", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::GetType", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::GetContextFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::FinishCommandList", NULL, cls_ID3D11DeviceContext2_114, xaux_ID3D11DeviceContext2_114, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceContext::FinishCommandList", NULL, cls_ID3D11DeviceContext2_114, xaux_ID3D11DeviceContext2_114, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11DeviceContext1::CopySubresourceRegion1", NULL, cls_ID3D11DeviceContext2_115, NULL, 10, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x015e, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::UpdateSubresource1", NULL, cls_ID3D11DeviceContext2_116, NULL, 8, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0072, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::DiscardResource", NULL, cls_ID3D11DeviceContext2_117, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -3068,13 +3114,13 @@ static const struct winecom_slot slots_ID3D11DeviceContext2[144] =
     { "ID3D11DeviceContext1::GSSetConstantBuffers1", NULL, cls_ID3D11DeviceContext2_122, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::PSSetConstantBuffers1", NULL, cls_ID3D11DeviceContext2_123, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::CSSetConstantBuffers1", NULL, cls_ID3D11DeviceContext2_124, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::VSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext2_125, xaux_ID3D11DeviceContext2_125, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_125, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::HSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext2_126, xaux_ID3D11DeviceContext2_126, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_126, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::DSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext2_127, xaux_ID3D11DeviceContext2_127, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_127, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::GSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext2_128, xaux_ID3D11DeviceContext2_128, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_128, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::PSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext2_129, xaux_ID3D11DeviceContext2_129, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_129, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::CSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext2_130, xaux_ID3D11DeviceContext2_130, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_130, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::SwapDeviceContextState", NULL, cls_ID3D11DeviceContext2_131, xaux_ID3D11DeviceContext2_131, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceContext1::VSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext2_125, xaux_ID3D11DeviceContext2_125, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_125, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::HSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext2_126, xaux_ID3D11DeviceContext2_126, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_126, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::DSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext2_127, xaux_ID3D11DeviceContext2_127, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_127, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::GSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext2_128, xaux_ID3D11DeviceContext2_128, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_128, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::PSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext2_129, xaux_ID3D11DeviceContext2_129, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_129, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::CSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext2_130, xaux_ID3D11DeviceContext2_130, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext2_130, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::SwapDeviceContextState", NULL, cls_ID3D11DeviceContext2_131, xaux_ID3D11DeviceContext2_131, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11DeviceContext1::ClearView", NULL, cls_ID3D11DeviceContext2_132, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0008, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::DiscardView1", NULL, cls_ID3D11DeviceContext2_133, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext2::UpdateTileMappings", NULL, cls_ID3D11DeviceContext2_134, NULL, 11, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0222, 0x0000, 0x0000, NULL, 0, NULL },
@@ -3154,9 +3200,15 @@ static const unsigned char caux_ID3D11DeviceContext3_72[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext3_73[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext3_73[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext3_73[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext3_74[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext3_74[] = { 57, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext3_74[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext3_75[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext3_75[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext3_75[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext3_76[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext3_76[] = { 77, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext3_76[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext3_77[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext3_77[] = { 0, 0, 30 };
 static const unsigned char caux_ID3D11DeviceContext3_77[] = { 0, 0, 1 };
@@ -3170,6 +3222,9 @@ static const unsigned char xaux_ID3D11DeviceContext3_80[] = { 30, 0, 0 };
 static const unsigned char cls_ID3D11DeviceContext3_81[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext3_81[] = { 0, 0, 30 };
 static const unsigned char caux_ID3D11DeviceContext3_81[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext3_82[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext3_82[] = { 53, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext3_82[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext3_84[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext3_84[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext3_84[] = { 0, 0, 1 };
@@ -3186,6 +3241,7 @@ static const unsigned char xaux_ID3D11DeviceContext3_88[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext3_88[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext3_89[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext3_89[] = { 0, 64, 38 };
+static const unsigned char caux_ID3D11DeviceContext3_89[] = { 0, 0, 0 };
 static const unsigned char cls_ID3D11DeviceContext3_90[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext3_90[] = { 0, 64, 38, 0, 0, 75 };
 static const unsigned char caux_ID3D11DeviceContext3_90[] = { 0, 0, 0, 0, 0, 4 };
@@ -3195,11 +3251,15 @@ static const unsigned char cls_ID3D11DeviceContext3_92[] = { WINECOM_CA_IFACE_OU
 static const unsigned char xaux_ID3D11DeviceContext3_92[] = { 37, 0 };
 static const unsigned char cls_ID3D11DeviceContext3_93[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext3_93[] = { 0, 30 };
+static const unsigned char caux_ID3D11DeviceContext3_93[] = { 0, 0 };
 static const unsigned char cls_ID3D11DeviceContext3_94[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext3_94[] = { 61 };
 static const unsigned char cls_ID3D11DeviceContext3_97[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext3_97[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext3_97[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext3_98[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext3_98[] = { 54, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext3_98[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext3_99[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext3_99[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext3_99[] = { 0, 0, 1 };
@@ -3209,6 +3269,9 @@ static const unsigned char caux_ID3D11DeviceContext3_100[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext3_101[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext3_101[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext3_101[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext3_102[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext3_102[] = { 51, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext3_102[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext3_103[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext3_103[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext3_103[] = { 0, 0, 1 };
@@ -3221,6 +3284,9 @@ static const unsigned char caux_ID3D11DeviceContext3_105[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext3_106[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext3_106[] = { 0, 0, 75 };
 static const unsigned char caux_ID3D11DeviceContext3_106[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext3_107[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext3_107[] = { 34, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext3_107[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext3_108[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext3_108[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext3_108[] = { 0, 0, 1 };
@@ -3272,7 +3338,7 @@ static const struct winecom_slot slots_ID3D11DeviceContext3[147] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11DeviceContext3_3, xaux_ID3D11DeviceContext3_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11DeviceContext3_3, xaux_ID3D11DeviceContext3_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -3342,61 +3408,55 @@ static const struct winecom_slot slots_ID3D11DeviceContext3[147] =
     { "ID3D11DeviceContext::CSSetShader", NULL, cls_ID3D11DeviceContext3_69, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::CSSetSamplers", NULL, cls_ID3D11DeviceContext3_70, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::CSSetConstantBuffers", NULL, cls_ID3D11DeviceContext3_71, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetConstantBuffers", NULL, cls_ID3D11DeviceContext3_72, xaux_ID3D11DeviceContext3_72, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_72, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::PSGetShaderResources", NULL, cls_ID3D11DeviceContext3_73, xaux_ID3D11DeviceContext3_73, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_73, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::PSGetShader",
-      "ID3D11DeviceContext::PSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::PSGetSamplers", NULL, cls_ID3D11DeviceContext3_75, xaux_ID3D11DeviceContext3_75, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_75, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetShader",
-      "ID3D11DeviceContext::VSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::PSGetConstantBuffers", NULL, cls_ID3D11DeviceContext3_77, xaux_ID3D11DeviceContext3_77, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_77, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::IAGetInputLayout", NULL, cls_ID3D11DeviceContext3_78, xaux_ID3D11DeviceContext3_78, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::IAGetVertexBuffers", NULL, cls_ID3D11DeviceContext3_79, xaux_ID3D11DeviceContext3_79, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_79, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::IAGetIndexBuffer", NULL, cls_ID3D11DeviceContext3_80, xaux_ID3D11DeviceContext3_80, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetConstantBuffers", NULL, cls_ID3D11DeviceContext3_81, xaux_ID3D11DeviceContext3_81, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_81, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetShader",
-      "ID3D11DeviceContext::GSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::IAGetPrimitiveTopology", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetShaderResources", NULL, cls_ID3D11DeviceContext3_84, xaux_ID3D11DeviceContext3_84, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_84, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetSamplers", NULL, cls_ID3D11DeviceContext3_85, xaux_ID3D11DeviceContext3_85, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_85, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GetPredication", NULL, cls_ID3D11DeviceContext3_86, xaux_ID3D11DeviceContext3_86, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetShaderResources", NULL, cls_ID3D11DeviceContext3_87, xaux_ID3D11DeviceContext3_87, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_87, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetSamplers", NULL, cls_ID3D11DeviceContext3_88, xaux_ID3D11DeviceContext3_88, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_88, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetRenderTargets", NULL, cls_ID3D11DeviceContext3_89, xaux_ID3D11DeviceContext3_89, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetRenderTargetsAndUnorderedAccessViews", NULL, cls_ID3D11DeviceContext3_90, xaux_ID3D11DeviceContext3_90, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_90, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0019, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetBlendState", NULL, cls_ID3D11DeviceContext3_91, xaux_ID3D11DeviceContext3_91, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetDepthStencilState", NULL, cls_ID3D11DeviceContext3_92, xaux_ID3D11DeviceContext3_92, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::SOGetTargets", NULL, cls_ID3D11DeviceContext3_93, xaux_ID3D11DeviceContext3_93, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::RSGetState", NULL, cls_ID3D11DeviceContext3_94, xaux_ID3D11DeviceContext3_94, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::RSGetViewports", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::RSGetScissorRects", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::HSGetShaderResources", NULL, cls_ID3D11DeviceContext3_97, xaux_ID3D11DeviceContext3_97, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_97, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::HSGetShader",
-      "ID3D11DeviceContext::HSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::HSGetSamplers", NULL, cls_ID3D11DeviceContext3_99, xaux_ID3D11DeviceContext3_99, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_99, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::HSGetConstantBuffers", NULL, cls_ID3D11DeviceContext3_100, xaux_ID3D11DeviceContext3_100, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_100, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::DSGetShaderResources", NULL, cls_ID3D11DeviceContext3_101, xaux_ID3D11DeviceContext3_101, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_101, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::DSGetShader",
-      "ID3D11DeviceContext::DSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::DSGetSamplers", NULL, cls_ID3D11DeviceContext3_103, xaux_ID3D11DeviceContext3_103, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_103, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::DSGetConstantBuffers", NULL, cls_ID3D11DeviceContext3_104, xaux_ID3D11DeviceContext3_104, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_104, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetShaderResources", NULL, cls_ID3D11DeviceContext3_105, xaux_ID3D11DeviceContext3_105, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_105, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetUnorderedAccessViews", NULL, cls_ID3D11DeviceContext3_106, xaux_ID3D11DeviceContext3_106, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_106, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetShader",
-      "ID3D11DeviceContext::CSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::CSGetSamplers", NULL, cls_ID3D11DeviceContext3_108, xaux_ID3D11DeviceContext3_108, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_108, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetConstantBuffers", NULL, cls_ID3D11DeviceContext3_109, xaux_ID3D11DeviceContext3_109, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_109, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceContext::VSGetConstantBuffers", NULL, cls_ID3D11DeviceContext3_72, xaux_ID3D11DeviceContext3_72, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_72, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::PSGetShaderResources", NULL, cls_ID3D11DeviceContext3_73, xaux_ID3D11DeviceContext3_73, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_73, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::PSGetShader", NULL, cls_ID3D11DeviceContext3_74, xaux_ID3D11DeviceContext3_74, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext3_74, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::PSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::PSGetSamplers", NULL, cls_ID3D11DeviceContext3_75, xaux_ID3D11DeviceContext3_75, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_75, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::VSGetShader", NULL, cls_ID3D11DeviceContext3_76, xaux_ID3D11DeviceContext3_76, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext3_76, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::VSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::PSGetConstantBuffers", NULL, cls_ID3D11DeviceContext3_77, xaux_ID3D11DeviceContext3_77, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_77, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::IAGetInputLayout", NULL, cls_ID3D11DeviceContext3_78, xaux_ID3D11DeviceContext3_78, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::IAGetVertexBuffers", NULL, cls_ID3D11DeviceContext3_79, xaux_ID3D11DeviceContext3_79, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_79, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext::IAGetIndexBuffer", NULL, cls_ID3D11DeviceContext3_80, xaux_ID3D11DeviceContext3_80, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0006, 0x0000 },
+    { "ID3D11DeviceContext::GSGetConstantBuffers", NULL, cls_ID3D11DeviceContext3_81, xaux_ID3D11DeviceContext3_81, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_81, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::GSGetShader", NULL, cls_ID3D11DeviceContext3_82, xaux_ID3D11DeviceContext3_82, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext3_82, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::GSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::IAGetPrimitiveTopology", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D11DeviceContext::VSGetShaderResources", NULL, cls_ID3D11DeviceContext3_84, xaux_ID3D11DeviceContext3_84, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_84, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::VSGetSamplers", NULL, cls_ID3D11DeviceContext3_85, xaux_ID3D11DeviceContext3_85, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_85, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::GetPredication", NULL, cls_ID3D11DeviceContext3_86, xaux_ID3D11DeviceContext3_86, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0002, 0x0000 },
+    { "ID3D11DeviceContext::GSGetShaderResources", NULL, cls_ID3D11DeviceContext3_87, xaux_ID3D11DeviceContext3_87, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_87, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::GSGetSamplers", NULL, cls_ID3D11DeviceContext3_88, xaux_ID3D11DeviceContext3_88, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_88, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::OMGetRenderTargets", NULL, cls_ID3D11DeviceContext3_89, xaux_ID3D11DeviceContext3_89, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_89, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0006, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::OMGetRenderTargetsAndUnorderedAccessViews", NULL, cls_ID3D11DeviceContext3_90, xaux_ID3D11DeviceContext3_90, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_90, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0019, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0026, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::OMGetBlendState", NULL, cls_ID3D11DeviceContext3_91, xaux_ID3D11DeviceContext3_91, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::OMGetDepthStencilState", NULL, cls_ID3D11DeviceContext3_92, xaux_ID3D11DeviceContext3_92, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0002, 0x0000 },
+    { "ID3D11DeviceContext::SOGetTargets", NULL, cls_ID3D11DeviceContext3_93, xaux_ID3D11DeviceContext3_93, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_93, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::RSGetState", NULL, cls_ID3D11DeviceContext3_94, xaux_ID3D11DeviceContext3_94, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::RSGetViewports", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D11DeviceContext::RSGetScissorRects", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D11DeviceContext::HSGetShaderResources", NULL, cls_ID3D11DeviceContext3_97, xaux_ID3D11DeviceContext3_97, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_97, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::HSGetShader", NULL, cls_ID3D11DeviceContext3_98, xaux_ID3D11DeviceContext3_98, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext3_98, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::HSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::HSGetSamplers", NULL, cls_ID3D11DeviceContext3_99, xaux_ID3D11DeviceContext3_99, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_99, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::HSGetConstantBuffers", NULL, cls_ID3D11DeviceContext3_100, xaux_ID3D11DeviceContext3_100, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_100, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::DSGetShaderResources", NULL, cls_ID3D11DeviceContext3_101, xaux_ID3D11DeviceContext3_101, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_101, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::DSGetShader", NULL, cls_ID3D11DeviceContext3_102, xaux_ID3D11DeviceContext3_102, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext3_102, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::DSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::DSGetSamplers", NULL, cls_ID3D11DeviceContext3_103, xaux_ID3D11DeviceContext3_103, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_103, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::DSGetConstantBuffers", NULL, cls_ID3D11DeviceContext3_104, xaux_ID3D11DeviceContext3_104, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_104, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetShaderResources", NULL, cls_ID3D11DeviceContext3_105, xaux_ID3D11DeviceContext3_105, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_105, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetUnorderedAccessViews", NULL, cls_ID3D11DeviceContext3_106, xaux_ID3D11DeviceContext3_106, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_106, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetShader", NULL, cls_ID3D11DeviceContext3_107, xaux_ID3D11DeviceContext3_107, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext3_107, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::CSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::CSGetSamplers", NULL, cls_ID3D11DeviceContext3_108, xaux_ID3D11DeviceContext3_108, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_108, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetConstantBuffers", NULL, cls_ID3D11DeviceContext3_109, xaux_ID3D11DeviceContext3_109, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_109, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11DeviceContext::ClearState", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::Flush", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::GetType", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::GetContextFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::FinishCommandList", NULL, cls_ID3D11DeviceContext3_114, xaux_ID3D11DeviceContext3_114, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceContext::FinishCommandList", NULL, cls_ID3D11DeviceContext3_114, xaux_ID3D11DeviceContext3_114, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11DeviceContext1::CopySubresourceRegion1", NULL, cls_ID3D11DeviceContext3_115, NULL, 10, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x015e, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::UpdateSubresource1", NULL, cls_ID3D11DeviceContext3_116, NULL, 8, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0072, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::DiscardResource", NULL, cls_ID3D11DeviceContext3_117, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -3407,13 +3467,13 @@ static const struct winecom_slot slots_ID3D11DeviceContext3[147] =
     { "ID3D11DeviceContext1::GSSetConstantBuffers1", NULL, cls_ID3D11DeviceContext3_122, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::PSSetConstantBuffers1", NULL, cls_ID3D11DeviceContext3_123, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::CSSetConstantBuffers1", NULL, cls_ID3D11DeviceContext3_124, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::VSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext3_125, xaux_ID3D11DeviceContext3_125, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_125, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::HSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext3_126, xaux_ID3D11DeviceContext3_126, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_126, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::DSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext3_127, xaux_ID3D11DeviceContext3_127, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_127, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::GSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext3_128, xaux_ID3D11DeviceContext3_128, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_128, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::PSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext3_129, xaux_ID3D11DeviceContext3_129, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_129, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::CSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext3_130, xaux_ID3D11DeviceContext3_130, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_130, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::SwapDeviceContextState", NULL, cls_ID3D11DeviceContext3_131, xaux_ID3D11DeviceContext3_131, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceContext1::VSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext3_125, xaux_ID3D11DeviceContext3_125, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_125, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::HSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext3_126, xaux_ID3D11DeviceContext3_126, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_126, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::DSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext3_127, xaux_ID3D11DeviceContext3_127, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_127, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::GSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext3_128, xaux_ID3D11DeviceContext3_128, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_128, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::PSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext3_129, xaux_ID3D11DeviceContext3_129, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_129, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::CSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext3_130, xaux_ID3D11DeviceContext3_130, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext3_130, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::SwapDeviceContextState", NULL, cls_ID3D11DeviceContext3_131, xaux_ID3D11DeviceContext3_131, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11DeviceContext1::ClearView", NULL, cls_ID3D11DeviceContext3_132, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0008, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::DiscardView1", NULL, cls_ID3D11DeviceContext3_133, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext2::UpdateTileMappings", NULL, cls_ID3D11DeviceContext3_134, NULL, 11, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0222, 0x0000, 0x0000, NULL, 0, NULL },
@@ -3434,7 +3494,7 @@ static const struct winecom_slot slots_ID3D11DeviceContext3[147] =
       "ID3D11DeviceContext3::Flush1: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
       NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceContext3::SetHardwareProtectionState", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext3::GetHardwareProtectionState", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceContext3::GetHardwareProtectionState", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
 };
 
 static const unsigned char cls_ID3D11DeviceContext4_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
@@ -3498,9 +3558,15 @@ static const unsigned char caux_ID3D11DeviceContext4_72[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext4_73[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext4_73[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext4_73[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext4_74[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext4_74[] = { 57, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext4_74[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext4_75[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext4_75[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext4_75[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext4_76[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext4_76[] = { 77, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext4_76[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext4_77[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext4_77[] = { 0, 0, 30 };
 static const unsigned char caux_ID3D11DeviceContext4_77[] = { 0, 0, 1 };
@@ -3514,6 +3580,9 @@ static const unsigned char xaux_ID3D11DeviceContext4_80[] = { 30, 0, 0 };
 static const unsigned char cls_ID3D11DeviceContext4_81[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext4_81[] = { 0, 0, 30 };
 static const unsigned char caux_ID3D11DeviceContext4_81[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext4_82[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext4_82[] = { 53, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext4_82[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext4_84[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext4_84[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext4_84[] = { 0, 0, 1 };
@@ -3530,6 +3599,7 @@ static const unsigned char xaux_ID3D11DeviceContext4_88[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext4_88[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext4_89[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext4_89[] = { 0, 64, 38 };
+static const unsigned char caux_ID3D11DeviceContext4_89[] = { 0, 0, 0 };
 static const unsigned char cls_ID3D11DeviceContext4_90[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext4_90[] = { 0, 64, 38, 0, 0, 75 };
 static const unsigned char caux_ID3D11DeviceContext4_90[] = { 0, 0, 0, 0, 0, 4 };
@@ -3539,11 +3609,15 @@ static const unsigned char cls_ID3D11DeviceContext4_92[] = { WINECOM_CA_IFACE_OU
 static const unsigned char xaux_ID3D11DeviceContext4_92[] = { 37, 0 };
 static const unsigned char cls_ID3D11DeviceContext4_93[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext4_93[] = { 0, 30 };
+static const unsigned char caux_ID3D11DeviceContext4_93[] = { 0, 0 };
 static const unsigned char cls_ID3D11DeviceContext4_94[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext4_94[] = { 61 };
 static const unsigned char cls_ID3D11DeviceContext4_97[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext4_97[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext4_97[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext4_98[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext4_98[] = { 54, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext4_98[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext4_99[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext4_99[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext4_99[] = { 0, 0, 1 };
@@ -3553,6 +3627,9 @@ static const unsigned char caux_ID3D11DeviceContext4_100[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext4_101[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext4_101[] = { 0, 0, 68 };
 static const unsigned char caux_ID3D11DeviceContext4_101[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext4_102[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext4_102[] = { 51, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext4_102[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext4_103[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext4_103[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext4_103[] = { 0, 0, 1 };
@@ -3565,6 +3642,9 @@ static const unsigned char caux_ID3D11DeviceContext4_105[] = { 0, 0, 1 };
 static const unsigned char cls_ID3D11DeviceContext4_106[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext4_106[] = { 0, 0, 75 };
 static const unsigned char caux_ID3D11DeviceContext4_106[] = { 0, 0, 1 };
+static const unsigned char cls_ID3D11DeviceContext4_107[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_ARR_OUT_COUNTPTR, WINECOM_CA_PASS };
+static const unsigned char xaux_ID3D11DeviceContext4_107[] = { 34, 31, 0 };
+static const unsigned char caux_ID3D11DeviceContext4_107[] = { 0, 2, 0 };
 static const unsigned char cls_ID3D11DeviceContext4_108[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_OUT_STATIC };
 static const unsigned char xaux_ID3D11DeviceContext4_108[] = { 0, 0, 67 };
 static const unsigned char caux_ID3D11DeviceContext4_108[] = { 0, 0, 1 };
@@ -3618,7 +3698,7 @@ static const struct winecom_slot slots_ID3D11DeviceContext4[149] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11DeviceContext4_3, xaux_ID3D11DeviceContext4_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11DeviceContext4_3, xaux_ID3D11DeviceContext4_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -3688,61 +3768,55 @@ static const struct winecom_slot slots_ID3D11DeviceContext4[149] =
     { "ID3D11DeviceContext::CSSetShader", NULL, cls_ID3D11DeviceContext4_69, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::CSSetSamplers", NULL, cls_ID3D11DeviceContext4_70, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::CSSetConstantBuffers", NULL, cls_ID3D11DeviceContext4_71, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetConstantBuffers", NULL, cls_ID3D11DeviceContext4_72, xaux_ID3D11DeviceContext4_72, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_72, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::PSGetShaderResources", NULL, cls_ID3D11DeviceContext4_73, xaux_ID3D11DeviceContext4_73, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_73, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::PSGetShader",
-      "ID3D11DeviceContext::PSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::PSGetSamplers", NULL, cls_ID3D11DeviceContext4_75, xaux_ID3D11DeviceContext4_75, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_75, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetShader",
-      "ID3D11DeviceContext::VSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::PSGetConstantBuffers", NULL, cls_ID3D11DeviceContext4_77, xaux_ID3D11DeviceContext4_77, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_77, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::IAGetInputLayout", NULL, cls_ID3D11DeviceContext4_78, xaux_ID3D11DeviceContext4_78, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::IAGetVertexBuffers", NULL, cls_ID3D11DeviceContext4_79, xaux_ID3D11DeviceContext4_79, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_79, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::IAGetIndexBuffer", NULL, cls_ID3D11DeviceContext4_80, xaux_ID3D11DeviceContext4_80, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetConstantBuffers", NULL, cls_ID3D11DeviceContext4_81, xaux_ID3D11DeviceContext4_81, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_81, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetShader",
-      "ID3D11DeviceContext::GSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::IAGetPrimitiveTopology", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetShaderResources", NULL, cls_ID3D11DeviceContext4_84, xaux_ID3D11DeviceContext4_84, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_84, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::VSGetSamplers", NULL, cls_ID3D11DeviceContext4_85, xaux_ID3D11DeviceContext4_85, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_85, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GetPredication", NULL, cls_ID3D11DeviceContext4_86, xaux_ID3D11DeviceContext4_86, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetShaderResources", NULL, cls_ID3D11DeviceContext4_87, xaux_ID3D11DeviceContext4_87, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_87, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::GSGetSamplers", NULL, cls_ID3D11DeviceContext4_88, xaux_ID3D11DeviceContext4_88, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_88, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetRenderTargets", NULL, cls_ID3D11DeviceContext4_89, xaux_ID3D11DeviceContext4_89, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetRenderTargetsAndUnorderedAccessViews", NULL, cls_ID3D11DeviceContext4_90, xaux_ID3D11DeviceContext4_90, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_90, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0019, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetBlendState", NULL, cls_ID3D11DeviceContext4_91, xaux_ID3D11DeviceContext4_91, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::OMGetDepthStencilState", NULL, cls_ID3D11DeviceContext4_92, xaux_ID3D11DeviceContext4_92, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::SOGetTargets", NULL, cls_ID3D11DeviceContext4_93, xaux_ID3D11DeviceContext4_93, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::RSGetState", NULL, cls_ID3D11DeviceContext4_94, xaux_ID3D11DeviceContext4_94, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::RSGetViewports", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::RSGetScissorRects", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::HSGetShaderResources", NULL, cls_ID3D11DeviceContext4_97, xaux_ID3D11DeviceContext4_97, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_97, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::HSGetShader",
-      "ID3D11DeviceContext::HSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::HSGetSamplers", NULL, cls_ID3D11DeviceContext4_99, xaux_ID3D11DeviceContext4_99, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_99, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::HSGetConstantBuffers", NULL, cls_ID3D11DeviceContext4_100, xaux_ID3D11DeviceContext4_100, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_100, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::DSGetShaderResources", NULL, cls_ID3D11DeviceContext4_101, xaux_ID3D11DeviceContext4_101, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_101, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::DSGetShader",
-      "ID3D11DeviceContext::DSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::DSGetSamplers", NULL, cls_ID3D11DeviceContext4_103, xaux_ID3D11DeviceContext4_103, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_103, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::DSGetConstantBuffers", NULL, cls_ID3D11DeviceContext4_104, xaux_ID3D11DeviceContext4_104, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_104, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetShaderResources", NULL, cls_ID3D11DeviceContext4_105, xaux_ID3D11DeviceContext4_105, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_105, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetUnorderedAccessViews", NULL, cls_ID3D11DeviceContext4_106, xaux_ID3D11DeviceContext4_106, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_106, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetShader",
-      "ID3D11DeviceContext::CSGetShader: writes the interface array `ID3D11ClassInstance **ppClassInstances` whose element count arrives through a UINT* rather than a by-value count; winecom has no class for a count it must read back through a pointer",
-      NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11DeviceContext::CSGetSamplers", NULL, cls_ID3D11DeviceContext4_108, xaux_ID3D11DeviceContext4_108, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_108, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::CSGetConstantBuffers", NULL, cls_ID3D11DeviceContext4_109, xaux_ID3D11DeviceContext4_109, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_109, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceContext::VSGetConstantBuffers", NULL, cls_ID3D11DeviceContext4_72, xaux_ID3D11DeviceContext4_72, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_72, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::PSGetShaderResources", NULL, cls_ID3D11DeviceContext4_73, xaux_ID3D11DeviceContext4_73, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_73, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::PSGetShader", NULL, cls_ID3D11DeviceContext4_74, xaux_ID3D11DeviceContext4_74, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext4_74, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::PSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::PSGetSamplers", NULL, cls_ID3D11DeviceContext4_75, xaux_ID3D11DeviceContext4_75, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_75, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::VSGetShader", NULL, cls_ID3D11DeviceContext4_76, xaux_ID3D11DeviceContext4_76, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext4_76, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::VSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::PSGetConstantBuffers", NULL, cls_ID3D11DeviceContext4_77, xaux_ID3D11DeviceContext4_77, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_77, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::IAGetInputLayout", NULL, cls_ID3D11DeviceContext4_78, xaux_ID3D11DeviceContext4_78, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::IAGetVertexBuffers", NULL, cls_ID3D11DeviceContext4_79, xaux_ID3D11DeviceContext4_79, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_79, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext::IAGetIndexBuffer", NULL, cls_ID3D11DeviceContext4_80, xaux_ID3D11DeviceContext4_80, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0006, 0x0000 },
+    { "ID3D11DeviceContext::GSGetConstantBuffers", NULL, cls_ID3D11DeviceContext4_81, xaux_ID3D11DeviceContext4_81, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_81, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::GSGetShader", NULL, cls_ID3D11DeviceContext4_82, xaux_ID3D11DeviceContext4_82, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext4_82, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::GSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::IAGetPrimitiveTopology", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D11DeviceContext::VSGetShaderResources", NULL, cls_ID3D11DeviceContext4_84, xaux_ID3D11DeviceContext4_84, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_84, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::VSGetSamplers", NULL, cls_ID3D11DeviceContext4_85, xaux_ID3D11DeviceContext4_85, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_85, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::GetPredication", NULL, cls_ID3D11DeviceContext4_86, xaux_ID3D11DeviceContext4_86, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0002, 0x0000 },
+    { "ID3D11DeviceContext::GSGetShaderResources", NULL, cls_ID3D11DeviceContext4_87, xaux_ID3D11DeviceContext4_87, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_87, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::GSGetSamplers", NULL, cls_ID3D11DeviceContext4_88, xaux_ID3D11DeviceContext4_88, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_88, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::OMGetRenderTargets", NULL, cls_ID3D11DeviceContext4_89, xaux_ID3D11DeviceContext4_89, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_89, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0006, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::OMGetRenderTargetsAndUnorderedAccessViews", NULL, cls_ID3D11DeviceContext4_90, xaux_ID3D11DeviceContext4_90, 7, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_90, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0019, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0026, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::OMGetBlendState", NULL, cls_ID3D11DeviceContext4_91, xaux_ID3D11DeviceContext4_91, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::OMGetDepthStencilState", NULL, cls_ID3D11DeviceContext4_92, xaux_ID3D11DeviceContext4_92, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0002, 0x0000 },
+    { "ID3D11DeviceContext::SOGetTargets", NULL, cls_ID3D11DeviceContext4_93, xaux_ID3D11DeviceContext4_93, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_93, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::RSGetState", NULL, cls_ID3D11DeviceContext4_94, xaux_ID3D11DeviceContext4_94, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::RSGetViewports", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D11DeviceContext::RSGetScissorRects", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "ID3D11DeviceContext::HSGetShaderResources", NULL, cls_ID3D11DeviceContext4_97, xaux_ID3D11DeviceContext4_97, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_97, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::HSGetShader", NULL, cls_ID3D11DeviceContext4_98, xaux_ID3D11DeviceContext4_98, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext4_98, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::HSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::HSGetSamplers", NULL, cls_ID3D11DeviceContext4_99, xaux_ID3D11DeviceContext4_99, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_99, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::HSGetConstantBuffers", NULL, cls_ID3D11DeviceContext4_100, xaux_ID3D11DeviceContext4_100, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_100, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::DSGetShaderResources", NULL, cls_ID3D11DeviceContext4_101, xaux_ID3D11DeviceContext4_101, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_101, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::DSGetShader", NULL, cls_ID3D11DeviceContext4_102, xaux_ID3D11DeviceContext4_102, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext4_102, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::DSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::DSGetSamplers", NULL, cls_ID3D11DeviceContext4_103, xaux_ID3D11DeviceContext4_103, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_103, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::DSGetConstantBuffers", NULL, cls_ID3D11DeviceContext4_104, xaux_ID3D11DeviceContext4_104, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_104, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetShaderResources", NULL, cls_ID3D11DeviceContext4_105, xaux_ID3D11DeviceContext4_105, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_105, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetUnorderedAccessViews", NULL, cls_ID3D11DeviceContext4_106, xaux_ID3D11DeviceContext4_106, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_106, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetShader", NULL, cls_ID3D11DeviceContext4_107, xaux_ID3D11DeviceContext4_107, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, caux_ID3D11DeviceContext4_107, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
+      "ID3D11DeviceContext::CSGetShader: the count-through-pointer out-array has no 32-bit staging (4-byte cells) yet", 0, 0x0003, 0x0004, 0x0000 },
+    { "ID3D11DeviceContext::CSGetSamplers", NULL, cls_ID3D11DeviceContext4_108, xaux_ID3D11DeviceContext4_108, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_108, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11DeviceContext::CSGetConstantBuffers", NULL, cls_ID3D11DeviceContext4_109, xaux_ID3D11DeviceContext4_109, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_109, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "ID3D11DeviceContext::ClearState", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::Flush", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::GetType", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext::GetContextFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext::FinishCommandList", NULL, cls_ID3D11DeviceContext4_114, xaux_ID3D11DeviceContext4_114, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceContext::FinishCommandList", NULL, cls_ID3D11DeviceContext4_114, xaux_ID3D11DeviceContext4_114, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11DeviceContext1::CopySubresourceRegion1", NULL, cls_ID3D11DeviceContext4_115, NULL, 10, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x015e, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::UpdateSubresource1", NULL, cls_ID3D11DeviceContext4_116, NULL, 8, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0072, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::DiscardResource", NULL, cls_ID3D11DeviceContext4_117, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -3753,13 +3827,13 @@ static const struct winecom_slot slots_ID3D11DeviceContext4[149] =
     { "ID3D11DeviceContext1::GSSetConstantBuffers1", NULL, cls_ID3D11DeviceContext4_122, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::PSSetConstantBuffers1", NULL, cls_ID3D11DeviceContext4_123, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::CSSetConstantBuffers1", NULL, cls_ID3D11DeviceContext4_124, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 1, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::VSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext4_125, xaux_ID3D11DeviceContext4_125, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_125, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::HSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext4_126, xaux_ID3D11DeviceContext4_126, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_126, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::DSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext4_127, xaux_ID3D11DeviceContext4_127, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_127, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::GSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext4_128, xaux_ID3D11DeviceContext4_128, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_128, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::PSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext4_129, xaux_ID3D11DeviceContext4_129, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_129, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::CSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext4_130, xaux_ID3D11DeviceContext4_130, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_130, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext1::SwapDeviceContextState", NULL, cls_ID3D11DeviceContext4_131, xaux_ID3D11DeviceContext4_131, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceContext1::VSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext4_125, xaux_ID3D11DeviceContext4_125, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_125, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::HSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext4_126, xaux_ID3D11DeviceContext4_126, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_126, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::DSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext4_127, xaux_ID3D11DeviceContext4_127, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_127, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::GSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext4_128, xaux_ID3D11DeviceContext4_128, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_128, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::PSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext4_129, xaux_ID3D11DeviceContext4_129, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_129, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::CSGetConstantBuffers1", NULL, cls_ID3D11DeviceContext4_130, xaux_ID3D11DeviceContext4_130, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, caux_ID3D11DeviceContext4_130, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0018, 0x0000 },
+    { "ID3D11DeviceContext1::SwapDeviceContextState", NULL, cls_ID3D11DeviceContext4_131, xaux_ID3D11DeviceContext4_131, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11DeviceContext1::ClearView", NULL, cls_ID3D11DeviceContext4_132, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0008, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext1::DiscardView1", NULL, cls_ID3D11DeviceContext4_133, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11DeviceContext2::UpdateTileMappings", NULL, cls_ID3D11DeviceContext4_134, NULL, 11, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0222, 0x0000, 0x0000, NULL, 0, NULL },
@@ -3780,7 +3854,7 @@ static const struct winecom_slot slots_ID3D11DeviceContext4[149] =
       "ID3D11DeviceContext3::Flush1: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
       NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceContext3::SetHardwareProtectionState", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
-    { "ID3D11DeviceContext3::GetHardwareProtectionState", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceContext3::GetHardwareProtectionState", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "ID3D11DeviceContext4::Signal", NULL, cls_ID3D11DeviceContext4_147, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0002, NULL, 0, NULL },
     { "ID3D11DeviceContext4::Wait", NULL, cls_ID3D11DeviceContext4_148, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0002, NULL, 0, NULL },
 };
@@ -3792,7 +3866,7 @@ static const struct winecom_slot slots_ID3D11DomainShader[7] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11DomainShader_3, xaux_ID3D11DomainShader_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11DomainShader_3, xaux_ID3D11DomainShader_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -3805,7 +3879,7 @@ static const struct winecom_slot slots_ID3D11Fence[10] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Fence_3, xaux_ID3D11Fence_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Fence_3, xaux_ID3D11Fence_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -3825,7 +3899,7 @@ static const struct winecom_slot slots_ID3D11GeometryShader[7] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11GeometryShader_3, xaux_ID3D11GeometryShader_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11GeometryShader_3, xaux_ID3D11GeometryShader_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -3838,7 +3912,7 @@ static const struct winecom_slot slots_ID3D11HullShader[7] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11HullShader_3, xaux_ID3D11HullShader_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11HullShader_3, xaux_ID3D11HullShader_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -3851,7 +3925,7 @@ static const struct winecom_slot slots_ID3D11InputLayout[7] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11InputLayout_3, xaux_ID3D11InputLayout_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11InputLayout_3, xaux_ID3D11InputLayout_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -3864,7 +3938,7 @@ static const struct winecom_slot slots_ID3D11PixelShader[7] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11PixelShader_3, xaux_ID3D11PixelShader_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11PixelShader_3, xaux_ID3D11PixelShader_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -3877,7 +3951,7 @@ static const struct winecom_slot slots_ID3D11Predicate[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Predicate_3, xaux_ID3D11Predicate_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Predicate_3, xaux_ID3D11Predicate_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -3892,7 +3966,7 @@ static const struct winecom_slot slots_ID3D11Query[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Query_3, xaux_ID3D11Query_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Query_3, xaux_ID3D11Query_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -3907,7 +3981,7 @@ static const struct winecom_slot slots_ID3D11Query1[10] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Query1_3, xaux_ID3D11Query1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Query1_3, xaux_ID3D11Query1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -3923,7 +3997,7 @@ static const struct winecom_slot slots_ID3D11RasterizerState[8] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11RasterizerState_3, xaux_ID3D11RasterizerState_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11RasterizerState_3, xaux_ID3D11RasterizerState_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -3937,7 +4011,7 @@ static const struct winecom_slot slots_ID3D11RasterizerState1[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11RasterizerState1_3, xaux_ID3D11RasterizerState1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11RasterizerState1_3, xaux_ID3D11RasterizerState1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -3952,7 +4026,7 @@ static const struct winecom_slot slots_ID3D11RasterizerState2[10] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11RasterizerState2_3, xaux_ID3D11RasterizerState2_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11RasterizerState2_3, xaux_ID3D11RasterizerState2_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -3970,11 +4044,11 @@ static const struct winecom_slot slots_ID3D11RenderTargetView[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11RenderTargetView_3, xaux_ID3D11RenderTargetView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11RenderTargetView_3, xaux_ID3D11RenderTargetView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11View::GetResource", NULL, cls_ID3D11RenderTargetView_7, xaux_ID3D11RenderTargetView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11View::GetResource", NULL, cls_ID3D11RenderTargetView_7, xaux_ID3D11RenderTargetView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11RenderTargetView::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -3987,11 +4061,11 @@ static const struct winecom_slot slots_ID3D11RenderTargetView1[10] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11RenderTargetView1_3, xaux_ID3D11RenderTargetView1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11RenderTargetView1_3, xaux_ID3D11RenderTargetView1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11View::GetResource", NULL, cls_ID3D11RenderTargetView1_7, xaux_ID3D11RenderTargetView1_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11View::GetResource", NULL, cls_ID3D11RenderTargetView1_7, xaux_ID3D11RenderTargetView1_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11RenderTargetView::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11RenderTargetView1::GetDesc1", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
@@ -4003,11 +4077,11 @@ static const struct winecom_slot slots_ID3D11Resource[10] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Resource_3, xaux_ID3D11Resource_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Resource_3, xaux_ID3D11Resource_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "ID3D11Resource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Resource::GetEvictionPriority", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
@@ -4019,7 +4093,7 @@ static const struct winecom_slot slots_ID3D11SamplerState[8] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11SamplerState_3, xaux_ID3D11SamplerState_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11SamplerState_3, xaux_ID3D11SamplerState_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -4035,11 +4109,11 @@ static const struct winecom_slot slots_ID3D11ShaderResourceView[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11ShaderResourceView_3, xaux_ID3D11ShaderResourceView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11ShaderResourceView_3, xaux_ID3D11ShaderResourceView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11View::GetResource", NULL, cls_ID3D11ShaderResourceView_7, xaux_ID3D11ShaderResourceView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11View::GetResource", NULL, cls_ID3D11ShaderResourceView_7, xaux_ID3D11ShaderResourceView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11ShaderResourceView::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -4052,11 +4126,11 @@ static const struct winecom_slot slots_ID3D11ShaderResourceView1[10] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11ShaderResourceView1_3, xaux_ID3D11ShaderResourceView1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11ShaderResourceView1_3, xaux_ID3D11ShaderResourceView1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11View::GetResource", NULL, cls_ID3D11ShaderResourceView1_7, xaux_ID3D11ShaderResourceView1_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11View::GetResource", NULL, cls_ID3D11ShaderResourceView1_7, xaux_ID3D11ShaderResourceView1_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11ShaderResourceView::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11ShaderResourceView1::GetDesc1", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
@@ -4068,11 +4142,11 @@ static const struct winecom_slot slots_ID3D11Texture1D[11] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Texture1D_3, xaux_ID3D11Texture1D_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Texture1D_3, xaux_ID3D11Texture1D_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "ID3D11Resource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Resource::GetEvictionPriority", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Texture1D::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4085,11 +4159,11 @@ static const struct winecom_slot slots_ID3D11Texture2D[11] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Texture2D_3, xaux_ID3D11Texture2D_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Texture2D_3, xaux_ID3D11Texture2D_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "ID3D11Resource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Resource::GetEvictionPriority", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Texture2D::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4102,11 +4176,11 @@ static const struct winecom_slot slots_ID3D11Texture2D1[12] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Texture2D1_3, xaux_ID3D11Texture2D1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Texture2D1_3, xaux_ID3D11Texture2D1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "ID3D11Resource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Resource::GetEvictionPriority", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Texture2D::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4120,11 +4194,11 @@ static const struct winecom_slot slots_ID3D11Texture3D[11] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Texture3D_3, xaux_ID3D11Texture3D_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Texture3D_3, xaux_ID3D11Texture3D_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "ID3D11Resource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Resource::GetEvictionPriority", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Texture3D::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4137,11 +4211,11 @@ static const struct winecom_slot slots_ID3D11Texture3D1[12] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Texture3D1_3, xaux_ID3D11Texture3D1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11Texture3D1_3, xaux_ID3D11Texture3D1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11Resource::GetType", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "ID3D11Resource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Resource::GetEvictionPriority", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11Texture3D::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4157,11 +4231,11 @@ static const struct winecom_slot slots_ID3D11UnorderedAccessView[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11UnorderedAccessView_3, xaux_ID3D11UnorderedAccessView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11UnorderedAccessView_3, xaux_ID3D11UnorderedAccessView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11View::GetResource", NULL, cls_ID3D11UnorderedAccessView_7, xaux_ID3D11UnorderedAccessView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11View::GetResource", NULL, cls_ID3D11UnorderedAccessView_7, xaux_ID3D11UnorderedAccessView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11UnorderedAccessView::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -4174,11 +4248,11 @@ static const struct winecom_slot slots_ID3D11UnorderedAccessView1[10] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11UnorderedAccessView1_3, xaux_ID3D11UnorderedAccessView1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11UnorderedAccessView1_3, xaux_ID3D11UnorderedAccessView1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11View::GetResource", NULL, cls_ID3D11UnorderedAccessView1_7, xaux_ID3D11UnorderedAccessView1_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11View::GetResource", NULL, cls_ID3D11UnorderedAccessView1_7, xaux_ID3D11UnorderedAccessView1_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11UnorderedAccessView::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11UnorderedAccessView1::GetDesc1", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
@@ -4190,7 +4264,7 @@ static const struct winecom_slot slots_ID3D11VertexShader[7] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VertexShader_3, xaux_ID3D11VertexShader_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VertexShader_3, xaux_ID3D11VertexShader_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -4259,13 +4333,13 @@ static const struct winecom_slot slots_ID3D11VideoContext[65] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoContext_3, xaux_ID3D11VideoContext_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoContext_3, xaux_ID3D11VideoContext_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11VideoContext::GetDecoderBuffer",
       "ID3D11VideoContext::GetDecoderBuffer: has a void** out-parameter (`void **buffer`) with no REFIID beside it to type the result; an untyped interface pointer cannot be given a guest vtable",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0004, 0x0000 },
     { "ID3D11VideoContext::ReleaseDecoderBuffer", NULL, cls_ID3D11VideoContext_8, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::DecoderBeginFrame", NULL, cls_ID3D11VideoContext_9, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::DecoderEndFrame", NULL, cls_ID3D11VideoContext_10, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4280,12 +4354,12 @@ static const struct winecom_slot slots_ID3D11VideoContext[65] =
     { "ID3D11VideoContext::VideoProcessorSetOutputConstriction", NULL, cls_ID3D11VideoContext_17, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0004, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetOutputStereoMode", NULL, cls_ID3D11VideoContext_18, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetOutputExtension", NULL, cls_ID3D11VideoContext_19, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetOutputTargetRect", NULL, cls_ID3D11VideoContext_20, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetOutputBackgroundColor", NULL, cls_ID3D11VideoContext_21, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext::VideoProcessorGetOutputTargetRect", NULL, cls_ID3D11VideoContext_20, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetOutputBackgroundColor", NULL, cls_ID3D11VideoContext_21, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorGetOutputColorSpace", NULL, cls_ID3D11VideoContext_22, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetOutputAlphaFillMode", NULL, cls_ID3D11VideoContext_23, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetOutputConstriction", NULL, cls_ID3D11VideoContext_24, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetOutputStereoMode", NULL, cls_ID3D11VideoContext_25, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext::VideoProcessorGetOutputAlphaFillMode", NULL, cls_ID3D11VideoContext_23, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0006, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetOutputConstriction", NULL, cls_ID3D11VideoContext_24, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetOutputStereoMode", NULL, cls_ID3D11VideoContext_25, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorGetOutputExtension", NULL, cls_ID3D11VideoContext_26, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamFrameFormat", NULL, cls_ID3D11VideoContext_27, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamColorSpace", NULL, cls_ID3D11VideoContext_28, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4300,18 +4374,18 @@ static const struct winecom_slot slots_ID3D11VideoContext[65] =
     { "ID3D11VideoContext::VideoProcessorSetStreamAutoProcessingMode", NULL, cls_ID3D11VideoContext_37, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamFilter", NULL, cls_ID3D11VideoContext_38, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001e, 0x0018, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamExtension", NULL, cls_ID3D11VideoContext_39, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000a, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamFrameFormat", NULL, cls_ID3D11VideoContext_40, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext::VideoProcessorGetStreamFrameFormat", NULL, cls_ID3D11VideoContext_40, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorGetStreamColorSpace", NULL, cls_ID3D11VideoContext_41, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamOutputRate", NULL, cls_ID3D11VideoContext_42, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamSourceRect", NULL, cls_ID3D11VideoContext_43, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamDestRect", NULL, cls_ID3D11VideoContext_44, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamAlpha", NULL, cls_ID3D11VideoContext_45, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamPalette", NULL, cls_ID3D11VideoContext_46, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamPixelAspectRatio", NULL, cls_ID3D11VideoContext_47, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamLumaKey", NULL, cls_ID3D11VideoContext_48, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamStereoFormat", NULL, cls_ID3D11VideoContext_49, NULL, 9, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamAutoProcessingMode", NULL, cls_ID3D11VideoContext_50, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamFilter", NULL, cls_ID3D11VideoContext_51, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext::VideoProcessorGetStreamOutputRate", NULL, cls_ID3D11VideoContext_42, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x000c, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamSourceRect", NULL, cls_ID3D11VideoContext_43, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamDestRect", NULL, cls_ID3D11VideoContext_44, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamAlpha", NULL, cls_ID3D11VideoContext_45, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamPalette", NULL, cls_ID3D11VideoContext_46, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0008, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamPixelAspectRatio", NULL, cls_ID3D11VideoContext_47, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamLumaKey", NULL, cls_ID3D11VideoContext_48, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamStereoFormat", NULL, cls_ID3D11VideoContext_49, NULL, 9, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x00fc, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamAutoProcessingMode", NULL, cls_ID3D11VideoContext_50, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamFilter", NULL, cls_ID3D11VideoContext_51, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0018, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorGetStreamExtension", NULL, cls_ID3D11VideoContext_52, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000a, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorBlt",
       "ID3D11VideoContext::VideoProcessorBlt: takes D3D11_VIDEO_PROCESSOR_STREAM, a struct that reaches an interface pointer through its own members (D3D11_VIDEO_PROCESSOR_STREAM -> ID3D11VideoProcessorInputView); the pointers inside it would arrive at DXVK as guest proxies.  Needs a hand-written walker, the shape dlls/d3d12/main.c's hand_resource_barrier has",
@@ -4328,7 +4402,7 @@ static const struct winecom_slot slots_ID3D11VideoContext[65] =
       "ID3D11VideoContext::ConfigureAuthenticatedChannel: takes D3D11_AUTHENTICATED_CONFIGURE_OUTPUT, a struct that reaches a kernel or GDI handle through its own members (D3D11_AUTHENTICATED_CONFIGURE_OUTPUT -> HANDLE).  Those integers name Wine objects and DXVK's native side has its own encoding for the same things, so one namespace's integer handed to the other names a different object rather than none.  Window handles are NOT in this set any more -- there is one HWND namespace in the process and this lane presents through it",
       NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorSetStreamRotation", NULL, cls_ID3D11VideoContext_63, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000e, 0x0004, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamRotation", NULL, cls_ID3D11VideoContext_64, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext::VideoProcessorGetStreamRotation", NULL, cls_ID3D11VideoContext_64, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x000c, 0x0000 },
 };
 
 static const unsigned char cls_ID3D11VideoContext1_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
@@ -4410,13 +4484,13 @@ static const struct winecom_slot slots_ID3D11VideoContext1[79] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoContext1_3, xaux_ID3D11VideoContext1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoContext1_3, xaux_ID3D11VideoContext1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11VideoContext::GetDecoderBuffer",
       "ID3D11VideoContext::GetDecoderBuffer: has a void** out-parameter (`void **buffer`) with no REFIID beside it to type the result; an untyped interface pointer cannot be given a guest vtable",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0004, 0x0000 },
     { "ID3D11VideoContext::ReleaseDecoderBuffer", NULL, cls_ID3D11VideoContext1_8, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::DecoderBeginFrame", NULL, cls_ID3D11VideoContext1_9, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::DecoderEndFrame", NULL, cls_ID3D11VideoContext1_10, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4431,12 +4505,12 @@ static const struct winecom_slot slots_ID3D11VideoContext1[79] =
     { "ID3D11VideoContext::VideoProcessorSetOutputConstriction", NULL, cls_ID3D11VideoContext1_17, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0004, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetOutputStereoMode", NULL, cls_ID3D11VideoContext1_18, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetOutputExtension", NULL, cls_ID3D11VideoContext1_19, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetOutputTargetRect", NULL, cls_ID3D11VideoContext1_20, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetOutputBackgroundColor", NULL, cls_ID3D11VideoContext1_21, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext::VideoProcessorGetOutputTargetRect", NULL, cls_ID3D11VideoContext1_20, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetOutputBackgroundColor", NULL, cls_ID3D11VideoContext1_21, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorGetOutputColorSpace", NULL, cls_ID3D11VideoContext1_22, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetOutputAlphaFillMode", NULL, cls_ID3D11VideoContext1_23, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetOutputConstriction", NULL, cls_ID3D11VideoContext1_24, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetOutputStereoMode", NULL, cls_ID3D11VideoContext1_25, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext::VideoProcessorGetOutputAlphaFillMode", NULL, cls_ID3D11VideoContext1_23, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0006, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetOutputConstriction", NULL, cls_ID3D11VideoContext1_24, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetOutputStereoMode", NULL, cls_ID3D11VideoContext1_25, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorGetOutputExtension", NULL, cls_ID3D11VideoContext1_26, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamFrameFormat", NULL, cls_ID3D11VideoContext1_27, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamColorSpace", NULL, cls_ID3D11VideoContext1_28, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4451,18 +4525,18 @@ static const struct winecom_slot slots_ID3D11VideoContext1[79] =
     { "ID3D11VideoContext::VideoProcessorSetStreamAutoProcessingMode", NULL, cls_ID3D11VideoContext1_37, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamFilter", NULL, cls_ID3D11VideoContext1_38, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001e, 0x0018, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamExtension", NULL, cls_ID3D11VideoContext1_39, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000a, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamFrameFormat", NULL, cls_ID3D11VideoContext1_40, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext::VideoProcessorGetStreamFrameFormat", NULL, cls_ID3D11VideoContext1_40, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorGetStreamColorSpace", NULL, cls_ID3D11VideoContext1_41, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamOutputRate", NULL, cls_ID3D11VideoContext1_42, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamSourceRect", NULL, cls_ID3D11VideoContext1_43, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamDestRect", NULL, cls_ID3D11VideoContext1_44, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamAlpha", NULL, cls_ID3D11VideoContext1_45, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamPalette", NULL, cls_ID3D11VideoContext1_46, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamPixelAspectRatio", NULL, cls_ID3D11VideoContext1_47, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamLumaKey", NULL, cls_ID3D11VideoContext1_48, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamStereoFormat", NULL, cls_ID3D11VideoContext1_49, NULL, 9, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamAutoProcessingMode", NULL, cls_ID3D11VideoContext1_50, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamFilter", NULL, cls_ID3D11VideoContext1_51, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext::VideoProcessorGetStreamOutputRate", NULL, cls_ID3D11VideoContext1_42, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x000c, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamSourceRect", NULL, cls_ID3D11VideoContext1_43, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamDestRect", NULL, cls_ID3D11VideoContext1_44, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamAlpha", NULL, cls_ID3D11VideoContext1_45, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamPalette", NULL, cls_ID3D11VideoContext1_46, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0008, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamPixelAspectRatio", NULL, cls_ID3D11VideoContext1_47, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamLumaKey", NULL, cls_ID3D11VideoContext1_48, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamStereoFormat", NULL, cls_ID3D11VideoContext1_49, NULL, 9, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x00fc, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamAutoProcessingMode", NULL, cls_ID3D11VideoContext1_50, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamFilter", NULL, cls_ID3D11VideoContext1_51, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0018, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorGetStreamExtension", NULL, cls_ID3D11VideoContext1_52, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000a, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorBlt",
       "ID3D11VideoContext::VideoProcessorBlt: takes D3D11_VIDEO_PROCESSOR_STREAM, a struct that reaches an interface pointer through its own members (D3D11_VIDEO_PROCESSOR_STREAM -> ID3D11VideoProcessorInputView); the pointers inside it would arrive at DXVK as guest proxies.  Needs a hand-written walker, the shape dlls/d3d12/main.c's hand_resource_barrier has",
@@ -4479,21 +4553,21 @@ static const struct winecom_slot slots_ID3D11VideoContext1[79] =
       "ID3D11VideoContext::ConfigureAuthenticatedChannel: takes D3D11_AUTHENTICATED_CONFIGURE_OUTPUT, a struct that reaches a kernel or GDI handle through its own members (D3D11_AUTHENTICATED_CONFIGURE_OUTPUT -> HANDLE).  Those integers name Wine objects and DXVK's native side has its own encoding for the same things, so one namespace's integer handed to the other names a different object rather than none.  Window handles are NOT in this set any more -- there is one HWND namespace in the process and this lane presents through it",
       NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorSetStreamRotation", NULL, cls_ID3D11VideoContext1_63, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000e, 0x0004, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamRotation", NULL, cls_ID3D11VideoContext1_64, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext::VideoProcessorGetStreamRotation", NULL, cls_ID3D11VideoContext1_64, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x000c, 0x0000 },
     { "ID3D11VideoContext1::SubmitDecoderBuffers1", NULL, cls_ID3D11VideoContext1_65, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11VideoContext1_65, 1, NULL },
-    { "ID3D11VideoContext1::GetDataForNewHardwareKey", NULL, cls_ID3D11VideoContext1_66, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext1::CheckCryptoSessionStatus", NULL, cls_ID3D11VideoContext1_67, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext1::GetDataForNewHardwareKey", NULL, cls_ID3D11VideoContext1_66, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0000, 0x0008 },
+    { "ID3D11VideoContext1::CheckCryptoSessionStatus", NULL, cls_ID3D11VideoContext1_67, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11VideoContext1::DecoderEnableDownsampling", NULL, cls_ID3D11VideoContext1_68, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000a, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext1::DecoderUpdateDownsampling", NULL, cls_ID3D11VideoContext1_69, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext1::VideoProcessorSetOutputColorSpace1", NULL, cls_ID3D11VideoContext1_70, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext1::VideoProcessorSetOutputShaderUsage", NULL, cls_ID3D11VideoContext1_71, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext1::VideoProcessorGetOutputColorSpace1", NULL, cls_ID3D11VideoContext1_72, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext1::VideoProcessorGetOutputShaderUsage", NULL, cls_ID3D11VideoContext1_73, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext1::VideoProcessorGetOutputColorSpace1", NULL, cls_ID3D11VideoContext1_72, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "ID3D11VideoContext1::VideoProcessorGetOutputShaderUsage", NULL, cls_ID3D11VideoContext1_73, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11VideoContext1::VideoProcessorSetStreamColorSpace1", NULL, cls_ID3D11VideoContext1_74, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext1::VideoProcessorSetStreamMirror", NULL, cls_ID3D11VideoContext1_75, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001e, 0x001c, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext1::VideoProcessorGetStreamColorSpace1", NULL, cls_ID3D11VideoContext1_76, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext1::VideoProcessorGetStreamMirror", NULL, cls_ID3D11VideoContext1_77, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext1::VideoProcessorGetBehaviorHints", NULL, cls_ID3D11VideoContext1_78, NULL, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001e, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext1::VideoProcessorGetStreamColorSpace1", NULL, cls_ID3D11VideoContext1_76, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext1::VideoProcessorGetStreamMirror", NULL, cls_ID3D11VideoContext1_77, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x001c, 0x0000 },
+    { "ID3D11VideoContext1::VideoProcessorGetBehaviorHints", NULL, cls_ID3D11VideoContext1_78, NULL, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001e, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0040, 0x0000 },
 };
 
 static const unsigned char cls_ID3D11VideoContext2_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
@@ -4579,13 +4653,13 @@ static const struct winecom_slot slots_ID3D11VideoContext2[83] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoContext2_3, xaux_ID3D11VideoContext2_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoContext2_3, xaux_ID3D11VideoContext2_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11VideoContext::GetDecoderBuffer",
       "ID3D11VideoContext::GetDecoderBuffer: has a void** out-parameter (`void **buffer`) with no REFIID beside it to type the result; an untyped interface pointer cannot be given a guest vtable",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0004, 0x0000 },
     { "ID3D11VideoContext::ReleaseDecoderBuffer", NULL, cls_ID3D11VideoContext2_8, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::DecoderBeginFrame", NULL, cls_ID3D11VideoContext2_9, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::DecoderEndFrame", NULL, cls_ID3D11VideoContext2_10, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4600,12 +4674,12 @@ static const struct winecom_slot slots_ID3D11VideoContext2[83] =
     { "ID3D11VideoContext::VideoProcessorSetOutputConstriction", NULL, cls_ID3D11VideoContext2_17, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0004, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetOutputStereoMode", NULL, cls_ID3D11VideoContext2_18, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetOutputExtension", NULL, cls_ID3D11VideoContext2_19, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetOutputTargetRect", NULL, cls_ID3D11VideoContext2_20, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetOutputBackgroundColor", NULL, cls_ID3D11VideoContext2_21, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext::VideoProcessorGetOutputTargetRect", NULL, cls_ID3D11VideoContext2_20, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetOutputBackgroundColor", NULL, cls_ID3D11VideoContext2_21, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorGetOutputColorSpace", NULL, cls_ID3D11VideoContext2_22, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetOutputAlphaFillMode", NULL, cls_ID3D11VideoContext2_23, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetOutputConstriction", NULL, cls_ID3D11VideoContext2_24, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetOutputStereoMode", NULL, cls_ID3D11VideoContext2_25, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext::VideoProcessorGetOutputAlphaFillMode", NULL, cls_ID3D11VideoContext2_23, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0006, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetOutputConstriction", NULL, cls_ID3D11VideoContext2_24, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetOutputStereoMode", NULL, cls_ID3D11VideoContext2_25, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorGetOutputExtension", NULL, cls_ID3D11VideoContext2_26, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamFrameFormat", NULL, cls_ID3D11VideoContext2_27, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamColorSpace", NULL, cls_ID3D11VideoContext2_28, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4620,18 +4694,18 @@ static const struct winecom_slot slots_ID3D11VideoContext2[83] =
     { "ID3D11VideoContext::VideoProcessorSetStreamAutoProcessingMode", NULL, cls_ID3D11VideoContext2_37, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamFilter", NULL, cls_ID3D11VideoContext2_38, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001e, 0x0018, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamExtension", NULL, cls_ID3D11VideoContext2_39, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000a, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamFrameFormat", NULL, cls_ID3D11VideoContext2_40, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext::VideoProcessorGetStreamFrameFormat", NULL, cls_ID3D11VideoContext2_40, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorGetStreamColorSpace", NULL, cls_ID3D11VideoContext2_41, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamOutputRate", NULL, cls_ID3D11VideoContext2_42, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamSourceRect", NULL, cls_ID3D11VideoContext2_43, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamDestRect", NULL, cls_ID3D11VideoContext2_44, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamAlpha", NULL, cls_ID3D11VideoContext2_45, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamPalette", NULL, cls_ID3D11VideoContext2_46, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamPixelAspectRatio", NULL, cls_ID3D11VideoContext2_47, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamLumaKey", NULL, cls_ID3D11VideoContext2_48, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamStereoFormat", NULL, cls_ID3D11VideoContext2_49, NULL, 9, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamAutoProcessingMode", NULL, cls_ID3D11VideoContext2_50, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamFilter", NULL, cls_ID3D11VideoContext2_51, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext::VideoProcessorGetStreamOutputRate", NULL, cls_ID3D11VideoContext2_42, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x000c, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamSourceRect", NULL, cls_ID3D11VideoContext2_43, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamDestRect", NULL, cls_ID3D11VideoContext2_44, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamAlpha", NULL, cls_ID3D11VideoContext2_45, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamPalette", NULL, cls_ID3D11VideoContext2_46, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0008, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamPixelAspectRatio", NULL, cls_ID3D11VideoContext2_47, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamLumaKey", NULL, cls_ID3D11VideoContext2_48, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamStereoFormat", NULL, cls_ID3D11VideoContext2_49, NULL, 9, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x00fc, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamAutoProcessingMode", NULL, cls_ID3D11VideoContext2_50, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorGetStreamFilter", NULL, cls_ID3D11VideoContext2_51, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0018, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorGetStreamExtension", NULL, cls_ID3D11VideoContext2_52, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000a, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorBlt",
       "ID3D11VideoContext::VideoProcessorBlt: takes D3D11_VIDEO_PROCESSOR_STREAM, a struct that reaches an interface pointer through its own members (D3D11_VIDEO_PROCESSOR_STREAM -> ID3D11VideoProcessorInputView); the pointers inside it would arrive at DXVK as guest proxies.  Needs a hand-written walker, the shape dlls/d3d12/main.c's hand_resource_barrier has",
@@ -4648,25 +4722,25 @@ static const struct winecom_slot slots_ID3D11VideoContext2[83] =
       "ID3D11VideoContext::ConfigureAuthenticatedChannel: takes D3D11_AUTHENTICATED_CONFIGURE_OUTPUT, a struct that reaches a kernel or GDI handle through its own members (D3D11_AUTHENTICATED_CONFIGURE_OUTPUT -> HANDLE).  Those integers name Wine objects and DXVK's native side has its own encoding for the same things, so one namespace's integer handed to the other names a different object rather than none.  Window handles are NOT in this set any more -- there is one HWND namespace in the process and this lane presents through it",
       NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11VideoContext::VideoProcessorSetStreamRotation", NULL, cls_ID3D11VideoContext2_63, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000e, 0x0004, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorGetStreamRotation", NULL, cls_ID3D11VideoContext2_64, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext::VideoProcessorGetStreamRotation", NULL, cls_ID3D11VideoContext2_64, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x000c, 0x0000 },
     { "ID3D11VideoContext1::SubmitDecoderBuffers1", NULL, cls_ID3D11VideoContext2_65, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, reps_ID3D11VideoContext2_65, 1, NULL },
-    { "ID3D11VideoContext1::GetDataForNewHardwareKey", NULL, cls_ID3D11VideoContext2_66, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext1::CheckCryptoSessionStatus", NULL, cls_ID3D11VideoContext2_67, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext1::GetDataForNewHardwareKey", NULL, cls_ID3D11VideoContext2_66, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0000, 0x0008 },
+    { "ID3D11VideoContext1::CheckCryptoSessionStatus", NULL, cls_ID3D11VideoContext2_67, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11VideoContext1::DecoderEnableDownsampling", NULL, cls_ID3D11VideoContext2_68, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000a, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext1::DecoderUpdateDownsampling", NULL, cls_ID3D11VideoContext2_69, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext1::VideoProcessorSetOutputColorSpace1", NULL, cls_ID3D11VideoContext2_70, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext1::VideoProcessorSetOutputShaderUsage", NULL, cls_ID3D11VideoContext2_71, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext1::VideoProcessorGetOutputColorSpace1", NULL, cls_ID3D11VideoContext2_72, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext1::VideoProcessorGetOutputShaderUsage", NULL, cls_ID3D11VideoContext2_73, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext1::VideoProcessorGetOutputColorSpace1", NULL, cls_ID3D11VideoContext2_72, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
+    { "ID3D11VideoContext1::VideoProcessorGetOutputShaderUsage", NULL, cls_ID3D11VideoContext2_73, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11VideoContext1::VideoProcessorSetStreamColorSpace1", NULL, cls_ID3D11VideoContext2_74, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext1::VideoProcessorSetStreamMirror", NULL, cls_ID3D11VideoContext2_75, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001e, 0x001c, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext1::VideoProcessorGetStreamColorSpace1", NULL, cls_ID3D11VideoContext2_76, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext1::VideoProcessorGetStreamMirror", NULL, cls_ID3D11VideoContext2_77, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext1::VideoProcessorGetBehaviorHints", NULL, cls_ID3D11VideoContext2_78, NULL, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001e, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext1::VideoProcessorGetStreamColorSpace1", NULL, cls_ID3D11VideoContext2_76, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoContext1::VideoProcessorGetStreamMirror", NULL, cls_ID3D11VideoContext2_77, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x001c, 0x0000 },
+    { "ID3D11VideoContext1::VideoProcessorGetBehaviorHints", NULL, cls_ID3D11VideoContext2_78, NULL, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001e, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0040, 0x0000 },
     { "ID3D11VideoContext2::VideoProcessorSetOutputHDRMetaData", NULL, cls_ID3D11VideoContext2_79, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext2::VideoProcessorGetOutputHDRMetaData", NULL, cls_ID3D11VideoContext2_80, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext2::VideoProcessorGetOutputHDRMetaData", NULL, cls_ID3D11VideoContext2_80, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11VideoContext2::VideoProcessorSetStreamHDRMetaData", NULL, cls_ID3D11VideoContext2_81, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000e, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext2::VideoProcessorGetStreamHDRMetaData", NULL, cls_ID3D11VideoContext2_82, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000a, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoContext2::VideoProcessorGetStreamHDRMetaData", NULL, cls_ID3D11VideoContext2_82, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000a, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
 };
 
 static const unsigned char cls_ID3D11VideoDecoder_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
@@ -4678,7 +4752,7 @@ static const struct winecom_slot slots_ID3D11VideoDecoder[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoDecoder_3, xaux_ID3D11VideoDecoder_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoDecoder_3, xaux_ID3D11VideoDecoder_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -4695,11 +4769,11 @@ static const struct winecom_slot slots_ID3D11VideoDecoderOutputView[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoDecoderOutputView_3, xaux_ID3D11VideoDecoderOutputView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoDecoderOutputView_3, xaux_ID3D11VideoDecoderOutputView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11View::GetResource", NULL, cls_ID3D11VideoDecoderOutputView_7, xaux_ID3D11VideoDecoderOutputView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11View::GetResource", NULL, cls_ID3D11VideoDecoderOutputView_7, xaux_ID3D11VideoDecoderOutputView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11VideoDecoderOutputView::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -4725,18 +4799,18 @@ static const struct winecom_slot slots_ID3D11VideoDevice[20] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11VideoDevice::CreateVideoDecoder", NULL, cls_ID3D11VideoDevice_3, xaux_ID3D11VideoDevice_3, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice::CreateVideoProcessor", NULL, cls_ID3D11VideoDevice_4, xaux_ID3D11VideoDevice_4, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice::CreateAuthenticatedChannel", NULL, cls_ID3D11VideoDevice_5, xaux_ID3D11VideoDevice_5, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice::CreateCryptoSession", NULL, cls_ID3D11VideoDevice_6, xaux_ID3D11VideoDevice_6, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice::CreateVideoDecoderOutputView", NULL, cls_ID3D11VideoDevice_7, xaux_ID3D11VideoDevice_7, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice::CreateVideoProcessorInputView", NULL, cls_ID3D11VideoDevice_8, xaux_ID3D11VideoDevice_8, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice::CreateVideoProcessorOutputView", NULL, cls_ID3D11VideoDevice_9, xaux_ID3D11VideoDevice_9, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice::CreateVideoProcessorEnumerator", NULL, cls_ID3D11VideoDevice_10, xaux_ID3D11VideoDevice_10, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoDevice::CreateVideoDecoder", NULL, cls_ID3D11VideoDevice_3, xaux_ID3D11VideoDevice_3, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11VideoDevice::CreateVideoProcessor", NULL, cls_ID3D11VideoDevice_4, xaux_ID3D11VideoDevice_4, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11VideoDevice::CreateAuthenticatedChannel", NULL, cls_ID3D11VideoDevice_5, xaux_ID3D11VideoDevice_5, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11VideoDevice::CreateCryptoSession", NULL, cls_ID3D11VideoDevice_6, xaux_ID3D11VideoDevice_6, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11VideoDevice::CreateVideoDecoderOutputView", NULL, cls_ID3D11VideoDevice_7, xaux_ID3D11VideoDevice_7, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11VideoDevice::CreateVideoProcessorInputView", NULL, cls_ID3D11VideoDevice_8, xaux_ID3D11VideoDevice_8, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11VideoDevice::CreateVideoProcessorOutputView", NULL, cls_ID3D11VideoDevice_9, xaux_ID3D11VideoDevice_9, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11VideoDevice::CreateVideoProcessorEnumerator", NULL, cls_ID3D11VideoDevice_10, xaux_ID3D11VideoDevice_10, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11VideoDevice::GetVideoDecoderProfileCount", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoDevice::GetVideoDecoderProfile", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice::CheckVideoDecoderFormat", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice::GetVideoDecoderConfigCount", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoDevice::CheckVideoDecoderFormat", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoDevice::GetVideoDecoderConfigCount", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11VideoDevice::GetVideoDecoderConfig", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoDevice::GetContentProtectionCaps", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoDevice::CheckCryptoKeyExchange", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4766,26 +4840,26 @@ static const struct winecom_slot slots_ID3D11VideoDevice1[24] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11VideoDevice::CreateVideoDecoder", NULL, cls_ID3D11VideoDevice1_3, xaux_ID3D11VideoDevice1_3, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice::CreateVideoProcessor", NULL, cls_ID3D11VideoDevice1_4, xaux_ID3D11VideoDevice1_4, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice::CreateAuthenticatedChannel", NULL, cls_ID3D11VideoDevice1_5, xaux_ID3D11VideoDevice1_5, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice::CreateCryptoSession", NULL, cls_ID3D11VideoDevice1_6, xaux_ID3D11VideoDevice1_6, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice::CreateVideoDecoderOutputView", NULL, cls_ID3D11VideoDevice1_7, xaux_ID3D11VideoDevice1_7, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice::CreateVideoProcessorInputView", NULL, cls_ID3D11VideoDevice1_8, xaux_ID3D11VideoDevice1_8, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice::CreateVideoProcessorOutputView", NULL, cls_ID3D11VideoDevice1_9, xaux_ID3D11VideoDevice1_9, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice::CreateVideoProcessorEnumerator", NULL, cls_ID3D11VideoDevice1_10, xaux_ID3D11VideoDevice1_10, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoDevice::CreateVideoDecoder", NULL, cls_ID3D11VideoDevice1_3, xaux_ID3D11VideoDevice1_3, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11VideoDevice::CreateVideoProcessor", NULL, cls_ID3D11VideoDevice1_4, xaux_ID3D11VideoDevice1_4, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11VideoDevice::CreateAuthenticatedChannel", NULL, cls_ID3D11VideoDevice1_5, xaux_ID3D11VideoDevice1_5, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "ID3D11VideoDevice::CreateCryptoSession", NULL, cls_ID3D11VideoDevice1_6, xaux_ID3D11VideoDevice1_6, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11VideoDevice::CreateVideoDecoderOutputView", NULL, cls_ID3D11VideoDevice1_7, xaux_ID3D11VideoDevice1_7, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "ID3D11VideoDevice::CreateVideoProcessorInputView", NULL, cls_ID3D11VideoDevice1_8, xaux_ID3D11VideoDevice1_8, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11VideoDevice::CreateVideoProcessorOutputView", NULL, cls_ID3D11VideoDevice1_9, xaux_ID3D11VideoDevice1_9, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
+    { "ID3D11VideoDevice::CreateVideoProcessorEnumerator", NULL, cls_ID3D11VideoDevice1_10, xaux_ID3D11VideoDevice1_10, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "ID3D11VideoDevice::GetVideoDecoderProfileCount", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoDevice::GetVideoDecoderProfile", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice::CheckVideoDecoderFormat", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice::GetVideoDecoderConfigCount", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoDevice::CheckVideoDecoderFormat", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "ID3D11VideoDevice::GetVideoDecoderConfigCount", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11VideoDevice::GetVideoDecoderConfig", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoDevice::GetContentProtectionCaps", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoDevice::CheckCryptoKeyExchange", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoDevice::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoDevice::SetPrivateDataInterface", NULL, cls_ID3D11VideoDevice1_19, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice1::GetCryptoSessionPrivateDataSize", NULL, NULL, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice1::GetVideoDecoderCaps", NULL, NULL, NULL, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0016, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoDevice1::CheckVideoDecoderDownsampling", NULL, NULL, NULL, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoDevice1::GetCryptoSessionPrivateDataSize", NULL, NULL, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0018, 0x0000 },
+    { "ID3D11VideoDevice1::GetVideoDecoderCaps", NULL, NULL, NULL, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0016, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0040, 0x0000 },
+    { "ID3D11VideoDevice1::CheckVideoDecoderDownsampling", NULL, NULL, NULL, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0060, 0x0000 },
     { "ID3D11VideoDevice1::RecommendVideoDecoderDownsampleParameters", NULL, NULL, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -4796,7 +4870,7 @@ static const struct winecom_slot slots_ID3D11VideoProcessor[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoProcessor_3, xaux_ID3D11VideoProcessor_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoProcessor_3, xaux_ID3D11VideoProcessor_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -4811,12 +4885,12 @@ static const struct winecom_slot slots_ID3D11VideoProcessorEnumerator[13] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoProcessorEnumerator_3, xaux_ID3D11VideoProcessorEnumerator_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoProcessorEnumerator_3, xaux_ID3D11VideoProcessorEnumerator_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11VideoProcessorEnumerator::GetVideoProcessorContentDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoProcessorEnumerator::CheckVideoProcessorFormat", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoProcessorEnumerator::CheckVideoProcessorFormat", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11VideoProcessorEnumerator::GetVideoProcessorCaps", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoProcessorEnumerator::GetVideoProcessorRateConversionCaps", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoProcessorEnumerator::GetVideoProcessorCustomRate", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
@@ -4830,17 +4904,17 @@ static const struct winecom_slot slots_ID3D11VideoProcessorEnumerator1[14] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoProcessorEnumerator1_3, xaux_ID3D11VideoProcessorEnumerator1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoProcessorEnumerator1_3, xaux_ID3D11VideoProcessorEnumerator1_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11VideoProcessorEnumerator::GetVideoProcessorContentDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoProcessorEnumerator::CheckVideoProcessorFormat", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoProcessorEnumerator::CheckVideoProcessorFormat", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "ID3D11VideoProcessorEnumerator::GetVideoProcessorCaps", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoProcessorEnumerator::GetVideoProcessorRateConversionCaps", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoProcessorEnumerator::GetVideoProcessorCustomRate", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoProcessorEnumerator::GetVideoProcessorFilterRange", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoProcessorEnumerator1::CheckVideoProcessorFormatConversion", NULL, NULL, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000f, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11VideoProcessorEnumerator1::CheckVideoProcessorFormatConversion", NULL, NULL, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000f, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0010, 0x0000 },
 };
 
 static const unsigned char cls_ID3D11VideoProcessorInputView_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
@@ -4852,11 +4926,11 @@ static const struct winecom_slot slots_ID3D11VideoProcessorInputView[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoProcessorInputView_3, xaux_ID3D11VideoProcessorInputView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoProcessorInputView_3, xaux_ID3D11VideoProcessorInputView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11View::GetResource", NULL, cls_ID3D11VideoProcessorInputView_7, xaux_ID3D11VideoProcessorInputView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11View::GetResource", NULL, cls_ID3D11VideoProcessorInputView_7, xaux_ID3D11VideoProcessorInputView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11VideoProcessorInputView::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -4869,11 +4943,11 @@ static const struct winecom_slot slots_ID3D11VideoProcessorOutputView[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoProcessorOutputView_3, xaux_ID3D11VideoProcessorOutputView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11VideoProcessorOutputView_3, xaux_ID3D11VideoProcessorOutputView_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11View::GetResource", NULL, cls_ID3D11VideoProcessorOutputView_7, xaux_ID3D11VideoProcessorOutputView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11View::GetResource", NULL, cls_ID3D11VideoProcessorOutputView_7, xaux_ID3D11VideoProcessorOutputView_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11VideoProcessorOutputView::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -4886,11 +4960,11 @@ static const struct winecom_slot slots_ID3D11View[8] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11View_3, xaux_ID3D11View_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3D11View_3, xaux_ID3D11View_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "ID3D11View::GetResource", NULL, cls_ID3D11View_7, xaux_ID3D11View_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11View::GetResource", NULL, cls_ID3D11View_7, xaux_ID3D11View_7, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
 };
 
 static const unsigned char cls_ID3DDeviceContextState_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
@@ -4900,7 +4974,7 @@ static const struct winecom_slot slots_ID3DDeviceContextState[7] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
-    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3DDeviceContextState_3, xaux_ID3DDeviceContextState_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "ID3D11DeviceChild::GetDevice", NULL, cls_ID3DDeviceContextState_3, xaux_ID3DDeviceContextState_3, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "ID3D11DeviceChild::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D11DeviceChild::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -4934,8 +5008,8 @@ static const struct winecom_slot slots_IDXGIAdapter[10] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIAdapter_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIAdapter::EnumOutputs", NULL, cls_IDXGIAdapter_7, xaux_IDXGIAdapter_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIAdapter_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIAdapter::EnumOutputs", NULL, cls_IDXGIAdapter_7, xaux_IDXGIAdapter_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIAdapter::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIAdapter_8, 1, NULL },
     { "IDXGIAdapter::CheckInterfaceSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
@@ -4955,8 +5029,8 @@ static const struct winecom_slot slots_IDXGIAdapter1[11] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIAdapter1_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIAdapter::EnumOutputs", NULL, cls_IDXGIAdapter1_7, xaux_IDXGIAdapter1_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIAdapter1_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIAdapter::EnumOutputs", NULL, cls_IDXGIAdapter1_7, xaux_IDXGIAdapter1_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIAdapter::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIAdapter1_8, 1, NULL },
     { "IDXGIAdapter::CheckInterfaceSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIAdapter1::GetDesc1", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIAdapter1_10, 1, NULL },
@@ -4979,8 +5053,8 @@ static const struct winecom_slot slots_IDXGIAdapter2[12] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIAdapter2_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIAdapter::EnumOutputs", NULL, cls_IDXGIAdapter2_7, xaux_IDXGIAdapter2_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIAdapter2_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIAdapter::EnumOutputs", NULL, cls_IDXGIAdapter2_7, xaux_IDXGIAdapter2_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIAdapter::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIAdapter2_8, 1, NULL },
     { "IDXGIAdapter::CheckInterfaceSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIAdapter1::GetDesc1", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIAdapter2_10, 1, NULL },
@@ -5004,21 +5078,21 @@ static const struct winecom_slot slots_IDXGIAdapter3[18] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIAdapter3_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIAdapter::EnumOutputs", NULL, cls_IDXGIAdapter3_7, xaux_IDXGIAdapter3_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIAdapter3_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIAdapter::EnumOutputs", NULL, cls_IDXGIAdapter3_7, xaux_IDXGIAdapter3_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIAdapter::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIAdapter3_8, 1, NULL },
     { "IDXGIAdapter::CheckInterfaceSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIAdapter1::GetDesc1", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIAdapter3_10, 1, NULL },
     { "IDXGIAdapter2::GetDesc2", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIAdapter3_11, 1, NULL },
     { "IDXGIAdapter3::RegisterHardwareContentProtectionTeardownStatusEvent",
       "IDXGIAdapter3::RegisterHardwareContentProtectionTeardownStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIAdapter3::UnregisterHardwareContentProtectionTeardownStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIAdapter3::QueryVideoMemoryInfo", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIAdapter3::SetVideoMemoryReservation", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0004, NULL, 0, NULL },
     { "IDXGIAdapter3::RegisterVideoMemoryBudgetChangeNotificationEvent",
       "IDXGIAdapter3::RegisterVideoMemoryBudgetChangeNotificationEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIAdapter3::UnregisterVideoMemoryBudgetChangeNotification", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -5041,21 +5115,21 @@ static const struct winecom_slot slots_IDXGIAdapter4[19] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIAdapter4_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIAdapter::EnumOutputs", NULL, cls_IDXGIAdapter4_7, xaux_IDXGIAdapter4_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIAdapter4_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIAdapter::EnumOutputs", NULL, cls_IDXGIAdapter4_7, xaux_IDXGIAdapter4_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIAdapter::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIAdapter4_8, 1, NULL },
     { "IDXGIAdapter::CheckInterfaceSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIAdapter1::GetDesc1", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIAdapter4_10, 1, NULL },
     { "IDXGIAdapter2::GetDesc2", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIAdapter4_11, 1, NULL },
     { "IDXGIAdapter3::RegisterHardwareContentProtectionTeardownStatusEvent",
       "IDXGIAdapter3::RegisterHardwareContentProtectionTeardownStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIAdapter3::UnregisterHardwareContentProtectionTeardownStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIAdapter3::QueryVideoMemoryInfo", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIAdapter3::SetVideoMemoryReservation", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0004, NULL, 0, NULL },
     { "IDXGIAdapter3::RegisterVideoMemoryBudgetChangeNotificationEvent",
       "IDXGIAdapter3::RegisterVideoMemoryBudgetChangeNotificationEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIAdapter3::UnregisterVideoMemoryBudgetChangeNotification", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIAdapter4::GetDesc3", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIAdapter4_18, 1, NULL },
 };
@@ -5072,14 +5146,14 @@ static const struct winecom_slot slots_IDXGIDevice[12] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIDevice_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDevice::GetAdapter", NULL, cls_IDXGIDevice_7, xaux_IDXGIDevice_7, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIDevice_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIDevice::GetAdapter", NULL, cls_IDXGIDevice_7, xaux_IDXGIDevice_7, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGIDevice::CreateSurface",
       "IDXGIDevice::CreateSurface: takes DXGI_SHARED_RESOURCE, a struct that reaches a kernel or GDI handle through its own members (DXGI_SHARED_RESOURCE -> HANDLE).  Those integers name Wine objects and DXVK's native side has its own encoding for the same things, so one namespace's integer handed to the other names a different object rather than none.  Window handles are NOT in this set any more -- there is one HWND namespace in the process and this lane presents through it",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIDevice::QueryResourceResidency", NULL, cls_IDXGIDevice_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
+      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
+    { "IDXGIDevice::QueryResourceResidency", NULL, cls_IDXGIDevice_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIDevice::SetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
-    { "IDXGIDevice::GetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIDevice::GetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
 };
 
 static const unsigned char cls_IDXGIDevice1_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -5094,16 +5168,16 @@ static const struct winecom_slot slots_IDXGIDevice1[14] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIDevice1_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDevice::GetAdapter", NULL, cls_IDXGIDevice1_7, xaux_IDXGIDevice1_7, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIDevice1_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIDevice::GetAdapter", NULL, cls_IDXGIDevice1_7, xaux_IDXGIDevice1_7, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGIDevice::CreateSurface",
       "IDXGIDevice::CreateSurface: takes DXGI_SHARED_RESOURCE, a struct that reaches a kernel or GDI handle through its own members (DXGI_SHARED_RESOURCE -> HANDLE).  Those integers name Wine objects and DXVK's native side has its own encoding for the same things, so one namespace's integer handed to the other names a different object rather than none.  Window handles are NOT in this set any more -- there is one HWND namespace in the process and this lane presents through it",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIDevice::QueryResourceResidency", NULL, cls_IDXGIDevice1_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
+      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
+    { "IDXGIDevice::QueryResourceResidency", NULL, cls_IDXGIDevice1_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIDevice::SetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
-    { "IDXGIDevice::GetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIDevice::GetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGIDevice1::SetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDevice1::GetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIDevice1::GetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
 };
 
 static const unsigned char cls_IDXGIDevice2_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -5120,18 +5194,18 @@ static const struct winecom_slot slots_IDXGIDevice2[17] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIDevice2_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDevice::GetAdapter", NULL, cls_IDXGIDevice2_7, xaux_IDXGIDevice2_7, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIDevice2_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIDevice::GetAdapter", NULL, cls_IDXGIDevice2_7, xaux_IDXGIDevice2_7, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGIDevice::CreateSurface",
       "IDXGIDevice::CreateSurface: takes DXGI_SHARED_RESOURCE, a struct that reaches a kernel or GDI handle through its own members (DXGI_SHARED_RESOURCE -> HANDLE).  Those integers name Wine objects and DXVK's native side has its own encoding for the same things, so one namespace's integer handed to the other names a different object rather than none.  Window handles are NOT in this set any more -- there is one HWND namespace in the process and this lane presents through it",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIDevice::QueryResourceResidency", NULL, cls_IDXGIDevice2_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
+      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
+    { "IDXGIDevice::QueryResourceResidency", NULL, cls_IDXGIDevice2_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIDevice::SetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
-    { "IDXGIDevice::GetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIDevice::GetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGIDevice1::SetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDevice1::GetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIDevice1::GetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGIDevice2::OfferResources", NULL, cls_IDXGIDevice2_14, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDevice2::ReclaimResources", NULL, cls_IDXGIDevice2_15, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIDevice2::ReclaimResources", NULL, cls_IDXGIDevice2_15, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIDevice2::EnqueueSetEvent",
       "IDXGIDevice2::EnqueueSetEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
       NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -5151,18 +5225,18 @@ static const struct winecom_slot slots_IDXGIDevice3[18] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIDevice3_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDevice::GetAdapter", NULL, cls_IDXGIDevice3_7, xaux_IDXGIDevice3_7, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIDevice3_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIDevice::GetAdapter", NULL, cls_IDXGIDevice3_7, xaux_IDXGIDevice3_7, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGIDevice::CreateSurface",
       "IDXGIDevice::CreateSurface: takes DXGI_SHARED_RESOURCE, a struct that reaches a kernel or GDI handle through its own members (DXGI_SHARED_RESOURCE -> HANDLE).  Those integers name Wine objects and DXVK's native side has its own encoding for the same things, so one namespace's integer handed to the other names a different object rather than none.  Window handles are NOT in this set any more -- there is one HWND namespace in the process and this lane presents through it",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIDevice::QueryResourceResidency", NULL, cls_IDXGIDevice3_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
+      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
+    { "IDXGIDevice::QueryResourceResidency", NULL, cls_IDXGIDevice3_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIDevice::SetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
-    { "IDXGIDevice::GetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIDevice::GetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGIDevice1::SetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDevice1::GetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIDevice1::GetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGIDevice2::OfferResources", NULL, cls_IDXGIDevice3_14, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDevice2::ReclaimResources", NULL, cls_IDXGIDevice3_15, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIDevice2::ReclaimResources", NULL, cls_IDXGIDevice3_15, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIDevice2::EnqueueSetEvent",
       "IDXGIDevice2::EnqueueSetEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
       NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -5185,24 +5259,24 @@ static const struct winecom_slot slots_IDXGIDevice4[20] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIDevice4_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDevice::GetAdapter", NULL, cls_IDXGIDevice4_7, xaux_IDXGIDevice4_7, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIDevice4_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIDevice::GetAdapter", NULL, cls_IDXGIDevice4_7, xaux_IDXGIDevice4_7, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGIDevice::CreateSurface",
       "IDXGIDevice::CreateSurface: takes DXGI_SHARED_RESOURCE, a struct that reaches a kernel or GDI handle through its own members (DXGI_SHARED_RESOURCE -> HANDLE).  Those integers name Wine objects and DXVK's native side has its own encoding for the same things, so one namespace's integer handed to the other names a different object rather than none.  Window handles are NOT in this set any more -- there is one HWND namespace in the process and this lane presents through it",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIDevice::QueryResourceResidency", NULL, cls_IDXGIDevice4_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL },
+      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
+    { "IDXGIDevice::QueryResourceResidency", NULL, cls_IDXGIDevice4_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 2, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0004, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIDevice::SetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
-    { "IDXGIDevice::GetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIDevice::GetGPUThreadPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGIDevice1::SetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDevice1::GetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIDevice1::GetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGIDevice2::OfferResources", NULL, cls_IDXGIDevice4_14, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDevice2::ReclaimResources", NULL, cls_IDXGIDevice4_15, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIDevice2::ReclaimResources", NULL, cls_IDXGIDevice4_15, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIDevice2::EnqueueSetEvent",
       "IDXGIDevice2::EnqueueSetEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
       NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIDevice3::Trim", NULL, NULL, NULL, 1, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIDevice4::OfferResources1", NULL, cls_IDXGIDevice4_18, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000d, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDevice4::ReclaimResources1", NULL, cls_IDXGIDevice4_19, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIDevice4::ReclaimResources1", NULL, cls_IDXGIDevice4_19, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
 };
 
 static const unsigned char cls_IDXGIDeviceSubObject_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -5215,8 +5289,8 @@ static const struct winecom_slot slots_IDXGIDeviceSubObject[8] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIDeviceSubObject_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGIDeviceSubObject_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIDeviceSubObject_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGIDeviceSubObject_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
 };
 
 static const unsigned char cls_IDXGIFactory_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -5232,12 +5306,12 @@ static const struct winecom_slot slots_IDXGIFactory[12] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIFactory_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory::EnumAdapters", NULL, cls_IDXGIFactory_7, xaux_IDXGIFactory_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIFactory_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIFactory::EnumAdapters", NULL, cls_IDXGIFactory_7, xaux_IDXGIFactory_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory::MakeWindowAssociation", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory::GetWindowAssociation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory::GetWindowAssociation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGIFactory::CreateSwapChain", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 7, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory::CreateSoftwareAdapter", NULL, cls_IDXGIFactory_11, xaux_IDXGIFactory_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory::CreateSoftwareAdapter", NULL, cls_IDXGIFactory_11, xaux_IDXGIFactory_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
 };
 
 static const unsigned char cls_IDXGIFactory1_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -5255,13 +5329,13 @@ static const struct winecom_slot slots_IDXGIFactory1[14] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIFactory1_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory::EnumAdapters", NULL, cls_IDXGIFactory1_7, xaux_IDXGIFactory1_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIFactory1_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIFactory::EnumAdapters", NULL, cls_IDXGIFactory1_7, xaux_IDXGIFactory1_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory::MakeWindowAssociation", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory::GetWindowAssociation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory::GetWindowAssociation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGIFactory::CreateSwapChain", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 7, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory::CreateSoftwareAdapter", NULL, cls_IDXGIFactory1_11, xaux_IDXGIFactory1_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory1::EnumAdapters1", NULL, cls_IDXGIFactory1_12, xaux_IDXGIFactory1_12, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory::CreateSoftwareAdapter", NULL, cls_IDXGIFactory1_11, xaux_IDXGIFactory1_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIFactory1::EnumAdapters1", NULL, cls_IDXGIFactory1_12, xaux_IDXGIFactory1_12, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory1::IsCurrent", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -5280,35 +5354,35 @@ static const struct winecom_slot slots_IDXGIFactory2[25] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIFactory2_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory::EnumAdapters", NULL, cls_IDXGIFactory2_7, xaux_IDXGIFactory2_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIFactory2_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIFactory::EnumAdapters", NULL, cls_IDXGIFactory2_7, xaux_IDXGIFactory2_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory::MakeWindowAssociation", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory::GetWindowAssociation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory::GetWindowAssociation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGIFactory::CreateSwapChain", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 7, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory::CreateSoftwareAdapter", NULL, cls_IDXGIFactory2_11, xaux_IDXGIFactory2_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory1::EnumAdapters1", NULL, cls_IDXGIFactory2_12, xaux_IDXGIFactory2_12, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory::CreateSoftwareAdapter", NULL, cls_IDXGIFactory2_11, xaux_IDXGIFactory2_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIFactory1::EnumAdapters1", NULL, cls_IDXGIFactory2_12, xaux_IDXGIFactory2_12, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory1::IsCurrent", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::IsWindowedStereoEnabled", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::CreateSwapChainForHwnd", NULL, NULL, NULL, 7, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 8, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIFactory2::CreateSwapChainForCoreWindow",
       "IDXGIFactory2::CreateSwapChainForCoreWindow: creates a swapchain for a WinRT CoreWindow, which has no HWND.  This lane presents through win32u's client-surface layer, which is a layer over a Wine window handle; there is no window here to attach a surface to, and DXVK's own answer would be to fabricate one",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
     { "IDXGIFactory2::GetSharedResourceAdapterLuid",
       "IDXGIFactory2::GetSharedResourceAdapterLuid: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
       NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory2::RegisterStereoStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory2::RegisterStereoStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIFactory2::RegisterStereoStatusEvent",
       "IDXGIFactory2::RegisterStereoStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterStereoStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory2::RegisterOcclusionStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory2::RegisterOcclusionStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIFactory2::RegisterOcclusionStatusEvent",
       "IDXGIFactory2::RegisterOcclusionStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterOcclusionStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::CreateSwapChainForComposition",
       "IDXGIFactory2::CreateSwapChainForComposition: creates a windowless composition swapchain.  DXVK serves it by fabricating a dummy window through its WSI backend (DxgiSurfaceFactory::CreateDummyWindow), and this lane's backend owns no windows -- it presents to windows the application asked Wine for.  A composition swapchain would render correctly and be visible nowhere, which is worse than a refusal",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
 };
 
 static const unsigned char cls_IDXGIFactory3_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -5326,35 +5400,35 @@ static const struct winecom_slot slots_IDXGIFactory3[26] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIFactory3_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory::EnumAdapters", NULL, cls_IDXGIFactory3_7, xaux_IDXGIFactory3_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIFactory3_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIFactory::EnumAdapters", NULL, cls_IDXGIFactory3_7, xaux_IDXGIFactory3_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory::MakeWindowAssociation", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory::GetWindowAssociation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory::GetWindowAssociation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGIFactory::CreateSwapChain", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 7, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory::CreateSoftwareAdapter", NULL, cls_IDXGIFactory3_11, xaux_IDXGIFactory3_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory1::EnumAdapters1", NULL, cls_IDXGIFactory3_12, xaux_IDXGIFactory3_12, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory::CreateSoftwareAdapter", NULL, cls_IDXGIFactory3_11, xaux_IDXGIFactory3_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIFactory1::EnumAdapters1", NULL, cls_IDXGIFactory3_12, xaux_IDXGIFactory3_12, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory1::IsCurrent", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::IsWindowedStereoEnabled", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::CreateSwapChainForHwnd", NULL, NULL, NULL, 7, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 8, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIFactory2::CreateSwapChainForCoreWindow",
       "IDXGIFactory2::CreateSwapChainForCoreWindow: creates a swapchain for a WinRT CoreWindow, which has no HWND.  This lane presents through win32u's client-surface layer, which is a layer over a Wine window handle; there is no window here to attach a surface to, and DXVK's own answer would be to fabricate one",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
     { "IDXGIFactory2::GetSharedResourceAdapterLuid",
       "IDXGIFactory2::GetSharedResourceAdapterLuid: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
       NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory2::RegisterStereoStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory2::RegisterStereoStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIFactory2::RegisterStereoStatusEvent",
       "IDXGIFactory2::RegisterStereoStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterStereoStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory2::RegisterOcclusionStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory2::RegisterOcclusionStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIFactory2::RegisterOcclusionStatusEvent",
       "IDXGIFactory2::RegisterOcclusionStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterOcclusionStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::CreateSwapChainForComposition",
       "IDXGIFactory2::CreateSwapChainForComposition: creates a windowless composition swapchain.  DXVK serves it by fabricating a dummy window through its WSI backend (DxgiSurfaceFactory::CreateDummyWindow), and this lane's backend owns no windows -- it presents to windows the application asked Wine for.  A composition swapchain would render correctly and be visible nowhere, which is worse than a refusal",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
     { "IDXGIFactory3::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -5375,38 +5449,38 @@ static const struct winecom_slot slots_IDXGIFactory4[28] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIFactory4_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory::EnumAdapters", NULL, cls_IDXGIFactory4_7, xaux_IDXGIFactory4_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIFactory4_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIFactory::EnumAdapters", NULL, cls_IDXGIFactory4_7, xaux_IDXGIFactory4_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory::MakeWindowAssociation", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory::GetWindowAssociation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory::GetWindowAssociation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGIFactory::CreateSwapChain", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 7, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory::CreateSoftwareAdapter", NULL, cls_IDXGIFactory4_11, xaux_IDXGIFactory4_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory1::EnumAdapters1", NULL, cls_IDXGIFactory4_12, xaux_IDXGIFactory4_12, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory::CreateSoftwareAdapter", NULL, cls_IDXGIFactory4_11, xaux_IDXGIFactory4_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIFactory1::EnumAdapters1", NULL, cls_IDXGIFactory4_12, xaux_IDXGIFactory4_12, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory1::IsCurrent", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::IsWindowedStereoEnabled", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::CreateSwapChainForHwnd", NULL, NULL, NULL, 7, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 8, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIFactory2::CreateSwapChainForCoreWindow",
       "IDXGIFactory2::CreateSwapChainForCoreWindow: creates a swapchain for a WinRT CoreWindow, which has no HWND.  This lane presents through win32u's client-surface layer, which is a layer over a Wine window handle; there is no window here to attach a surface to, and DXVK's own answer would be to fabricate one",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
     { "IDXGIFactory2::GetSharedResourceAdapterLuid",
       "IDXGIFactory2::GetSharedResourceAdapterLuid: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
       NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory2::RegisterStereoStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory2::RegisterStereoStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIFactory2::RegisterStereoStatusEvent",
       "IDXGIFactory2::RegisterStereoStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterStereoStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory2::RegisterOcclusionStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory2::RegisterOcclusionStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIFactory2::RegisterOcclusionStatusEvent",
       "IDXGIFactory2::RegisterOcclusionStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterOcclusionStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::CreateSwapChainForComposition",
       "IDXGIFactory2::CreateSwapChainForComposition: creates a windowless composition swapchain.  DXVK serves it by fabricating a dummy window through its WSI backend (DxgiSurfaceFactory::CreateDummyWindow), and this lane's backend owns no windows -- it presents to windows the application asked Wine for.  A composition swapchain would render correctly and be visible nowhere, which is worse than a refusal",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
     { "IDXGIFactory3::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory4::EnumAdapterByLuid", NULL, cls_IDXGIFactory4_26, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0001, NULL, 0, NULL },
-    { "IDXGIFactory4::EnumWarpAdapter", NULL, cls_IDXGIFactory4_27, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory4::EnumAdapterByLuid", NULL, cls_IDXGIFactory4_26, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0001, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "IDXGIFactory4::EnumWarpAdapter", NULL, cls_IDXGIFactory4_27, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
 };
 
 static const unsigned char cls_IDXGIFactory5_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -5426,38 +5500,38 @@ static const struct winecom_slot slots_IDXGIFactory5[29] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIFactory5_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory::EnumAdapters", NULL, cls_IDXGIFactory5_7, xaux_IDXGIFactory5_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIFactory5_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIFactory::EnumAdapters", NULL, cls_IDXGIFactory5_7, xaux_IDXGIFactory5_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory::MakeWindowAssociation", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory::GetWindowAssociation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory::GetWindowAssociation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGIFactory::CreateSwapChain", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 7, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory::CreateSoftwareAdapter", NULL, cls_IDXGIFactory5_11, xaux_IDXGIFactory5_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory1::EnumAdapters1", NULL, cls_IDXGIFactory5_12, xaux_IDXGIFactory5_12, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory::CreateSoftwareAdapter", NULL, cls_IDXGIFactory5_11, xaux_IDXGIFactory5_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIFactory1::EnumAdapters1", NULL, cls_IDXGIFactory5_12, xaux_IDXGIFactory5_12, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory1::IsCurrent", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::IsWindowedStereoEnabled", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::CreateSwapChainForHwnd", NULL, NULL, NULL, 7, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 8, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIFactory2::CreateSwapChainForCoreWindow",
       "IDXGIFactory2::CreateSwapChainForCoreWindow: creates a swapchain for a WinRT CoreWindow, which has no HWND.  This lane presents through win32u's client-surface layer, which is a layer over a Wine window handle; there is no window here to attach a surface to, and DXVK's own answer would be to fabricate one",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
     { "IDXGIFactory2::GetSharedResourceAdapterLuid",
       "IDXGIFactory2::GetSharedResourceAdapterLuid: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
       NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory2::RegisterStereoStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory2::RegisterStereoStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIFactory2::RegisterStereoStatusEvent",
       "IDXGIFactory2::RegisterStereoStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterStereoStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory2::RegisterOcclusionStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory2::RegisterOcclusionStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIFactory2::RegisterOcclusionStatusEvent",
       "IDXGIFactory2::RegisterOcclusionStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterOcclusionStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::CreateSwapChainForComposition",
       "IDXGIFactory2::CreateSwapChainForComposition: creates a windowless composition swapchain.  DXVK serves it by fabricating a dummy window through its WSI backend (DxgiSurfaceFactory::CreateDummyWindow), and this lane's backend owns no windows -- it presents to windows the application asked Wine for.  A composition swapchain would render correctly and be visible nowhere, which is worse than a refusal",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
     { "IDXGIFactory3::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory4::EnumAdapterByLuid", NULL, cls_IDXGIFactory5_26, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0001, NULL, 0, NULL },
-    { "IDXGIFactory4::EnumWarpAdapter", NULL, cls_IDXGIFactory5_27, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory4::EnumAdapterByLuid", NULL, cls_IDXGIFactory5_26, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0001, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "IDXGIFactory4::EnumWarpAdapter", NULL, cls_IDXGIFactory5_27, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory5::CheckFeatureSupport", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -5479,40 +5553,40 @@ static const struct winecom_slot slots_IDXGIFactory6[30] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIFactory6_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory::EnumAdapters", NULL, cls_IDXGIFactory6_7, xaux_IDXGIFactory6_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIFactory6_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIFactory::EnumAdapters", NULL, cls_IDXGIFactory6_7, xaux_IDXGIFactory6_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory::MakeWindowAssociation", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory::GetWindowAssociation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory::GetWindowAssociation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGIFactory::CreateSwapChain", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 7, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory::CreateSoftwareAdapter", NULL, cls_IDXGIFactory6_11, xaux_IDXGIFactory6_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory1::EnumAdapters1", NULL, cls_IDXGIFactory6_12, xaux_IDXGIFactory6_12, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory::CreateSoftwareAdapter", NULL, cls_IDXGIFactory6_11, xaux_IDXGIFactory6_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIFactory1::EnumAdapters1", NULL, cls_IDXGIFactory6_12, xaux_IDXGIFactory6_12, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory1::IsCurrent", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::IsWindowedStereoEnabled", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::CreateSwapChainForHwnd", NULL, NULL, NULL, 7, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 8, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIFactory2::CreateSwapChainForCoreWindow",
       "IDXGIFactory2::CreateSwapChainForCoreWindow: creates a swapchain for a WinRT CoreWindow, which has no HWND.  This lane presents through win32u's client-surface layer, which is a layer over a Wine window handle; there is no window here to attach a surface to, and DXVK's own answer would be to fabricate one",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
     { "IDXGIFactory2::GetSharedResourceAdapterLuid",
       "IDXGIFactory2::GetSharedResourceAdapterLuid: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
       NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory2::RegisterStereoStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory2::RegisterStereoStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIFactory2::RegisterStereoStatusEvent",
       "IDXGIFactory2::RegisterStereoStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterStereoStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory2::RegisterOcclusionStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory2::RegisterOcclusionStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIFactory2::RegisterOcclusionStatusEvent",
       "IDXGIFactory2::RegisterOcclusionStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterOcclusionStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::CreateSwapChainForComposition",
       "IDXGIFactory2::CreateSwapChainForComposition: creates a windowless composition swapchain.  DXVK serves it by fabricating a dummy window through its WSI backend (DxgiSurfaceFactory::CreateDummyWindow), and this lane's backend owns no windows -- it presents to windows the application asked Wine for.  A composition swapchain would render correctly and be visible nowhere, which is worse than a refusal",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
     { "IDXGIFactory3::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory4::EnumAdapterByLuid", NULL, cls_IDXGIFactory6_26, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0001, NULL, 0, NULL },
-    { "IDXGIFactory4::EnumWarpAdapter", NULL, cls_IDXGIFactory6_27, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory4::EnumAdapterByLuid", NULL, cls_IDXGIFactory6_26, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0001, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "IDXGIFactory4::EnumWarpAdapter", NULL, cls_IDXGIFactory6_27, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory5::CheckFeatureSupport", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory6::EnumAdapterByGpuPreference", NULL, cls_IDXGIFactory6_29, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 2, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory6::EnumAdapterByGpuPreference", NULL, cls_IDXGIFactory6_29, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 2, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
 };
 
 static const unsigned char cls_IDXGIFactory7_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -5533,43 +5607,43 @@ static const struct winecom_slot slots_IDXGIFactory7[32] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIFactory7_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory::EnumAdapters", NULL, cls_IDXGIFactory7_7, xaux_IDXGIFactory7_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIFactory7_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIFactory::EnumAdapters", NULL, cls_IDXGIFactory7_7, xaux_IDXGIFactory7_7, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory::MakeWindowAssociation", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory::GetWindowAssociation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory::GetWindowAssociation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGIFactory::CreateSwapChain", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 7, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory::CreateSoftwareAdapter", NULL, cls_IDXGIFactory7_11, xaux_IDXGIFactory7_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory1::EnumAdapters1", NULL, cls_IDXGIFactory7_12, xaux_IDXGIFactory7_12, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory::CreateSoftwareAdapter", NULL, cls_IDXGIFactory7_11, xaux_IDXGIFactory7_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIFactory1::EnumAdapters1", NULL, cls_IDXGIFactory7_12, xaux_IDXGIFactory7_12, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory1::IsCurrent", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::IsWindowedStereoEnabled", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::CreateSwapChainForHwnd", NULL, NULL, NULL, 7, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 8, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIFactory2::CreateSwapChainForCoreWindow",
       "IDXGIFactory2::CreateSwapChainForCoreWindow: creates a swapchain for a WinRT CoreWindow, which has no HWND.  This lane presents through win32u's client-surface layer, which is a layer over a Wine window handle; there is no window here to attach a surface to, and DXVK's own answer would be to fabricate one",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
     { "IDXGIFactory2::GetSharedResourceAdapterLuid",
       "IDXGIFactory2::GetSharedResourceAdapterLuid: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
       NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIFactory2::RegisterStereoStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory2::RegisterStereoStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIFactory2::RegisterStereoStatusEvent",
       "IDXGIFactory2::RegisterStereoStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterStereoStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory2::RegisterOcclusionStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory2::RegisterOcclusionStatusWindow", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIFactory2::RegisterOcclusionStatusEvent",
       "IDXGIFactory2::RegisterOcclusionStatusEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory2::UnregisterOcclusionStatus", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIFactory2::CreateSwapChainForComposition",
       "IDXGIFactory2::CreateSwapChainForComposition: creates a windowless composition swapchain.  DXVK serves it by fabricating a dummy window through its WSI backend (DxgiSurfaceFactory::CreateDummyWindow), and this lane's backend owns no windows -- it presents to windows the application asked Wine for.  A composition swapchain would render correctly and be visible nowhere, which is worse than a refusal",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
     { "IDXGIFactory3::GetCreationFlags", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory4::EnumAdapterByLuid", NULL, cls_IDXGIFactory7_26, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0001, NULL, 0, NULL },
-    { "IDXGIFactory4::EnumWarpAdapter", NULL, cls_IDXGIFactory7_27, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory4::EnumAdapterByLuid", NULL, cls_IDXGIFactory7_26, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0001, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "IDXGIFactory4::EnumWarpAdapter", NULL, cls_IDXGIFactory7_27, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIFactory5::CheckFeatureSupport", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0005, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIFactory6::EnumAdapterByGpuPreference", NULL, cls_IDXGIFactory7_29, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 2, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIFactory6::EnumAdapterByGpuPreference", NULL, cls_IDXGIFactory7_29, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 2, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0008, 0x0000, 0x0000 },
     { "IDXGIFactory7::RegisterAdaptersChangedEvent",
       "IDXGIFactory7::RegisterAdaptersChangedEvent: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGIFactory7::UnregisterAdaptersChangedEvent", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -5580,10 +5654,10 @@ static const struct winecom_slot slots_IDXGIFactoryMedia[5] =
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL },  /* runtime */
     { "IDXGIFactoryMedia::CreateSwapChainForCompositionSurfaceHandle",
       "IDXGIFactoryMedia::CreateSwapChainForCompositionSurfaceHandle: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
     { "IDXGIFactoryMedia::CreateDecodeSwapChainForCompositionSurfaceHandle",
       "IDXGIFactoryMedia::CreateDecodeSwapChainForCompositionSurfaceHandle: takes a by-value HANDLE.  A Wine HANDLE is a Wine object; DXVK's native side encodes an event as the tagged eventfd 0x4556464400000000|fd (src/include/native/windows/dxvk_native_event.h) and a shared resource as its own key.  Handing one namespace's integer to the other is the exact collision ppc64le/vkd3d's tagged-handle series was written to prevent -- MEASURED there as eight bytes written into a live pipe",
-      NULL, NULL, 7, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+      NULL, NULL, 7, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000, NULL, 0, NULL, 0, 0x0020, 0x0000, 0x0000 },
 };
 
 static const unsigned char cls_IDXGIKeyedMutex_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -5596,8 +5670,8 @@ static const struct winecom_slot slots_IDXGIKeyedMutex[10] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIKeyedMutex_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGIKeyedMutex_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIKeyedMutex_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGIKeyedMutex_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIKeyedMutex::AcquireSync", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0001, NULL, 0, NULL },
     { "IDXGIKeyedMutex::ReleaseSync", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0001, NULL, 0, NULL },
 };
@@ -5611,7 +5685,7 @@ static const struct winecom_slot slots_IDXGIObject[7] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIObject_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIObject_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
 };
 
 static const unsigned char cls_IDXGIOutput_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -5629,9 +5703,9 @@ static const struct winecom_slot slots_IDXGIOutput[19] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIOutput_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIOutput_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIOutput::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIOutput_7, 1, NULL },
-    { "IDXGIOutput::GetDisplayModeList", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput::GetDisplayModeList", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIOutput::FindClosestMatchingMode", NULL, cls_IDXGIOutput_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::WaitForVBlank", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::TakeOwnership", NULL, cls_IDXGIOutput_11, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, NULL },
@@ -5663,9 +5737,9 @@ static const struct winecom_slot slots_IDXGIOutput1[23] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIOutput1_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIOutput1_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIOutput::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIOutput1_7, 1, NULL },
-    { "IDXGIOutput::GetDisplayModeList", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput::GetDisplayModeList", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIOutput::FindClosestMatchingMode", NULL, cls_IDXGIOutput1_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::WaitForVBlank", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::TakeOwnership", NULL, cls_IDXGIOutput1_11, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, NULL },
@@ -5676,10 +5750,10 @@ static const struct winecom_slot slots_IDXGIOutput1[23] =
     { "IDXGIOutput::SetDisplaySurface", NULL, cls_IDXGIOutput1_16, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::GetDisplaySurfaceData", NULL, cls_IDXGIOutput1_17, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::GetFrameStatistics", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput1::GetDisplayModeList1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput1::GetDisplayModeList1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIOutput1::FindClosestMatchingMode1", NULL, cls_IDXGIOutput1_20, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput1::GetDisplaySurfaceData1", NULL, cls_IDXGIOutput1_21, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput1::DuplicateOutput", NULL, cls_IDXGIOutput1_22, xaux_IDXGIOutput1_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput1::DuplicateOutput", NULL, cls_IDXGIOutput1_22, xaux_IDXGIOutput1_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
 };
 
 static const unsigned char cls_IDXGIOutput2_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -5701,9 +5775,9 @@ static const struct winecom_slot slots_IDXGIOutput2[24] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIOutput2_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIOutput2_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIOutput::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIOutput2_7, 1, NULL },
-    { "IDXGIOutput::GetDisplayModeList", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput::GetDisplayModeList", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIOutput::FindClosestMatchingMode", NULL, cls_IDXGIOutput2_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::WaitForVBlank", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::TakeOwnership", NULL, cls_IDXGIOutput2_11, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, NULL },
@@ -5714,10 +5788,10 @@ static const struct winecom_slot slots_IDXGIOutput2[24] =
     { "IDXGIOutput::SetDisplaySurface", NULL, cls_IDXGIOutput2_16, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::GetDisplaySurfaceData", NULL, cls_IDXGIOutput2_17, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::GetFrameStatistics", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput1::GetDisplayModeList1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput1::GetDisplayModeList1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIOutput1::FindClosestMatchingMode1", NULL, cls_IDXGIOutput2_20, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput1::GetDisplaySurfaceData1", NULL, cls_IDXGIOutput2_21, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput1::DuplicateOutput", NULL, cls_IDXGIOutput2_22, xaux_IDXGIOutput2_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput1::DuplicateOutput", NULL, cls_IDXGIOutput2_22, xaux_IDXGIOutput2_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIOutput2::SupportsOverlays", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
 };
 
@@ -5741,9 +5815,9 @@ static const struct winecom_slot slots_IDXGIOutput3[25] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIOutput3_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIOutput3_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIOutput::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIOutput3_7, 1, NULL },
-    { "IDXGIOutput::GetDisplayModeList", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput::GetDisplayModeList", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIOutput::FindClosestMatchingMode", NULL, cls_IDXGIOutput3_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::WaitForVBlank", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::TakeOwnership", NULL, cls_IDXGIOutput3_11, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, NULL },
@@ -5754,12 +5828,12 @@ static const struct winecom_slot slots_IDXGIOutput3[25] =
     { "IDXGIOutput::SetDisplaySurface", NULL, cls_IDXGIOutput3_16, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::GetDisplaySurfaceData", NULL, cls_IDXGIOutput3_17, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::GetFrameStatistics", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput1::GetDisplayModeList1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput1::GetDisplayModeList1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIOutput1::FindClosestMatchingMode1", NULL, cls_IDXGIOutput3_20, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput1::GetDisplaySurfaceData1", NULL, cls_IDXGIOutput3_21, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput1::DuplicateOutput", NULL, cls_IDXGIOutput3_22, xaux_IDXGIOutput3_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput1::DuplicateOutput", NULL, cls_IDXGIOutput3_22, xaux_IDXGIOutput3_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIOutput2::SupportsOverlays", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput3::CheckOverlaySupport", NULL, cls_IDXGIOutput3_24, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput3::CheckOverlaySupport", NULL, cls_IDXGIOutput3_24, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
 };
 
 static const unsigned char cls_IDXGIOutput4_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -5783,9 +5857,9 @@ static const struct winecom_slot slots_IDXGIOutput4[26] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIOutput4_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIOutput4_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIOutput::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIOutput4_7, 1, NULL },
-    { "IDXGIOutput::GetDisplayModeList", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput::GetDisplayModeList", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIOutput::FindClosestMatchingMode", NULL, cls_IDXGIOutput4_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::WaitForVBlank", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::TakeOwnership", NULL, cls_IDXGIOutput4_11, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, NULL },
@@ -5796,13 +5870,13 @@ static const struct winecom_slot slots_IDXGIOutput4[26] =
     { "IDXGIOutput::SetDisplaySurface", NULL, cls_IDXGIOutput4_16, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::GetDisplaySurfaceData", NULL, cls_IDXGIOutput4_17, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::GetFrameStatistics", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput1::GetDisplayModeList1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput1::GetDisplayModeList1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIOutput1::FindClosestMatchingMode1", NULL, cls_IDXGIOutput4_20, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput1::GetDisplaySurfaceData1", NULL, cls_IDXGIOutput4_21, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput1::DuplicateOutput", NULL, cls_IDXGIOutput4_22, xaux_IDXGIOutput4_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput1::DuplicateOutput", NULL, cls_IDXGIOutput4_22, xaux_IDXGIOutput4_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIOutput2::SupportsOverlays", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput3::CheckOverlaySupport", NULL, cls_IDXGIOutput4_24, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput4::CheckOverlayColorSpaceSupport", NULL, cls_IDXGIOutput4_25, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput3::CheckOverlaySupport", NULL, cls_IDXGIOutput4_24, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "IDXGIOutput4::CheckOverlayColorSpaceSupport", NULL, cls_IDXGIOutput4_25, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0008, 0x0000 },
 };
 
 static const unsigned char cls_IDXGIOutput5_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -5828,9 +5902,9 @@ static const struct winecom_slot slots_IDXGIOutput5[27] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIOutput5_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIOutput5_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIOutput::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIOutput5_7, 1, NULL },
-    { "IDXGIOutput::GetDisplayModeList", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput::GetDisplayModeList", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIOutput::FindClosestMatchingMode", NULL, cls_IDXGIOutput5_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::WaitForVBlank", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::TakeOwnership", NULL, cls_IDXGIOutput5_11, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, NULL },
@@ -5841,14 +5915,14 @@ static const struct winecom_slot slots_IDXGIOutput5[27] =
     { "IDXGIOutput::SetDisplaySurface", NULL, cls_IDXGIOutput5_16, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::GetDisplaySurfaceData", NULL, cls_IDXGIOutput5_17, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::GetFrameStatistics", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput1::GetDisplayModeList1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput1::GetDisplayModeList1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIOutput1::FindClosestMatchingMode1", NULL, cls_IDXGIOutput5_20, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput1::GetDisplaySurfaceData1", NULL, cls_IDXGIOutput5_21, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput1::DuplicateOutput", NULL, cls_IDXGIOutput5_22, xaux_IDXGIOutput5_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput1::DuplicateOutput", NULL, cls_IDXGIOutput5_22, xaux_IDXGIOutput5_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIOutput2::SupportsOverlays", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput3::CheckOverlaySupport", NULL, cls_IDXGIOutput5_24, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput4::CheckOverlayColorSpaceSupport", NULL, cls_IDXGIOutput5_25, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput5::DuplicateOutput1", NULL, cls_IDXGIOutput5_26, xaux_IDXGIOutput5_26, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput3::CheckOverlaySupport", NULL, cls_IDXGIOutput5_24, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "IDXGIOutput4::CheckOverlayColorSpaceSupport", NULL, cls_IDXGIOutput5_25, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0008, 0x0000 },
+    { "IDXGIOutput5::DuplicateOutput1", NULL, cls_IDXGIOutput5_26, xaux_IDXGIOutput5_26, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
 };
 
 static const unsigned char cls_IDXGIOutput6_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -5876,9 +5950,9 @@ static const struct winecom_slot slots_IDXGIOutput6[29] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIOutput6_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIOutput6_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIOutput::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIOutput6_7, 1, NULL },
-    { "IDXGIOutput::GetDisplayModeList", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput::GetDisplayModeList", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIOutput::FindClosestMatchingMode", NULL, cls_IDXGIOutput6_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::WaitForVBlank", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::TakeOwnership", NULL, cls_IDXGIOutput6_11, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0002, 0x0000, NULL, 0, NULL },
@@ -5889,16 +5963,16 @@ static const struct winecom_slot slots_IDXGIOutput6[29] =
     { "IDXGIOutput::SetDisplaySurface", NULL, cls_IDXGIOutput6_16, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::GetDisplaySurfaceData", NULL, cls_IDXGIOutput6_17, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput::GetFrameStatistics", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput1::GetDisplayModeList1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput1::GetDisplayModeList1", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIOutput1::FindClosestMatchingMode1", NULL, cls_IDXGIOutput6_20, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGIOutput1::GetDisplaySurfaceData1", NULL, cls_IDXGIOutput6_21, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput1::DuplicateOutput", NULL, cls_IDXGIOutput6_22, xaux_IDXGIOutput6_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput1::DuplicateOutput", NULL, cls_IDXGIOutput6_22, xaux_IDXGIOutput6_22, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIOutput2::SupportsOverlays", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput3::CheckOverlaySupport", NULL, cls_IDXGIOutput6_24, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput4::CheckOverlayColorSpaceSupport", NULL, cls_IDXGIOutput6_25, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutput5::DuplicateOutput1", NULL, cls_IDXGIOutput6_26, xaux_IDXGIOutput6_26, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput3::CheckOverlaySupport", NULL, cls_IDXGIOutput6_24, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "IDXGIOutput4::CheckOverlayColorSpaceSupport", NULL, cls_IDXGIOutput6_25, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0008, 0x0000 },
+    { "IDXGIOutput5::DuplicateOutput1", NULL, cls_IDXGIOutput6_26, xaux_IDXGIOutput6_26, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0010, 0x0000, 0x0000 },
     { "IDXGIOutput6::GetDesc1", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIOutput6_27, 1, NULL },
-    { "IDXGIOutput6::CheckHardwareCompositionSupport", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutput6::CheckHardwareCompositionSupport", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
 };
 
 static const unsigned char cls_IDXGIOutputDuplication_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -5912,12 +5986,12 @@ static const struct winecom_slot slots_IDXGIOutputDuplication[15] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIOutputDuplication_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIOutputDuplication_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIOutputDuplication::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutputDuplication::AcquireNextFrame", NULL, cls_IDXGIOutputDuplication_8, xaux_IDXGIOutputDuplication_8, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutputDuplication::GetFrameDirtyRects", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutputDuplication::GetFrameMoveRects", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIOutputDuplication::GetFramePointerShape", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIOutputDuplication::AcquireNextFrame", NULL, cls_IDXGIOutputDuplication_8, xaux_IDXGIOutputDuplication_8, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
+    { "IDXGIOutputDuplication::GetFrameDirtyRects", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "IDXGIOutputDuplication::GetFrameMoveRects", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
+    { "IDXGIOutputDuplication::GetFramePointerShape", NULL, NULL, NULL, 5, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0004, 0x0000 },
     { "IDXGIOutputDuplication::MapDesktopSurface", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
       "IDXGIOutputDuplication::MapDesktopSurface: writes DXGI_MAPPED_RECT through `DXGI_MAPPED_RECT *locked_rect`, and that struct carries a pointer field a 4-byte guest cell cannot hold -- repacking OUT would silently truncate it (a hand32 walker with a below-4GiB answer must serve this row)" },
     { "IDXGIOutputDuplication::UnMapDesktopSurface", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -5936,12 +6010,12 @@ static const struct winecom_slot slots_IDXGIResource[12] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIResource_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGIResource_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIResource_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGIResource_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIResource::GetSharedHandle", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIResource_8, 1, NULL },
-    { "IDXGIResource::GetUsage", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIResource::GetUsage", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGIResource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIResource::GetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIResource::GetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
 };
 
 static const unsigned char cls_IDXGIResource1_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -5958,13 +6032,13 @@ static const struct winecom_slot slots_IDXGIResource1[14] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGIResource1_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGIResource1_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGIResource1_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGIResource1_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIResource::GetSharedHandle", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGIResource1_8, 1, NULL },
-    { "IDXGIResource::GetUsage", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIResource::GetUsage", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGIResource::SetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIResource::GetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIResource1::CreateSubresourceSurface", NULL, cls_IDXGIResource1_12, xaux_IDXGIResource1_12, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIResource::GetEvictionPriority", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
+    { "IDXGIResource1::CreateSubresourceSurface", NULL, cls_IDXGIResource1_12, xaux_IDXGIResource1_12, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGIResource1::CreateSharedHandle",
       "IDXGIResource1::CreateSharedHandle: carries WCHAR: DXVK's native headers typedef WCHAR to wchar_t (4 bytes here), the guest PE's WCHAR is 2 -- a string crossing unconverted is silent, so this slot waits for the converting hand-written form",
       NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
@@ -5980,8 +6054,8 @@ static const struct winecom_slot slots_IDXGISurface[11] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGISurface_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGISurface_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGISurface_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGISurface_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGISurface::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISurface::Map", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, 
       "IDXGISurface::Map: writes DXGI_MAPPED_RECT through `DXGI_MAPPED_RECT *mapped_rect`, and that struct carries a pointer field a 4-byte guest cell cannot hold -- repacking OUT would silently truncate it (a hand32 walker with a below-4GiB answer must serve this row)" },
@@ -5998,8 +6072,8 @@ static const struct winecom_slot slots_IDXGISurface1[13] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGISurface1_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGISurface1_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGISurface1_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGISurface1_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGISurface::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISurface::Map", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, 
       "IDXGISurface::Map: writes DXGI_MAPPED_RECT through `DXGI_MAPPED_RECT *mapped_rect`, and that struct carries a pointer field a 4-byte guest cell cannot hold -- repacking OUT would silently truncate it (a hand32 walker with a below-4GiB answer must serve this row)" },
@@ -6020,8 +6094,8 @@ static const struct winecom_slot slots_IDXGISurface2[14] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGISurface2_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGISurface2_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGISurface2_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGISurface2_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGISurface::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISurface::Map", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0002, 0x0000, 0x0000, NULL, 0, 
       "IDXGISurface::Map: writes DXGI_MAPPED_RECT through `DXGI_MAPPED_RECT *mapped_rect`, and that struct carries a pointer field a 4-byte guest cell cannot hold -- repacking OUT would silently truncate it (a hand32 walker with a below-4GiB answer must serve this row)" },
@@ -6029,7 +6103,7 @@ static const struct winecom_slot slots_IDXGISurface2[14] =
     { "IDXGISurface1::GetDC", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, 
       "IDXGISurface1::GetDC: parameter `HDC *hdc` points at HDC, which the i386 layout roster never audited" },
     { "IDXGISurface1::ReleaseDC", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISurface2::GetResource", NULL, cls_IDXGISurface2_13, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISurface2::GetResource", NULL, cls_IDXGISurface2_13, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0004, 0x0000 },
 };
 
 static const unsigned char cls_IDXGISwapChain_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -6050,18 +6124,18 @@ static const struct winecom_slot slots_IDXGISwapChain[18] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGISwapChain_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGISwapChain_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGISwapChain_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGISwapChain_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGISwapChain::Present", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 9, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGISwapChain::GetBuffer", NULL, cls_IDXGISwapChain_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetBuffer", NULL, cls_IDXGISwapChain_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "IDXGISwapChain::SetFullscreenState", NULL, cls_IDXGISwapChain_10, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain::GetFullscreenState", NULL, cls_IDXGISwapChain_11, xaux_IDXGISwapChain_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetFullscreenState", NULL, cls_IDXGISwapChain_11, xaux_IDXGISwapChain_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0001, 0x0000 },
     { "IDXGISwapChain::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGISwapChain_12, 1, NULL },
     { "IDXGISwapChain::ResizeBuffers", NULL, NULL, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001f, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain::ResizeTarget", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain::GetContainingOutput", NULL, cls_IDXGISwapChain_15, xaux_IDXGISwapChain_15, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetContainingOutput", NULL, cls_IDXGISwapChain_15, xaux_IDXGISwapChain_15, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGISwapChain::GetFrameStatistics", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain::GetLastPresentCount", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetLastPresentCount", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
 };
 
 static const unsigned char cls_IDXGISwapChain1_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -6085,31 +6159,31 @@ static const struct winecom_slot slots_IDXGISwapChain1[29] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGISwapChain1_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGISwapChain1_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGISwapChain1_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGISwapChain1_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGISwapChain::Present", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 9, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGISwapChain::GetBuffer", NULL, cls_IDXGISwapChain1_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetBuffer", NULL, cls_IDXGISwapChain1_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "IDXGISwapChain::SetFullscreenState", NULL, cls_IDXGISwapChain1_10, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain::GetFullscreenState", NULL, cls_IDXGISwapChain1_11, xaux_IDXGISwapChain1_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetFullscreenState", NULL, cls_IDXGISwapChain1_11, xaux_IDXGISwapChain1_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0001, 0x0000 },
     { "IDXGISwapChain::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGISwapChain1_12, 1, NULL },
     { "IDXGISwapChain::ResizeBuffers", NULL, NULL, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001f, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain::ResizeTarget", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain::GetContainingOutput", NULL, cls_IDXGISwapChain1_15, xaux_IDXGISwapChain1_15, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetContainingOutput", NULL, cls_IDXGISwapChain1_15, xaux_IDXGISwapChain1_15, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGISwapChain::GetFrameStatistics", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain::GetLastPresentCount", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetLastPresentCount", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGISwapChain1::GetDesc1", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain1::GetFullscreenDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain1::GetHwnd", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain1::GetCoreWindow", NULL, cls_IDXGISwapChain1_21, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain1::GetHwnd", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "IDXGISwapChain1::GetCoreWindow", NULL, cls_IDXGISwapChain1_21, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGISwapChain1::Present1", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 10, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGISwapChain1::IsTemporaryMonoSupported", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain1::GetRestrictToOutput", NULL, cls_IDXGISwapChain1_24, xaux_IDXGISwapChain1_24, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain1::GetRestrictToOutput", NULL, cls_IDXGISwapChain1_24, xaux_IDXGISwapChain1_24, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGISwapChain1::SetBackgroundColor", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
       "IDXGISwapChain1::SetBackgroundColor: parameter `const DXGI_RGBA *pColor` points at DXGI_RGBA, which the i386 layout roster never audited" },
     { "IDXGISwapChain1::GetBackgroundColor", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
       "IDXGISwapChain1::GetBackgroundColor: parameter `DXGI_RGBA *pColor` points at DXGI_RGBA, which the i386 layout roster never audited" },
     { "IDXGISwapChain1::SetRotation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain1::GetRotation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain1::GetRotation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
 };
 
 static const unsigned char cls_IDXGISwapChain2_6[] = { WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
@@ -6133,35 +6207,35 @@ static const struct winecom_slot slots_IDXGISwapChain2[36] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGISwapChain2_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGISwapChain2_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGISwapChain2_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGISwapChain2_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGISwapChain::Present", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 9, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGISwapChain::GetBuffer", NULL, cls_IDXGISwapChain2_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetBuffer", NULL, cls_IDXGISwapChain2_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "IDXGISwapChain::SetFullscreenState", NULL, cls_IDXGISwapChain2_10, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain::GetFullscreenState", NULL, cls_IDXGISwapChain2_11, xaux_IDXGISwapChain2_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetFullscreenState", NULL, cls_IDXGISwapChain2_11, xaux_IDXGISwapChain2_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0001, 0x0000 },
     { "IDXGISwapChain::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGISwapChain2_12, 1, NULL },
     { "IDXGISwapChain::ResizeBuffers", NULL, NULL, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001f, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain::ResizeTarget", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain::GetContainingOutput", NULL, cls_IDXGISwapChain2_15, xaux_IDXGISwapChain2_15, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetContainingOutput", NULL, cls_IDXGISwapChain2_15, xaux_IDXGISwapChain2_15, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGISwapChain::GetFrameStatistics", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain::GetLastPresentCount", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetLastPresentCount", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGISwapChain1::GetDesc1", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain1::GetFullscreenDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain1::GetHwnd", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain1::GetCoreWindow", NULL, cls_IDXGISwapChain2_21, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain1::GetHwnd", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "IDXGISwapChain1::GetCoreWindow", NULL, cls_IDXGISwapChain2_21, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGISwapChain1::Present1", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 10, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGISwapChain1::IsTemporaryMonoSupported", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain1::GetRestrictToOutput", NULL, cls_IDXGISwapChain2_24, xaux_IDXGISwapChain2_24, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain1::GetRestrictToOutput", NULL, cls_IDXGISwapChain2_24, xaux_IDXGISwapChain2_24, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGISwapChain1::SetBackgroundColor", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
       "IDXGISwapChain1::SetBackgroundColor: parameter `const DXGI_RGBA *pColor` points at DXGI_RGBA, which the i386 layout roster never audited" },
     { "IDXGISwapChain1::GetBackgroundColor", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
       "IDXGISwapChain1::GetBackgroundColor: parameter `DXGI_RGBA *pColor` points at DXGI_RGBA, which the i386 layout roster never audited" },
     { "IDXGISwapChain1::SetRotation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain1::GetRotation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain1::GetRotation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGISwapChain2::SetSourceSize", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain2::GetSourceSize", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain2::GetSourceSize", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0003, 0x0000 },
     { "IDXGISwapChain2::SetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain2::GetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain2::GetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGISwapChain2::GetFrameLatencyWaitableObject", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain2::SetMatrixTransform", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain2::GetMatrixTransform", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
@@ -6189,40 +6263,40 @@ static const struct winecom_slot slots_IDXGISwapChain3[40] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGISwapChain3_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGISwapChain3_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGISwapChain3_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGISwapChain3_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGISwapChain::Present", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 9, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGISwapChain::GetBuffer", NULL, cls_IDXGISwapChain3_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetBuffer", NULL, cls_IDXGISwapChain3_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "IDXGISwapChain::SetFullscreenState", NULL, cls_IDXGISwapChain3_10, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain::GetFullscreenState", NULL, cls_IDXGISwapChain3_11, xaux_IDXGISwapChain3_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetFullscreenState", NULL, cls_IDXGISwapChain3_11, xaux_IDXGISwapChain3_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0001, 0x0000 },
     { "IDXGISwapChain::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGISwapChain3_12, 1, NULL },
     { "IDXGISwapChain::ResizeBuffers", NULL, NULL, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001f, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain::ResizeTarget", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain::GetContainingOutput", NULL, cls_IDXGISwapChain3_15, xaux_IDXGISwapChain3_15, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetContainingOutput", NULL, cls_IDXGISwapChain3_15, xaux_IDXGISwapChain3_15, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGISwapChain::GetFrameStatistics", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain::GetLastPresentCount", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetLastPresentCount", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGISwapChain1::GetDesc1", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain1::GetFullscreenDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain1::GetHwnd", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain1::GetCoreWindow", NULL, cls_IDXGISwapChain3_21, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain1::GetHwnd", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "IDXGISwapChain1::GetCoreWindow", NULL, cls_IDXGISwapChain3_21, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGISwapChain1::Present1", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 10, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGISwapChain1::IsTemporaryMonoSupported", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain1::GetRestrictToOutput", NULL, cls_IDXGISwapChain3_24, xaux_IDXGISwapChain3_24, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain1::GetRestrictToOutput", NULL, cls_IDXGISwapChain3_24, xaux_IDXGISwapChain3_24, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGISwapChain1::SetBackgroundColor", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
       "IDXGISwapChain1::SetBackgroundColor: parameter `const DXGI_RGBA *pColor` points at DXGI_RGBA, which the i386 layout roster never audited" },
     { "IDXGISwapChain1::GetBackgroundColor", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
       "IDXGISwapChain1::GetBackgroundColor: parameter `DXGI_RGBA *pColor` points at DXGI_RGBA, which the i386 layout roster never audited" },
     { "IDXGISwapChain1::SetRotation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain1::GetRotation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain1::GetRotation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGISwapChain2::SetSourceSize", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain2::GetSourceSize", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain2::GetSourceSize", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0003, 0x0000 },
     { "IDXGISwapChain2::SetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain2::GetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain2::GetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGISwapChain2::GetFrameLatencyWaitableObject", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain2::SetMatrixTransform", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain2::GetMatrixTransform", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain3::GetCurrentBackBufferIndex", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain3::CheckColorSpaceSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain3::CheckColorSpaceSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGISwapChain3::SetColorSpace1", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain3::ResizeBuffers1", NULL, cls_IDXGISwapChain3_39, NULL, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001f, 0x0000, 0x0000, NULL, 0, NULL },
 };
@@ -6249,40 +6323,40 @@ static const struct winecom_slot slots_IDXGISwapChain4[41] =
     { "IDXGIObject::SetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 1, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::SetPrivateDataInterface", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 2, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGIObject::GetPrivateData", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGIObject::GetParent", NULL, cls_IDXGISwapChain4_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGISwapChain4_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGIObject::GetParent", NULL, cls_IDXGISwapChain4_6, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
+    { "IDXGIDeviceSubObject::GetDevice", NULL, cls_IDXGISwapChain4_7, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGISwapChain::Present", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 9, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
-    { "IDXGISwapChain::GetBuffer", NULL, cls_IDXGISwapChain4_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetBuffer", NULL, cls_IDXGISwapChain4_9, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 1, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0004, 0x0000, 0x0000 },
     { "IDXGISwapChain::SetFullscreenState", NULL, cls_IDXGISwapChain4_10, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0001, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain::GetFullscreenState", NULL, cls_IDXGISwapChain4_11, xaux_IDXGISwapChain4_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetFullscreenState", NULL, cls_IDXGISwapChain4_11, xaux_IDXGISwapChain4_11, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0001, 0x0000 },
     { "IDXGISwapChain::GetDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, reps_IDXGISwapChain4_12, 1, NULL },
     { "IDXGISwapChain::ResizeBuffers", NULL, NULL, NULL, 6, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001f, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain::ResizeTarget", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain::GetContainingOutput", NULL, cls_IDXGISwapChain4_15, xaux_IDXGISwapChain4_15, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetContainingOutput", NULL, cls_IDXGISwapChain4_15, xaux_IDXGISwapChain4_15, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGISwapChain::GetFrameStatistics", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain::GetLastPresentCount", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain::GetLastPresentCount", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGISwapChain1::GetDesc1", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain1::GetFullscreenDesc", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain1::GetHwnd", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain1::GetCoreWindow", NULL, cls_IDXGISwapChain4_21, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain1::GetHwnd", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
+    { "IDXGISwapChain1::GetCoreWindow", NULL, cls_IDXGISwapChain4_21, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0002, 0x0000, 0x0000 },
     { "IDXGISwapChain1::Present1", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 10, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "IDXGISwapChain1::IsTemporaryMonoSupported", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain1::GetRestrictToOutput", NULL, cls_IDXGISwapChain4_24, xaux_IDXGISwapChain4_24, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain1::GetRestrictToOutput", NULL, cls_IDXGISwapChain4_24, xaux_IDXGISwapChain4_24, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0001, 0x0000, 0x0000 },
     { "IDXGISwapChain1::SetBackgroundColor", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
       "IDXGISwapChain1::SetBackgroundColor: parameter `const DXGI_RGBA *pColor` points at DXGI_RGBA, which the i386 layout roster never audited" },
     { "IDXGISwapChain1::GetBackgroundColor", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, 
       "IDXGISwapChain1::GetBackgroundColor: parameter `DXGI_RGBA *pColor` points at DXGI_RGBA, which the i386 layout roster never audited" },
     { "IDXGISwapChain1::SetRotation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain1::GetRotation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain1::GetRotation", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGISwapChain2::SetSourceSize", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain2::GetSourceSize", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain2::GetSourceSize", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0003, 0x0000 },
     { "IDXGISwapChain2::SetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain2::GetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain2::GetMaximumFrameLatency", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0001, 0x0000 },
     { "IDXGISwapChain2::GetFrameLatencyWaitableObject", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain2::SetMatrixTransform", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain2::GetMatrixTransform", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain3::GetCurrentBackBufferIndex", NULL, NULL, NULL, 1, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000, NULL, 0, NULL },
-    { "IDXGISwapChain3::CheckColorSpaceSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
+    { "IDXGISwapChain3::CheckColorSpaceSupport", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL, 0, 0x0000, 0x0002, 0x0000 },
     { "IDXGISwapChain3::SetColorSpace1", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain3::ResizeBuffers1", NULL, cls_IDXGISwapChain4_39, NULL, 8, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001f, 0x0000, 0x0000, NULL, 0, NULL },
     { "IDXGISwapChain4::SetHDRMetaData", NULL, NULL, NULL, 4, WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000, NULL, 0, NULL },
@@ -6566,11 +6640,11 @@ static const struct winecom_iface d3d11_com_ifaces[D3D11_IFACE_COUNT] =
       3, NULL },
 };
 
-/* 2048 slot(s) marshalled, 424 hand-written, 121 refused with a named
+/* 2078 slot(s) marshalled, 424 hand-written, 91 refused with a named
  * reason, 411 IUnknown slot(s) served by the runtime; 5 interface(s)
  * carry identity rows only.
  * i386 geometry: 2588 row(s) carry WINECOM_F_I386_GEOM (639 distinct
  * frames re-checked against clang's stdcall @N decoration), 21 with
  * a non-zero qwordmask, 1 returning EDX:EAX; 5 row(s) publish no
- * i386 geometry and a 32-bit lane must fail closed on them; 47
+ * i386 geometry and a 32-bit lane must fail closed on them; 77
  * row(s) refuse on the 32-bit lane only (refuse32). */

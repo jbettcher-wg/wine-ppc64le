@@ -43,6 +43,27 @@
 #define WINECOM_CA_IFACE_ARR_OUT_STATIC 8  /* Iface** out ARRAY: element type
                                               in xaux[i], element count in the
                                               by-value parameter caux[i] */
+#define WINECOM_CA_IFACE_ARR_OUT_COUNTPTR 9 /* Iface** out ARRAY whose element
+                                              count arrives through a UINT* at
+                                              parameter caux[i]: IN = the
+                                              array's capacity, OUT = the
+                                              count the callee wrote (which
+                                              may EXCEED capacity -- D3D11's
+                                              XSGetShader contract, and what
+                                              DXVK's GetClassInstances really
+                                              does: with a non-NULL count it
+                                              fills exactly CAPACITY cells,
+                                              real instances then NULL
+                                              padding, and stores the actual
+                                              instance count; with a NULL
+                                              count pointer it touches
+                                              NOTHING, array included).  The
+                                              dispatcher snapshots capacity
+                                              BEFORE the call -- the callee
+                                              overwrites the same UINT -- and
+                                              wraps capacity cells after it.
+                                              Element type in xaux[i], same
+                                              as the by-value-count class. */
 
 #define WINECOM_F_RET_VOID    1  /* method returns void */
 #define WINECOM_F_RET_VIA_ARG 2  /* sret: RAX = the __ret argument */
@@ -405,6 +426,50 @@ struct winecom_slot
                                    surface does not, so a mismatch is a loud
                                    refusal rather than registers full of
                                    garbage. */
+    unsigned short scrubptr;    /* REFUSAL HYGIENE, the Witcher 3 GetShader
+                                   lesson: a refusal that answers E_NOTIMPL
+                                   (or returns from a void method) while
+                                   leaving the caller's out-params untouched
+                                   hands the guest whatever host residue sat
+                                   in its uninitialized locals -- W3 called
+                                   through exactly such a residue pointer and
+                                   the emulator executed HOST bytes as x86.
+                                   Refused must mean INERT, not just loud.
+
+                                   Bit i (parameter i counting after `this`,
+                                   like every mask here): the parameter is a
+                                   non-const pointer to a POINTER-WIDTH out
+                                   value -- measured (8,4) bytes on the
+                                   (x86-64, i386) guests by the clang oracle,
+                                   which is what a `T**` interface cell, a
+                                   void** and a SIZE_T* all measure -- and on
+                                   ANY refusal of this row the dispatcher
+                                   writes NULL through it at the LANE's own
+                                   width before answering.  IN-ness is judged
+                                   the COM way: const anywhere in the
+                                   spelling (or a REFIID) marks an input and
+                                   is never scrubbed; the residual risk that
+                                   a sloppy header passes INPUT data through
+                                   a non-const pointer is accepted, because
+                                   the call already failed and a zeroed
+                                   out-param is the defined value of an
+                                   undefined one.  A table generated before
+                                   these fields has zeros and behaves exactly
+                                   as it did -- the not-fail-closed rule of
+                                   narrowmask, for the same reason.  Appended
+                                   last. */
+    unsigned short scrubdw;     /* bit i: non-const pointer to a 4-byte out
+                                   value on BOTH guests (UINT counts, BOOLs,
+                                   FLOATs); refusal writes 4 zero bytes.  The
+                                   GetShader count is this: zero says
+                                   "nothing returned" to a caller that never
+                                   checks a void return. */
+    unsigned short scrubq;      /* bit i: non-const pointer to an 8-byte out
+                                   value on BOTH guests (UINT64); refusal
+                                   writes 8 zero bytes.  Pointees wider than
+                                   8 bytes have no mask spelling and stay
+                                   unscrubbed -- the refusal reason keeps
+                                   naming them. */
 };
 
 /* One divergent-layout struct parameter of a slot, for the 32-bit lane: the

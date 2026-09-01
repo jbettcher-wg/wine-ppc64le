@@ -4476,8 +4476,52 @@ static void report_guest_access_violation( EXCEPTION_RECORD *rec, const AMD64_CO
              debugstr_w(mod->BaseDllName.Buffer), ctx->Rip - (ULONG64)(ULONG_PTR)mod->DllBase,
              ctx->Rip, (void *)rec->ExceptionInformation[1] );
     else
-        ERR( "guest fault %08x at rip %I64x, which is in no guest image, touching %p\n",
-             (UINT)rec->ExceptionCode, ctx->Rip, (void *)rec->ExceptionInformation[1] );
+    {
+        /* The MIRROR of report_native_pc_in_guest_image: the GUEST executing
+         * HOST bytes.  A guest rip inside a native module means a host
+         * pointer leaked into guest state -- the emulator decoded ppc64le
+         * bytes as x86 until one of them touched something unmapped, so the
+         * fault address above says nothing and the disassembly-shaped
+         * reports say less.  [MEASURED] The Witcher 3 read the out-params a
+         * REFUSED PSGetShader never wrote, called through the host-pointer
+         * stack residue in its own uninitialized local, and this exact
+         * situation cost a days-class hunt to name.  The one line below is
+         * that hunt, prepaid: which native image the rip is in, and where
+         * to look first (a refused slot upstream -- `grep -a refus` the run
+         * log; refuse_once prints ONE line for a call made sixty times a
+         * second). */
+        LDR_DATA_TABLE_ENTRY *host = module_entry_from_address( (void *)(ULONG_PTR)ctx->Rip );
+
+        if (host)
+            ERR( "guest fault %08x at rip %I64x, touching %p -- THE GUEST IS "
+                 "EXECUTING NATIVE CODE: rip is %s+%I64x, a HOST module.  A "
+                 "host pointer leaked into guest state; look for a refused "
+                 "out-parameter upstream (grep -a refus the run log)\n",
+                 (UINT)rec->ExceptionCode, ctx->Rip,
+                 (void *)rec->ExceptionInformation[1],
+                 debugstr_w(host->BaseDllName.Buffer),
+                 ctx->Rip - (ULONG64)(ULONG_PTR)host->DllBase );
+        else
+        {
+            /* Second tier: a dlopened unix .so (DXVK, the wine .so's) lives
+             * in no loader list; dladdr on the unix side names it. */
+            struct emu_name_host_addr_params np = { .addr = ctx->Rip };
+
+            WINE_UNIX_CALL( unix_emu_name_host_addr, &np );
+            if (np.found)
+                ERR( "guest fault %08x at rip %I64x, touching %p -- THE GUEST "
+                     "IS EXECUTING NATIVE CODE: rip is %s+%I64x, a HOST unix "
+                     "library.  A host pointer leaked into guest state; look "
+                     "for a refused out-parameter upstream (grep -a refus the "
+                     "run log)\n",
+                     (UINT)rec->ExceptionCode, ctx->Rip,
+                     (void *)rec->ExceptionInformation[1], debugstr_a(np.name),
+                     ctx->Rip - np.base );
+            else
+                ERR( "guest fault %08x at rip %I64x, which is in no guest image, touching %p\n",
+                     (UINT)rec->ExceptionCode, ctx->Rip, (void *)rec->ExceptionInformation[1] );
+        }
+    }
 
     for (i = 0; i < 16; i += 4)
         ERR( "  %s=%016I64x  %s=%016I64x  %s=%016I64x  %s=%016I64x\n",

@@ -160,6 +160,36 @@ static inline UINT64 winecom_fp_invoke( UINT64 (*caller)( void *, const UINT64 *
     }
 }
 
+#else /* __powerpc64__ */
+
+/* The NON-ppc64 arm exists so a client module (mfcom.c and friends) compiles
+ * unchanged when the SAME source is built for the other PE arch (the i386
+ * builtin build reuses dlls/mfplat's sources wholesale).  Nothing here is
+ * ever CALLED on that arch: the winecom runtime is the ppc64 side's, and the
+ * i386 lane's own dispatch refuses fp rows (refuse32/no-FP-plumbing, fail
+ * closed).  So the caller is a null stub and the invoke answers the same
+ * E_NOTIMPL the runtime would -- reached only if someone wires it where it
+ * cannot belong, and loud in a debugger rather than silently wrong.
+ * [MEASURED] Without this arm the i386-windows build of mfcom.c does not
+ * compile at all -- caught by the first clean rebuild after the FP work
+ * landed; the committed tree's stale i386-windows/mfcom.o had been hiding
+ * it behind the known missing makedep edge. */
+
+#define WINECOM_DEFINE_FP_CALLER( name ) \
+    static UINT64 name( void *fn, const UINT64 *gpr, const double *fpr, \
+                        double *fp_ret ) \
+    { (void)fn; (void)gpr; (void)fpr; (void)fp_ret; return 0x80004001u /* E_NOTIMPL */; }
+
+static inline UINT64 winecom_fp_invoke( UINT64 (*caller)( void *, const UINT64 *,
+                                                          const double *, double * ),
+                                        void *fn, UINT argc, const UINT64 *args,
+                                        UINT fpword, UINT64 *fpret_bits )
+{
+    (void)caller; (void)fn; (void)argc; (void)args; (void)fpword;
+    if (fpret_bits) *fpret_bits = 0;
+    return 0x80004001u; /* E_NOTIMPL */
+}
+
 #endif /* __powerpc64__ */
 
 #endif /* __WINE_WINECOM_FPCALL_H */

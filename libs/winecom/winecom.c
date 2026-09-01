@@ -2202,6 +2202,62 @@ static void refuse_once( UINT iface, UINT slot, const char *name, const char *wh
            why ? why : "no marshal plan" );
 }
 
+/* -------------------------------------------------- refusal hygiene ------
+ *
+ * Refused must mean INERT.  Every refusal above answers E_NOTIMPL -- but a
+ * void-returning method has no HRESULT anybody reads, and even one that does
+ * is routinely unchecked; if the caller's out-params are left untouched, the
+ * guest reads its own uninitialized locals, which on a shared stack means
+ * HOST-pointer residue.  [MEASURED] The Witcher 3 calls PSGetShader for
+ * state snapshots, never checks anything, called through exactly such a
+ * residue pointer, and the emulator decoded a native module's ppc64le bytes
+ * as x86 until they dereferenced NULL -- then its own crash reporter
+ * deadlocked on the wreck.  Days of hunt for one unwritten out-pointer.
+ *
+ * So every refusal that returns to the guest scrubs what the generator could
+ * prove: winecom_slot's scrubptr/scrubdw/scrubq masks (pointer-width NULL /
+ * 4-byte zero / 8-byte zero -- the widths are clang-measured, the IN-ness is
+ * the COM constness convention; the field banner in winecom.h has the whole
+ * argument).  Writing through the guest's own out pointers is what the
+ * post-call wrap paths already do, so this adds no new exposure class.
+ *
+ * WINEEMUNOREFUSESCRUB=1 turns the scrub off -- the negative control that
+ * proves it is load-bearing: with it armed, a refused slot's sentinel
+ * survives and the hygiene gate goes red. */
+static int refuse_scrub_off = -1;
+
+static void scrub_refused_outs( const struct winecom_slot *sl, const UINT64 *rawargs,
+                                BOOL is_guest32 )
+{
+    UINT i;
+
+    if (!sl || !(sl->scrubptr | sl->scrubdw | sl->scrubq)) return;
+    if (refuse_scrub_off == -1)
+    {
+        refuse_scrub_off = com_env_flag( L"WINEEMUNOREFUSESCRUB" );
+        if (refuse_scrub_off)
+            ERR( "WINEEMUNOREFUSESCRUB=1 -- refusals will NOT scrub their "
+                 "out-params; unchecked callers read uninitialized locals, "
+                 "which is the sabotage this lever exists to prove\n" );
+    }
+    if (refuse_scrub_off) return;
+    for (i = 1; i < sl->argc && i <= 16; i++)
+    {
+        UINT bit = 1u << (i - 1);
+        ULONG_PTR p = (ULONG_PTR)rawargs[i];
+
+        if (!p) continue;
+        if (sl->scrubptr & bit)
+        {
+            /* pointer-width pointee: (8,4) on the (x86-64, i386) guest */
+            if (is_guest32) *(UINT *)p = 0;
+            else *(UINT64 *)p = 0;
+        }
+        else if (sl->scrubdw & bit) *(UINT *)p = 0;
+        else if (sl->scrubq & bit) *(UINT64 *)p = 0;
+    }
+}
+
 HRESULT winecom_wrap_out_iface( HRESULT hr, const GUID *riid, void **ppv )
 {
     UINT idx;
@@ -2260,6 +2316,11 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
     UINT i, n, ppv_idx = 0, riid_idx = 0;
     UINT out_static_idx[8], n_out_static = 0;
     UINT out_arr_idx[8], n_out_arr = 0;
+    /* the count-through-pointer out arrays (CA_IFACE_ARR_OUT_COUNTPTR): the
+     * capacity is SNAPSHOTTED here before the call, because the callee
+     * overwrites the same UINT with the actual count -- which D3D11 lets
+     * exceed capacity, while exactly capacity cells were written */
+    UINT out_carr_idx[4], out_carr_cap[4], n_out_carr = 0;
     UINT borrowed[16], n_borrowed = 0;
     const UINT64 *arr_borrowed = NULL;
     UINT n_arr_borrowed = 0;
@@ -2338,6 +2399,7 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
                              "this surface cannot reverse-proxy" );
                 if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
                 release_borrows( args, borrowed, n_borrowed );
+                scrub_refused_outs( sl, rawargs, guest32 );
                 *rax_out = (UINT)E_NOTIMPL;
                 return STATUS_SUCCESS;
             }
@@ -2372,6 +2434,7 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
                              "table; the generator must emit one" );
                 if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
                 release_borrows( args, borrowed, n_borrowed );
+                scrub_refused_outs( sl, rawargs, guest32 );
                 *rax_out = (UINT)E_NOTIMPL;
                 return STATUS_SUCCESS;
             }
@@ -2388,6 +2451,7 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
                                      "32-bit lane's staging buffer" );
                         if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
                         release_borrows( args, borrowed, n_borrowed );
+                        scrub_refused_outs( sl, rawargs, guest32 );
                         *rax_out = (UINT)E_NOTIMPL;
                         return STATUS_SUCCESS;
                     }
@@ -2397,6 +2461,44 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
                     arr_out_used += cnt;
                 }
                 out_arr_idx[n_out_arr++] = i;
+            }
+            break;
+        case WINECOM_CA_IFACE_ARR_OUT_COUNTPTR:
+            /* The XSGetShader shape: an out interface array whose element
+             * count arrives through a UINT* (caux[i-1]) -- IN the capacity,
+             * OUT the actual count.  The callee writes the guest's own
+             * storage in place, exactly the ARR_OUT_STATIC arrangement, and
+             * [READ FROM DXVK, GetClassInstances] fills exactly CAPACITY
+             * cells -- real instances then NULL padding -- before storing
+             * the actual count; with a NULL count pointer it touches
+             * NOTHING, the array included.  So: snapshot capacity now (the
+             * callee overwrites the same UINT), wrap capacity cells after.
+             * The 32-bit lane never reaches this class (the generator marks
+             * these rows refuse32); refuse rather than guess if it ever
+             * does. */
+            args[i] = raw;
+            if (!sl->caux || guest32)
+            {
+                refuse_once( iface, slot, sl->name, guest32 ?
+                             "count-through-pointer out-array has no 32-bit "
+                             "staging; the generator should have said refuse32" :
+                             "count-through-pointer out-array with no caux "
+                             "count-parameter table; the generator must emit one" );
+                if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
+                release_borrows( args, borrowed, n_borrowed );
+                scrub_refused_outs( sl, rawargs, guest32 );
+                *rax_out = (UINT)E_NOTIMPL;
+                return STATUS_SUCCESS;
+            }
+            if (raw && n_out_carr < ARRAYSIZE(out_carr_idx))
+            {
+                const UINT *cp = (const UINT *)(ULONG_PTR)rawargs[sl->caux[i - 1] + 1];
+
+                if (cp && *cp)
+                {
+                    out_carr_idx[n_out_carr] = i;
+                    out_carr_cap[n_out_carr++] = *cp;
+                }
             }
             break;
         case WINECOM_CA_PPV_OUT:
@@ -2420,6 +2522,7 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
                              "relay" );
                 if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
                 release_borrows( args, borrowed, n_borrowed );
+                scrub_refused_outs( sl, rawargs, guest32 );
                 *rax_out = (UINT)E_NOTIMPL;
                 return STATUS_SUCCESS;
             }
@@ -2442,6 +2545,7 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
                                                          count * sizeof(*dst) )))
             {
                 release_borrows( args, borrowed, n_borrowed );
+                scrub_refused_outs( sl, rawargs, guest32 );
                 *rax_out = (UINT)E_OUTOFMEMORY;
                 return STATUS_SUCCESS;
             }
@@ -2465,6 +2569,7 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
                     while (n--) winecom_to_native_end( (void *)(ULONG_PTR)dst[n] );
                     if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
                     release_borrows( args, borrowed, n_borrowed );
+                    scrub_refused_outs( sl, rawargs, guest32 );
                     *rax_out = (UINT)E_NOTIMPL;
                     return STATUS_SUCCESS;
                 }
@@ -2480,6 +2585,7 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
                          "runtime marshal path" );
             if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
             release_borrows( args, borrowed, n_borrowed );
+            scrub_refused_outs( sl, rawargs, guest32 );
             *rax_out = (UINT)E_NOTIMPL;
             return STATUS_SUCCESS;
         }
@@ -2518,6 +2624,7 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
             for (n = 0; n < n_arr_borrowed; n++)
                 winecom_to_native_end( (void *)(ULONG_PTR)arr_borrowed[n] );
             if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
+            scrub_refused_outs( sl, rawargs, guest32 );
             *rax_out = (UINT)E_NOTIMPL;
             return STATUS_SUCCESS;
         }
@@ -2575,6 +2682,20 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
         UINT k;
 
         for (k = 0; k < count; k++)
+            if (out[k]) out[k] = winecom_wrap( out[k], sl->xaux[idx - 1] );
+    }
+    /* The count-through-pointer arrays, by the SNAPSHOTTED capacity: the
+     * count parameter now holds the callee's ACTUAL count, which D3D11 lets
+     * exceed the capacity, while exactly capacity cells were written --
+     * real interfaces then NULL padding (DXVK's GetClassInstances).  Same
+     * whatever-the-return rule as above: these too are void readbacks. */
+    for (n = 0; n < n_out_carr; n++)
+    {
+        UINT idx = out_carr_idx[n];
+        void **out = (void **)(ULONG_PTR)args[idx];
+        UINT k;
+
+        for (k = 0; k < out_carr_cap[n]; k++)
             if (out[k]) out[k] = winecom_wrap( out[k], sl->xaux[idx - 1] );
     }
 
@@ -2679,6 +2800,21 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
     if (!sl || sl->refuse)
     {
         refuse_once( iface, slot, sl ? sl->name : NULL, sl ? sl->refuse : NULL );
+        /* refusal hygiene: a generation-refused row still carries the scrub
+         * masks the generator derived from its signature, so the caller's
+         * out-params are made NULL/0 rather than left as the uninitialized
+         * locals an unchecked caller reads back (see scrub_refused_outs).
+         * Only the masked positions are read out of the trap frame. */
+        if (sl && (sl->scrubptr | sl->scrubdw | sl->scrubq))
+        {
+            UINT64 rawargs[16] = { 0 };
+            UINT i;
+
+            for (i = 1; i < sl->argc && i < 16; i++)
+                if ((sl->scrubptr | sl->scrubdw | sl->scrubq) & (1u << (i - 1)))
+                    rawargs[i] = winecom_read_arg( ctx, i );
+            scrub_refused_outs( sl, rawargs, FALSE );
+        }
         ctx->Rax = (UINT)E_NOTIMPL;
         return STATUS_SUCCESS;
     }
@@ -2911,16 +3047,28 @@ NTSTATUS winecom_dispatch32( UINT iface, UINT slot, I386_CONTEXT *ctx )
         return STATUS_SUCCESS;
     }
 
-    if (sl->refuse)
+    if (sl->refuse || sl->refuse32)
     {
-        refuse_once( iface, slot, sl->name, sl->refuse );
-        ctx->Eax = (UINT)E_NOTIMPL;
-        pop_frame32( ctx, pop_bytes );
-        return STATUS_SUCCESS;
-    }
-    if (sl->refuse32)
-    {
-        refuse_once( iface, slot, sl->name, sl->refuse32 );
+        refuse_once( iface, slot, sl->name, sl->refuse ? sl->refuse : sl->refuse32 );
+        /* refusal hygiene, the 32-bit spelling: the scrub masks index
+         * parameters the same way, but the values come from the stdcall
+         * frame -- [esp]=return, [esp+4]=this, then each parameter one
+         * 4-byte slot, two where qwordmask says so (the same arithmetic
+         * pop_frame32 popped by).  A guest cell is 4 bytes whatever the
+         * mask class, except scrubq's genuine 8-byte pointee. */
+        if (sl->scrubptr | sl->scrubdw | sl->scrubq)
+        {
+            UINT64 rawargs[16] = { 0 };
+            UINT i, off = 8;   /* past the return address and `this` */
+
+            for (i = 1; i < sl->argc && i < 16; i++)
+            {
+                if ((sl->scrubptr | sl->scrubdw | sl->scrubq) & (1u << (i - 1)))
+                    rawargs[i] = *(const UINT *)(ULONG_PTR)(ctx->Esp + off);
+                off += (sl->qwordmask & (1u << (i - 1))) ? 8 : 4;
+            }
+            scrub_refused_outs( sl, rawargs, TRUE );
+        }
         ctx->Eax = (UINT)E_NOTIMPL;
         pop_frame32( ctx, pop_bytes );
         return STATUS_SUCCESS;

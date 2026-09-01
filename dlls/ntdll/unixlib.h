@@ -247,6 +247,23 @@ enum ntdll_unix_funcs
      * A no-op (counts zero) when EC is not armed -- no ABI 7 bridge, no
      * live view protocol, or WINE_PPC64LE_NO_EC=1. */
     unix_emu_register_ec,
+    /* args is a struct emu_name_host_addr_params: name the HOST image (a
+     * dlopened unix .so -- DXVK, ntdll.so -- that no PE loader list knows)
+     * containing an address, via dladdr.  The guest-fault reporter's second
+     * tier: the first tier walks the PE loader list for native BUILTINS.
+     * Diagnostic only; found=0 simply means neither world claims it. */
+    unix_emu_name_host_addr,
+};
+
+/* The guest-executing-host diagnostic's dladdr tier (refusal hygiene's
+ * sibling: naming the host image a leaked pointer landed in is what turns
+ * the next W3-class hunt into one log line). */
+struct emu_name_host_addr_params
+{
+    UINT64 addr;
+    UINT64 base;         /* out: the image's load base */
+    UINT   found;        /* out */
+    char   name[120];    /* out: the image path's tail, NUL-terminated */
 };
 
 /* One contiguous stub array (flat exports, or one COM interface's vtable

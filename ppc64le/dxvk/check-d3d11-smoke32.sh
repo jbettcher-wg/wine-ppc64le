@@ -92,6 +92,7 @@ for m in kernel32 d3d11; do
         || skip "llvm-dlltool failed for $m"
 done
 clang -target i386-windows-gnu -nostdlibinc $INCL -Wall -O1 -fno-builtin -g \
+    -DD3D11_SMOKE_NO_GETSHADER \
     -c -o "$OUT/guest32.o" "$HERE/probes/d3d11_smoke.c" || skip "i386 compile failed"
 clang -target i386-windows-gnu -fuse-ld=lld -nostdlib \
     -Wl,--entry=d3d11_smoke_entry -Wl,--subsystem,console -Wl,/safeseh:no \
@@ -103,6 +104,7 @@ NATIVE_INC_BASE="$HERE/src/include/native"
 [ -d "$NATIVE_INC_BASE" ] || skip "no DXVK native headers at $NATIVE_INC_BASE"
 NATIVE_INC="-I$NATIVE_INC_BASE -I$NATIVE_INC_BASE/windows -I$NATIVE_INC_BASE/directx"
 ${CC:-gcc} -std=c11 -O2 -mcpu=power8 $NATIVE_INC -Wall -fno-builtin \
+    -DD3D11_SMOKE_NO_GETSHADER \
     -DD3D11_SMOKE_NATIVE -c -o "$OUT/native.o" "$HERE/probes/d3d11_smoke.c" \
     || skip "native compile failed"
 ${CC:-gcc} -o "$OUT/native" "$OUT/native.o" -ldl || skip "native link failed"

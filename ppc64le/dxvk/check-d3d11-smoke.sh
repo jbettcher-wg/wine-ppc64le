@@ -231,6 +231,32 @@ sabotage() {
         fi
     done
 
+    # part 3: refusal hygiene's own negative control.  The refusal probe's
+    # OpenSharedResource out-param is seeded with a sentinel; the normal leg F
+    # requires osr_scrubbed=yes (a refused slot WRITES NULL before answering
+    # -- the Witcher 3 GetShader lesson).  Here the scrub is disabled by its
+    # lever, and the sentinel MUST survive: if osr_scrubbed stays "yes" with
+    # the lever armed, the scrub the positive leg observed was not the thing
+    # this lever controls, and neither leg proves anything.
+    if [ -x "$OUT/refusal.exe" ] || [ -f "$OUT/refusal.exe" ]; then
+        timeout -k 5 "$TIMEOUT" \
+            env WINEDEBUG="$WDBG" WINEDLLOVERRIDES="winedbg.exe=d" \
+            WINEEMUNOREFUSESCRUB=1 \
+            "$BUILD/wine" "$OUT/refusal.exe" \
+            > "$OUT/sabotage_scrub.out" 2>"$OUT/sabotage_scrub.err"
+        if grep -q "osr_scrubbed=no" "$OUT/sabotage_scrub.out"; then
+            say "sabotage: WINEEMUNOREFUSESCRUB=1 left the sentinel in the \
+refused out-param, as it must (the scrub is load-bearing)"
+        else
+            bad "WINEEMUNOREFUSESCRUB=1 did not stop the refusal scrub \
+(wanted osr_scrubbed=no): $(grep -o 'osr_scrubbed=[a-zA-Z]*' \
+"$OUT/sabotage_scrub.out" | head -1)"; ok=0
+        fi
+    else
+        note "sabotage: no refusal.exe from a prior full run; skipping the \
+refusal-hygiene control (run the gate without --sabotage first)"
+    fi
+
     [ "$ok" = 1 ] && say "SABOTAGE PASS"
     [ "$ok" = 1 ]
 }
@@ -346,6 +372,17 @@ refused call; it crashed instead of being refused cleanly"
         sed 's/^/  refusal| /' "$OUT/refusal.err" >&2
         bad "leg F: the port's +winecom trace does not name both 'refusing' \
 and 'OpenSharedResource'; the refusal is either missing or unnamed"
+    fi
+    # refusal hygiene: refused means INERT.  The probe seeds the out-param
+    # with a sentinel; the dispatcher must have scrubbed it to NULL before
+    # answering E_NOTIMPL, or an unchecked caller reads stack residue -- the
+    # Witcher 3 GetShader crash class.  --sabotage part 3 proves the other
+    # direction with WINEEMUNOREFUSESCRUB=1.
+    if grep -q "osr_scrubbed=yes" "$OUT/refusal.out"; then
+        say "leg F: the refused out-param came back scrubbed (NULL)"
+    else
+        bad "leg F: the refused OpenSharedResource left its out-param \
+unscrubbed: $(grep -o 'osr_scrubbed=[a-zA-Z]*' "$OUT/refusal.out" | head -1)"
     fi
 fi
 
