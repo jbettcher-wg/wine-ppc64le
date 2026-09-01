@@ -401,3 +401,12 @@
 @ stdcall __wine_com_release_guest(ptr)
 @ stdcall __wine_com_addref_guest(ptr)
 @ stdcall __wine_guest_VariantClear(ptr)
+
+# THE END, and appended here for the reason the two notes above give.  The
+# interface-ARRAY delivery self-test hook (include/wine/winecom_arrin.h): the
+# one row on any roster that carries CA_IFACE_ARR_IN is on THIS surface, so
+# the hook that drives it is too.  Exported because the gate's guest probe
+# must reach it through the ordinary GUEST-IMPL path -- a private back door
+# would measure a boundary no application crosses.
+@ stdcall __wine_winecom_arrin_selftest(ptr ptr)
+@ stdcall __wine_guest___wine_winecom_arrin_selftest(ptr ptr)

@@ -65,3 +65,12 @@ GUEST-IMPL   PropVariantClear                 __wine_guest_PropVariantClear
 GUEST-IMPL   PropVariantCopy                  __wine_guest_PropVariantCopy
 GUEST-REFUSE RoGetAgileReference
 GUEST-IMPL   SetErrorInfo                     __wine_guest_SetErrorInfo
+
+# The interface-ARRAY delivery self-test hook (include/wine/winecom_arrin.h).
+# PROBE-EXTRA because the declaration is in a wine/ header the oracle's
+# default translation unit has no reason to include -- the same arrangement
+# dlls/mfplat/mfplat.thunks makes for the reverse-proxy hook, and for the same
+# reason: spec2thunk reads Wine headers, and no Wine header has any business
+# declaring a test hook.
+PROBE-EXTRA  wine/winecom_arrin.h
+GUEST-IMPL   __wine_winecom_arrin_selftest    __wine_guest___wine_winecom_arrin_selftest

@@ -1159,6 +1159,7 @@ SOURCES = \
 	wine/winecom_fpcall.h \
 	wine/winecom_variant.h \
 	wine/winecom_selftest.h \
+	wine/winecom_arrin.h \
 	wine/wined3d.h \
 	wine/winedmo.h \
 	wine/winedxgi.idl \

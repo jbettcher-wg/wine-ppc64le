@@ -105,6 +105,11 @@
 
 #include "syscom_marshal.h"
 
+/* AFTER the marshal tables: the array-delivery hook's vtable width and its
+ * rostered IID are both read from them (see the hook, at the end of the
+ * 64-bit-lane wrappers).  wbemcli.h comes in through this header. */
+#include "wine/winecom_arrin.h"
+
 WINE_DEFAULT_DEBUG_CHANNEL(combase);
 
 /* ------------------------------------------------ the live-voice registry
@@ -2657,3 +2662,233 @@ HRESULT WINAPI __wine_guest_CoUnmarshalHresult( IStream *stm, HRESULT *phresult 
 }
 
 #endif /* __powerpc64__ -- the 64-bit-lane flat wrappers */
+
+/* ----------------------------------- the interface-ARRAY delivery self-test
+ *
+ * include/wine/winecom_arrin.h is the argument for why this exists and what
+ * each half proves.  What is below is only the native half: a handful of
+ * distinguishable native objects, one call to IWbemObjectSink::Indicate
+ * through an ordinary vtable, and the checks that can only be made from this
+ * side of the boundary.
+ *
+ * It lives HERE and not beside its mf twin because the ONE row on any roster
+ * that carries CA_IFACE_ARR_IN is Indicate, and Indicate is on THIS surface.
+ * A hook on the Media Foundation surface would have had to invent a row to
+ * drive, which is a re-implementation of the arm rather than a drive of it.
+ *
+ * OUTSIDE the __powerpc64__ guard above, deliberately.  What that guard keeps
+ * out of the i386 build is WRAPPERS OF REAL COMBASE EXPORTS, whose dllimport
+ * declarations collide with the module's own definitions there; this is a new
+ * export that wraps nothing, so it compiles on both lanes and its two spec
+ * lines carry no -arch, exactly as the mf surface's hook does.
+ */
+
+/* A native IWbemClassObject, built slot by slot rather than by filling in
+ * wbemcli.h's vtable struct.  What this object is FOR is being a
+ * DISTINGUISHABLE native ppc64 vtable at a native address; exactly one of its
+ * twenty-seven slots has to mean anything, and that is the one the guest calls
+ * back through.  Saying so as an array of pointers -- with the width pinned to
+ * the roster's own slot count below, so a regenerated table that grows the
+ * interface breaks the build rather than leaving a short vtable for the guest
+ * to walk off the end of -- is the honest spelling; twenty-three filled-in
+ * method names would bury it. */
+struct arrin_obj
+{
+    void *const *vtbl;
+    LONG  refs;
+    UINT  tag;          /* which element of the delivery this object is */
+    UINT  gets;         /* how many times the guest called back through it */
+    UINT  order;        /* 1-based, the order the callbacks arrived in */
+};
+
+static LONG arrin_seq;          /* the delivery's own callback counter */
+
+static HRESULT WINAPI arrin_QueryInterface( struct arrin_obj *o, REFIID riid, void **ppv )
+{
+    if (!ppv) return E_POINTER;
+    /* The rostered type as well as IUnknown, and the rostered type is read
+     * FROM THE ROSTER rather than from a libuuid symbol: the object claims to
+     * be exactly what the table says element type 81 is, so a regenerated
+     * roster cannot leave this answering for an interface it no longer
+     * describes. */
+    if (IsEqualGUID( riid, &IID_IUnknown ) ||
+        IsEqualGUID( riid, &syscom_com_ifaces[SYSCOM_IFACE_IWbemClassObject].iid ))
+    {
+        InterlockedIncrement( &o->refs );
+        *ppv = o;
+        return S_OK;
+    }
+    *ppv = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI arrin_AddRef( struct arrin_obj *o )
+{
+    return (ULONG)InterlockedIncrement( &o->refs );
+}
+
+static ULONG WINAPI arrin_Release( struct arrin_obj *o )
+{
+    /* NOT freed at zero: these objects have automatic storage in the hook
+     * below and outlive every reference by construction.  A count that goes
+     * to zero is a FINDING here, not a lifetime event -- the hook reads it. */
+    return (ULONG)InterlockedDecrement( &o->refs );
+}
+
+/* Slot 4.  Its answer is the object's identity: element k answers
+ * WINECOM_ARRIN_HR(k), so a guest comparing what came back for position k
+ * against what it expected for position k is making the element-wise claim
+ * and nothing weaker.  The out-parameters are left alone -- refusal hygiene's
+ * rule is about refused slots, and this one serves. */
+static HRESULT WINAPI arrin_Get( struct arrin_obj *o, LPCWSTR name, LONG flags,
+                                 VARIANT *val, CIMTYPE *type, LONG *flavor )
+{
+    (void)name; (void)flags; (void)val; (void)type; (void)flavor;
+    if (!o->gets++) o->order = (UINT)InterlockedIncrement( &arrin_seq );
+    return WINECOM_ARRIN_HR( o->tag );
+}
+
+/* Every other slot.  Reached only if the guest called a method the probe has
+ * no business calling, which the hook would rather hear about than serve. */
+static HRESULT WINAPI arrin_unused( void )
+{
+    ERR( "syscom arrin: the guest called a slot this test object does not "
+         "serve; the probe is driving something it was not written to\n" );
+    return E_NOTIMPL;
+}
+
+#define ARRIN_U ((void *)arrin_unused)
+static void *const arrin_vtbl[] =
+{
+    (void *)arrin_QueryInterface,     /*  0 */
+    (void *)arrin_AddRef,             /*  1 */
+    (void *)arrin_Release,            /*  2 */
+    ARRIN_U,                                /*  3 GetQualifierSet */
+    (void *)arrin_Get,                /*  4 Get             */
+    ARRIN_U, ARRIN_U, ARRIN_U, ARRIN_U,     /*  5..8  */
+    ARRIN_U, ARRIN_U, ARRIN_U, ARRIN_U,     /*  9..12 */
+    ARRIN_U, ARRIN_U, ARRIN_U, ARRIN_U,     /* 13..16 */
+    ARRIN_U, ARRIN_U, ARRIN_U, ARRIN_U,     /* 17..20 */
+    ARRIN_U, ARRIN_U, ARRIN_U, ARRIN_U,     /* 21..24 */
+    ARRIN_U, ARRIN_U,                       /* 25..26 */
+};
+#undef ARRIN_U
+
+/* The pin: the roster's own count for this interface.  If a regenerated table
+ * grows IWbemClassObject, this build stops rather than handing the guest a
+ * proxy whose vtable is wider than the object behind it. */
+C_ASSERT( ARRAYSIZE(arrin_vtbl) == ARRAYSIZE(slots_IWbemClassObject) );
+
+static void arrin_check( struct winecom_arrin_report *r, BOOL ok, const char *what )
+{
+    r->checks++;
+    if (ok) return;
+    r->failures++;
+    if (!r->first_fail) r->first_fail = r->checks;
+    ERR( "syscom arrin: check %u FAILED: %s\n", r->checks, what );
+}
+
+HRESULT WINAPI __wine_winecom_arrin_selftest( IWbemObjectSink *sink,
+                                              struct winecom_arrin_report *report )
+{
+    struct arrin_obj objs[WINECOM_ARRIN_COUNT];
+    IWbemClassObject *arr[WINECOM_ARRIN_COUNT], *orig[WINECOM_ARRIN_COUNT];
+    UINT k, unmutated = 1, once = 1, in_order = 1;
+    HRESULT hr;
+
+    if (!sink || !report) return E_POINTER;
+    memset( report, 0, sizeof(*report) );
+    if (!syscom_ready()) return E_FAIL;
+
+    arrin_seq = 0;
+    for (k = 0; k < WINECOM_ARRIN_COUNT; k++)
+    {
+        memset( &objs[k], 0, sizeof(objs[k]) );
+        objs[k].vtbl = arrin_vtbl;
+        objs[k].refs = 1;
+        objs[k].tag  = k;
+        arr[k] = orig[k] = (IWbemClassObject *)&objs[k];
+        report->refs_before += 1;
+    }
+    report->sent = WINECOM_ARRIN_COUNT;
+
+    /* THE DELIVERY.  One ordinary vtable call; on the guest lane slot 3 of
+     * this pointer is the reverse dispatcher, and cls_IWbemObjectSink_3 sends
+     * the second parameter through the CA_IFACE_ARR_IN arm. */
+    hr = IWbemObjectSink_Indicate( sink, WINECOM_ARRIN_COUNT, arr );
+    report->guest_hr = (UINT)hr;
+    arrin_check( report, hr == WINECOM_ARRIN_HR_OK,
+                 "the sink's Indicate did not answer what the guest sink "
+                 "answers, so the delivery did not arrive intact" );
+
+    /* The caller's array is the caller's.  The arm copies into its own
+     * staging precisely so that a native caller which reuses its array across
+     * deliveries -- which is what wbemprox does -- is never handed proxies. */
+    for (k = 0; k < WINECOM_ARRIN_COUNT; k++)
+        if (arr[k] != orig[k]) unmutated = 0;
+    report->array_unmutated = unmutated;
+    arrin_check( report, unmutated != 0,
+                 "the array the caller passed was MUTATED; the arm wrote its "
+                 "proxies into the native caller's own storage" );
+
+    for (k = 0; k < WINECOM_ARRIN_COUNT; k++)
+    {
+        if (objs[k].gets != 1) once = 0;
+        if (objs[k].order != k + 1) in_order = 0;
+    }
+    report->entered_once = once;
+    report->in_order = in_order;
+    arrin_check( report, once != 0,
+                 "an element was not called back exactly once: either an "
+                 "object never arrived or two positions carry one object" );
+    arrin_check( report, in_order != 0,
+                 "the callbacks did not arrive in element order, so the "
+                 "position an object arrived at is not the position it was "
+                 "sent at" );
+
+    /* THE EMPTY DELIVERY, which is a real shape and not an edge case: a WMI
+     * query that matched nothing still calls Indicate.  The arm short-circuits
+     * on it, and this is the leg that says the short circuit passes the count
+     * and the NULL through rather than staging anything. */
+    hr = IWbemObjectSink_Indicate( sink, 0, NULL );
+    report->empty_hr = (UINT)hr;
+    arrin_check( report, hr == WINECOM_ARRIN_HR_EMPTY,
+                 "the empty delivery (count 0, NULL array) did not arrive as "
+                 "itself" );
+
+    /* THE REFERENCE CONTRACT.  winecom_to_guest takes a reference for the
+     * guest on every element it wraps; the arm has to give every one of them
+     * back when the call returns.  Read after both deliveries so a leak of one
+     * per element per call shows as three. */
+    for (k = 0; k < WINECOM_ARRIN_COUNT; k++)
+        report->refs_after += (UINT)objs[k].refs;
+    report->refs_leaked = (report->refs_after != report->refs_before);
+    arrin_check( report, !report->refs_leaked,
+                 "the delivery did not give back the references it took for "
+                 "the guest; every element of every Indicate leaks one" );
+
+    return report->failures ? E_FAIL : S_OK;
+}
+
+/* The guest-lane wrapper: the sink arrives as a GUEST pointer and becomes a
+ * reverse proxy here, borrowed for the duration of the call.  This is the ONLY
+ * difference between what the gate's guest leg measures and what a native
+ * caller of the hook would measure, and it is the difference the gate is for. */
+HRESULT WINAPI __wine_guest___wine_winecom_arrin_selftest(
+        IWbemObjectSink *sink, struct winecom_arrin_report *report )
+{
+    void *native = NULL;
+    HRESULT hr;
+
+    if (!syscom_ready()) return E_FAIL;
+    if (!winecom_to_native( sink, SYSCOM_IFACE_IWbemObjectSink, &native ))
+    {
+        ERR( "syscom arrin: the sink %p cannot be reverse-proxied, so there "
+             "is nothing to deliver to\n", sink );
+        return E_NOTIMPL;
+    }
+    hr = __wine_winecom_arrin_selftest( (IWbemObjectSink *)native, report );
+    winecom_to_native_end( native );
+    return hr;
+}
+

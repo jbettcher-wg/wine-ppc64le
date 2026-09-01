@@ -687,6 +687,7 @@ static UINT64 winecom_reverse_dispatch( UINT slot, const UINT64 *gpr, const doub
      * function scope, because its address rides in the block through
      * rev_enter_guest */
     void *arr_stage[64];
+    UINT n_arr_stage = 0;
     UINT n_out = 0, n_in = 0;
     UINT i, nfpr = 0, iface;
 
@@ -946,6 +947,15 @@ static UINT64 winecom_reverse_dispatch( UINT slot, const UINT64 *gpr, const doub
                 }
                 arr_stage[k] = g;
             }
+            /* BORROWED, exactly as the scalar case's proxy is, and given back
+             * by its own loop after the call -- in_ifaces[] cannot carry these
+             * because it is indexed by ARGUMENT POSITION and an array has one
+             * position for many objects.  (The forward direction's twin says
+             * the same thing about borrowed[]; winecom.c.)  Without this the
+             * reference winecom_to_guest takes for the guest is never dropped
+             * and every element of every delivery leaks one -- which no static
+             * reading of the arm shows, and the first live drive of it does. */
+            n_arr_stage = count;
             b.args[i] = (UINT64)(ULONG_PTR)arr_stage;
             break;
         }
@@ -992,6 +1002,8 @@ static UINT64 winecom_reverse_dispatch( UINT slot, const UINT64 *gpr, const doub
      * through its own trap, so this drops only the reference this layer took. */
     for (i = 0; i < n_in; i++)
         winecom_to_guest_end( (void *)(ULONG_PTR)b.args[in_ifaces[i]] );
+    for (i = 0; i < n_arr_stage; i++)
+        winecom_to_guest_end( arr_stage[i] );
 
     if (sl->flags & WINECOM_F_RET_VOID) return 0;
     return (UINT64)(LONG_PTR)(LONG)b.rax;

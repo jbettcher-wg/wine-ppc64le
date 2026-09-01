@@ -41,8 +41,28 @@
 #      direction, with its reason.
 #   4  BALANCE.  The trace shows the reverse proxy destroyed and the guest's
 #      Release entered, which is the reference contract closing.
+#   5  DELIVERY.  The one argument class layers 1-4 cannot reach, because
+#      IMFAttributes has no method of it: an interface ARRAY as an in-parameter
+#      (WINECOM_CA_IFACE_ARR_IN).  Exactly one row on any roster this port
+#      serves carries that class -- IWbemObjectSink::Indicate, on the SYSCOM
+#      surface -- so this layer drives a second probe against a second hook,
+#      in combase rather than mfplat, for the reason
+#      include/wine/winecom_arrin.h gives at length: a hook on the mf surface
+#      would have had to invent a row, which is a model of the arm and not the
+#      arm.  Both sides check again, and the claim that only the guest side
+#      can make is the ELEMENT-WISE one -- element k is native object k, not
+#      merely "three of something".
 #
-# --sabotage runs three negative controls instead, and all three must go red:
+#      This layer is why the arm stopped being a claim.  It landed
+#      2026-09-01 statically verified and DISCLOSED as never executed; the
+#      first live drive of it found a reference the arm took for the guest on
+#      every element and never gave back (libs/winecom/reverse.c, the
+#      n_arr_stage loop), which no reading of the code had shown.
+#
+# --sabotage runs five negative controls instead, and all five must go red
+# (a-c are the mechanism's, d is the delivery's, and the delivery also gets its
+# own raw-pointer arm because the elements cross by a different path than the
+# scalar arguments do):
 #
 #   a  WINEEMUNOCOMWRAP=1 hands pointers across RAW in BOTH directions -- the
 #      guest object reaches native code as x86-64 bytes to call.  The probe
@@ -54,6 +74,12 @@
 #      the crossing really goes through the emulator.
 #   c  a probe compiled with a corrupted expected value must fail its own value
 #      check, proving the arguments are COMPARED and not merely printed.
+#   d  the DELIVERY probe compiled with a corrupted per-element oracle must
+#      fail too.  It is a separate control from c and not a duplicate of it:
+#      c moves a constant that crosses in a REGISTER, d moves the one that
+#      identifies WHICH OBJECT arrived at which position, so only d can tell a
+#      correct element-wise translation from one that wrapped a single object
+#      three times and reported three successes.
 #
 # Exit 0 = pass, 1 = a check failed, 2 = could not run (not a pass).
 set -u
@@ -76,6 +102,10 @@ skip() { echo "check-reverse-proxy: $*" >&2; exit 2; }
     skip "no guest mfplat thunk; build it first"
 [ -f "$BUILD/dlls/mfplat/ppc64-windows/mfplat.dll" ] || \
     skip "no native mfplat; build it first"
+# Layer 5 lives on the OTHER surface -- the array row is combase's, not
+# mfplat's -- so it needs combase's guest thunk as well.
+[ -f "$BUILD/dlls/combase/x86_64-windows/combase.dll" ] || \
+    skip "no guest combase thunk; layer 5 (the array delivery) needs it"
 command -v clang >/dev/null || skip "need clang for the guest build"
 command -v llvm-dlltool >/dev/null || skip "need llvm-dlltool for the guest build"
 command -v python3 >/dev/null || skip "need python3 for the provenance layer"
@@ -135,6 +165,35 @@ row_is '{ "IMFAttributes::SetItem",' \
 completeness pass -- the per-tag walker in dlls/mfplat/mfcom.c); a row that \
 reads any other way means the mf tables changed shape under this gate"
 
+# Layer 5's row, and it is on the OTHER surface's tables.  Three facts, all of
+# which layer 5 stands on and any of which a regeneration could move: the
+# second parameter of Indicate is classed CA_IFACE_ARR_IN (6); its element
+# type is recorded in xaux WITH the xmask bit that says the generator wrote it
+# (without the bit the reverse arm refuses by name, which would make layer 5
+# red for the right reason but stop it measuring anything); and aux2 -- the
+# count parameter index -- names parameter 0, lObjectCount.  If this row ever
+# changes shape, layer 5 is measuring something else.
+SYSMARSHAL="$SRC/dlls/combase/syscom_marshal.h"
+sysrow_is() {   # <grep-pattern> <what it must contain> <description>
+    if grep -A1 -F "$1" "$SYSMARSHAL" | grep -qF "$2"; then
+        say "row: $3"
+    else
+        bad "$3 -- expected '$2' near '$1' in syscom_marshal.h"
+    fi
+}
+sysrow_is 'static const unsigned char cls_IWbemObjectSink_3[]' \
+          '{ WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_IN };' \
+          "IWbemObjectSink::Indicate's second parameter is still the \
+interface ARRAY class -- the only row on any roster that carries it"
+sysrow_is 'static const unsigned char xaux_IWbemObjectSink_3[]' \
+          '{ 0, 81 };' \
+          "...with its element type recorded in xaux"
+sysrow_is '{ "IWbemObjectSink::Indicate",' \
+          'cls_IWbemObjectSink_3, xaux_IWbemObjectSink_3, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x02 }' \
+          "...and argc 3, aux2 0 (the count is parameter 0), xmask 0x02 (the \
+bit that says the generator WROTE that xaux entry -- without it an untouched \
+zero would read as roster index 0, a real interface)"
+
 # ---- build: the x86-64 guest probe ---------------------------------------
 # The imports are described by hand rather than taken from a mingw sysroot: the
 # point of naming the DLL for each symbol is that the guest binds to the same
@@ -158,7 +217,12 @@ ExitProcess
 GetCurrentThreadId
 GetTickCount
 EOF
-for m in mfplat kernel32; do
+cat > "$OUT/combase.def" <<'EOF'
+LIBRARY combase.dll
+EXPORTS
+__wine_winecom_arrin_selftest
+EOF
+for m in mfplat kernel32 combase; do
     llvm-dlltool -m i386:x86-64 -d "$OUT/$m.def" -l "$OUT/lib$m.a" \
         || skip "llvm-dlltool failed for $m"
 done
@@ -174,6 +238,21 @@ guest_build() {   # <exe> [extra cflags...]
 }
 
 guest_build "$OUT/reverse_probe.exe" || skip "guest build of reverse_probe.c failed"
+
+# Layer 5's probe: the same machinery, a different source and a different
+# import (combase, because that is where the array row's surface lives).  It
+# needs no CRT either -- see arrin_probe.c's header.
+arrin_build() {   # <exe> [extra cflags...]
+    exe=$1; shift
+    clang -target x86_64-windows-gnu -nostdlibinc $INCL \
+        -DARRIN_PROBE_NO_CRT -D_UCRT -Wall -O1 -fno-builtin -g "$@" \
+        -c -o "$OUT/arrin.o" "$HERE/probes/arrin_probe.c" || return 1
+    clang -target x86_64-windows-gnu -fuse-ld=lld -nostdlib \
+        -Wl,--entry=arrin_probe_entry -Wl,--subsystem,console \
+        -o "$exe" "$OUT/arrin.o" "$OUT/libcombase.a" "$OUT/libkernel32.a"
+}
+
+arrin_build "$OUT/arrin_probe.exe" || skip "guest build of arrin_probe.c failed"
 
 # Bounded, because a run that never returns is a result too: the sabotage
 # controls hand raw code pointers across and a run can spin instead of faulting.
@@ -226,7 +305,39 @@ actually being compared"
 as it must"
     fi
 
-    [ $fail -eq 0 ] && say "SABOTAGE PASS (all three controls red)"
+    # ---- control d: a corrupted PER-ELEMENT oracle ------------------------
+    # The delivery's own control.  Element k's native object answers
+    # WINECOM_ARRIN_HR(k); move the base and the guest's expectation for every
+    # position moves with it, so a probe that merely counted three arrivals
+    # would still pass and one that compares which object arrived where
+    # cannot.  Run FIRST as a raw-pointer control too: WINEEMUNOCOMWRAP=1 hands
+    # the elements across as native vtables, and a guest calling one of those
+    # is calling ppc64 bytes as x86-64.
+    run_probe "$OUT/arrin_probe.exe" +winecom 1 0 "$OUT/sab_d1.err" \
+        > "$OUT/sab_d1.out"
+    if grep -q "arrin_probe: PASS" "$OUT/sab_d1.out"; then
+        bad "WINEEMUNOCOMWRAP=1 still PASSED the array delivery -- the \
+elements are not going through the proxy runtime at all"
+    else
+        say "sabotage(arr-rawptr): raw elements failed the delivery at \
+'$(tail -1 "$OUT/sab_d1.out" | cut -c1-60)' (a guest calling a ppc64 vtable \
+as x86-64 usually dies before it can print anything, which is also a \
+failure), as they must"
+    fi
+
+    arrin_build "$OUT/arrin_probe_bad.exe" \
+        -DWINECOM_ARRIN_HR_BASE=0x00025200 || skip "sabotage build failed"
+    run_probe "$OUT/arrin_probe_bad.exe" -all 0 0 "$OUT/sab_d2.err" \
+        > "$OUT/sab_d2.out"
+    if grep -q "arrin_probe: PASS" "$OUT/sab_d2.out"; then
+        bad "a corrupted per-element oracle still PASSED -- the delivery's \
+elements are counted but not IDENTIFIED"
+    else
+        say "sabotage(arr-oracle): a moved per-element constant failed the \
+element-wise check, as it must"
+    fi
+
+    [ $fail -eq 0 ] && say "SABOTAGE PASS (all five controls red)"
     exit $fail
 fi
 
@@ -292,6 +403,33 @@ else
     bad "the reverse proxy was never destroyed -- its one guest reference is \
 still held"
 fi
+
+# ---- 5: the interface-ARRAY delivery -------------------------------------
+# Traced from the start, unlike layers 1 and 2, because there is no second run
+# to compare a transcript against here: the probe's own stdout carries the
+# element-wise verdict and the trace carries the proof that the arm is what
+# carried it, and one run gives both.
+run_probe "$OUT/arrin_probe.exe" +winecom 0 0 "$OUT/arrin.err" > "$OUT/arrin.out"
+if grep -q "arrin_probe: PASS" "$OUT/arrin.out"; then
+    sed 's/^/  arrin| /' "$OUT/arrin.out"
+else
+    sed 's/^/  arrin| /' "$OUT/arrin.out" >&2
+    tail -20 "$OUT/arrin.err" >&2
+    bad "the interface-array delivery probe did not pass"
+fi
+
+# The trace has to show the row being dispatched in the REVERSE direction and
+# an element being forward-wrapped on the way in -- otherwise the right answers
+# could have been reached without the arm running at all.  The wrap line names
+# the ELEMENT TYPE, which is the arm's xaux entry doing its job.
+for want in "winecom_reverse_dispatch IWbemObjectSink::Indicate" \
+            "wrapped IWbemClassObject host .* as proxy"; do
+    if ! grep -qE "$want" "$OUT/arrin.err"; then
+        bad "no '$want' in the +winecom trace of the delivery"
+    fi
+done
+[ $fail -eq 0 ] && say "delivery: the array row was dispatched in reverse and \
+each element crossed as its own forward proxy"
 
 [ $fail -eq 0 ] && say "PASS"
 exit $fail
