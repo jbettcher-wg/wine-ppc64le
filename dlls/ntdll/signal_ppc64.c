@@ -1429,7 +1429,20 @@ struct thunk_info
 #define THUNK_SIG_ARGC(sig)  ((sig) & 0xff)   /* for a variadic, the FIXED count */
 #define THUNK_SIG_VOID       0x100u           /* returns void */
 #define THUNK_SIG_VARIADIC   0x200u           /* synthesise a va_list, see below */
-#define THUNK_SIG_RESERVED   0x0000fc00u      /* must be zero */
+/* THE ROW'S SIGNATURE TIER, and the ONLY descriptor bit that changes no
+ * marshalling whatsoever.  Set means the generator got this export's signature
+ * from the module's own implementing C DEFINITION (spec2thunk's
+ * WineSourceDefs) rather than from a Wine header DECLARATION.  Both tiers
+ * measure widths, signs and fp by the same rules -- in different translation
+ * units -- so the dispatch path must and does ignore it.
+ *
+ * It exists for one purpose: the WINEEMUNOFLAT* levers below, which put a
+ * chosen subset of the source tier back to its pre-tier refusal without
+ * rebuilding.  See their banner. */
+#define THUNK_SIG_SRCTIER    0x400u
+#define THUNK_SIG_RESERVED   0x0000f800u      /* must be zero; bit 10 is the
+                                                 tier bit above.  Kept in step
+                                                 with wine_sig.DESC_RESERVED */
 /* Bit 16+i set: argument i is a 32-bit slot, measured by the generator's
  * clang oracle from the parameter's type on the guest target (NOT from the
  * .spec argument class, whose `long` names plenty of HANDLEs).  An MS-x64
@@ -1576,6 +1589,617 @@ static inline ULONG_PTR narrow_thunk_arg( ULONG_PTR v, UINT width, UINT sign )
 /* FEXBRIDGE_TRAP_* */
 #define GUEST_TRAP_CONTINUE 0
 #define GUEST_TRAP_EXIT     1
+
+/* ------------------------------------------- the source-tier kill switches --
+ *
+ * WHY THESE EXIST.  1edc93608b6 ("spec2thunk: the source-definition tier")
+ * turned 2,624 previously-refused flat exports into served ones in one commit
+ * -- ucrtbase +417, kernelbase +340, msvcrt +309, msvcr120 +284, ntdll +105 --
+ * and shipped no way to put any of them back.  One wrongly-inferred signature
+ * on a hot CRT export is this tree's sub-word/wrong-width ABI failure class,
+ * whose symptom is a wrong NUMBER rather than a crash at the call site.  When
+ * the Witcher 3 stopped loading, the COM half of the same stretch could be
+ * exonerated in one seat run because libs/winecom/winecom.c had grown levers;
+ * the flat half could not be tested at all short of rebuilding the tree with
+ * the tier ripped out.  These three are the flat half's answer, and they are
+ * deliberately the same three grains and the same idiom:
+ *
+ *   WINEEMUNOFLATTIER=source   every source-tier row in every module.  The
+ *                              one-variable leg that tests the whole landing.
+ *   WINEEMUNOFLATMODS=a,b,...  source-tier rows of the named guest DLLs only
+ *                              (`ucrtbase`, or `ucrtbase.dll`).  For binary-
+ *                              searching the five big gainers.
+ *   WINEEMUNOFLATROWS=m!E,...  individual exports, `module!Export` or a bare
+ *                              `Export`, or `@/path/file` with one per line
+ *                              and `#` comments.  The finest grain: down to
+ *                              the single export.
+ *
+ * All three are ADDITIVE and all three are subsets of the source tier.  A
+ * header-tier row is never touched by any of them: the header tier is not
+ * what landed, so it is not a restore target, and a lever that could reach it
+ * would let a bisect leg "clear" the tier while actually testing something
+ * else.  A ROWS name that resolves to a header-tier row therefore forces
+ * nothing and says so, which is the same rule as a name that resolves to
+ * nothing at all.
+ *
+ * THE RESTORE TARGET IS THE ABSENT EXPORT, and it is reached by the path that
+ * already exists rather than by a new one.  A generation-refused flat export
+ * is simply NOT EMITTED: spec2thunk puts it on the `refused` list, writes no
+ * stub, no descriptor and no .def line, so the guest thunk PE has no such
+ * export.  At run time that shows up in exactly two places, both in
+ * dlls/ntdll/loader.c:
+ *
+ *   * an IMPORT of it binds to allocate_stub()'s per-symbol 0xdead0000+n
+ *     sentinel (an unmapped address on this port -- no AMD64 stub code can be
+ *     generated from ppc64 host code), with a WARN at the bind site naming the
+ *     dll and symbol.  Binding is harmless; only CALLING it faults, at an
+ *     address that names its own symbol.
+ *   * a GetProcAddress of it answers NULL.
+ *
+ * Both of those are downstream of ONE function returning NULL:
+ * find_ordinal_export(), which is the single choke point for by-name and
+ * by-ordinal resolution alike and already answers NULL for an export-table
+ * hole (`if (!functions[ordinal]) return NULL;`).  So a lever hit makes
+ * find_ordinal_export answer NULL for that stub, and every consequence --
+ * sentinel, WARN, NULL, the lot -- is the pre-tier behaviour verbatim,
+ * produced by the pre-tier code.  Nothing here invents a refusal.
+ *
+ * That placement also means the levers bite BEFORE the guest ever holds the
+ * address, which is the only place they can honestly bite: by the time a stub
+ * traps into the dispatcher the guest has already been handed a callable
+ * address, and the pre-tier world would never have got that far.
+ *
+ * THE HOT PATH PAYS ONE PREDICTABLE TEST WHEN THEY ARE UNSET.  Every export
+ * resolution in the process, native modules included, reaches
+ * flat_lever_forces_export(); its first act is to read `flat_lever_armed`,
+ * which latches to 0 on the first call once the environment is readable and
+ * is then a load and a never-taken branch forever.  No environment read, no
+ * string work, no walk.  Armed, the per-module forced-set is resolved ONCE,
+ * on first sight of that module, under the loader lock the caller already
+ * holds.
+ *
+ * A NAME THAT MATCHES NOTHING IS LOUD, for the reason the COM lane's banner
+ * gives: a bisect leg run under a lever that silently forced nothing is
+ * recorded as "tested, clean", and the conclusion drawn from it is wrong in
+ * the most expensive direction.  Modules arrive over the life of a process
+ * and there is no "last module", so a target that has matched nothing YET is
+ * re-reported on every thunk module armed after it -- bounded by the number
+ * of thunk modules a process loads, and the honest thing a per-module
+ * resolver can say. */
+
+/* Big enough for every module a guest process loads, THUNK MODULES AND NATIVE
+ * ONES ALIKE -- the cache holds negatives too (forced == NULL), because the
+ * overwhelming majority of export resolutions in an armed process are native
+ * modules that will never have a __wine_thunk_info, and re-running the export
+ * directory's binary search for that name on every one of them would be the
+ * armed run's dominant cost.  Sizing it for thunk modules alone would fill it
+ * with natives and then silently stop forcing, which is why the overflow is
+ * loud.  A heavy title sits around 90 modules total. */
+#define FLAT_LEVER_MAX_MODULES 256
+
+struct flat_lever_target
+{
+    char *mod;      /* NULL for a bare `Export`, which may match anywhere */
+    char *name;     /* NULL for a WINEEMUNOFLATMODS entry, which is mod-only */
+    UINT  hits;
+};
+
+struct flat_lever_module
+{
+    ULONG_PTR      base;
+    UINT           count, stubs_rva, stride;
+    unsigned char *forced;   /* count bytes; NULL means nothing forced here */
+};
+
+static int flat_lever_armed = -1;          /* -1 not looked at yet, 0 unarmed,
+                                              1 armed.  THE HOT-PATH TEST. */
+static BOOL flat_lever_all_source;         /* WINEEMUNOFLATTIER=source */
+static struct flat_lever_target *flat_lever_targets;
+static UINT flat_lever_target_count;
+static struct flat_lever_module flat_lever_modules[FLAT_LEVER_MAX_MODULES];
+static UINT flat_lever_module_count;
+static BOOL flat_lever_module_overflow;
+
+static void *flat_alloc( SIZE_T size )
+{
+    return RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, size );
+}
+
+static void flat_free( void *p )
+{
+    RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, p );
+}
+
+/* An environment variable's VALUE, ASCII, heap-allocated, or NULL.  PE-side,
+ * so no getenv; the growth loop is winecom.c's com_env_str verbatim in shape,
+ * including its reason -- MaximumLength is a USHORT, so one query caps at
+ * 32767 characters and a `@file` carries anything longer. */
+static char *flat_env_str( const WCHAR *name )
+{
+    UNICODE_STRING nameW, value;
+    ULONG chars = 512;
+    WCHAR *buf = NULL;
+    char *ret;
+    NTSTATUS st;
+    UINT i, n;
+
+    RtlInitUnicodeString( &nameW, name );
+    for (;;)
+    {
+        if (!(buf = flat_alloc( chars * sizeof(WCHAR) ))) return NULL;
+        value.Buffer = buf;
+        value.MaximumLength = (USHORT)(chars * sizeof(WCHAR));
+        value.Length = 0;
+        st = RtlQueryEnvironmentVariable_U( NULL, &nameW, &value );
+        if (st != STATUS_BUFFER_TOO_SMALL || chars >= 0x7fff) break;
+        flat_free( buf );
+        chars = chars * 4 < 0x7fff ? chars * 4 : 0x7fff;
+    }
+    n = value.Length / sizeof(WCHAR);
+    if (st || !n)
+    {
+        flat_free( buf );
+        return NULL;
+    }
+    if ((ret = flat_alloc( n + 1 )))
+    {
+        /* every spelling these levers accept -- export names, DLL names,
+         * paths -- is ASCII; anything else is a typo, and '?' makes it one
+         * the unmatched-target report can print */
+        for (i = 0; i < n; i++) ret[i] = buf[i] < 0x80 ? (char)buf[i] : '?';
+        ret[n] = 0;
+    }
+    flat_free( buf );
+    return ret;
+}
+
+/* `@path` -- the whole file as one ASCII buffer, or NULL.  A UNIX absolute
+ * path is spelled through the Z: drive, the same as the COM lane's reader and
+ * for the same reason: this side has no access to a unix-path conversion, and
+ * `Z:\home\x\rows.list` is what every Wine prefix maps `/home/x/rows.list` to
+ * anyway. */
+static char *flat_read_list_file( const char *path )
+{
+    UNICODE_STRING ntpath;
+    OBJECT_ATTRIBUTES attr;
+    IO_STATUS_BLOCK io;
+    FILE_STANDARD_INFORMATION info;
+    WCHAR dos[MAX_PATH + 4];
+    HANDLE handle;
+    char *data = NULL;
+    UINT i, n = 0;
+    LARGE_INTEGER off;
+
+    if (path[0] == '/') { dos[n++] = 'Z'; dos[n++] = ':'; }
+    for (i = 0; path[i] && n < ARRAY_SIZE(dos) - 1; i++)
+        dos[n++] = path[i] == '/' ? '\\' : (WCHAR)(unsigned char)path[i];
+    dos[n] = 0;
+    if (path[i])
+    {
+        ERR( "the flat row-list path %s is longer than MAX_PATH; ignoring it\n", path );
+        return NULL;
+    }
+    if (!RtlDosPathNameToNtPathName_U( dos, &ntpath, NULL, NULL ))
+    {
+        ERR( "the flat row-list path %s is not a path this side can open\n", path );
+        return NULL;
+    }
+    InitializeObjectAttributes( &attr, &ntpath, OBJ_CASE_INSENSITIVE, NULL, NULL );
+    if (NtOpenFile( &handle, GENERIC_READ | SYNCHRONIZE, &attr, &io,
+                    FILE_SHARE_READ, FILE_SYNCHRONOUS_IO_NONALERT ))
+    {
+        ERR( "cannot open the flat row list %s; NO rows are forced -- do not "
+             "read this leg as 'tested clean'\n", path );
+        RtlFreeUnicodeString( &ntpath );
+        return NULL;
+    }
+    RtlFreeUnicodeString( &ntpath );
+    if (!NtQueryInformationFile( handle, &io, &info, sizeof(info),
+                                 FileStandardInformation ) &&
+        info.EndOfFile.QuadPart > 0 && info.EndOfFile.QuadPart < 0x100000 &&
+        (data = flat_alloc( (SIZE_T)info.EndOfFile.QuadPart + 1 )))
+    {
+        off.QuadPart = 0;
+        if (NtReadFile( handle, NULL, NULL, NULL, &io, data,
+                        (ULONG)info.EndOfFile.QuadPart, &off, NULL ))
+        {
+            flat_free( data );
+            data = NULL;
+        }
+        else data[io.Information] = 0;
+    }
+    NtClose( handle );
+    if (!data)
+        ERR( "cannot read the flat row list %s (empty, over 1 MB, or a read "
+             "error); NO rows are forced\n", path );
+    return data;
+}
+
+static int flat_lower( int c ) { return c >= 'A' && c <= 'Z' ? c + 32 : c; }
+
+static BOOL flat_ieq( const char *a, const char *b )
+{
+    while (*a && flat_lower( (unsigned char)*a ) == flat_lower( (unsigned char)*b ))
+    { a++; b++; }
+    return !*a && !*b;
+}
+
+/* A guest DLL name as the levers accept it against the name the module calls
+ * itself.  `ucrtbase` and `ucrtbase.dll` both name ucrtbase.dll: a reader
+ * reaching for this lever has the bare name in front of them (it is what the
+ * tier census printed) and the file name is what the PE carries. */
+static BOOL flat_module_matches( const char *want, const char *have )
+{
+    UINT n;
+
+    if (flat_ieq( want, have )) return TRUE;
+    for (n = 0; have[n]; n++) {}
+    if (n > 4 && flat_lower( (unsigned char)have[n - 4] ) == '.' &&
+        flat_lower( (unsigned char)have[n - 3] ) == 'd' &&
+        flat_lower( (unsigned char)have[n - 2] ) == 'l' &&
+        flat_lower( (unsigned char)have[n - 1] ) == 'l')
+    {
+        UINT i;
+
+        for (i = 0; i < n - 4; i++)
+            if (!want[i] || flat_lower( (unsigned char)want[i] )
+                            != flat_lower( (unsigned char)have[i] )) return FALSE;
+        return !want[i];
+    }
+    return FALSE;
+}
+
+/* One target, split at `!` when it carries a module.  The name is COPIED: it
+ * points into an environment string or a file buffer that is freed as soon as
+ * parsing is done.  `want_row` false collects a WINEEMUNOFLATMODS entry, which
+ * is a module with no export name. */
+static void flat_add_target( const char *text, UINT len, BOOL want_row )
+{
+    struct flat_lever_target *grown, ent;
+    const char *bang = NULL;
+    UINT i, modlen;
+
+    if (!len) return;
+    memset( &ent, 0, sizeof(ent) );
+    for (i = 0; i < len; i++) if (text[i] == '!') { bang = text + i; break; }
+
+    if (!want_row)
+    {
+        if (bang)
+        {
+            ERR( "WINEEMUNOFLATMODS takes MODULE names, but '%.*s' carries a "
+                 "'!' -- did you mean WINEEMUNOFLATROWS?  Ignored\n", (int)len, text );
+            return;
+        }
+        if (!(ent.mod = flat_alloc( len + 1 ))) return;
+        memcpy( ent.mod, text, len );
+        ent.mod[len] = 0;
+    }
+    else
+    {
+        modlen = bang ? (UINT)(bang - text) : 0;
+        if (bang && (!modlen || bang + 1 >= text + len))
+        {
+            ERR( "WINEEMUNOFLATROWS: '%.*s' is not a `module!Export`; ignored\n",
+                 (int)len, text );
+            return;
+        }
+        if (modlen)
+        {
+            if (!(ent.mod = flat_alloc( modlen + 1 ))) return;
+            memcpy( ent.mod, text, modlen );
+            ent.mod[modlen] = 0;
+            text += modlen + 1;
+            len -= modlen + 1;
+        }
+        if (!(ent.name = flat_alloc( len + 1 ))) { flat_free( ent.mod ); return; }
+        memcpy( ent.name, text, len );
+        ent.name[len] = 0;
+    }
+
+    /* RtlReAllocateHeap is NOT realloc: it answers NULL for a NULL pointer
+     * rather than allocating, so the first entry has to be allocated. */
+    grown = flat_lever_targets
+        ? RtlReAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, flat_lever_targets,
+                             (flat_lever_target_count + 1) * sizeof(*grown) )
+        : flat_alloc( sizeof(*grown) );
+    if (!grown) { flat_free( ent.mod ); flat_free( ent.name ); return; }
+    flat_lever_targets = grown;
+    flat_lever_targets[flat_lever_target_count++] = ent;
+}
+
+/* Split on commas and newlines, dropping `#` comments and surrounding space,
+ * and expanding a leading `@` into the file it names.  `depth` stops an
+ * `@file` whose contents name another file. */
+static void flat_parse_targets( const char *list, BOOL want_row, int depth )
+{
+    const char *p = list;
+
+    while (*p)
+    {
+        const char *start, *end;
+
+        while (*p == ',' || *p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+        if (*p == '#')
+        {
+            while (*p && *p != '\n') p++;
+            continue;
+        }
+        start = p;
+        while (*p && *p != ',' && *p != '\n' && *p != '#') p++;
+        end = p;
+        while (end > start && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r')) end--;
+        if (end == start) continue;
+        if (*start == '@')
+        {
+            char *body, *name;
+            UINT len = (UINT)(end - start - 1);
+
+            if (depth || !len)
+            {
+                ERR( "nested or empty @file in a flat lever list; ignored\n" );
+                continue;
+            }
+            if (!(name = flat_alloc( len + 1 ))) continue;
+            memcpy( name, start + 1, len );
+            name[len] = 0;
+            if ((body = flat_read_list_file( name )))
+            {
+                flat_parse_targets( body, want_row, 1 );
+                flat_free( body );
+            }
+            flat_free( name );
+            continue;
+        }
+        flat_add_target( start, (UINT)(end - start), want_row );
+    }
+}
+
+/* Read the three levers, once.  Called from the resolution hot path on its
+ * first pass, which is the earliest moment the process environment is
+ * guaranteed readable -- ntdll resolves exports before that environment
+ * exists, and latching "unarmed" there would disarm the whole run. */
+static void flat_lever_init(void)
+{
+    char *tier, *mods, *rows;
+    PEB *peb = NtCurrentTeb()->Peb;
+
+    if (!peb->ProcessParameters || !peb->ProcessParameters->Environment) return;
+
+    flat_lever_armed = 0;
+    tier = flat_env_str( L"WINEEMUNOFLATTIER" );
+    mods = flat_env_str( L"WINEEMUNOFLATMODS" );
+    rows = flat_env_str( L"WINEEMUNOFLATROWS" );
+    if (!tier && !mods && !rows) return;
+
+    if (tier)
+    {
+        if (flat_ieq( tier, "source" )) flat_lever_all_source = TRUE;
+        else
+            /* NOT a silent no-op, and not an alias for "everything": the only
+             * tier that LANDED, and so the only one there is a pre-tier world
+             * to restore, is the source tier. */
+            ERR( "WINEEMUNOFLATTIER=%s names no tier -- the only accepted value "
+                 "is 'source', and this leg forces NOTHING from it\n", tier );
+    }
+    if (mods) flat_parse_targets( mods, FALSE, 0 );
+    if (rows) flat_parse_targets( rows, TRUE, 0 );
+    flat_free( tier );
+    flat_free( mods );
+    flat_free( rows );
+
+    if (!flat_lever_all_source && !flat_lever_target_count) return;
+    flat_lever_armed = 1;
+    ERR( "WINEEMUNOFLAT* armed: tier=%s, %u module/export target(s).  Every "
+         "source-tier row they name is put back to its pre-tier state -- the "
+         "export goes ABSENT, so an import of it binds to a 0xdead0000+n "
+         "sentinel and a GetProcAddress of it answers NULL\n",
+         flat_lever_all_source ? "source" : "off", flat_lever_target_count );
+}
+
+/* `__wine_thunk_info` out of a module's export directory, by hand.  NOT
+ * through LdrGetProcedureAddress: this runs INSIDE find_ordinal_export, and
+ * that call would re-enter it. */
+static const struct thunk_info *flat_find_thunk_info(
+    ULONG_PTR base, const IMAGE_EXPORT_DIRECTORY *exports )
+{
+    const WORD *ordinals = (const WORD *)(base + exports->AddressOfNameOrdinals);
+    const DWORD *names = (const DWORD *)(base + exports->AddressOfNames);
+    const DWORD *funcs = (const DWORD *)(base + exports->AddressOfFunctions);
+    int min = 0, max = (int)exports->NumberOfNames - 1;
+
+    while (min <= max)
+    {
+        int res, pos = (min + max) / 2;
+
+        res = strcmp( (const char *)(base + names[pos]), "__wine_thunk_info" );
+        if (!res)
+        {
+            WORD ord = ordinals[pos];
+
+            if (ord >= exports->NumberOfFunctions || !funcs[ord]) return NULL;
+            return (const struct thunk_info *)(base + funcs[ord]);
+        }
+        if (res > 0) max = pos - 1;
+        else min = pos + 1;
+    }
+    return NULL;
+}
+
+/* This module's forced set, resolved once and cached.  Returns NULL when the
+ * module forces nothing -- including when it is not a thunk module at all,
+ * which is the answer for every native DLL in the process. */
+static const struct flat_lever_module *flat_lever_module_for(
+    ULONG_PTR base, const IMAGE_EXPORT_DIRECTORY *exports )
+{
+    const struct thunk_info *info;
+    struct flat_lever_module *m;
+    const UINT *sigs, *names;
+    const char *modname;
+    UINT i, t, forced = 0, seen = 0;
+
+    for (i = 0; i < flat_lever_module_count; i++)
+        if (flat_lever_modules[i].base == base)
+            return flat_lever_modules[i].forced ? &flat_lever_modules[i] : NULL;
+
+    if (flat_lever_module_count == ARRAY_SIZE(flat_lever_modules))
+    {
+        /* A lever that quietly stops working past the cache's last slot is
+         * precisely the "tested, clean" failure this whole mechanism exists to
+         * prevent, so say it -- once. */
+        if (!flat_lever_module_overflow)
+        {
+            flat_lever_module_overflow = TRUE;
+            ERR( "more than %u modules have been resolved against the flat "
+                 "levers; anything further is NOT forced and this leg is "
+                 "INCOMPLETE\n", (UINT)ARRAY_SIZE(flat_lever_modules) );
+        }
+        return NULL;
+    }
+    m = &flat_lever_modules[flat_lever_module_count++];
+    m->base = base;
+    m->forced = NULL;
+
+    if (!(info = flat_find_thunk_info( base, exports ))) return NULL;
+    if (info->version != THUNK_INFO_VERSION)
+    {
+        ERR( "a thunk module at %p has info version %u, expected %u; the flat "
+             "levers force NOTHING in it\n", (void *)base,
+             info->version, THUNK_INFO_VERSION );
+        return NULL;
+    }
+    m->count     = info->count;
+    m->stubs_rva = info->stubs_rva;
+    m->stride    = info->stride;
+    if (!m->count || !m->stride) return NULL;
+
+    modname = exports->Name ? (const char *)(base + exports->Name) : "<unnamed>";
+    sigs  = (const UINT *)(base + info->sigs_rva);
+    names = (const UINT *)(base + info->names_rva);
+
+    if (!(m->forced = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap,
+                                       HEAP_ZERO_MEMORY, m->count )))
+    {
+        ERR( "no memory for %s's forced-refusal map; NO rows are forced there "
+             "-- do not read this leg as 'tested clean'\n", modname );
+        return NULL;
+    }
+
+    for (i = 0; i < m->count; i++)
+    {
+        /* THE WHOLE POINT OF THE TIER BIT.  A header-tier row is not a
+         * restore target under any of the three levers, so it is skipped
+         * before any name is even looked at -- which also makes a ROWS name
+         * that happens to hit a header-tier row report as matching nothing,
+         * honestly. */
+        if (!(sigs[i] & THUNK_SIG_SRCTIER)) continue;
+        seen++;
+        if (flat_lever_all_source) { m->forced[i] = 1; forced++; continue; }
+
+        for (t = 0; t < flat_lever_target_count; t++)
+        {
+            struct flat_lever_target *tg = &flat_lever_targets[t];
+
+            if (tg->mod && !flat_module_matches( tg->mod, modname )) continue;
+            if (tg->name && !flat_ieq( tg->name, (const char *)(base + names[i]) ))
+                continue;
+            /* NO early exit once a row is claimed: two targets may name the
+             * same export (a bare name and a `module!Export` one), and
+             * stopping at the first would leave the second reported as
+             * matching NOTHING -- a false typo warning on a good name. */
+            tg->hits++;
+            if (!m->forced[i]) { m->forced[i] = 1; forced++; }
+        }
+    }
+
+    if (!forced)
+    {
+        flat_free( m->forced );
+        m->forced = NULL;
+    }
+    /* The per-module count line, so a leg's log PROVES what it tested. */
+    ERR( "%s: %u source-tier rows forced back (of %u source-tier, %u exports)\n",
+         modname, forced, seen, m->count );
+
+    /* Loudness, per module, for the reason in this section's banner.  Two
+     * strengths, because only one of them is a certainty:
+     *
+     *   * a target scoped to THIS module that matched nothing HERE is a
+     *     definite typo -- the module is in front of us and it has no such
+     *     source-tier row.  (A header-tier export lands here too, which is
+     *     the honest answer: the levers do not reach that tier.)
+     *   * anything else -- a bare export name, or a module name no module has
+     *     answered to yet -- may still match a module loaded later, so it is
+     *     reported as STILL unmatched rather than as wrong, once per thunk
+     *     module armed after it.  A process loads a handful of thunk modules,
+     *     so the repetition is bounded, and a line still appearing at the end
+     *     of a run is the answer. */
+    for (t = 0; t < flat_lever_target_count; t++)
+    {
+        struct flat_lever_target *tg = &flat_lever_targets[t];
+        const char *lever = tg->name ? "ROWS" : "MODS";
+
+        if (tg->hits) continue;
+        if (tg->mod && flat_module_matches( tg->mod, modname ))
+            ERR( "WINEEMUNOFLAT%s names '%s%s%s', and %s has no such SOURCE-TIER "
+                 "row -- a TYPO, or a header-tier export the levers do not "
+                 "reach; either way this target tested NOTHING\n",
+                 lever, tg->mod, tg->name ? "!" : "",
+                 tg->name ? tg->name : "", modname );
+        else
+            ERR( "WINEEMUNOFLAT%s names '%s%s%s', which has matched no "
+                 "source-tier row in any thunk module seen so far (%s "
+                 "included); if it never does, this target tested NOTHING\n",
+                 lever, tg->mod ? tg->mod : "", tg->mod && tg->name ? "!" : "",
+                 tg->name ? tg->name : "", modname );
+    }
+    return m->forced ? m : NULL;
+}
+
+/***********************************************************************
+ *           flat_lever_forces_export
+ *
+ * Does a WINEEMUNOFLAT* lever put this resolved export back to its pre-tier,
+ * NOT-EMITTED state?  Called from find_ordinal_export() in loader.c with the
+ * loader section held -- which is what serialises everything above, so nothing
+ * here takes a lock of its own.
+ *
+ * `proc` is the address the export table resolved to, and for a flat thunk
+ * that is the stub's first byte, so the stub INDEX is arithmetic: no name
+ * lookup, no ordinal walk.  The exact-multiple test is the same one the trap
+ * dispatcher applies, and for the same reason -- an address inside the stub
+ * array that is not a stub start is not a row.
+ */
+BOOL flat_lever_forces_export( HMODULE module, const IMAGE_EXPORT_DIRECTORY *exports,
+                               const void *proc )
+{
+    const struct flat_lever_module *m;
+    ULONG_PTR base = (ULONG_PTR)module, addr = (ULONG_PTR)proc, first;
+    UINT idx;
+
+    /* THE UNARMED COST, and the reason the tri-state is spelled -1/0/1 with 0
+     * meaning "looked, nothing set": once latched, an unarmed process pays
+     * exactly this one load and one never-taken-again branch per export
+     * resolution.  The -1 test below is a second branch, but only an ARMED
+     * process ever reaches it. */
+    if (!flat_lever_armed) return FALSE;
+    if (flat_lever_armed < 0)
+    {
+        flat_lever_init();
+        /* still -1 means the environment was not readable yet (ntdll resolves
+         * exports before the process parameters exist); ask again next time
+         * rather than latch a wrong answer. */
+        if (flat_lever_armed <= 0) return FALSE;
+    }
+    if (!(m = flat_lever_module_for( base, exports ))) return FALSE;
+
+    first = base + m->stubs_rva;
+    if (addr < first) return FALSE;
+    idx = (UINT)((addr - first) / m->stride);
+    if (idx >= m->count) return FALSE;
+    if (first + (ULONG_PTR)idx * m->stride != addr) return FALSE;
+    return m->forced[idx] != 0;
+}
 
 /***********************************************************************
  *           guest namespace overrides

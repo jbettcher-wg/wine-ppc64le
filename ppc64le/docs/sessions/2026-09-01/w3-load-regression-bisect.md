@@ -242,3 +242,129 @@ armed/unarmed pair; `--sabotage` runs the unarmed controls alone).  It exists
 because a lever that silently does nothing is worse than no lever: a leg run
 under one is recorded as "tested, clean", and that is the most expensive kind
 of wrong answer this bisect can produce.
+
+## The FLAT levers (added afterwards, same lesson)
+
+The COM levers above exonerated the COM half: with `WINEEMUNOCOMWAVE` putting
+all 466 rows and 16 IIDs back to their pre-landing refusal, the fault at
+`witcher3.exe+f4a78b` is **byte-identical**.  That leaves the other half of
+the completeness program, and it is the bigger one.
+
+Commit `1edc93608b6` ("spec2thunk: the source-definition tier") newly SERVES
+**2,624 flat exports** that used to be refused — signatures inferred from
+Wine's own implementing C source instead of from a header declaration.
+Biggest gainers: **ucrtbase +417, kernelbase +340, msvcrt +309, msvcr120
++284, ntdll +105**.  One wrongly-inferred signature on a hot CRT export
+produces exactly this fault shape: this tree's sub-word / wrong-width ABI
+failure class, whose symptom is a wrong NUMBER (a length that comes out `-2`,
+a pointer with a garbage top half) rather than a crash at the call site.
+
+There was no way to test that.  The tier's provenance lived only in
+`spec2thunk --report`, and **the build never passes `--report`** — so nothing
+beside the shipped artifact said which of its 20,625 rows were new.  It does
+now: **descriptor bit 10** (`THUNK_SIG_SRCTIER` in ntdll's `signal_ppc64.c`,
+`DESC_SRCTIER` in `wine_sig.py`) marks a source-tier row, one bit per export
+in a table the guest PE already carries.  Header-tier rows are unchanged.
+
+| lever | what it does |
+|---|---|
+| `WINEEMUNOFLATTIER=source` | Every source-tier row in every module goes back to its pre-tier state.  **This is the one-variable leg that tests the whole `1edc93608b6` landing.** |
+| `WINEEMUNOFLATMODS=a,b,...` | Source-tier rows of the named guest DLLs only.  `ucrtbase` and `ucrtbase.dll` both work.  For binary-searching the five big gainers. |
+| `WINEEMUNOFLATROWS=m!E,...` | Individual exports: `module!Export`, or a bare `Export` (which may match in any module, and then says which), or `@/path/file` with one target per line and `#` comments.  The finest grain. |
+
+All three are additive, and all three reach **only** the source tier.  A
+header-tier row is not what landed, so it is not a restore target; naming one
+forces nothing and is reported as a miss.
+
+### What "back to its pre-tier state" actually means
+
+A generation-refused flat export is simply **not emitted** — no stub, no
+descriptor, no `.def` line, so the guest thunk PE has no such export.  At run
+time that has exactly two faces, both already in `dlls/ntdll/loader.c`:
+
+* an **import** of it binds to `allocate_stub()`'s per-symbol `0xdead0000+n`
+  sentinel (unmapped on this port), with a `WARN` at the bind site naming the
+  dll and symbol.  Binding is harmless; only *calling* it faults, at an
+  address that names its own symbol.
+* a **GetProcAddress** of it answers `NULL`.
+
+Both are downstream of one function answering NULL: `find_ordinal_export()`,
+the single choke point for by-name and by-ordinal resolution alike, which
+already answers NULL for an export-table hole.  A lever hit makes it answer
+NULL for that stub, so every consequence is the pre-tier behaviour produced by
+the pre-tier code.  **No new refusal path was invented**, deliberately: with
+one, a leg would be measuring the lever instead of the tier.
+
+### Leg 2 is not the answer to this
+
+The table above records leg 2 — "7 modules' guest thunks regenerated with the
+OLD tool" — as *"fault persists → source-tier thunks 'not it'"*.  Do not treat
+that as settled, for three reasons:
+
+* it ran under the **bridge skew** this note opens with, like every other leg;
+* it covered seven modules, not the whole tier.  The tier touched **95
+  Makefile invocations**; those seven are most of the row count but not all of
+  it, and "the rest" is exactly where a binary search would end up if the
+  first five come back clean;
+* it swapped built halves, which is the procedure that produced the invalid
+  leg 4.  `WINEEMUNOFLATTIER=source` swaps nothing and cannot make that
+  mistake.
+
+Run leg (a) below even if leg 2 is believed.  It costs one `env` line.
+
+### The legs, in order
+
+```sh
+# (a) THE WHOLE LANDING OFF.  One variable, and it is the leg that decides
+#     whether the flat tier is in this at all.
+WINEEMUNOFLATTIER=source <launch W3>
+
+# (b) If (a) is CLEAN, binary-search the modules.  Start with the five big
+#     gainers, since together they are 1,455 of the 2,624 rows.
+WINEEMUNOFLATMODS=ucrtbase,kernelbase,msvcrt,msvcr120,ntdll <launch W3>
+
+#     Clean?  then the culprit is in "the rest" -- everything else the tier
+#     touched.  Not clean?  halve the five:
+WINEEMUNOFLATMODS=ucrtbase,kernelbase   <launch W3>
+WINEEMUNOFLATMODS=msvcrt,msvcr120,ntdll <launch W3>
+#     ...and keep halving to the single module.
+
+# (c) Then binary-search that module's own source-tier rows down to ONE
+#     export.  The row list comes out of the built artifact itself:
+python3 ppc64le/thunks/flat-tier-rows.py \
+    dlls/ucrtbase/x86_64-windows/ucrtbase.dll > /tmp/leg.list   # 417 lines
+head -208 /tmp/leg.list > /tmp/leg-a.list
+WINEEMUNOFLATROWS=@/tmp/leg-a.list <launch W3>
+#     ...halve, repeat, and finish at the single export:
+WINEEMUNOFLATROWS=ucrtbase!_o__wcsnicmp <launch W3>
+```
+
+`flat-tier-rows.py` reads the tier bit out of the **built** guest DLL, so its
+output is always the rows that artifact really serves from source.
+`--count` gives a one-line summary per module, `--header-tier` gives the
+control set (the rows no lever can touch), `--plain` drops the `module!`
+prefix.
+
+### Reading the result
+
+Check stderr before believing any leg:
+
+* `WINEEMUNOFLAT* armed: tier=source, N module/export target(s)` — the run
+  read the lever at all.
+* `ucrtbase.dll: 417 source-tier rows forced back (of 417 source-tier, 1836
+  exports)` — one line per thunk module, and **this is the line that proves
+  what the leg tested.  If the count is 0, the leg tested nothing.**
+* `names '<x>', and <mod> has no such SOURCE-TIER row` — a typo, or a
+  header-tier export the levers do not reach.  Either way that target tested
+  nothing.
+* `has matched no source-tier row in any thunk module seen so far` — a bare
+  export name that has not landed yet.  It may still match a module loaded
+  later; if the line is still appearing at the end of the run, it never did.
+* `more than 256 modules have been resolved against the flat levers` — the
+  per-module cache is full and anything past it is not forced.  The leg is
+  incomplete; no process has come near this, but it says so rather than
+  quietly stopping.
+
+The gate is `ppc64le/thunks/check-flat-levers.sh` (every arm an armed/unarmed
+pair; `--sabotage` runs the unarmed controls alone), for the same reason as
+the COM one: a lever that silently does nothing is worse than no lever.

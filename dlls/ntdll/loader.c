@@ -1127,6 +1127,20 @@ static FARPROC find_ordinal_export( HMODULE module, const IMAGE_EXPORT_DIRECTORY
 
     proc = get_rva( module, functions[ordinal] );
 
+#ifdef __powerpc64__
+    /* THE FLAT SOURCE-TIER KILL SWITCHES land here, and only here, because
+     * this is the single choke point every by-name and by-ordinal resolution
+     * passes through -- and because the state a lever restores is "the
+     * generator never emitted this export", whose whole runtime meaning is the
+     * `if (!functions[ordinal]) return NULL;` two lines above.  Answering NULL
+     * gives an import allocate_stub()'s named sentinel and a GetProcAddress
+     * NULL, which is exactly what a source-tier export did before
+     * 1edc93608b6 landed it.  No new refusal path exists for this; there must
+     * not be one, or a bisect leg would be measuring the lever instead of the
+     * tier.  Unarmed this is one load and one branch inside the callee. */
+    if (flat_lever_forces_export( module, exports, proc )) return NULL;
+#endif
+
     /* if the address falls into the export dir, it's a forward */
     if (((const char *)proc >= (const char *)exports) && 
         ((const char *)proc < (const char *)exports + exp_size))

@@ -99,6 +99,12 @@ extern void flush_guest_thunk_cache(void);
 extern NTSTATUS emu32_dispatch_thunk( I386_CONTEXT *ctx );
 extern void dump_guest_thunk_profile(void);
 extern void emu_xstat_dump(void);
+/* The WINEEMUNOFLAT* source-tier kill switches; see their banner in
+ * signal_ppc64.c.  Answers TRUE when a lever puts this resolved guest thunk
+ * export back to its pre-tier, NOT-EMITTED state, which find_ordinal_export
+ * turns into the export-table hole it already knows how to answer. */
+extern BOOL flat_lever_forces_export( HMODULE module, const IMAGE_EXPORT_DIRECTORY *exports,
+                                      const void *proc );
 #endif
 extern FARPROC RELAY_GetProcAddress( HMODULE module, const IMAGE_EXPORT_DIRECTORY *exports,
                                      DWORD exp_size, FARPROC proc, DWORD ordinal, const WCHAR *user );
