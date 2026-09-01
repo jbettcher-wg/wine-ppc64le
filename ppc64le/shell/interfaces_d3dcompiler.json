@@ -1,0 +1,90 @@
+{
+  "enums": [],
+  "iface_ptr_aliases": {
+    "ID3DBlob": "ID3D10Blob",
+    "LPD3DBLOB": "ID3D10Blob",
+    "LPD3D10BLOB": "ID3D10Blob",
+    "ID3D11FunctionLinkingGraph": "IUnknown",
+    "ID3D11Linker": "IUnknown",
+    "ID3D11Module": "IUnknown",
+    "ID3D11ShaderReflection": "IUnknown"
+  },
+  "interfaces": {
+    "ID3D10Blob": {
+      "base": "IUnknown",
+      "header": "d3dcommon.h",
+      "uuid": "8ba5fb08-5195-40e2-ac58-0d989c3a0102",
+      "slots": [
+        {
+          "name": "QueryInterface",
+          "owner": "IUnknown",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ],
+          "ret": "HRESULT",
+          "slot": 0
+        },
+        {
+          "name": "AddRef",
+          "owner": "IUnknown",
+          "params": [],
+          "ret": "ULONG",
+          "slot": 1
+        },
+        {
+          "name": "Release",
+          "owner": "IUnknown",
+          "params": [],
+          "ret": "ULONG",
+          "slot": 2
+        },
+        {
+          "name": "GetBufferPointer",
+          "owner": "ID3D10Blob",
+          "params": [],
+          "ret": "LPVOID",
+          "slot": 3
+        },
+        {
+          "name": "GetBufferSize",
+          "owner": "ID3D10Blob",
+          "params": [],
+          "ret": "SIZE_T",
+          "slot": 4
+        }
+      ]
+    },
+    "IUnknown": {
+      "base": null,
+      "header": "unknwn.h",
+      "uuid": "00000000-0000-0000-c000-000000000046",
+      "slots": [
+        {
+          "name": "QueryInterface",
+          "owner": "IUnknown",
+          "params": [
+            "REFIID riid",
+            "void** ppvObject"
+          ],
+          "ret": "HRESULT",
+          "slot": 0
+        },
+        {
+          "name": "AddRef",
+          "owner": "IUnknown",
+          "params": [],
+          "ret": "ULONG",
+          "slot": 1
+        },
+        {
+          "name": "Release",
+          "owner": "IUnknown",
+          "params": [],
+          "ret": "ULONG",
+          "slot": 2
+        }
+      ]
+    }
+  }
+}

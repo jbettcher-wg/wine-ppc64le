@@ -9,3 +9,42 @@
 # module's own .spec.
 DLL d3dcompiler_47.dll
 FROM-SPEC auto
+
+# THE BLOB SURFACE (2026-09-01).  This module was FROM-SPEC auto with no
+# COM-JSON, so D3DCompile2's `ID3DBlob **ppCode` crossed as a plain scalar:
+# the native compiler wrote a ppc64 blob pointer into the guest's cell and
+# the guest's next vtable call executed ppc64 bytes as x86-64 -- the Witcher 3
+# hit it compiling shaders during a save load.  With COM-JSON in place,
+# spec2thunk's flat audit FAILS THE BUILD for any interface-bearing export
+# left unclassified below, which is the guarantee this module lacked.
+COM-JSON  ../../ppc64le/shell/interfaces_d3dcompiler.json
+
+# Blob-vending exports: wrappers in guestcom.c put every ID3DBlob out-cell
+# through the proxy machinery.  ID3DInclude (an IN interface the compiler
+# calls back into) is policed per call inside the wrappers: NULL and the
+# D3D_COMPILE_STANDARD_FILE_INCLUDE sentinel cross, a real guest handler is
+# refused with the blob cells scrubbed.
+# (D3DAssemble is spec-private and oracle-refused -- never emitted to a
+# guest, so it needs no wrapper; the audit rejects a row for it as stale.)
+GUEST-IMPL   D3DCompile                         __wine_guest_D3DCompile
+GUEST-IMPL   D3DCompile2                        __wine_guest_D3DCompile2
+GUEST-IMPL   D3DCompileFromFile                 __wine_guest_D3DCompileFromFile
+GUEST-IMPL   D3DCreateBlob                      __wine_guest_D3DCreateBlob
+GUEST-IMPL   D3DDisassemble                     __wine_guest_D3DDisassemble
+GUEST-IMPL   D3DGetBlobPart                     __wine_guest_D3DGetBlobPart
+GUEST-IMPL   D3DGetDebugInfo                    __wine_guest_D3DGetDebugInfo
+GUEST-IMPL   D3DGetInputAndOutputSignatureBlob  __wine_guest_D3DGetInputAndOutputSignatureBlob
+GUEST-IMPL   D3DGetInputSignatureBlob           __wine_guest_D3DGetInputSignatureBlob
+GUEST-IMPL   D3DGetOutputSignatureBlob          __wine_guest_D3DGetOutputSignatureBlob
+GUEST-IMPL   D3DPreprocess                      __wine_guest_D3DPreprocess
+GUEST-IMPL   D3DReadFileToBlob                  __wine_guest_D3DReadFileToBlob
+GUEST-IMPL   D3DStripShader                     __wine_guest_D3DStripShader
+GUEST-IMPL   D3DWriteBlobToFile                 __wine_guest_D3DWriteBlobToFile
+
+# The reflection/linker family vends LARGE interfaces (ID3D11ShaderReflection,
+# ID3D11Linker, ID3D11FunctionLinkingGraph, ID3D11Module) no guest title has
+# driven on this port; loud inert refusal until one does.
+GUEST-REFUSE D3DCreateFunctionLinkingGraph  vends ID3D11FunctionLinkingGraph, unrostered
+GUEST-REFUSE D3DCreateLinker                vends ID3D11Linker, unrostered
+GUEST-REFUSE D3DLoadModule                  vends ID3D11Module, unrostered
+GUEST-REFUSE D3DReflect                     vends ID3D11ShaderReflection by RIID, unrostered

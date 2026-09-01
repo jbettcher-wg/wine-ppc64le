@@ -18,3 +18,18 @@
 # from this module's own .spec.
 DLL d3dcompiler_43.dll
 FROM-SPEC auto
+
+# THE BLOB SURFACE (2026-09-01) -- same hole, same fix as d3dcompiler_47's
+# .thunks (whose banner has the story): ID3DBlob outs must cross as proxies.
+COM-JSON  ../../ppc64le/shell/interfaces_d3dcompiler.json
+GUEST-IMPL   D3DCompile                         __wine_guest_D3DCompile
+GUEST-IMPL   D3DCreateBlob                      __wine_guest_D3DCreateBlob
+GUEST-IMPL   D3DDisassemble                     __wine_guest_D3DDisassemble
+GUEST-IMPL   D3DGetBlobPart                     __wine_guest_D3DGetBlobPart
+GUEST-IMPL   D3DGetDebugInfo                    __wine_guest_D3DGetDebugInfo
+GUEST-IMPL   D3DGetInputAndOutputSignatureBlob  __wine_guest_D3DGetInputAndOutputSignatureBlob
+GUEST-IMPL   D3DGetInputSignatureBlob           __wine_guest_D3DGetInputSignatureBlob
+GUEST-IMPL   D3DGetOutputSignatureBlob          __wine_guest_D3DGetOutputSignatureBlob
+GUEST-IMPL   D3DPreprocess                      __wine_guest_D3DPreprocess
+GUEST-IMPL   D3DStripShader                     __wine_guest_D3DStripShader
+GUEST-REFUSE D3DReflect                     vends ID3D11ShaderReflection by RIID, unrostered

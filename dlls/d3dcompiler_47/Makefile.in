@@ -1,6 +1,6 @@
 MODULE    = d3dcompiler_47.dll
 IMPORTLIB = d3dcompiler
-IMPORTS   = wined3d
+IMPORTS   = wined3d winecom
 EXTRADEFS = -DD3D_COMPILER_VERSION=47
 PARENTSRC = ../d3dcompiler_43
 EXTRAINCL = $(VKD3D_PE_CFLAGS)
@@ -10,6 +10,7 @@ VER_PRODUCTVERSION      = 6,3,9600,16984
 
 SOURCES = \
 	d3dcompiler_47.thunks \
+	guestcom.c \
 	asmparser.c \
 	asmshader.l \
 	asmshader.y \
