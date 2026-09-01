@@ -32,15 +32,29 @@
 >
 > (Legs are not nested — the lean return serves the trap path too, so
 > the pre-PPC64EC production crossing, lazy CONTEXT + syscall return,
-> sat at ~430–437.)  Remaining named work: the entry half of the PE
-> re-entry + `emu_teb_stack_switch` (~10% of the bench crossing
-> between them), the exception path's lean-return adoption (cold),
-> step C (gen_winecom FP), and the winecom global `wc_cs` attribution
-> (a callgraph W3 run on a real seat — headless WSI init fails).  Kill
-> switches: `WINE_PPC64LE_NO_TRAP_VIEW=1`, `WINE_PPC64LE_NO_EC=1`,
-> `WINE_PPC64LE_NO_LEAN_RETURN=1`, `FEXBRIDGE_EAGER_CTX=1`.  Gates:
-> `check-ec-transition.sh`, `check-rip-cache.sh` layer 4b.
-> The plan below is the original feasibility page, kept as written.
+> sat at ~430–437.)
+>
+> **2026-09-01 follow-through, all landed the next sitting:** the entry
+> half slimmed (`779715d7ed5` — TEB install inlined, per-crossing
+> scratch work gone, exception path adopted the lean return; the bench
+> crossing fell to **311–314 ns**, and the audit says what remains in
+> the entry is the contractual frame work a mid-dispatch suspension
+> reads); **step C built** (`cf38a2552d3` — COM-lane FP descriptors,
+> one shared splitter/caller, fail-closed everywhere; the mf family's
+> 30 float methods incl. the first served FP returns and d3d11's video
+> rows stopped being refusals); and the winecom `wc_cs` theory was
+> **exonerated on data** (`984c52a6d1d` — every CS caller chain is the
+> game's own contended locks crossing to wait, as they must).
+> Total journey: **~430 → ~313 ns per crossing, −27%, everything
+> default-on.**  Still open, none urgent: row-cookie-style adoption
+> for anything the profile names next, the i386 lane stays on traps by
+> measurement, and no live title has yet value-driven the served FP
+> returns.  Kill switches: `WINE_PPC64LE_NO_TRAP_VIEW=1`,
+> `WINE_PPC64LE_NO_EC=1`, `WINE_PPC64LE_NO_LEAN_RETURN=1`,
+> `WINEEMUNOCOMFP=1`, `FEXBRIDGE_EAGER_CTX=1`.  Gates:
+> `check-ec-transition.sh`, `check-rip-cache.sh` 4b, `check-mf-smoke`
+> step 13/control d.  The plan below is the original feasibility page,
+> kept as written.
 
 The question: do what ARM64EC does — compile the hot PE-side surface as
 native ppc64 code carrying x86-shaped exports, so a guest→DLL call is one
