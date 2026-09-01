@@ -557,12 +557,15 @@ wine-side path**.  In order of expected yield:
   per-slot row cells ride as the bridge cookie; thunk_rip_cache_get is
   gone from the crossing; the cache levers win over the cells
   (check-rip-cache layer 4b).  ~423→~402 ns.
-* **The winecom global wc_cs**: 6.6% of W3's D3D11-submission thread is
-  native RtlEnter/LeaveCriticalSection; wc_cs is taken on EVERY proxy
-  AddRef/Release and every interface intern (winecom.c).  Attribution
-  needs a CALLGRAPH profile of a seat-run W3 (headless dies at DXVK's
-  headless-WSI init, pristine tree too) — measure before touching
-  locking.
+* **The winecom global wc_cs — EXONERATED ON DATA (2026-09-01 seat-run
+  callgraph, /tmp/w3-cgall.perf on op4k)**: every RtlEnterCriticalSection
+  caller chain is emu_trap_dispatch — the GAME's own contended critical
+  sections crossing to wait natively, which is what contended enters must
+  do (RtlpWaitForCriticalSection 0.52% process-wide confirms real
+  contention; CS machinery ~2.3% of the process total).  winecom's
+  locking never appears.  Do NOT rework wc_cs on this evidence; the
+  contended-wait cost is REDengine's own lock churn — ntsync territory,
+  already tuned (spin-then-block).
 * **Step C**: gen_winecom FP descriptors (the hand_clear_dsv class) — see
   the doc's corrected scope.
 * **NOTE for the JIT side** (found building this, filed in the fex tree's
