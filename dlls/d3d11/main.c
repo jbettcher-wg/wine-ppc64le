@@ -107,6 +107,34 @@ static UINT64 unix_vtbl_call( void *host, UINT slot, UINT argc, UINT64 *args )
     return p.ret;
 }
 
+/* The generic FLOATING-POINT invoker (PPC64EC step C): float raw bits ride
+ * the integer view across the unixlib -- the FP_SHAPE precedent, minus the
+ * per-shape enum -- and the unix side splits them into ELFv2's register
+ * files through the one shared implementation (wine/winecom_fpcall.h).  The
+ * marshal table's fpmask/fpwide/fpret drive it; the VideoProcessor
+ * SetStreamAlpha/SetStreamLumaKey rows are what it un-refuses today. */
+static UINT64 unix_vtbl_call_fp( void *host, UINT slot, UINT argc, UINT64 *args,
+                                 UINT fpword, UINT64 *fpret_bits )
+{
+    struct d3d11_fpcall_params p;
+    NTSTATUS status;
+
+    memcpy( p.args, args, sizeof(p.args) );
+    p.args[0] = (UINT64)(ULONG_PTR)host;
+    p.slot = slot;
+    p.argc = argc;
+    p.fpword = fpword;
+    p.ret = 0;
+    p.fpret_bits = 0;
+    if ((status = D3D11_UNIX_CALL( fpcall, &p )))
+    {
+        ERR( "unix fp call failed, status %08x\n", (UINT)status );
+        return (UINT64)(UINT)E_FAIL;
+    }
+    if (fpret_bits) *fpret_bits = p.fpret_bits;
+    return p.ret;
+}
+
 /* ------------------------------------------------- the runtime instance */
 
 /* Every guest module that publishes this roster.  winecom_attach validates
@@ -256,6 +284,7 @@ static const struct winecom_surface d3d11_surface =
     .hand32 = d3d11_hand32,
     .hand32_count = ARRAYSIZE(d3d11_hand32),
     .wrap_concrete = d3d11_wrap_concrete,
+    .invoke_fp = unix_vtbl_call_fp,
 };
 
 static LONG com_init_state;            /* 0 = no, 1 = in progress, 2 = ok,

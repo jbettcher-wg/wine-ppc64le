@@ -719,7 +719,7 @@ static BOOL journal_on;
 
 static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct winecom_slot *sl,
                                    struct com_proxy *proxy, UINT iface, UINT slot,
-                                   const UINT64 *rawargs, UINT64 *rax_out );
+                                   const UINT64 *rawargs, UINT64 *rax_out, UINT64 *fpret_bits );
 
 /* Replay every record in `p`'s ring, oldest first, then reset the ring.
  * Runs on the recording thread inside its own trap in the ordered cases; the
@@ -792,7 +792,7 @@ static void wc_journal_drain( struct com_proxy *p )
             break;
         }
 
-        status = invoke_marshalled( itf, sl, p, iface, slot, rawargs, &rax );
+        status = invoke_marshalled( itf, sl, p, iface, slot, rawargs, &rax, NULL );
         if (status)
             ERR( "journal replay of %s failed, status %08x; continuing\n",
                  sl->name, (UINT)status );
@@ -1389,7 +1389,7 @@ static void wc_dev_drain( void )
         TRACE( "devjournal: replay %s proxy %p va %I64x size %u handle %I64x stamp %I64u\n",
                sl->name, p, *(const UINT64 *)(rec + 40), *(const UINT *)(rec + 48),
                *(const UINT64 *)(rec + 32), best_stamp );
-        status = invoke_marshalled( itf, sl, p, iface, slot, rawargs, &rax );
+        status = invoke_marshalled( itf, sl, p, iface, slot, rawargs, &rax, NULL );
         if (status)
             ERR( "devjournal: replay of %s failed, status %08x; continuing\n",
                  sl->name, (UINT)status );
@@ -2251,7 +2251,7 @@ static void release_borrows( const UINT64 *args, const UINT *borrowed, UINT coun
  */
 static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct winecom_slot *sl,
                                    struct com_proxy *proxy, UINT iface, UINT slot,
-                                   const UINT64 *rawargs, UINT64 *rax_out )
+                                   const UINT64 *rawargs, UINT64 *rax_out, UINT64 *fpret_bits )
 {
     UINT64 args[16] = { 0 };
     UINT64 arr_buf[32];
@@ -2485,7 +2485,49 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
         }
     }
 
-    ret = wc_surface->invoke( proxy->host, slot, sl->argc, args );
+    if (sl->fpmask || sl->fpret)
+    {
+        /* A slot whose signature carries by-value floats: the widest-integer
+         * invoker cannot place them, so this goes through the surface's
+         * FLOATING-POINT invoker (PPC64EC step C) with the flat lane's fpword
+         * encoding.  Three ways to fail, all CLOSED and all named: a surface
+         * with no FP invoker, the WINEEMUNOCOMFP=1 negative control, and a
+         * path with no FP-return plumbing (the journal drains and the 32-bit
+         * dispatch pass fpret_bits NULL -- an fp-marked row must never be
+         * journaled, and the 32-bit lane's generator marks these rows
+         * refuse32, so reaching here from either is a defect this refusal
+         * makes loud instead of silent). */
+        static int fp_off = -1;
+
+        if (fp_off == -1)
+        {
+            fp_off = com_env_flag( L"WINEEMUNOCOMFP" );
+            if (fp_off)
+                ERR( "WINEEMUNOCOMFP=1 -- every float-bearing slot refuses; "
+                     "the FP invoker is off\n" );
+        }
+        if (fp_off || !wc_surface->invoke_fp || !fpret_bits)
+        {
+            refuse_once( iface, slot, sl->name,
+                         !fpret_bits ? "floating-point slot reached through a "
+                                       "path with no FP plumbing (journal "
+                                       "replay or the 32-bit dispatch)"
+                                     : "float-bearing slot with no FP invoker "
+                                       "on this surface (or WINEEMUNOCOMFP=1)" );
+            release_borrows( args, borrowed, n_borrowed );
+            for (n = 0; n < n_arr_borrowed; n++)
+                winecom_to_native_end( (void *)(ULONG_PTR)arr_borrowed[n] );
+            if (arr_heap) RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, arr_heap );
+            *rax_out = (UINT)E_NOTIMPL;
+            return STATUS_SUCCESS;
+        }
+        ret = wc_surface->invoke_fp( proxy->host, slot, sl->argc, args,
+                                     (UINT)sl->fpmask |
+                                     ((UINT)(sl->fpmask & (unsigned char)~sl->fpwide) << 8) |
+                                     ((UINT)sl->fpret << 16),
+                                     fpret_bits );
+    }
+    else ret = wc_surface->invoke( proxy->host, slot, sl->argc, args );
 
     release_borrows( args, borrowed, n_borrowed );
     for (n = 0; n < n_arr_borrowed; n++)
@@ -2655,12 +2697,49 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
     }
 
     {
-        UINT64 rawargs[16] = { 0 }, rax = 0;
+        UINT64 rawargs[16] = { 0 }, rax = 0, fpret_bits = 0;
         NTSTATUS st;
 
         for (i = 1; i < sl->argc && i < 16; i++) rawargs[i] = winecom_read_arg( ctx, i );
-        st = invoke_marshalled( itf, sl, proxy, iface, slot, rawargs, &rax );
-        if (st == STATUS_SUCCESS) ctx->Rax = rax;
+        if (sl->fpmask)
+        {
+            /* A floating-point argument in an XMM position: the loop above
+             * read this position's INTEGER slot, which MS-x64 leaves
+             * UNDEFINED when the value travelled in XMM1..XMM3 (positions 0-3
+             * are register slots, and `this` owns position 0).  Lift the raw
+             * bits from the register file instead -- materialize first, the
+             * lazy-context contract, same as every FP hand walker.  Overall
+             * positions 4 and up travel on the stack whatever their type, so
+             * winecom_read_arg already produced the right bits (a float in
+             * the slot's low four bytes -- exactly the shape invoke_fp
+             * consumes). */
+            __wine_emu_materialize_ctx( ctx );
+            for (i = 1; i < sl->argc && i < 4; i++)
+                if (sl->fpmask & (1u << (i - 1)))
+                    rawargs[i] = ctx->FltSave.XmmRegisters[i].Low;
+        }
+        st = invoke_marshalled( itf, sl, proxy, iface, slot, rawargs, &rax, &fpret_bits );
+        if (st == STATUS_SUCCESS)
+        {
+            if (sl->fpret)
+            {
+                /* MS-x64 returns a float or double in XMM0, not RAX.  Write
+                 * the WHOLE register (the flat FP path's rule, same reason:
+                 * stale high bytes from a previous call would be visible to
+                 * a guest reading wider than the callee wrote), and
+                 * materialize first -- a write to a still-lazy FP group is
+                 * ignored at resume.  fpret_bits carries f1's double-format
+                 * bits; a float return narrows here, once. */
+                union { UINT64 bits; double d; } v;
+
+                __wine_emu_materialize_ctx( ctx );
+                v.bits = fpret_bits;
+                memset( &ctx->FltSave.XmmRegisters[0], 0, sizeof(ctx->FltSave.XmmRegisters[0]) );
+                if (sl->fpret == 2) *(float *)&ctx->FltSave.XmmRegisters[0] = (float)v.d;
+                else *(double *)&ctx->FltSave.XmmRegisters[0] = v.d;
+            }
+            ctx->Rax = rax;
+        }
         return st;
     }
 }
@@ -2931,7 +3010,7 @@ NTSTATUS winecom_dispatch32( UINT iface, UINT slot, I386_CONTEXT *ctx )
         rawargs[r->param + 1] = (UINT64)(ULONG_PTR)buf;
     }
 
-    st = invoke_marshalled( itf, sl, proxy, iface, slot, rawargs, &rax );
+    st = invoke_marshalled( itf, sl, proxy, iface, slot, rawargs, &rax, NULL );
 
     for (i = 0; i < n_fixes; i++)
     {

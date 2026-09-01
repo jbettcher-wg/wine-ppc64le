@@ -39,9 +39,13 @@ REFUSALS below for the exact texts:
     `typedef wchar_t WCHAR` (src/include/native/windows/windows_base.h:30),
     which is FOUR bytes here; the guest PE's WCHAR is two.  A string crossing
     unconverted is not a subtle defect, but it is a silent one.
-  * by-value floats, unless a hand-written slot carries them.  The unixlib
-    boundary calls with the widest INTEGER form, so a float argument would
-    arrive in the wrong register file entirely.
+  * by-value floats in parameter positions past the eighth, where the fp
+    masks cannot name them.  Positions 1..8 and float returns are SERVED
+    since PPC64EC step C through the surface's floating-point invoker
+    (unix_vtbl_call_fp over wine/winecom_fpcall.h), driven by the row's
+    fpmask/fpwide/fpret; the hand-written float slots stay hand-written.
+    The 32-BIT lane has not adopted the invoker, so served fp rows carry
+    refuse32.
   * by-value types that are not integer-class.  Fail-closed: an unknown
     by-value spelling stops generation, because "it is probably an enum" is
     how a by-value aggregate silently becomes four bytes of garbage.
@@ -1053,19 +1057,32 @@ def classify(key, slot, ifaces, iface_index, byval_ok, bearing,
             "(4 bytes here), the guest PE's WCHAR is 2 -- a string crossing "
             "unconverted is silent, so this slot waits for the converting "
             "hand-written form")
+    fpmask = fpwide = fpret = 0
     if FLOAT_TOKENS.search(slot["ret"]) and "*" not in slot["ret"]:
-        raise Refused(
-            "returns a float by value; the unixlib boundary calls with the "
-            "widest INTEGER form, so the result would come back out of the "
-            "wrong register file")
+        # PPC64EC step C: served, not refused.  The surface's floating-point
+        # invoker (unix_vtbl_call_fp -> wine/winecom_fpcall.h) returns f1's
+        # bits beside the integer result; fpret says the width, the flat
+        # lane's THUNK_FP_RET encoding.
+        fpret = 1 if Param(slot["ret"]).base in ("double", "DOUBLE") else 2
 
     for i, p in enumerate(params):
         if p.stars == 0:
             if FLOAT_TOKENS.search(p.raw):
-                raise Refused(
-                    "passes %s by value; the unixlib boundary calls with the "
-                    "widest INTEGER form, so a float argument would be placed "
-                    "in the wrong register file entirely" % p.base)
+                # PPC64EC step C: a by-value float is a SERVED position now
+                # (fpmask/fpwide drive the surface's floating-point invoker),
+                # not a refusal -- unless it sits past the eighth parameter,
+                # where the masks cannot name it and either register file
+                # would have run out anyway.
+                if i >= 7:
+                    raise Refused(
+                        "passes %s by value in parameter position %d, past "
+                        "the eight-parameter register window the fp masks "
+                        "name" % (p.base, i + 1))
+                fpmask |= 1 << i
+                if p.base in ("double", "DOUBLE"):
+                    fpwide |= 1 << i
+                cls[i] = CA["PASS"]
+                continue
             if p.base in BYVAL_OPAQUE:
                 raise Refused(BYVAL_OPAQUE[p.base])
             if p.base in BYVAL_AGGREGATE:
@@ -1206,7 +1223,8 @@ def classify(key, slot, ifaces, iface_index, byval_ok, bearing,
         cls[i] = CA["PASS"]
 
     return (cls, xaux, caux, aux, aux2,
-            (narrowmask, narrowwide, narrowsign, dwordmask, dwordsign))
+            (narrowmask, narrowwide, narrowsign, dwordmask, dwordsign,
+             fpmask, fpwide, fpret))
 
 
 # --------------------------------------------------------------------------
@@ -1269,7 +1287,7 @@ def generate(roster, prefix, header_dir=HEADERS, surface=None,
     w = out.append
     stats = dict(marshalled=0, refused=0, hand=0, identity=0, iunknown=0,
                  geom=0, geom_unproven=0, qword_slots=0, ret_qword=0,
-                 refused32=0)
+                 refused32=0, fp_served=0)
     refusal_log = []
     qword_log = []
     unproven_log = []
@@ -1317,7 +1335,8 @@ def generate(roster, prefix, header_dir=HEADERS, surface=None,
         # the d3d11 banner said "2611 rows carry WINECOM_F_I386_GEOM" while
         # only 2593 existed, the 18 others living in elided tables.
         istats = dict(marshalled=0, refused=0, hand=0, refused32=0,
-                      geom=0, geom_unproven=0, qword_slots=0, ret_qword=0)
+                      geom=0, geom_unproven=0, qword_slots=0, ret_qword=0,
+                      fp_served=0)
         iqword_log = []
         iunproven_log = []
         ichk = []
@@ -1433,14 +1452,36 @@ def generate(roster, prefix, header_dir=HEADERS, surface=None,
                 kname = "caux_%s_%d" % (n, s["slot"])
                 decls.append("static const unsigned char %s[] = { %s };"
                              % (kname, ", ".join(str(x) for x in caux)))
-            nm, nw, ns, dm, ds = masks
-            rows.append('    { "%s", NULL, %s, %s, %d, %s, %d, %d, %s, 0, 0,'
-                        ' 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%04x, 0x%04x,'
-                        ' 0x%04x, %s, %d, %s },'
-                        % (label, cname, xname, argc,
-                           "|".join(flags + gflags) or "0", aux, aux2, kname,
-                           0, nm, nw, ns, dm, ds, qm, rname, repn, r32))
-            istats["marshalled"] += 1
+            nm, nw, ns, dm, ds, fpm, fpw, fpr = masks
+            if fpm or fpr:
+                # A float-bearing row, served forward through the surface's
+                # invoke_fp (PPC64EC step C).  The 32-BIT lane has not
+                # adopted the FP invoker, so unless the i386 audit already
+                # refused this row it refuses here by name -- served on the
+                # 64-bit lane, honest on the other, the refuse32 discipline.
+                if r32 == "NULL":
+                    r32 = ('"the 32-bit lane has not adopted the FP invoker; '
+                           "a hand32 walker or the lane's own FP path comes "
+                           'first"')
+                rows.append('    { "%s", NULL, %s, %s, %d, %s, %d, %d, %s,'
+                            ' 0x%02x, 0x%02x,'
+                            ' 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%04x, 0x%04x,'
+                            ' 0x%04x, %s, %d, %s, %d },'
+                            % (label, cname, xname, argc,
+                               "|".join(flags + gflags) or "0", aux, aux2, kname,
+                               fpm, fpw,
+                               0, nm, nw, ns, dm, ds, qm, rname, repn, r32, fpr))
+                istats["marshalled"] += 1
+                istats["fp_served"] += 1
+                interesting = True
+            else:
+                rows.append('    { "%s", NULL, %s, %s, %d, %s, %d, %d, %s, 0, 0,'
+                            ' 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%04x, 0x%04x,'
+                            ' 0x%04x, %s, %d, %s },'
+                            % (label, cname, xname, argc,
+                               "|".join(flags + gflags) or "0", aux, aux2, kname,
+                               0, nm, nw, ns, dm, ds, qm, rname, repn, r32))
+                istats["marshalled"] += 1
 
         if not interesting:
             # An identity row: IUnknown's three slots are served by the

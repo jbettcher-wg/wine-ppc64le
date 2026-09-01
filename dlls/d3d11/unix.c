@@ -58,6 +58,7 @@
 #include "winternl.h"
 #include "wine/unixlib.h"
 #include "wine/debug.h"
+#include "wine/winecom_fpcall.h"
 
 /* The ONE copy of the WSI callback ABI, shared with the DXVK patch series.
  * dlls/d3d11/Makefile.in puts ppc64le/dxvk on this TU's include path. */
@@ -669,6 +670,24 @@ static NTSTATUS d3d11_unix_flat( void *args )
     return STATUS_SUCCESS;
 }
 
+/* The GENERIC float-bearing vtable call: the generated rows' counterpart to
+ * d3d11_unix_float's hand-walker shapes (unixlib.h has the contract).  The
+ * split-and-call is the ONE shared implementation every FP-serving surface
+ * uses -- wine/winecom_fpcall.h -- so the register rule has a single home. */
+WINECOM_DEFINE_FP_CALLER( d3d11_fp_caller )
+
+static NTSTATUS d3d11_unix_fpcall( void *args )
+{
+    struct d3d11_fpcall_params *p = args;
+    void **vtbl;
+
+    if (!p->args[0] || p->argc > D3D11_UNIX_MAX_ARGS) return STATUS_INVALID_PARAMETER;
+    vtbl = *(void ***)(ULONG_PTR)p->args[0];
+    p->ret = winecom_fp_invoke( d3d11_fp_caller, vtbl[p->slot], p->argc,
+                                p->args, p->fpword, &p->fpret_bits );
+    return STATUS_SUCCESS;
+}
+
 /* THE ONE PLACE THAT KNOWS THIS IS A WINE THREAD.
  *
  * Everything below this point may be re-entered by DXVK through the WSI
@@ -700,6 +719,7 @@ WINE_THREAD_ENTRY( d3d11_enter_float,   d3d11_unix_float )
 WINE_THREAD_ENTRY( d3d11_enter_flat,    d3d11_unix_flat )
 WINE_THREAD_ENTRY( d3d11_enter_present, d3d11_unix_present )
 WINE_THREAD_ENTRY( d3d11_enter_hwnd,    d3d11_unix_hwnd )
+WINE_THREAD_ENTRY( d3d11_enter_fpcall,  d3d11_unix_fpcall )
 
 const unixlib_entry_t __wine_unix_call_funcs[] =
 {
@@ -709,6 +729,7 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     d3d11_enter_flat,
     d3d11_enter_present,
     d3d11_enter_hwnd,
+    d3d11_enter_fpcall,
 };
 
 C_ASSERT( ARRAYSIZE(__wine_unix_call_funcs) == unix_funcs_count );

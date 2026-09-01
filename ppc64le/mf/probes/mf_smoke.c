@@ -406,6 +406,50 @@ static int mf_smoke_run( void )
         out_hr( "hr", hr );
         verdict( hr == S_OK, "could not describe the PCM type" );
 
+        /* PPC64EC step C, the FORWARD floating-point path.  SetDouble's
+         * value travels BY VALUE in XMM1 and can only reach the native
+         * callee through the surface's floating-point invoker
+         * (winecom_surface::invoke_fp) -- this row was a named refusal until
+         * that existed, and WINEEMUNOCOMFP=1 makes it one again, which is
+         * the gate's negative control.  GetDouble returns the value through
+         * a POINTER (no FP register on the way back), so this round trip
+         * isolates the argument direction; the bits are printed raw so the
+         * comparison is exact and the transcript byte-stable.  On the native
+         * leg the same calls run natively -- identical output, layer 4's
+         * rule. */
+        begin( "IMFAttributes::SetDouble/GetDouble round trip" );
+        {
+            /* an attribute store takes any key; this one is the gate's own.
+             * The round trip runs on its OWN media type, released before the
+             * reader ever sees it: a foreign attribute on the type handed to
+             * SetCurrentMediaType changes what winegstreamer negotiates, and
+             * the first cut of this step proved it -- the guest leg's refused
+             * SetDouble left the two legs' types DIFFERENT and their sample
+             * chunking diverged.  A probe must measure the boundary, not
+             * steer the pipeline. */
+            static const GUID fp_key =
+                {0x5ec5b3c1, 0xf90a, 0x4c17,
+                 {0x9e,0xc6,0x0f,0x70,0xca,0x11,0x57,0x0d}};
+            union { double d; ULONGLONG bits; } want, back;
+            IMFMediaType *fpstore = NULL;
+            double got = 0.0;
+
+            want.d = 3.140000000000000124900090270330; /* WINECOM_ST_DOUBLE */
+            hr = MFCreateMediaType( &fpstore );
+            if (SUCCEEDED(hr))
+                hr = IMFMediaType_SetDouble( fpstore, &fp_key, want.d );
+            if (SUCCEEDED(hr))
+                hr = IMFMediaType_GetDouble( fpstore, &fp_key, &got );
+            back.d = got;
+            out_hr( "hr", hr );
+            out( " bits=" );
+            out_hex( (ULONG)(back.bits >> 32), 8 );
+            out_hex( (ULONG)back.bits, 8 );
+            verdict( hr == S_OK && back.bits == want.bits,
+                     "the by-value double did not survive the crossing" );
+            if (fpstore) IMFMediaType_Release( fpstore );
+        }
+
         /* CA_IFACE_IN: a guest-held proxy travelling back INTO native MF as an
          * argument.  winecom_translate_in unwraps it to its host pointer --
          * the forward half of design §6.3.  A guest-IMPLEMENTED IMFMediaType

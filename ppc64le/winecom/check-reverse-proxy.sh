@@ -112,14 +112,17 @@ row_is() {   # <grep-pattern> <what it must contain> <description>
         bad "$3 -- expected '$2' near '$1' in mf_marshal.h"
     fi
 }
+# Since PPC64EC step C these two rows are FORWARD-served too (refuse NULL,
+# the same fpmask/fpwide, an appended .fpret) -- the reverse contract this
+# gate proves is unchanged, and the masks it pins are the same masks.
 row_is '{ "IMFAttributes::SetDouble"' \
-       'WINECOM_F_REV, 0, 0, NULL, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00 }' \
-       "IMFAttributes::SetDouble is reverse-servable, its double in the second \
-parameter position"
+       'WINECOM_F_REV, 0, 0, NULL, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, .fpret = 0 }' \
+       "IMFAttributes::SetDouble is reverse-servable AND forward-served, its \
+double in the second parameter position"
 row_is '{ "IMFSimpleAudioVolume::SetMasterVolume"' \
-       'WINECOM_F_REV, 0, 0, NULL, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00 }' \
-       "IMFSimpleAudioVolume::SetMasterVolume is reverse-servable, its SINGLE \
-in the first"
+       'WINECOM_F_REV, 0, 0, NULL, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, .fpret = 0 }' \
+       "IMFSimpleAudioVolume::SetMasterVolume is reverse-servable AND \
+forward-served, its SINGLE in the first"
 row_is '{ "IMFAttributes::SetUnknown", NULL, cls_IMFAttributes_27' \
        'xaux_IMFAttributes_27, 3, 0, 0, 0, NULL, 0, 0, 0x02, 0x00, 0x00, 0x00 }' \
        "IMFAttributes::SetUnknown records the interface TYPE of its IN \

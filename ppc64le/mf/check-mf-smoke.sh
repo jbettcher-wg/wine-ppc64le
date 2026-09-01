@@ -292,6 +292,22 @@ ways failed the async run at \
 '$(tail -1 "$OUT/sabotage_async.out" | cut -c1-60)', as they must"
     fi
 
+    # ---- control d: the floating-point invoker off ------------------------
+    # WINEEMUNOCOMFP=1 makes every float-bearing slot refuse (fail closed to
+    # E_NOTIMPL, the pre-step-C world), so the SetDouble/GetDouble round trip
+    # in mf_smoke.c MUST fail its value check and the run MUST NOT reach
+    # PASS.  This is what proves the FP invoker is load-bearing rather than
+    # the value arriving some other way.
+    timeout -k 5 "$TIMEOUT" env WINEDEBUG=-all WINEEMUNOCOMFP=1 "$BUILD/wine" \
+        "$OUT/mf_smoke_guest.exe" > "$OUT/sabotage_fp.out" 2>"$OUT/sabotage_fp.err"
+    if grep -q "mf_smoke: PASS" "$OUT/sabotage_fp.out"; then
+        bad "WINEEMUNOCOMFP=1 still PASSED -- the by-value double is not \
+crossing through the FP invoker"
+    else
+        say "sabotage(fp-off): the FP invoker lever failed the guest run at \
+'$(tail -1 "$OUT/sabotage_fp.out" | cut -c1-60)', as it must"
+    fi
+
     [ $fail -eq 0 ] && say "SABOTAGE PASS (all controls red)"
     exit $fail
 fi
@@ -341,6 +357,7 @@ for want in "materialised .* guest vtable slots" \
             "winecom_dispatch IMFSourceReader::GetNativeMediaType" \
             "winecom_dispatch IMFAttributes::GetGUID" \
             "winecom_dispatch IMFAttributes::GetUINT32" \
+            "winecom_dispatch IMFAttributes::SetDouble" \
             "winecom_dispatch IMFSourceReader::SetCurrentMediaType" \
             "winecom_dispatch IMFSourceReader::ReadSample" \
             "winecom_dispatch IMFSample::ConvertToContiguousBuffer" \

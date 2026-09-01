@@ -115,6 +115,27 @@ struct d3d11_flat_params
     UINT   argc;
 };
 
+/* The GENERIC float-bearing vtable call (PPC64EC step C): what unix_float's
+ * per-shape enum is for the hand walkers, this is for the GENERATED rows --
+ * the marshal table's fpmask/fpwide/fpret name the positions, so no shape
+ * list has to grow one case per newly-served slot.  args[] is the integer
+ * view with each floating-point position carrying the value's raw bits
+ * (winecom_invoke_fp_fn's exact contract, wine/winecom.h); fpword is the
+ * flat lane's encoding (mask | single<<8 | ret<<16); the unix side splits
+ * into ELFv2's two register files through the one shared implementation
+ * (wine/winecom_fpcall.h) and calls the host slot.  fpret_bits carries f1's
+ * double-format bits back when the return is floating point; ret carries
+ * RAX's worth as always. */
+struct d3d11_fpcall_params
+{
+    UINT64 args[D3D11_UNIX_MAX_ARGS];
+    UINT64 fpret_bits;
+    UINT64 ret;
+    UINT   slot;
+    UINT   argc;
+    UINT   fpword;
+};
+
 /* ------------------------------------------------------------ presentation
  *
  * The two calls below carry everything the presentation path needs across the
@@ -166,6 +187,7 @@ enum d3d11_unix_func
     unix_flat,
     unix_present,
     unix_hwnd,
+    unix_fpcall,    /* appended last: existing ids keep their values */
     unix_funcs_count
 };
 

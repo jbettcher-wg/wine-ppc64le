@@ -382,6 +382,29 @@ struct winecom_slot
                                    the 64-bit lane serves it -- a divergent
                                    struct array whose element count is not
                                    mechanical, until a hand32 serves it. */
+    unsigned char fpret;        /* the slot's by-value floating-point RETURN:
+                                   0 none, 1 double, 2 float -- the flat
+                                   lane's THUNK_FP_RET encoding, kept
+                                   identical on purpose (one convention, two
+                                   lanes).  MS-x64 returns these in XMM0, not
+                                   RAX, so the dispatcher writes the whole
+                                   register back (stale high bytes from a
+                                   previous call would be visible to a guest
+                                   reading wider than the callee wrote --
+                                   the flat FP path's own note).  A table
+                                   generated before this field existed has 0
+                                   here AND still carries the generation-time
+                                   refusal on every float-returning row, so
+                                   nothing changes until a surface is
+                                   regenerated.  Appended last, same rule as
+                                   caux.  A forward-served row with a nonzero
+                                   fpret or fpmask is only ever emitted by a
+                                   generator whose surface supplies
+                                   invoke_fp below -- and the runtime fails
+                                   CLOSED (refuse, E_NOTIMPL) when the
+                                   surface does not, so a mismatch is a loud
+                                   refusal rather than registers full of
+                                   garbage. */
 };
 
 /* One divergent-layout struct parameter of a slot, for the 32-bit lane: the
@@ -428,6 +451,27 @@ struct winecom_iface
  * COM calls the native vtable directly. */
 typedef UINT64 (*winecom_invoke_fn)( void *host, UINT slot, UINT argc,
                                      UINT64 *args );
+/* The FLOATING-POINT host invoker (PPC64EC step C, ppc64le/docs/ppc64ec.md):
+ * the same call for a slot whose signature carries by-value floats, which the
+ * widest-integer form above cannot place -- the value belongs in the other
+ * register file.  args[] is the same integer view the ordinary invoker gets,
+ * with each floating-point position carrying the value's RAW BITS (a float in
+ * the low four bytes, exactly as an MS-x64 stack slot or XMM register holds
+ * it); `fpword` names the positions in the flat lane's encoding -- bits 0..7:
+ * parameter i (counting AFTER `this`) is floating point; bits 8..15: that
+ * parameter is a SINGLE; bits 16..17: the return, THUNK_FP_RET-style (0 none,
+ * 1 double, 2 float).  The implementation splits the arguments into ELFv2's
+ * two register files by the flat lane's exact rule (FPRs by ORDER, GPRs by
+ * POSITION with the FP positions skipped -- see marshal_thunk_args_fp's
+ * banner for the ldexp() measurement behind it), calls the slot, and stores
+ * f1's DOUBLE-format bits to *fpret_bits when the return is floating point
+ * (the caller converts to float width; include/wine/winecom_fpcall.h is the
+ * one shared implementation).  Integer/HRESULT results come back in the
+ * return value as always.  NULL = this surface cannot place a float, and
+ * every fp-marked row on it REFUSES -- fail closed.  Appended last. */
+typedef UINT64 (*winecom_invoke_fp_fn)( void *host, UINT slot, UINT argc,
+                                        UINT64 *args, UINT fpword,
+                                        UINT64 *fpret_bits );
 /* A hand-written slot: reads its own arguments out of the trap CONTEXT.
  * The CONTEXT is NOT const, because a slot returning a float has to write
  * ctx->FltSave.XmmRegisters[0] itself -- MS-x64 returns floats there and not
@@ -501,6 +545,20 @@ struct winecom_surface
                                             winecom_wrap consults it before
                                             interning.  NULL = wrap as
                                             declared.  Appended last. */
+    winecom_invoke_fp_fn invoke_fp;      /* the floating-point invoker, or
+                                            NULL -- and NULL fails CLOSED:
+                                            every fp-marked row on the
+                                            surface refuses by name.  A
+                                            surface that predates the field
+                                            reads NULL here and cannot have
+                                            fp-marked forward rows anyway
+                                            (its generator refused them).
+                                            WINEEMUNOCOMFP=1 makes the
+                                            runtime read this as NULL
+                                            process-wide -- the negative
+                                            control that proves the FP path
+                                            is load-bearing.  Appended
+                                            last. */
 };
 
 /* Bind this linkee's runtime instance to `surface` and materialise the

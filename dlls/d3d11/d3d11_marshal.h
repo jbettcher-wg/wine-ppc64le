@@ -4223,8 +4223,10 @@ static const unsigned char cls_ID3D11VideoContext_28[] = { WINECOM_CA_IFACE_IN, 
 static const unsigned char cls_ID3D11VideoContext_29[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext_30[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext_31[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
+static const unsigned char cls_ID3D11VideoContext_32[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext_33[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext_34[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
+static const unsigned char cls_ID3D11VideoContext_35[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext_36[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext_37[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext_38[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
@@ -4290,14 +4292,10 @@ static const struct winecom_slot slots_ID3D11VideoContext[65] =
     { "ID3D11VideoContext::VideoProcessorSetStreamOutputRate", NULL, cls_ID3D11VideoContext_29, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000e, 0x0008, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamSourceRect", NULL, cls_ID3D11VideoContext_30, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamDestRect", NULL, cls_ID3D11VideoContext_31, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorSetStreamAlpha",
-      "ID3D11VideoContext::VideoProcessorSetStreamAlpha: passes float by value; the unixlib boundary calls with the widest INTEGER form, so a float argument would be placed in the wrong register file entirely",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorSetStreamAlpha", NULL, cls_ID3D11VideoContext_32, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, "the 32-bit lane has not adopted the FP invoker; a hand32 walker or the lane's own FP path comes first", 0 },
     { "ID3D11VideoContext::VideoProcessorSetStreamPalette", NULL, cls_ID3D11VideoContext_33, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamPixelAspectRatio", NULL, cls_ID3D11VideoContext_34, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorSetStreamLumaKey",
-      "ID3D11VideoContext::VideoProcessorSetStreamLumaKey: passes float by value; the unixlib boundary calls with the widest INTEGER form, so a float argument would be placed in the wrong register file entirely",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorSetStreamLumaKey", NULL, cls_ID3D11VideoContext_35, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, "the 32-bit lane has not adopted the FP invoker; a hand32 walker or the lane's own FP path comes first", 0 },
     { "ID3D11VideoContext::VideoProcessorSetStreamStereoFormat", NULL, cls_ID3D11VideoContext_36, NULL, 9, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x00fe, 0x00b4, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamAutoProcessingMode", NULL, cls_ID3D11VideoContext_37, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamFilter", NULL, cls_ID3D11VideoContext_38, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001e, 0x0018, 0x0000, NULL, 0, NULL },
@@ -4360,8 +4358,10 @@ static const unsigned char cls_ID3D11VideoContext1_28[] = { WINECOM_CA_IFACE_IN,
 static const unsigned char cls_ID3D11VideoContext1_29[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext1_30[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext1_31[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
+static const unsigned char cls_ID3D11VideoContext1_32[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext1_33[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext1_34[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
+static const unsigned char cls_ID3D11VideoContext1_35[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext1_36[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext1_37[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext1_38[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
@@ -4443,14 +4443,10 @@ static const struct winecom_slot slots_ID3D11VideoContext1[79] =
     { "ID3D11VideoContext::VideoProcessorSetStreamOutputRate", NULL, cls_ID3D11VideoContext1_29, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000e, 0x0008, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamSourceRect", NULL, cls_ID3D11VideoContext1_30, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamDestRect", NULL, cls_ID3D11VideoContext1_31, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorSetStreamAlpha",
-      "ID3D11VideoContext::VideoProcessorSetStreamAlpha: passes float by value; the unixlib boundary calls with the widest INTEGER form, so a float argument would be placed in the wrong register file entirely",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorSetStreamAlpha", NULL, cls_ID3D11VideoContext1_32, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, "the 32-bit lane has not adopted the FP invoker; a hand32 walker or the lane's own FP path comes first", 0 },
     { "ID3D11VideoContext::VideoProcessorSetStreamPalette", NULL, cls_ID3D11VideoContext1_33, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamPixelAspectRatio", NULL, cls_ID3D11VideoContext1_34, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorSetStreamLumaKey",
-      "ID3D11VideoContext::VideoProcessorSetStreamLumaKey: passes float by value; the unixlib boundary calls with the widest INTEGER form, so a float argument would be placed in the wrong register file entirely",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorSetStreamLumaKey", NULL, cls_ID3D11VideoContext1_35, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, "the 32-bit lane has not adopted the FP invoker; a hand32 walker or the lane's own FP path comes first", 0 },
     { "ID3D11VideoContext::VideoProcessorSetStreamStereoFormat", NULL, cls_ID3D11VideoContext1_36, NULL, 9, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x00fe, 0x00b4, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamAutoProcessingMode", NULL, cls_ID3D11VideoContext1_37, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamFilter", NULL, cls_ID3D11VideoContext1_38, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001e, 0x0018, 0x0000, NULL, 0, NULL },
@@ -4527,8 +4523,10 @@ static const unsigned char cls_ID3D11VideoContext2_28[] = { WINECOM_CA_IFACE_IN,
 static const unsigned char cls_ID3D11VideoContext2_29[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext2_30[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext2_31[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
+static const unsigned char cls_ID3D11VideoContext2_32[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext2_33[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext2_34[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
+static const unsigned char cls_ID3D11VideoContext2_35[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext2_36[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext2_37[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ID3D11VideoContext2_38[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
@@ -4614,14 +4612,10 @@ static const struct winecom_slot slots_ID3D11VideoContext2[83] =
     { "ID3D11VideoContext::VideoProcessorSetStreamOutputRate", NULL, cls_ID3D11VideoContext2_29, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x000e, 0x0008, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamSourceRect", NULL, cls_ID3D11VideoContext2_30, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamDestRect", NULL, cls_ID3D11VideoContext2_31, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorSetStreamAlpha",
-      "ID3D11VideoContext::VideoProcessorSetStreamAlpha: passes float by value; the unixlib boundary calls with the widest INTEGER form, so a float argument would be placed in the wrong register file entirely",
-      NULL, NULL, 5, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorSetStreamAlpha", NULL, cls_ID3D11VideoContext2_32, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, "the 32-bit lane has not adopted the FP invoker; a hand32 walker or the lane's own FP path comes first", 0 },
     { "ID3D11VideoContext::VideoProcessorSetStreamPalette", NULL, cls_ID3D11VideoContext2_33, NULL, 5, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamPixelAspectRatio", NULL, cls_ID3D11VideoContext2_34, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, NULL },
-    { "ID3D11VideoContext::VideoProcessorSetStreamLumaKey",
-      "ID3D11VideoContext::VideoProcessorSetStreamLumaKey: passes float by value; the unixlib boundary calls with the widest INTEGER form, so a float argument would be placed in the wrong register file entirely",
-      NULL, NULL, 6, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D11VideoContext::VideoProcessorSetStreamLumaKey", NULL, cls_ID3D11VideoContext2_35, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, "the 32-bit lane has not adopted the FP invoker; a hand32 walker or the lane's own FP path comes first", 0 },
     { "ID3D11VideoContext::VideoProcessorSetStreamStereoFormat", NULL, cls_ID3D11VideoContext2_36, NULL, 9, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x00fe, 0x00b4, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamAutoProcessingMode", NULL, cls_ID3D11VideoContext2_37, NULL, 4, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0004, 0x0000, NULL, 0, NULL },
     { "ID3D11VideoContext::VideoProcessorSetStreamFilter", NULL, cls_ID3D11VideoContext2_38, NULL, 6, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM|WINECOM_F_I386_STRUCTS_OK, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x001e, 0x0018, 0x0000, NULL, 0, NULL },
@@ -6572,7 +6566,7 @@ static const struct winecom_iface d3d11_com_ifaces[D3D11_IFACE_COUNT] =
       3, NULL },
 };
 
-/* 2042 slot(s) marshalled, 424 hand-written, 127 refused with a named
+/* 2048 slot(s) marshalled, 424 hand-written, 121 refused with a named
  * reason, 411 IUnknown slot(s) served by the runtime; 5 interface(s)
  * carry identity rows only.
  * i386 geometry: 2588 row(s) carry WINECOM_F_I386_GEOM (639 distinct

@@ -89,6 +89,7 @@
 
 #include "wine/debug.h"
 #include "wine/winecom.h"
+#include "wine/winecom_fpcall.h"
 #include "wine/winecom_selftest.h"
 
 #include "mf_marshal.h"
@@ -101,8 +102,8 @@ WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
  * ULONG_PTR arguments (args[0] is `this`).  ELFv2 callees ignore the excess,
  * so one shape serves every slot.  No unixlib: these are ordinary native COM
  * objects in the same process.  A slot whose signature needs a floating-point
- * register is not called through here at all -- ppc64le/mf/gen_winecom.py
- * refuses it by name at generation time. */
+ * register is not called through here at all -- it goes through mf_invoke_fp
+ * below (PPC64EC step C), driven by the row's fpmask/fpwide/fpret. */
 static UINT64 mf_invoke( void *host, UINT slot, UINT argc, UINT64 *args )
 {
     void **vtbl = *(void ***)host;
@@ -115,6 +116,23 @@ static UINT64 mf_invoke( void *host, UINT slot, UINT argc, UINT64 *args )
         ( args[0], args[1], args[2],  args[3],  args[4],  args[5],  args[6],
           args[7], args[8], args[9],  args[10], args[11], args[12], args[13],
           args[14], args[15] );
+}
+
+/* The FLOATING-POINT invoker (PPC64EC step C): same direct native vtable
+ * call, but through the one shared splitter/caller so a by-value float
+ * reaches the other register file.  IMFAttributes::SetDouble and the
+ * IMFMediaEngine time/rate surface are the rows this un-refuses -- the
+ * marshal table's fpmask/fpwide/fpret say per slot what travels where. */
+WINECOM_DEFINE_FP_CALLER( mf_fp_caller )
+
+static UINT64 mf_invoke_fp( void *host, UINT slot, UINT argc, UINT64 *args,
+                            UINT fpword, UINT64 *fpret_bits )
+{
+    void **vtbl = *(void ***)host;
+
+    args[0] = (UINT64)(ULONG_PTR)host;
+    return winecom_fp_invoke( mf_fp_caller, vtbl[slot], argc, args, fpword,
+                              fpret_bits );
 }
 
 /* The three guest thunk modules that publish this roster.  Any one of them
@@ -314,6 +332,7 @@ static const struct winecom_surface mf_surface =
      * (The d3d12 lane's invoker crosses a unixlib and must never get one,
      * which is why this is a per-surface opt-in and not a global.) */
     .flags = WINECOM_SF_REVERSE,
+    .invoke_fp = mf_invoke_fp,
 };
 
 C_ASSERT( MF_HAND_COUNT == ARRAYSIZE(mf_hand_funcs) );
