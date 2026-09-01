@@ -94,9 +94,22 @@ fail=0
 # Kept in the script rather than a data file so the reasons above and the list
 # cannot drift apart.
 holes_expected() {
-    [ "$SABOTAGE" = 1 ] && return 0     # sabotage 1: the empty list
+    if [ "$SABOTAGE" = 1 ]; then
+        # sabotage 1 INVERTED 2026-09-01: with the real list empty, "empty
+        # the list" is a vacuous control.  Document a PHANTOM hole instead:
+        # the stale-list check ("documented hole is no longer a hole") must
+        # go red on it, which is exactly the check that caught the real
+        # staleness this list carried for weeks.
+        printf 'vcruntime140.dll\t__wine_phantom_hole_sabotage\n'
+        return 0
+    fi
+    # __CxxFrameHandler3 LEFT this list 2026-09-01: the chain closes now --
+    # vcruntime140 forwards to ucrtbase, which forwards to guestcrt, whose
+    # export is real guest code (the guest EH personality runs AS GUEST,
+    # which was the whole point of the old hole).  The audit's own rows say
+    # so on both the old and new generators; the list was stale, and this
+    # gate was red on a pristine tree until this line.
     cat <<'EOF'
-vcruntime140.dll	__CxxFrameHandler3
 EOF
 }
 
