@@ -94,8 +94,13 @@ BYVAL_INTEGER = frozenset("""
     ULONG64 LONG64 QWORD HANDLE HWND HRESULT
     ULONG_PTR DWORD_PTR UINT_PTR LONG_PTR INT_PTR
     SHORT USHORT CHAR UCHAR BOOLEAN COLORREF
+    LCID DISPID
     unsigned int short char long
 """.split())
+# LCID and DISPID joined 2026-09-01 with the IDispatch roster row: winnt.h
+# says `typedef DWORD LCID` and oaidl says `typedef LONG DISPID` -- one
+# integer register on both ABIs, the same one-hop licence the syscom
+# generator records for the same two names.
 # SHORT/USHORT/CHAR/UCHAR/BOOLEAN/COLORREF were absent from the line above
 # while ppc64le/gen_interfaces.py's SCALAR_BASE has carried the first two all
 # along, and two lists that disagree is how a tooling gap gets reported as an
@@ -337,6 +342,13 @@ HAND_SLOTS = [
     # payload is a plain void*/size pair.  Same hidden-pointer dereference.
     ("INSSBuffer3::GetProperty",                  "hand_nss_get_property"),
     ("INSSBuffer3::SetProperty",                  "hand_nss_set_property"),
+    # IDispatch::Invoke (2026-09-01, appended LAST so every existing hand
+    # index keeps its value): DISPPARAMS is a VARIANT array the guest
+    # authored; the walker clones and translates it through the shared
+    # discipline in include/wine/winecom_variant.h.  Serving the VT_DISPATCH
+    # tag without serving Invoke would hand out proxies whose one
+    # interesting method refuses.
+    ("IDispatch::Invoke",                         "hand_dispatch_invoke"),
 ]
 
 # Refusals decided here rather than derived, each with the reason the runtime

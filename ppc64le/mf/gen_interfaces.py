@@ -240,6 +240,35 @@ def build(srctree, build_dir):
                dict(slot=1, owner="IUnknown", name="AddRef", ret="ULONG", params=[]),
                dict(slot=2, owner="IUnknown", name="Release", ret="ULONG", params=[])])
 
+    # IDispatch joined 2026-09-01, for the PROPVARIANT completeness pass:
+    # VT_DISPATCH is a served tag now, and a served tag must hand the guest a
+    # proxy whose vtable really has IDispatch's seven slots -- an IUnknown-
+    # typed proxy would send `Invoke` into slot 4 of a 3-slot table.  Written
+    # out here exactly as IUnknown above (oaidl.h is not this surface's widl
+    # output), with the declaration transcribed from include/oaidl.h.
+    # Invoke is HAND-SERVED (the shared VARIANT discipline,
+    # include/wine/winecom_variant.h); GetTypeInfo refuses by name (ITypeInfo
+    # is not on this roster and nothing on this surface vends one).
+    ifaces["IDispatch"] = dict(
+        uuid="00020400-0000-0000-c000-000000000046",
+        base="IUnknown", header="oaidl.h",
+        slots=[dict(slot=0, owner="IUnknown", name="QueryInterface", ret="HRESULT",
+                    params=["REFIID riid", "void **ppvObject"]),
+               dict(slot=1, owner="IUnknown", name="AddRef", ret="ULONG", params=[]),
+               dict(slot=2, owner="IUnknown", name="Release", ret="ULONG", params=[]),
+               dict(slot=3, owner="IDispatch", name="GetTypeInfoCount", ret="HRESULT",
+                    params=["UINT *pctinfo"]),
+               dict(slot=4, owner="IDispatch", name="GetTypeInfo", ret="HRESULT",
+                    params=["UINT iTInfo", "LCID lcid", "ITypeInfo **ppTInfo"]),
+               dict(slot=5, owner="IDispatch", name="GetIDsOfNames", ret="HRESULT",
+                    params=["REFIID riid", "LPOLESTR *rgszNames", "UINT cNames",
+                            "LCID lcid", "DISPID *rgDispId"]),
+               dict(slot=6, owner="IDispatch", name="Invoke", ret="HRESULT",
+                    params=["DISPID dispIdMember", "REFIID riid", "LCID lcid",
+                            "WORD wFlags", "DISPPARAMS *pDispParams",
+                            "VARIANT *pVarResult", "EXCEPINFO *pExcepInfo",
+                            "UINT *puArgErr"])])
+
     # IClassFactory is on the roster for a reason measured rather than
     # assumed: WITHOUT it, this surface's only door is welded shut.
     #

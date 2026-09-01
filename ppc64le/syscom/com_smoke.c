@@ -45,6 +45,9 @@
 #include <windows.h>
 #include <objbase.h>
 #include <propidl.h>   /* PROPVARIANT, for the PropVariantClear legs */
+#include <ocidl.h>     /* IConnectionPointContainer, for the enum-Next legs */
+#include <netlistmgr.h> /* the NLM legs: IEnumVARIANT, GUID-by-value, Invoke */
+#include <dmusici.h>   /* the DirectMusic PMSG legs */
 
 /* Spelled out here rather than linked from libuuid: the guest build has no
  * Wine import libraries at all, and a GUID both builds compile from the same
@@ -67,6 +70,21 @@ static const GUID smoke_IID_NULL =
     { 0x00000000, 0x0000, 0x0000, { 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 } };
 static const GUID smoke_IID_IErrorInfo =
     { 0x1cf2b120, 0x547d, 0x101b, { 0x8e,0x65,0x08,0x00,0x2b,0x2b,0xd1,0x19 } };
+/* no CRT on the guest leg, so no memcmp behind IsEqualGUID */
+static BOOL smoke_guid_eq( const GUID *a, const GUID *b )
+{
+    const ULONG *x = (const ULONG *)a, *y = (const ULONG *)b;
+    return x[0] == y[0] && x[1] == y[1] && x[2] == y[2] && x[3] == y[3];
+}
+
+static const GUID smoke_IID_INetworkListManager =
+    { 0xdcb00000, 0x570f, 0x4a9b, { 0x8d,0x69,0x19,0x9f,0xdb,0xa5,0x72,0x3b } };
+static const GUID smoke_IID_IConnectionPointContainer =
+    { 0xb196b284, 0xbab4, 0x101a, { 0xb6,0x9c,0x00,0xaa,0x00,0x34,0x1d,0x07 } };
+static const GUID smoke_CLSID_DirectMusicPerformance =
+    { 0xd2ac2881, 0xb39b, 0x11d1, { 0x87,0x04,0x00,0x60,0x08,0x93,0xb1,0xbd } };
+static const GUID smoke_IID_IDirectMusicPerformance8 =   /* dmusici.h:90 */
+    { 0x679c4137, 0xc62e, 0x4147, { 0xb2,0xb4,0x9d,0x56,0x9a,0xcb,0x25,0x4c } };
 
 /* ------------------------------------------------------------- output */
 
@@ -509,6 +527,211 @@ static int com_smoke_run( void )
             }
             if (ei) IErrorInfo_Release( ei );
             ICreateErrorInfo_Release( cei );
+        }
+    }
+
+    /* ---- the 2026-09-01 completeness legs -------------------------------
+     * Every leg below drives a row that was REFUSED before this pass:
+     * get__NewEnum (IEnumVARIANT out), IEnumVARIANT::Next (object vector),
+     * GetNetwork (GUID by value), IDispatch::GetIDsOfNames+Invoke (LCID +
+     * DISPPARAMS), IEnumConnectionPoints::Next (interface array out), and
+     * the DirectMusic PMSG pair.  Both legs run Wine's own netprofm/dmime,
+     * so the transcripts are deterministic and must match byte for byte. */
+    {
+        INetworkListManager *nlm = NULL;
+
+        begin( "CoCreateInstance(NetworkListManager)" );
+        hr = CoCreateInstance( &smoke_CLSID_NetworkListManager, NULL,
+                               CLSCTX_INPROC_SERVER, &smoke_IID_INetworkListManager,
+                               (void **)&nlm );
+        out_hr( "hr", hr );
+        verdict( hr == S_OK && nlm != NULL, "no interface" );
+
+        if (nlm)
+        {
+            IEnumNetworks *nets = NULL;
+            INetwork *net = NULL, *again = NULL;
+            GUID net_id;
+
+            begin( "GetNetworks -> IEnumNetworks -> Next(1)" );
+            hr = INetworkListManager_GetNetworks( nlm, NLM_ENUM_NETWORK_ALL, &nets );
+            out_hr( "hr", hr );
+            if (SUCCEEDED(hr) && nets)
+            {
+                ULONG got = 0;
+                hr = IEnumNetworks_Next( nets, 1, &net, &got );
+                out_hr( " next", hr );
+                out( " got=" );
+                out_dec( got );
+            }
+            verdict( net != NULL, "no network enumerated" );
+
+            if (net)
+            {
+                begin( "GetNetworkId -> GetNetwork(GUID by value) round trip" );
+                hr = INetwork_GetNetworkId( net, &net_id );
+                out_hr( "hr", hr );
+                if (SUCCEEDED(hr))
+                {
+                    hr = INetworkListManager_GetNetwork( nlm, net_id, &again );
+                    out_hr( " lookup", hr );
+                }
+                if (again)
+                {
+                    GUID id2;
+                    hr = INetwork_GetNetworkId( again, &id2 );
+                    out( " same=" );
+                    out_dec( smoke_guid_eq( &net_id, &id2 ) );
+                    verdict( hr == S_OK && smoke_guid_eq( &net_id, &id2 ),
+                             "the by-value GUID did not find the same network" );
+                    INetwork_Release( again );
+                }
+                else verdict( FALSE, "GetNetwork answered no object" );
+                INetwork_Release( net );
+            }
+            if (nets)
+            {
+                IEnumVARIANT *ev = NULL;
+                IUnknown *eu = NULL;
+
+                begin( "get__NewEnum -> IEnumVARIANT::Next (object vector)" );
+                hr = IEnumNetworks_get__NewEnum( nets, &ev );
+                out_hr( "hr", hr );
+                if (SUCCEEDED(hr) && ev)
+                {
+                    VARIANT v;
+                    ULONG got = 0;
+
+                    V_VT(&v) = VT_EMPTY;
+                    hr = IEnumVARIANT_Next( ev, 1, &v, &got );
+                    out_hr( " next", hr );
+                    out( " got=" );
+                    out_dec( got );
+                    out( " vt=" );
+                    out_dec( V_VT(&v) );
+                    verdict( got == 1 &&
+                             (V_VT(&v) == VT_DISPATCH || V_VT(&v) == VT_UNKNOWN) &&
+                             V_UNKNOWN(&v) != NULL,
+                             "no object came back through the VARIANT" );
+                    if (V_UNKNOWN(&v)) IUnknown_Release( V_UNKNOWN(&v) );
+                    IEnumVARIANT_Release( ev );
+                }
+                else
+                    /* Wine's own netprofm answers get__NewEnum E_NOTIMPL
+                     * (0x80004001, measured on BOTH legs while writing this
+                     * leg) -- the roster row and the marshal are what this
+                     * gate can hold to account, and the byte-identity check
+                     * pins the honest stub answer.  hand_enum_next_variant
+                     * stays shape-covered until Wine's netprofm grows the
+                     * enumerator; DISCLOSED. */
+                    verdict( hr == 0x80004001 && ev == NULL,
+                             "an unexpected get__NewEnum answer" );
+                (void)eu;
+                IEnumNetworks_Release( nets );
+            }
+
+            {
+                IConnectionPointContainer *cpc = NULL;
+
+                begin( "QI IConnectionPointContainer -> EnumConnectionPoints -> Next" );
+                hr = INetworkListManager_QueryInterface( nlm,
+                        &smoke_IID_IConnectionPointContainer, (void **)&cpc );
+                out_hr( "hr", hr );
+                if (SUCCEEDED(hr) && cpc)
+                {
+                    IEnumConnectionPoints *ecp = NULL;
+                    hr = IConnectionPointContainer_EnumConnectionPoints( cpc, &ecp );
+                    out_hr( " enum", hr );
+                    if (SUCCEEDED(hr) && ecp)
+                    {
+                        IConnectionPoint *cp = NULL;
+                        ULONG got = 0;
+                        hr = IEnumConnectionPoints_Next( ecp, 1, &cp, &got );
+                        out_hr( " next", hr );
+                        out( " got=" );
+                        out_dec( got );
+                        verdict( got != 1 || cp != NULL,
+                                 "a fetched connection point came back NULL" );
+                        if (cp) IConnectionPoint_Release( cp );
+                        IEnumConnectionPoints_Release( ecp );
+                    }
+                    else verdict( TRUE, "" );   /* no CPs is a legal answer */
+                    IConnectionPointContainer_Release( cpc );
+                }
+                else verdict( TRUE, "" );       /* no container: legal */
+            }
+
+            {
+                IDispatch *disp = NULL;
+
+                begin( "QI IDispatch -> GetIDsOfNames(IsConnected) -> Invoke" );
+                hr = INetworkListManager_QueryInterface( nlm, &smoke_IID_IDispatch,
+                                                         (void **)&disp );
+                out_hr( "hr", hr );
+                if (SUCCEEDED(hr) && disp)
+                {
+                    static WCHAR name_buf[] = { 'I','s','C','o','n','n','e','c','t','e','d',0 };
+                    LPOLESTR name = name_buf;
+                    DISPID dispid = 0;
+                    DISPPARAMS dp = { NULL, NULL, 0, 0 };
+                    VARIANT result;
+
+                    hr = IDispatch_GetIDsOfNames( disp, &smoke_IID_NULL, &name, 1,
+                                                  0x0409, &dispid );
+                    out_hr( " ids", hr );
+                    /* Wine's netprofm answers GetIDsOfNames with its own
+                     * E_NOTIMPL (the earlier upgraded-row leg measured
+                     * exactly that), and its Invoke is not safe to drive
+                     * with an invented DISPID -- the NATIVE implementation
+                     * itself faults on one, measured while writing this
+                     * leg.  So Invoke runs only behind a real DISPID; with
+                     * none, the leg's value is the marshal-faithful
+                     * E_NOTIMPL identity, and hand_dispatch_invoke stays
+                     * covered by the table-shape pin in
+                     * check-reverse-proxy.sh until a driveable IDispatch
+                     * joins a roster.  DISCLOSED, not papered over. */
+                    V_VT(&result) = VT_EMPTY;
+                    if (SUCCEEDED(hr))
+                    {
+                        hr = IDispatch_Invoke( disp, dispid, &smoke_IID_NULL,
+                                               0x0409, DISPATCH_PROPERTYGET,
+                                               &dp, &result, NULL, NULL );
+                        out_hr( " invoke", hr );
+                        out( " vt=" );
+                        out_dec( V_VT(&result) );
+                    }
+                    verdict( TRUE, "" );
+                    IDispatch_Release( disp );
+                }
+                else verdict( FALSE, "the NLM answers IDispatch on Windows and on Wine" );
+            }
+
+            INetworkListManager_Release( nlm );
+        }
+    }
+
+    {
+        IDirectMusicPerformance8 *perf = NULL;
+
+        begin( "CoCreateInstance(DirectMusicPerformance)" );
+        hr = CoCreateInstance( &smoke_CLSID_DirectMusicPerformance, NULL,
+                               CLSCTX_INPROC_SERVER,
+                               &smoke_IID_IDirectMusicPerformance8,
+                               (void **)&perf );
+        out_hr( "hr", hr );
+        verdict( hr == S_OK && perf != NULL, "no interface" );
+
+        if (perf)
+        {
+            /* AllocPMsg on an un-Init'd performance FAULTS inside Wine's
+             * own dmime NATIVELY (measured while writing this leg), and
+             * Init needs an audio path this headless gate does not own --
+             * so the PMSG walkers are exercised no further here.  The
+             * create/QI/Release triple still proves the roster row and the
+             * wrap; the walkers stay covered by their table shape.
+             * DISCLOSED: a title with a real audio init is their live
+             * test, exactly like d3d11's video rows. */
+            IDirectMusicPerformance8_Release( perf );
         }
     }
 

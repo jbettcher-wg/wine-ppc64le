@@ -94,6 +94,7 @@
 #include "wine/debug.h"
 #include "wine/winecom.h"
 #include "wine/winecom_fpcall.h"
+#include "wine/winecom_variant.h"
 #include "wine/winecom_selftest.h"
 
 #include "mf_marshal.h"
@@ -192,33 +193,64 @@ struct mf_pv_in_state
 {
     PROPVARIANT copy;
     void *borrowed;              /* winecom_to_native borrow to give back */
+    void **vec;                  /* a cloned object-vector's element array */
+    void **vec_borrowed;         /* ...and the borrows to give back */
+    ULONG vec_count;
     const PROPVARIANT *use;      /* what the native callee is handed */
 };
 
 static BOOL mf_pv_iface_arm_untranslatable( VARTYPE vt )
 {
     VARTYPE base = vt & VT_TYPEMASK;
-    if (base == VT_DISPATCH) return TRUE;
-    return base == VT_UNKNOWN && (vt & ~VT_TYPEMASK) != 0;
+
+    /* 2026-09-01: VT_DISPATCH is a SERVED tag (IDispatch is on the roster
+     * and Invoke is hand-served), and a VECTOR of VT_UNKNOWN/VT_DISPATCH is
+     * served elementwise below.  What remains untranslatable: ARRAY/BYREF
+     * object arms (SAFEARRAY element lifetime is oleaut's, not a walker's)
+     * and vectors of VARIANTs (each element re-dispatches on its own tag,
+     * recursively -- add it when something real carries one). */
+    if ((vt & (VT_ARRAY | VT_BYREF)) &&
+        (base == VT_UNKNOWN || base == VT_DISPATCH || base == VT_VARIANT))
+        return TRUE;
+    if ((vt & VT_VECTOR) && base == VT_VARIANT) return TRUE;
+    return FALSE;
 }
+
+/* the vector element view of a PROPVARIANT's CAUNK arm: count + elements */
+static ULONG mf_pv_vec_count( const PROPVARIANT *pv ) { return pv->caub.cElems; }
+static IUnknown **mf_pv_vec_elems( const PROPVARIANT *pv )
+{
+    return (IUnknown **)pv->caub.pElems;
+}
+
+static BOOL mf_pv_is_obj_vector( VARTYPE vt )
+{
+    VARTYPE base = vt & VT_TYPEMASK;
+    return (vt & VT_VECTOR) && !(vt & (VT_ARRAY | VT_BYREF)) &&
+           (base == VT_UNKNOWN || base == VT_DISPATCH);
+}
+
+static void mf_pv_in_end( struct mf_pv_in_state *st );
 
 static BOOL mf_pv_in( const PROPVARIANT *pv, struct mf_pv_in_state *st, UINT slot )
 {
     static LONG logged;
 
     st->borrowed = NULL;
+    st->vec = st->vec_borrowed = NULL;
+    st->vec_count = 0;
     st->use = pv;
     if (!pv) return TRUE;
     if (mf_pv_iface_arm_untranslatable( pv->vt ))
     {
         if (!InterlockedExchange( &logged, 1 ))
             FIXME( "mf: slot %u was given a PROPVARIANT of type 0x%04x -- an "
-                   "interface arm nothing can translate (VT_DISPATCH, or a "
-                   "VECTOR/ARRAY/BYREF of interfaces).  Refusing this call; "
+                   "interface arm nothing can translate (an ARRAY/BYREF of "
+                   "objects, or a vector of VARIANTs).  Refusing this call; "
                    "every other tag is served.\n", slot, pv->vt );
         return FALSE;
     }
-    if ((pv->vt & VT_TYPEMASK) == VT_UNKNOWN)
+    if (pv->vt == VT_UNKNOWN || pv->vt == VT_DISPATCH)
     {
         st->copy = *pv;
         if (pv->punkVal)
@@ -226,13 +258,48 @@ static BOOL mf_pv_in( const PROPVARIANT *pv, struct mf_pv_in_state *st, UINT slo
             void *native;
             if (!winecom_to_native( pv->punkVal, MF_IFACE_IUnknown, &native ))
             {
-                WARN( "mf: slot %u: VT_UNKNOWN payload %p has no native "
-                      "identity and no reverse proxy; refusing\n",
-                      slot, pv->punkVal );
+                WARN( "mf: slot %u: object payload %p (vt 0x%04x) has no "
+                      "native identity and no reverse proxy; refusing\n",
+                      slot, pv->punkVal, pv->vt );
                 return FALSE;
             }
             st->copy.punkVal = native;
             st->borrowed = native;
+        }
+        st->use = &st->copy;
+    }
+    else if (mf_pv_is_obj_vector( pv->vt ))
+    {
+        /* clone the element array; each guest element unwraps to its host
+         * object, borrowed for the call's duration.  The guest's own array
+         * is never mutated. */
+        ULONG n = mf_pv_vec_count( pv ), i;
+        IUnknown **src = mf_pv_vec_elems( pv );
+
+        st->copy = *pv;
+        if (n && src)
+        {
+            st->vec = RtlAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY,
+                                       2 * n * sizeof(void *) );
+            if (!st->vec) return FALSE;
+            st->vec_borrowed = st->vec + n;
+            st->vec_count = n;
+            for (i = 0; i < n; i++)
+            {
+                void *native = NULL;
+
+                if (src[i] &&
+                    !winecom_to_native( src[i], MF_IFACE_IUnknown, &native ))
+                {
+                    WARN( "mf: slot %u: object vector element %u has no "
+                          "native identity; refusing\n", slot, i );
+                    mf_pv_in_end( st );
+                    return FALSE;
+                }
+                st->vec[i] = native;
+                st->vec_borrowed[i] = native;
+            }
+            st->copy.caub.pElems = (UCHAR *)st->vec;
         }
         st->use = &st->copy;
     }
@@ -241,7 +308,14 @@ static BOOL mf_pv_in( const PROPVARIANT *pv, struct mf_pv_in_state *st, UINT slo
 
 static void mf_pv_in_end( struct mf_pv_in_state *st )
 {
+    ULONG i;
+
     if (st->borrowed) winecom_to_native_end( st->borrowed );
+    for (i = 0; i < st->vec_count; i++)
+        if (st->vec_borrowed[i]) winecom_to_native_end( st->vec_borrowed[i] );
+    if (st->vec) RtlFreeHeap( GetProcessHeap(), 0, st->vec );
+    st->vec = st->vec_borrowed = NULL;
+    st->vec_count = 0;
 }
 
 /* Only meaningful after a SUCCEEDED call wrote *pv. */
@@ -259,9 +333,11 @@ static HRESULT mf_pv_out_fixup( PROPVARIANT *pv, UINT slot )
         PropVariantClear( pv );
         return E_NOTIMPL;
     }
-    if ((pv->vt & VT_TYPEMASK) == VT_UNKNOWN && pv->punkVal)
+    if ((pv->vt == VT_UNKNOWN || pv->vt == VT_DISPATCH) && pv->punkVal)
     {
-        void *guest = winecom_wrap( pv->punkVal, MF_IFACE_IUnknown );
+        void *guest = winecom_wrap( pv->punkVal,
+                                    pv->vt == VT_DISPATCH ? MF_IFACE_IDispatch
+                                                          : MF_IFACE_IUnknown );
         if (!guest)
         {
             /* wrap released the object rather than hand out a raw vtable;
@@ -271,6 +347,20 @@ static HRESULT mf_pv_out_fixup( PROPVARIANT *pv, UINT slot )
             return E_NOTIMPL;
         }
         pv->punkVal = guest;
+    }
+    else if (mf_pv_is_obj_vector( pv->vt ))
+    {
+        /* wrap each element in place: the vector's storage is the callee's
+         * CoTaskMemAlloc'd answer and now belongs to the guest, whose
+         * PropVariantClear releases each non-NULL element -- a wrapped
+         * proxy releases correctly, a scrubbed NULL is skipped. */
+        ULONG n = mf_pv_vec_count( pv ), i;
+        IUnknown **el = mf_pv_vec_elems( pv );
+        UINT idx = (pv->vt & VT_TYPEMASK) == VT_DISPATCH ? MF_IFACE_IDispatch
+                                                         : MF_IFACE_IUnknown;
+
+        for (i = 0; el && i < n; i++)
+            if (el[i]) el[i] = winecom_wrap( el[i], idx );
     }
     return S_OK;
 }
@@ -751,6 +841,58 @@ static UINT64 hand_nss_set_property( void *host, UINT slot, AMD64_CONTEXT *ctx )
 }
 
 /* The order here IS gen_winecom.py's HAND_SLOTS order (first appearance). */
+/* IDispatch::Invoke (2026-09-01): the shared VARIANT/DISPPARAMS discipline,
+ * include/wine/winecom_variant.h -- the guest's rgvarg is cloned and each
+ * element's object arm unwrapped; the result VARIANT is wrapped (or
+ * scrubbed, loudly) under this surface's own IDispatch row. */
+static UINT64 hand_dispatch_invoke( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    UINT64 args[16] = { 0 };
+    DISPPARAMS *dp = (DISPPARAMS *)(ULONG_PTR)winecom_read_arg( ctx, 5 );
+    VARIANT *result = (VARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 6 );
+    VARIANTARG local[16], *cloned = local;
+    DISPPARAMS use;
+    static LONG logged;
+    UINT64 ret;
+    UINT i;
+
+    for (i = 1; i < 9; i++) args[i] = winecom_read_arg( ctx, i );
+    if (dp && dp->cArgs)
+    {
+        use = *dp;
+        if (dp->cArgs > ARRAYSIZE(local))
+        {
+            cloned = RtlAllocateHeap( GetProcessHeap(), 0,
+                                      dp->cArgs * sizeof(*cloned) );
+            if (!cloned) return (UINT64)(UINT)E_OUTOFMEMORY;
+        }
+        memcpy( cloned, dp->rgvarg, dp->cArgs * sizeof(*cloned) );
+        for (i = 0; i < dp->cArgs; i++)
+            if (!winecom_variant_in( &cloned[i] ))
+            {
+                if (!InterlockedExchange( &logged, 1 ))
+                    FIXME( "mf: Invoke was given a VARIANT (vt 0x%04x) "
+                           "carrying a guest-authored object or an "
+                           "untranslatable arm; refusing\n",
+                           V_VT(&dp->rgvarg[i]) );
+                if (cloned != local)
+                    RtlFreeHeap( GetProcessHeap(), 0, cloned );
+                return (UINT64)(UINT)E_NOTIMPL;
+            }
+        use.rgvarg = cloned;
+        args[5] = (UINT64)(ULONG_PTR)&use;
+    }
+    ret = mf_invoke( host, slot, 9, args );
+    if (dp && dp->cArgs && cloned != local)
+        RtlFreeHeap( GetProcessHeap(), 0, cloned );
+    if (SUCCEEDED((HRESULT)(UINT)ret) &&
+        winecom_variant_out_fixup( result, MF_IFACE_IDispatch ) &&
+        !InterlockedExchange( &logged, 1 ))
+        FIXME( "mf: Invoke returned a non-IDispatch object in a VARIANT; "
+               "released and scrubbed to EMPTY\n" );
+    return ret;
+}
+
 static const winecom_hand_fn mf_hand_funcs[] =
 {
     hand_propvariant_in,
@@ -772,6 +914,7 @@ static const winecom_hand_fn mf_hand_funcs[] =
     hand_get_video_representation,
     hand_nss_get_property,
     hand_nss_set_property,
+    hand_dispatch_invoke,
 };
 
 static const struct winecom_surface mf_surface =

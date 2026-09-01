@@ -761,6 +761,23 @@ HAND_SLOTS = [
     # honest answer on hardware whose driver exposes ray tracing.
     ("ID3D12Device5::CreateStateObject",             "hand_create_state_object"),
     ("ID3D12Device7::AddToStateObject",              "hand_add_to_state_object"),
+    # ---- the 2026-09-01 completeness pass ----
+    # (RegisterDestructionCallback is NOT here: its blocker is real and now
+    # precisely named in REFUSALS below -- the trampoline exists, but vkd3d
+    # would invoke it from the UNIX side's teardown path, which cannot enter
+    # PE code directly.)
+    # D3D12_NODE_ID by value: sixteen bytes, a hidden pointer on MS-x64 and
+    # two GPRs here -- the walker dereferences and calls a real by-value
+    # prototype (the GUID-case answer, worked in dlls/mfplat/mfcom.c first).
+    ("ID3D12WorkGraphProperties::GetNodeIndex",      "hand_node_id_byval"),
+    ("ID3D12WorkGraphProperties::GetEntrypointIndex", "hand_node_id_byval"),
+    # DRED's breadcrumbs: a native-owned node chain carrying command-list
+    # and queue pointers.  The walker DEEP-COPIES the chain (mutating DRED's
+    # own list would corrupt native state) and wraps the two interfaces per
+    # node; the copy is valid until the next call, which is DRED's own
+    # post-mortem usage shape.
+    ("ID3D12DeviceRemovedExtendedData::GetAutoBreadcrumbsOutput",
+                                                     "hand_dred_breadcrumbs"),
 ]
 
 # Refusals decided here rather than derived.  Keyed "Owner::Method".
@@ -779,7 +796,22 @@ CONST_QWORD_GETTERS = {
     "ID3D12Resource2::GetGPUVirtualAddress",
 }
 
-REFUSALS = {}
+REFUSALS = {
+    # 2026-09-01: the reason UPGRADED from "needs the guest-callback
+    # trampoline" -- the trampoline EXISTS (ntdll's pool), and it is not the
+    # blocker.  This surface's native side is vkd3d behind a unixlib, so the
+    # stored callback would be invoked from UNIX code on the device's
+    # teardown path -- and unix code cannot call PE code directly (the same
+    # stack-discipline fact that makes trap dispatch go through
+    # call_user_mode_callback).  Serving this needs a unix->PE callback
+    # relay; until that seam exists, registering would leak a pointer that
+    # detonates at teardown, which is worse than a refusal a caller can see.
+    "ID3DDestructionNotifier::RegisterDestructionCallback":
+        "takes a guest function pointer vkd3d would invoke from the UNIX "
+        "side's teardown path; unix code cannot enter PE code directly, so "
+        "this waits on a unix-to-PE callback relay, not on the trampoline "
+        "pool (which exists)",
+}
 
 # void** out-parameters that are blocks of memory rather than untyped
 # interface pointers, checked one by one against the headers.  Everything

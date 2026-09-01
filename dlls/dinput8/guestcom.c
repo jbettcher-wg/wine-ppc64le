@@ -66,6 +66,8 @@
 
 #include <stdarg.h>
 
+#define COBJMACROS   /* the 2026-09-01 shims AddRef what they wrap */
+
 #include "windef.h"
 #include "winbase.h"
 #include "objbase.h"
@@ -133,13 +135,15 @@ static const WCHAR *const dinput8_guest_modules[] = { L"dinput8.dll" };
  * DIDEVICEINSTANCE (both sides compile it from this same header, and guest
  * memory IS host memory here).
  *
- * REFUSED, and the generated table says so by name, are the three whose
+ * SERVED SINCE 2026-09-01 (the completeness pass) are the three whose
  * callback receives an INTERFACE POINTER -- EnumDevicesBySemantics gets an
  * LPDIRECTINPUTDEVICE8, EnumCreatedEffectObjects an LPDIRECTINPUTEFFECT,
- * ConfigureDevices an array of devices inside a struct.  A trampoline would
- * hand the guest a native ppc64 vtable, so each of those needs a per-callback
- * shim that wraps its argument as a proxy first.  That is a hand-written slot
- * of its own, not a table entry, and none of the corpus has asked for one.
+ * ConfigureDevices an IUnknown draw surface.  Each has the per-callback SHIM
+ * the old refusal text said serving one needs: a native function takes the
+ * callback's place, wraps that argument as a proxy, and enters the guest
+ * through the same trampoline the plain enumerations use (the five-argument
+ * semantics callback through __wine_guest_wrap_callback5).  See the shim
+ * block below the plain hands.
  */
 
 /* ntdll's trampoline factory, resolved once by name.  A tree whose ntdll
@@ -232,11 +236,165 @@ static UINT64 hand_enum_cb1( void *host, UINT slot, AMD64_CONTEXT *ctx )
     return hand_enum( host, slot, ctx, 1, 4 );
 }
 
+/* ------------------------------------------- shimmed callbacks (2026-09-01)
+ *
+ * The three enumerations whose callback receives an INTERFACE POINTER.  The
+ * refusal these replace said exactly what serving one takes: "a per-callback
+ * shim that wraps its argument as a proxy first".  These are those shims:
+ * native functions handed to dinput IN PLACE of the guest's callback, with a
+ * context block riding in pvRef.  Each wraps its interface argument through
+ * this surface's own winecom instance, then enters the guest through the
+ * SAME trampoline machinery hand_enum uses.
+ *
+ * REFERENCES: the device/effect dinput hands a callback is LENT for the
+ * call's duration (DirectInput's own contract: AddRef to keep).  winecom_wrap
+ * CONSUMES one reference, so the shim takes one first -- dinput's own
+ * release balance is untouched, and the interned proxy owns what it holds.
+ * The same device re-enumerated finds the same proxy (interning), which is
+ * also what keeps repeated enumerations from minting garbage. */
+
+struct dinput8_shim_ctx
+{
+    void *tramp;        /* the guest callback, behind a native trampoline */
+    void *guest_pvref;  /* the guest's own context argument, untouched */
+    UINT  iface;        /* what to wrap the interface argument as */
+};
+
+static BOOL CALLBACK dinput8_semantics_shim( const void *lpddi, void *lpdid,
+                                             DWORD flags, DWORD remaining,
+                                             void *ctx_ptr )
+{
+    struct dinput8_shim_ctx *sc = ctx_ptr;
+    BOOL (CALLBACK *cb)( const void *, void *, DWORD, DWORD, void * ) = sc->tramp;
+    void *proxy = NULL;
+
+    if (lpdid)
+    {
+        IUnknown_AddRef( (IUnknown *)lpdid );      /* wrap consumes one */
+        proxy = winecom_wrap( lpdid, sc->iface );
+    }
+    return cb( lpddi, proxy, flags, remaining, sc->guest_pvref );
+}
+
+static BOOL CALLBACK dinput8_iface_arg0_shim( void *itf, void *ctx_ptr )
+{
+    struct dinput8_shim_ctx *sc = ctx_ptr;
+    BOOL (CALLBACK *cb)( void *, void * ) = sc->tramp;
+    void *proxy = NULL;
+
+    if (itf)
+    {
+        IUnknown_AddRef( (IUnknown *)itf );
+        proxy = winecom_wrap( itf, sc->iface );
+    }
+    return cb( proxy, sc->guest_pvref );
+}
+
+/* ntdll's five-argument factory, resolved beside the four-argument one --
+ * the semantics callback carries five. */
+static void *(CDECL *guest_wrap_callback5)( void *fn, BOOL wide );
+
+static BOOL resolve_wrap_callback5(void)
+{
+    UNICODE_STRING ntdllW;
+    ANSI_STRING name;
+    HMODULE ntdll;
+    void *proc;
+
+    if (guest_wrap_callback5) return TRUE;
+
+    RtlInitUnicodeString( &ntdllW, L"ntdll.dll" );
+    RtlInitAnsiString( &name, "__wine_guest_wrap_callback5" );
+    if (LdrGetDllHandle( NULL, 0, &ntdllW, &ntdll ) ||
+        LdrGetProcedureAddress( ntdll, &name, 0, &proc ))
+    {
+        ERR( "dinput8: this ntdll exports no __wine_guest_wrap_callback5; "
+             "EnumDevicesBySemantics refuses rather than truncate the "
+             "callback's five arguments\n" );
+        return FALSE;
+    }
+    InterlockedExchangePointer( (void **)&guest_wrap_callback5, proc );
+    return TRUE;
+}
+
+/* One shimmed enumeration: the guest callback becomes a trampoline, the
+ * NATIVE shim takes its place, and the context block rides in pvRef.  The
+ * block lives on this frame -- every one of these calls is synchronous
+ * (an enumeration, or ConfigureDevices' modal UI), so it outlives every
+ * shim invocation by construction. */
+static UINT64 hand_shimmed_enum( void *host, UINT slot, AMD64_CONTEXT *ctx,
+                                 UINT cb_arg, UINT pvref_arg, UINT argc,
+                                 void *shim, UINT iface, BOOL five )
+{
+    UINT64 args[16] = { 0 };
+    struct dinput8_shim_ctx sc;
+    void *cb;
+    UINT i;
+
+    for (i = 1; i < argc; i++) args[i] = winecom_read_arg( ctx, i );
+    cb = (void *)(ULONG_PTR)args[cb_arg];
+    if (cb)
+    {
+        if (!resolve_wrap_callback()) return (UINT64)(UINT)E_NOTIMPL;
+        if (five && !resolve_wrap_callback5()) return (UINT64)(UINT)E_NOTIMPL;
+        sc.tramp = five ? guest_wrap_callback5( cb, FALSE )
+                        : guest_wrap_callback( cb, FALSE );
+        if (!sc.tramp)
+        {
+            ERR( "dinput8: could not wrap the guest callback; refusing\n" );
+            return (UINT64)(UINT)E_NOTIMPL;
+        }
+        sc.guest_pvref = (void *)(ULONG_PTR)args[pvref_arg];
+        sc.iface = iface;
+        args[cb_arg] = (UINT64)(ULONG_PTR)shim;
+        args[pvref_arg] = (UINT64)(ULONG_PTR)&sc;
+    }
+    return dinput8_invoke( host, slot, argc, args );
+}
+
+/* EnumDevicesBySemantics(user, actionformat, cb@2, pvRef@3, flags): the
+ * DEVICE is the callback's second argument. */
+static UINT64 hand_enum_semantics_a( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    return hand_shimmed_enum( host, slot, ctx, 3, 4, 6,
+                              (void *)dinput8_semantics_shim,
+                              DINPUT8_IFACE_IDirectInputDevice8A, TRUE );
+}
+
+static UINT64 hand_enum_semantics_w( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    return hand_shimmed_enum( host, slot, ctx, 3, 4, 6,
+                              (void *)dinput8_semantics_shim,
+                              DINPUT8_IFACE_IDirectInputDevice8W, TRUE );
+}
+
+/* ConfigureDevices(cb@0, params, flags, pvRef@3): the callback's first
+ * argument is an IUnknown draw surface. */
+static UINT64 hand_configure_devices( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    return hand_shimmed_enum( host, slot, ctx, 1, 4, 5,
+                              (void *)dinput8_iface_arg0_shim,
+                              DINPUT8_IFACE_IUnknown, FALSE );
+}
+
+/* EnumCreatedEffectObjects(cb@0, pvRef@1, flags): the EFFECT is the
+ * callback's first argument. */
+static UINT64 hand_enum_created_fx( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    return hand_shimmed_enum( host, slot, ctx, 1, 2, 4,
+                              (void *)dinput8_iface_arg0_shim,
+                              DINPUT8_IFACE_IDirectInputEffect, FALSE );
+}
+
 /* The order here IS the hand_funcs[] order in dinput8_marshal.h. */
 static const winecom_hand_fn dinput8_hand_funcs[] =
 {
     hand_enum_cb2,
     hand_enum_cb1,
+    hand_enum_semantics_a,
+    hand_enum_semantics_w,
+    hand_configure_devices,
+    hand_enum_created_fx,
 };
 
 C_ASSERT( ARRAYSIZE(dinput8_hand_funcs) == DINPUT8_HAND_COUNT );

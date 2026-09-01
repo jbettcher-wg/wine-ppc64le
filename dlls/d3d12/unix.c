@@ -226,6 +226,25 @@ static NTSTATUS d3d12_unix_call_fp( void *args )
     return STATUS_INVALID_PARAMETER;
 }
 
+/* D3D12_NODE_ID by value (unixlib.h): sixteen bytes, reconstituted here and
+ * passed through a real by-value prototype -- the compiler emits the two-GPR
+ * ELFv2 form, nothing is hand-packed. */
+static NTSTATUS d3d12_unix_call_nodeid( void *args )
+{
+    struct nodeid { const WCHAR *name; UINT arrindex; };
+    typedef UINT (*nodeid_fn)( void *iface, struct nodeid id );
+    struct d3d12_nodeid_params *p = args;
+    struct nodeid node_id;
+    void **vtbl;
+
+    if (!p->host) return STATUS_INVALID_PARAMETER;
+    vtbl = *(void ***)(ULONG_PTR)p->host;
+    node_id.name = (const WCHAR *)(ULONG_PTR)p->name;
+    node_id.arrindex = p->arrindex;
+    p->ret = ((nodeid_fn)vtbl[p->slot])( (void *)(ULONG_PTR)p->host, node_id );
+    return STATUS_SUCCESS;
+}
+
 /* unix_present.c: the presentation factory (design §4). */
 extern NTSTATUS d3d12_unix_present_factory( void *args );
 
@@ -236,6 +255,7 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     d3d12_unix_flat,
     d3d12_unix_present_factory,
     d3d12_unix_call_fp,
+    d3d12_unix_call_nodeid,
 };
 
 C_ASSERT( ARRAYSIZE(__wine_unix_call_funcs) == unix_funcs_count );

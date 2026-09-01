@@ -285,6 +285,20 @@ HAND_SLOTS = {
     "IDirectInputDeviceW::EnumObjects":        ("hand_enum_cb1", 0),
     "IDirectInputDevice2A::EnumEffects":       ("hand_enum_cb1", 0),
     "IDirectInputDevice2W::EnumEffects":       ("hand_enum_cb1", 0),
+    # 2026-09-01, the completeness pass: the three callbacks whose OWN first
+    # (or second) argument is an interface pointer.  Each is served by a
+    # per-callback SHIM in dlls/dinput8/guestcom.c that wraps that argument
+    # as a proxy BEFORE entering the guest trampoline -- exactly what
+    # CALLBACK_REFUSAL below says serving one needs.  The refusal text
+    # stays, for any FUTURE callback typedef that arrives without a shim.
+    "IDirectInput8A::EnumDevicesBySemantics":  ("hand_enum_semantics_a", 2),
+    "IDirectInput8W::EnumDevicesBySemantics":  ("hand_enum_semantics_w", 2),
+    "IDirectInput8A::ConfigureDevices":        ("hand_configure_devices", 0),
+    "IDirectInput8W::ConfigureDevices":        ("hand_configure_devices", 0),
+    "IDirectInputDevice2A::EnumCreatedEffectObjects":
+                                               ("hand_enum_created_fx", 0),
+    "IDirectInputDevice2W::EnumCreatedEffectObjects":
+                                               ("hand_enum_created_fx", 0),
 }
 
 

@@ -134,7 +134,7 @@ enum d3d12_iface_index
     D3D12_IFACE_COUNT = 117
 };
 
-#define D3D12_HAND_COUNT 16
+#define D3D12_HAND_COUNT 18
 
 /* hand_funcs[] order in dlls/d3d12/main.c:
      *   0 hand_resource_barrier
@@ -153,6 +153,8 @@ enum d3d12_iface_index
      *   13 hand_barrier_groups
      *   14 hand_create_state_object
      *   15 hand_add_to_state_object
+     *   16 hand_node_id_byval
+     *   17 hand_dred_breadcrumbs
  */
 
 
@@ -2449,9 +2451,7 @@ static const struct winecom_slot slots_ID3D12DeviceRemovedExtendedData[5] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0, 0, 0 },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL, 0, 0, 0 },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL, 0, 0, 0 },  /* runtime */
-    { "ID3D12DeviceRemovedExtendedData::GetAutoBreadcrumbsOutput",
-      "ID3D12DeviceRemovedExtendedData::GetAutoBreadcrumbsOutput: D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT carries interface pointers inside a struct (D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT -> D3D12_AUTO_BREADCRUMB_NODE -> ID3D12CommandQueue) and has no hand-written walker; the pointers inside it would reach vkd3d as guest proxies",
-      NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
+    { "ID3D12DeviceRemovedExtendedData::GetAutoBreadcrumbsOutput", NULL, NULL, NULL, 2, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 17, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3D12DeviceRemovedExtendedData::GetPageFaultAllocationOutput", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000 },
 };
 
@@ -4407,15 +4407,11 @@ static const struct winecom_slot slots_ID3D12WorkGraphProperties[16] =
     { "ID3D12WorkGraphProperties::GetWorkGraphIndex", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0000, 0x0000, 0x0000 },
     { "ID3D12WorkGraphProperties::GetNumNodes", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000 },
     { "ID3D12WorkGraphProperties::GetNodeID", NULL, cls_ID3D12WorkGraphProperties_7, NULL, 4, WINECOM_F_RET_VIA_ARG|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000 },
-    { "ID3D12WorkGraphProperties::GetNodeIndex",
-      "ID3D12WorkGraphProperties::GetNodeIndex: takes a D3D12_NODE_ID ({ LPCWSTR Name; UINT ArrayIndex; }, 16 bytes) by value; a hidden pointer on one ABI and two registers on the other -- see the GUID case",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0002 },
+    { "ID3D12WorkGraphProperties::GetNodeIndex", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 16, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0002 },
     { "ID3D12WorkGraphProperties::GetNodeLocalRootArgumentsTableIndex", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000 },
     { "ID3D12WorkGraphProperties::GetNumEntrypoints", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000 },
     { "ID3D12WorkGraphProperties::GetEntrypointID", NULL, cls_ID3D12WorkGraphProperties_11, NULL, 4, WINECOM_F_RET_VIA_ARG|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0006, 0x0000, 0x0000 },
-    { "ID3D12WorkGraphProperties::GetEntrypointIndex",
-      "ID3D12WorkGraphProperties::GetEntrypointIndex: takes a D3D12_NODE_ID ({ LPCWSTR Name; UINT ArrayIndex; }, 16 bytes) by value; a hidden pointer on one ABI and two registers on the other -- see the GUID case",
-      NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0002 },
+    { "ID3D12WorkGraphProperties::GetEntrypointIndex", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_I386_GEOM, 16, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0002 },
     { "ID3D12WorkGraphProperties::GetEntrypointRecordSizeInBytes", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000 },
     { "ID3D12WorkGraphProperties::GetWorkGraphMemoryRequirements", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID|WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000 },
     { "ID3D12WorkGraphProperties::GetEntrypointRecordAlignmentInBytes", NULL, NULL, NULL, 3, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0003, 0x0000, 0x0000 },
@@ -4427,7 +4423,7 @@ static const struct winecom_slot slots_ID3DDestructionNotifier[5] =
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0, NULL, 0, 0, 0 },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0, NULL, 0, 0, 0 },  /* runtime */
     { "ID3DDestructionNotifier::RegisterDestructionCallback",
-      "ID3DDestructionNotifier::RegisterDestructionCallback: takes a guest function pointer by value; native code calling it would execute x86-64 bytes as ppc64.  Needs the guest-callback trampoline (ppc64le/thunks), not a marshal class",
+      "ID3DDestructionNotifier::RegisterDestructionCallback: takes a guest function pointer vkd3d would invoke from the UNIX side's teardown path; unix code cannot enter PE code directly, so this waits on a unix-to-PE callback relay, not on the trampoline pool (which exists)",
       NULL, NULL, 4, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0x0000 },
     { "ID3DDestructionNotifier::UnregisterDestructionCallback", NULL, NULL, NULL, 2, WINECOM_F_I386_GEOM, 0, 0, NULL, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x0001, 0x0000, 0x0000 },
 };
@@ -6099,7 +6095,7 @@ static const struct winecom_iface d3d12_com_ifaces[D3D12_IFACE_COUNT] =
       3, NULL, 0 },
 };
 
-/* 2661 slot(s) marshalled, 133 hand-written, 4 refused with a named
+/* 2661 slot(s) marshalled, 136 hand-written, 1 refused with a named
  * reason, 351 IUnknown slot(s) served by the runtime; 1 interface(s)
  * (IUnknown itself) carry identity rows only.
  * i386 geometry: 2798 row(s) carry WINECOM_F_I386_GEOM (416 distinct

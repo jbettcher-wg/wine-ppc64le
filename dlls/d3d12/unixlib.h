@@ -107,6 +107,22 @@ struct d3d12_present_factory_params
     UINT64 factory;   /* out: host IDXGIFactory2-shaped interface pointer */
 };
 
+/* D3D12_NODE_ID by value (ID3D12WorkGraphProperties::GetNodeIndex /
+ * GetEntrypointIndex, 2026-09-01): a { const WCHAR *Name; UINT ArrayIndex; }
+ * sixteen-byte aggregate MS-x64 passes by hidden pointer and ELFv2 passes
+ * in two GPRs.  The PE side dereferences the guest's hidden pointer and
+ * sends the two fields; the unix side calls the host slot through a
+ * correctly-typed by-value prototype.  The return is a UINT (a node/
+ * entrypoint index, not an HRESULT). */
+struct d3d12_nodeid_params
+{
+    UINT64 name;      /* the aggregate's Name pointer, guest==host memory */
+    UINT   arrindex;
+    UINT   slot;
+    UINT64 host;
+    UINT   ret;
+};
+
 enum d3d12_unix_func
 {
     unix_init,
@@ -114,6 +130,7 @@ enum d3d12_unix_func
     unix_flat,
     unix_present_factory,
     unix_call_fp,
+    unix_call_nodeid,   /* appended last: existing ids keep their values */
     unix_funcs_count
 };
 

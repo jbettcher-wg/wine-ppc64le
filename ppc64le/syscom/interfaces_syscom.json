@@ -702,6 +702,158 @@
         }
       ]
     },
+    "IAudioSessionEnumerator": {
+      "uuid": "e2f5bb11-0570-40ca-acdd-3aa01277dee8",
+      "base": "IUnknown",
+      "header": "audiopolicy.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IAudioSessionEnumerator",
+          "name": "GetCount",
+          "ret": "HRESULT",
+          "params": [
+            "INT *SessionCount"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IAudioSessionEnumerator",
+          "name": "GetSession",
+          "ret": "HRESULT",
+          "params": [
+            "INT SessionCount",
+            "IAudioSessionControl **Session"
+          ]
+        }
+      ]
+    },
+    "IAudioSessionEvents": {
+      "uuid": "24918acc-64b3-37c1-8ca9-74a66e9957a8",
+      "base": "IUnknown",
+      "header": "audiopolicy.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IAudioSessionEvents",
+          "name": "OnDisplayNameChanged",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR NewDisplayName",
+            "LPCGUID EventContext"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IAudioSessionEvents",
+          "name": "OnIconPathChanged",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR NewIconPath",
+            "LPCGUID EventContext"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IAudioSessionEvents",
+          "name": "OnSimpleVolumeChanged",
+          "ret": "HRESULT",
+          "params": [
+            "float NewVolume",
+            "BOOL NewMute",
+            "LPCGUID EventContext"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IAudioSessionEvents",
+          "name": "OnChannelVolumeChanged",
+          "ret": "HRESULT",
+          "params": [
+            "DWORD ChannelCount",
+            "float *NewChannelVolumeArray",
+            "DWORD ChangedChannel",
+            "LPCGUID EventContext"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IAudioSessionEvents",
+          "name": "OnGroupingParamChanged",
+          "ret": "HRESULT",
+          "params": [
+            "LPCGUID NewGroupingParam",
+            "LPCGUID EventContext"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IAudioSessionEvents",
+          "name": "OnStateChanged",
+          "ret": "HRESULT",
+          "params": [
+            "AudioSessionState NewState"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IAudioSessionEvents",
+          "name": "OnSessionDisconnected",
+          "ret": "HRESULT",
+          "params": [
+            "AudioSessionDisconnectReason DisconnectReason"
+          ]
+        }
+      ]
+    },
     "IAudioSessionManager": {
       "uuid": "bfa971f1-4d5e-40bb-935e-967039bfbee4",
       "base": "IUnknown",
@@ -850,6 +1002,96 @@
           "ret": "HRESULT",
           "params": [
             "IAudioVolumeDuckNotification *duckNotification"
+          ]
+        }
+      ]
+    },
+    "IAudioSessionNotification": {
+      "uuid": "641dd20b-4d41-49cc-aba3-174b9477bb08",
+      "base": "IUnknown",
+      "header": "audiopolicy.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IAudioSessionNotification",
+          "name": "OnSessionCreated",
+          "ret": "HRESULT",
+          "params": [
+            "IAudioSessionControl *NewSession"
+          ]
+        }
+      ]
+    },
+    "IAudioVolumeDuckNotification": {
+      "uuid": "c3b284d4-6d39-4359-b3cf-b56ddb3bb39c",
+      "base": "IUnknown",
+      "header": "audiopolicy.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IAudioVolumeDuckNotification",
+          "name": "OnVolumeDuckNotification",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR sessionID",
+            "UINT32 countCommunicationSessions"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IAudioVolumeDuckNotification",
+          "name": "OnVolumeUnduckNotification",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR sessionID"
           ]
         }
       ]
@@ -5300,6 +5542,73 @@
         }
       ]
     },
+    "IEnumVARIANT": {
+      "uuid": "00020404-0000-0000-c000-000000000046",
+      "base": "IUnknown",
+      "header": "oaidl.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IEnumVARIANT",
+          "name": "Next",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG celt",
+            "VARIANT *rgVar",
+            "ULONG *pCeltFetched"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IEnumVARIANT",
+          "name": "Skip",
+          "ret": "HRESULT",
+          "params": [
+            "ULONG celt"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IEnumVARIANT",
+          "name": "Reset",
+          "ret": "HRESULT",
+          "params": []
+        },
+        {
+          "slot": 6,
+          "owner": "IEnumVARIANT",
+          "name": "Clone",
+          "ret": "HRESULT",
+          "params": [
+            "IEnumVARIANT **ppEnum"
+          ]
+        }
+      ]
+    },
     "IEnumWbemClassObject": {
       "uuid": "027947e1-d731-11ce-a357-000000000001",
       "base": "IUnknown",
@@ -8582,6 +8891,77 @@
         }
       ]
     },
+    "IWbemCallResult": {
+      "uuid": "44aca675-e8fc-11d0-a07c-00c04fb68820",
+      "base": "IUnknown",
+      "header": "wbemcli.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IWbemCallResult",
+          "name": "GetResultObject",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lTimeout",
+            "IWbemClassObject **ppResultObject"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IWbemCallResult",
+          "name": "GetResultString",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lTimeout",
+            "BSTR *pstrResultString"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IWbemCallResult",
+          "name": "GetResultServices",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lTimeout",
+            "IWbemServices **ppServices"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IWbemCallResult",
+          "name": "GetCallStatus",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lTimeout",
+            "LONG *plStatus"
+          ]
+        }
+      ]
+    },
     "IWbemClassObject": {
       "uuid": "dc12a681-737f-11cf-884d-00aa004b2e24",
       "base": "IUnknown",
@@ -9016,6 +9396,160 @@
             "IWbemContext *pCtx",
             "IWbemServices **ppNamespace"
           ]
+        }
+      ]
+    },
+    "IWbemObjectSink": {
+      "uuid": "7c857801-7381-11cf-884d-00aa004b2e24",
+      "base": "IUnknown",
+      "header": "wbemcli.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IWbemObjectSink",
+          "name": "Indicate",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lObjectCount",
+            "IWbemClassObject **apObjArray"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IWbemObjectSink",
+          "name": "SetStatus",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lFlags",
+            "HRESULT hResult",
+            "BSTR strParam",
+            "IWbemClassObject *pObjParam"
+          ]
+        }
+      ]
+    },
+    "IWbemQualifierSet": {
+      "uuid": "dc12a680-737f-11cf-884d-00aa004b2e24",
+      "base": "IUnknown",
+      "header": "wbemcli.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IWbemQualifierSet",
+          "name": "Get",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR wszName",
+            "LONG lFlags",
+            "VARIANT *pVal",
+            "LONG *plFlavor"
+          ]
+        },
+        {
+          "slot": 4,
+          "owner": "IWbemQualifierSet",
+          "name": "Put",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR wszName",
+            "VARIANT *pVal",
+            "LONG lFlavor"
+          ]
+        },
+        {
+          "slot": 5,
+          "owner": "IWbemQualifierSet",
+          "name": "Delete",
+          "ret": "HRESULT",
+          "params": [
+            "LPCWSTR wszName"
+          ]
+        },
+        {
+          "slot": 6,
+          "owner": "IWbemQualifierSet",
+          "name": "GetNames",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lFlags",
+            "SAFEARRAY **pNames"
+          ]
+        },
+        {
+          "slot": 7,
+          "owner": "IWbemQualifierSet",
+          "name": "BeginEnumeration",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lFlags"
+          ]
+        },
+        {
+          "slot": 8,
+          "owner": "IWbemQualifierSet",
+          "name": "Next",
+          "ret": "HRESULT",
+          "params": [
+            "LONG lFlags",
+            "BSTR *pstrName",
+            "VARIANT *pVal",
+            "LONG *plFlavor"
+          ]
+        },
+        {
+          "slot": 9,
+          "owner": "IWbemQualifierSet",
+          "name": "EndEnumeration",
+          "ret": "HRESULT",
+          "params": []
         }
       ]
     },

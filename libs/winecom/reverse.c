@@ -65,8 +65,10 @@
  * whose forward row carries a `refuse` string (the tables' own judgement about
  * its signature stands in both directions), a hand-written slot (its signature
  * lives in a C function, so there is nothing to marshal by), an aggregate
- * return, a completion-event handle, an interface ARRAY, and anything wider
- * than the eight-argument register file.  Each says which and why, once.
+ * return, a completion-event handle, and anything wider than the
+ * eight-argument register file.  Each says which and why, once.  (An
+ * interface ARRAY left this list 2026-09-01: the CA_IFACE_ARR_IN arm
+ * forward-mints each element for the guest -- IWbemObjectSink::Indicate.)
  *
  * The ONE exception is spelled by the generator rather than assumed here:
  * WINECOM_F_REV on a row means "cls/xaux/fpmask describe this signature
@@ -681,6 +683,10 @@ static UINT64 winecom_reverse_dispatch( UINT slot, const UINT64 *gpr, const doub
     void *out_ptrs[REV_MAX_ARGS];
     UINT out_iface[REV_MAX_ARGS];
     UINT in_ifaces[REV_MAX_ARGS];
+    /* staging for the ONE interface-array-in row (see the ARR_IN arm):
+     * function scope, because its address rides in the block through
+     * rev_enter_guest */
+    void *arr_stage[64];
     UINT n_out = 0, n_in = 0;
     UINT i, nfpr = 0, iface;
 
@@ -883,11 +889,71 @@ static UINT64 winecom_reverse_dispatch( UINT slot, const UINT64 *gpr, const doub
             }
             break;
         }
+        case WINECOM_CA_IFACE_ARR_IN:
+        {
+            /* An ARRAY of native objects arriving at a guest method --
+             * IWbemObjectSink::Indicate is the row this arm exists for
+             * (2026-09-01): wbemprox delivers its results by handing the
+             * application's sink lObjectCount IWbemClassObject pointers.
+             * Each element FORWARD-mints exactly as the scalar case above
+             * (a guest object cannot cross INTO native through this arm,
+             * which is what keeps the sink licence bounded); the wrapped
+             * pointers live in a stack-side copy so the native caller's
+             * array is never mutated.  The count is BY VALUE at the
+             * parameter aux2 names -- same field the forward direction
+             * reads for this class (winecom.h).  An element that cannot
+             * be wrapped scrubs to NULL, loudly: the guest sees a NULL it
+             * can check, never a native vtable. */
+            const void *const *src = (const void *const *)(ULONG_PTR)raw;
+            UINT64 count;
+            UINT k;
+            static LONG arr_logged;
+
+            if (!sl->xaux || !(sl->xmask & (1u << p)))
+            {
+                rev_refuse_once( iface, slot, sl->name,
+                                 "has an interface ARRAY whose element type "
+                                 "the generated table does not record (no "
+                                 "xmask bit); regenerate the marshal tables" );
+                return (UINT64)(LONG_PTR)(LONG)E_NOTIMPL;
+            }
+            count = gpr[1 + sl->aux2];   /* the count parameter, by value */
+            if (!src || !count)
+            {
+                b.args[i] = raw;
+                break;
+            }
+            if (count > ARRAYSIZE(arr_stage))
+            {
+                rev_refuse_once( iface, slot, sl->name,
+                                 "delivered more array elements than the "
+                                 "reverse stub's staging carries (64); raise "
+                                 "the bound if a real sink ever needs it" );
+                return (UINT64)(LONG_PTR)(LONG)E_NOTIMPL;
+            }
+            for (k = 0; k < count; k++)
+            {
+                void *g = NULL;
+
+                if (src[k] && !winecom_to_guest( (void *)src[k],
+                                                 sl->xaux[p], &g ))
+                {
+                    if (!InterlockedExchange( &arr_logged, 1 ))
+                        ERR( "reverse %s: array element %u cannot be wrapped "
+                             "for the guest; scrubbing to NULL\n",
+                             sl->name, k );
+                    g = NULL;
+                }
+                arr_stage[k] = g;
+            }
+            b.args[i] = (UINT64)(ULONG_PTR)arr_stage;
+            break;
+        }
         default:
             rev_refuse_once( iface, slot, sl->name,
                              "has an argument class with no REVERSE marshal "
-                             "path (an interface array, a completion event or "
-                             "an aggregate return)" );
+                             "path (a completion event or an aggregate "
+                             "return)" );
             return (UINT64)(LONG_PTR)(LONG)E_NOTIMPL;
         }
     }

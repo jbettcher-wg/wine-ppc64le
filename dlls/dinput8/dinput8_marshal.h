@@ -22,10 +22,14 @@ enum dinput8_iface_index
     DINPUT8_IFACE_COUNT = 6
 };
 
-#define DINPUT8_HAND_COUNT 2
+#define DINPUT8_HAND_COUNT 6
 /* hand_funcs[] order in dlls/dinput8/guestcom.c:
  *   0 hand_enum_cb2
  *   1 hand_enum_cb1
+ *   2 hand_enum_semantics_a
+ *   3 hand_enum_semantics_w
+ *   4 hand_configure_devices
+ *   5 hand_enum_created_fx
  */
 
 static const unsigned char cls_IDirectInput8A_CreateDevice[3] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_IN };
@@ -42,32 +46,8 @@ static const struct winecom_slot slots_IDirectInput8A[11] =
     { "IDirectInput8A::RunControlPanel", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0, 0, 0 },
     { "IDirectInput8A::Initialize", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0, 0, 0 },
     { "IDirectInput8A::FindDevice", NULL, NULL, NULL, 4, 0, 0, 0, NULL, 0, 0, 0 },
-    { "IDirectInput8A::EnumDevicesBySemantics",
-      "IDirectInput8A::EnumDevicesBySemantics takes a guest callback WHOSE "
-      "OWN FIRST ARGUMENT IS AN INTERFACE POINTER -- a device, an effect, "
-      "or an array of them inside a struct. The port wraps a guest "
-      "function pointer at registration with ntdll's trampoline pool "
-      "(__wine_guest_wrap_callback), and that is what the served Enum* "
-      "slots below do; but a trampoline carries its arguments through "
-      "UNTRANSLATED, so the native pointer dinput passes would reach the "
-      "guest as a ppc64 vtable. Serving one needs a per-callback shim that "
-      "wraps that argument as a proxy first, which is a hand-written slot "
-      "of its own rather than a table entry. Refused by name until "
-      "something needs it",
-      NULL, NULL, 6, 0, 0, 0, NULL, 0, 0, 0 },
-    { "IDirectInput8A::ConfigureDevices",
-      "IDirectInput8A::ConfigureDevices takes a guest callback WHOSE OWN "
-      "FIRST ARGUMENT IS AN INTERFACE POINTER -- a device, an effect, or "
-      "an array of them inside a struct. The port wraps a guest function "
-      "pointer at registration with ntdll's trampoline pool "
-      "(__wine_guest_wrap_callback), and that is what the served Enum* "
-      "slots below do; but a trampoline carries its arguments through "
-      "UNTRANSLATED, so the native pointer dinput passes would reach the "
-      "guest as a ppc64 vtable. Serving one needs a per-callback shim that "
-      "wraps that argument as a proxy first, which is a hand-written slot "
-      "of its own rather than a table entry. Refused by name until "
-      "something needs it",
-      NULL, NULL, 5, 0, 0, 0, NULL, 0, 0, 0 },
+    { "IDirectInput8A::EnumDevicesBySemantics", NULL, NULL, NULL, 6, WINECOM_F_HAND, 2, 0, NULL, 0, 0, 0 },
+    { "IDirectInput8A::ConfigureDevices", NULL, NULL, NULL, 5, WINECOM_F_HAND, 4, 0, NULL, 0, 0, 0 },
 };
 static const unsigned char cls_IDirectInput8W_CreateDevice[3] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_IN };
 static const unsigned char xaux_IDirectInput8W_CreateDevice[3] = { 0, 3, 5 };
@@ -83,32 +63,8 @@ static const struct winecom_slot slots_IDirectInput8W[11] =
     { "IDirectInput8W::RunControlPanel", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0, 0, 0 },
     { "IDirectInput8W::Initialize", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0, 0, 0 },
     { "IDirectInput8W::FindDevice", NULL, NULL, NULL, 4, 0, 0, 0, NULL, 0, 0, 0 },
-    { "IDirectInput8W::EnumDevicesBySemantics",
-      "IDirectInput8W::EnumDevicesBySemantics takes a guest callback WHOSE "
-      "OWN FIRST ARGUMENT IS AN INTERFACE POINTER -- a device, an effect, "
-      "or an array of them inside a struct. The port wraps a guest "
-      "function pointer at registration with ntdll's trampoline pool "
-      "(__wine_guest_wrap_callback), and that is what the served Enum* "
-      "slots below do; but a trampoline carries its arguments through "
-      "UNTRANSLATED, so the native pointer dinput passes would reach the "
-      "guest as a ppc64 vtable. Serving one needs a per-callback shim that "
-      "wraps that argument as a proxy first, which is a hand-written slot "
-      "of its own rather than a table entry. Refused by name until "
-      "something needs it",
-      NULL, NULL, 6, 0, 0, 0, NULL, 0, 0, 0 },
-    { "IDirectInput8W::ConfigureDevices",
-      "IDirectInput8W::ConfigureDevices takes a guest callback WHOSE OWN "
-      "FIRST ARGUMENT IS AN INTERFACE POINTER -- a device, an effect, or "
-      "an array of them inside a struct. The port wraps a guest function "
-      "pointer at registration with ntdll's trampoline pool "
-      "(__wine_guest_wrap_callback), and that is what the served Enum* "
-      "slots below do; but a trampoline carries its arguments through "
-      "UNTRANSLATED, so the native pointer dinput passes would reach the "
-      "guest as a ppc64 vtable. Serving one needs a per-callback shim that "
-      "wraps that argument as a proxy first, which is a hand-written slot "
-      "of its own rather than a table entry. Refused by name until "
-      "something needs it",
-      NULL, NULL, 5, 0, 0, 0, NULL, 0, 0, 0 },
+    { "IDirectInput8W::EnumDevicesBySemantics", NULL, NULL, NULL, 6, WINECOM_F_HAND, 3, 0, NULL, 0, 0, 0 },
+    { "IDirectInput8W::ConfigureDevices", NULL, NULL, NULL, 5, WINECOM_F_HAND, 4, 0, NULL, 0, 0, 0 },
 };
 static const unsigned char cls_IDirectInputDevice8A_CreateEffect[4] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_IN };
 static const unsigned char xaux_IDirectInputDevice8A_CreateEffect[4] = { 0, 0, 4, 5 };
@@ -138,19 +94,7 @@ static const struct winecom_slot slots_IDirectInputDevice8A[32] =
     { "IDirectInputDevice2A::GetEffectInfo", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0, 0, 0 },
     { "IDirectInputDevice2A::GetForceFeedbackState", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0, 0, 0 },
     { "IDirectInputDevice2A::SendForceFeedbackCommand", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0, 0, 0 },
-    { "IDirectInputDevice2A::EnumCreatedEffectObjects",
-      "IDirectInputDevice2A::EnumCreatedEffectObjects takes a guest "
-      "callback WHOSE OWN FIRST ARGUMENT IS AN INTERFACE POINTER -- a "
-      "device, an effect, or an array of them inside a struct. The port "
-      "wraps a guest function pointer at registration with ntdll's "
-      "trampoline pool (__wine_guest_wrap_callback), and that is what the "
-      "served Enum* slots below do; but a trampoline carries its arguments "
-      "through UNTRANSLATED, so the native pointer dinput passes would "
-      "reach the guest as a ppc64 vtable. Serving one needs a per-callback "
-      "shim that wraps that argument as a proxy first, which is a "
-      "hand-written slot of its own rather than a table entry. Refused by "
-      "name until something needs it",
-      NULL, NULL, 4, 0, 0, 0, NULL, 0, 0, 0 },
+    { "IDirectInputDevice2A::EnumCreatedEffectObjects", NULL, NULL, NULL, 4, WINECOM_F_HAND, 5, 0, NULL, 0, 0, 0 },
     { "IDirectInputDevice2A::Escape", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0, 0, 0 },
     { "IDirectInputDevice2A::Poll", NULL, NULL, NULL, 1, 0, 0, 0, NULL, 0, 0, 0 },
     { "IDirectInputDevice2A::SendDeviceData", NULL, NULL, NULL, 5, 0, 0, 0, NULL, 0, 0, 0 },
@@ -188,19 +132,7 @@ static const struct winecom_slot slots_IDirectInputDevice8W[32] =
     { "IDirectInputDevice2W::GetEffectInfo", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0, 0, 0 },
     { "IDirectInputDevice2W::GetForceFeedbackState", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0, 0, 0 },
     { "IDirectInputDevice2W::SendForceFeedbackCommand", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0, 0, 0 },
-    { "IDirectInputDevice2W::EnumCreatedEffectObjects",
-      "IDirectInputDevice2W::EnumCreatedEffectObjects takes a guest "
-      "callback WHOSE OWN FIRST ARGUMENT IS AN INTERFACE POINTER -- a "
-      "device, an effect, or an array of them inside a struct. The port "
-      "wraps a guest function pointer at registration with ntdll's "
-      "trampoline pool (__wine_guest_wrap_callback), and that is what the "
-      "served Enum* slots below do; but a trampoline carries its arguments "
-      "through UNTRANSLATED, so the native pointer dinput passes would "
-      "reach the guest as a ppc64 vtable. Serving one needs a per-callback "
-      "shim that wraps that argument as a proxy first, which is a "
-      "hand-written slot of its own rather than a table entry. Refused by "
-      "name until something needs it",
-      NULL, NULL, 4, 0, 0, 0, NULL, 0, 0, 0 },
+    { "IDirectInputDevice2W::EnumCreatedEffectObjects", NULL, NULL, NULL, 4, WINECOM_F_HAND, 5, 0, NULL, 0, 0, 0 },
     { "IDirectInputDevice2W::Escape", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0, 0, 0 },
     { "IDirectInputDevice2W::Poll", NULL, NULL, NULL, 1, 0, 0, 0, NULL, 0, 0, 0 },
     { "IDirectInputDevice2W::SendDeviceData", NULL, NULL, NULL, 5, 0, 0, 0, NULL, 0, 0, 0 },
@@ -245,20 +177,18 @@ static const struct winecom_iface dinput8_com_ifaces[DINPUT8_IFACE_COUNT] =
 };
 
 /*
- * 70 slot(s) marshalled, 8 hand-written, 6 refused with a named reason, 18
+ * 70 slot(s) marshalled, 14 hand-written, 0 refused with a named reason, 18
  * IUnknown slot(s) served by the runtime.
  *
  * Hand-written (a guest callback swapped for one of ntdll's trampolines at
  * the moment it arrives): IDirectInput8A::EnumDevices,
- * IDirectInput8W::EnumDevices, IDirectInputDeviceA::EnumObjects,
+ * IDirectInput8A::EnumDevicesBySemantics, IDirectInput8A::ConfigureDevices,
+ * IDirectInput8W::EnumDevices, IDirectInput8W::EnumDevicesBySemantics,
+ * IDirectInput8W::ConfigureDevices, IDirectInputDeviceA::EnumObjects,
  * IDirectInputDevice2A::EnumEffects,
+ * IDirectInputDevice2A::EnumCreatedEffectObjects,
  * IDirectInputDevice7A::EnumEffectsInFile,
  * IDirectInputDeviceW::EnumObjects, IDirectInputDevice2W::EnumEffects,
+ * IDirectInputDevice2W::EnumCreatedEffectObjects,
  * IDirectInputDevice7W::EnumEffectsInFile
- *
- * Refused: IDirectInput8A::EnumDevicesBySemantics,
- * IDirectInput8A::ConfigureDevices, IDirectInput8W::EnumDevicesBySemantics,
- * IDirectInput8W::ConfigureDevices,
- * IDirectInputDevice2A::EnumCreatedEffectObjects,
- * IDirectInputDevice2W::EnumCreatedEffectObjects.
  */

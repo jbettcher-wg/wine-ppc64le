@@ -150,6 +150,86 @@
     }
    ]
   },
+  "IDispatch": {
+   "uuid": "00020400-0000-0000-c000-000000000046",
+   "base": "IUnknown",
+   "header": "oaidl.h",
+   "slots": [
+    {
+     "slot": 0,
+     "owner": "IUnknown",
+     "name": "QueryInterface",
+     "ret": "HRESULT",
+     "params": [
+      "REFIID riid",
+      "void **ppvObject"
+     ]
+    },
+    {
+     "slot": 1,
+     "owner": "IUnknown",
+     "name": "AddRef",
+     "ret": "ULONG",
+     "params": []
+    },
+    {
+     "slot": 2,
+     "owner": "IUnknown",
+     "name": "Release",
+     "ret": "ULONG",
+     "params": []
+    },
+    {
+     "slot": 3,
+     "owner": "IDispatch",
+     "name": "GetTypeInfoCount",
+     "ret": "HRESULT",
+     "params": [
+      "UINT *pctinfo"
+     ]
+    },
+    {
+     "slot": 4,
+     "owner": "IDispatch",
+     "name": "GetTypeInfo",
+     "ret": "HRESULT",
+     "params": [
+      "UINT iTInfo",
+      "LCID lcid",
+      "ITypeInfo **ppTInfo"
+     ]
+    },
+    {
+     "slot": 5,
+     "owner": "IDispatch",
+     "name": "GetIDsOfNames",
+     "ret": "HRESULT",
+     "params": [
+      "REFIID riid",
+      "LPOLESTR *rgszNames",
+      "UINT cNames",
+      "LCID lcid",
+      "DISPID *rgDispId"
+     ]
+    },
+    {
+     "slot": 6,
+     "owner": "IDispatch",
+     "name": "Invoke",
+     "ret": "HRESULT",
+     "params": [
+      "DISPID dispIdMember",
+      "REFIID riid",
+      "LCID lcid",
+      "WORD wFlags",
+      "DISPPARAMS *pDispParams",
+      "VARIANT *pVarResult",
+      "EXCEPINFO *pExcepInfo",
+      "UINT *puArgErr"
+     ]
+    }
+   ]
+  },
   "IEVRFilterConfig": {
    "uuid": "83e91e85-82c1-4ea7-801d-85dc50b75086",
    "base": "IUnknown",

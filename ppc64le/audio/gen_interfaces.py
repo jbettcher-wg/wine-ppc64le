@@ -203,6 +203,11 @@ SURFACES = {
             "IAudioRenderClient",
             "IAudioSessionControl", "IAudioSessionManager",
             "IAudioSessionManager2", "ISimpleAudioVolume",
+            # 2026-09-01, the completeness pass: the session sinks + the
+            # enumerator (reverse-licensed in gen_syscom_audio.py) --
+            # the drift gate's mirror of the same growth.
+            "IAudioSessionEnumerator", "IAudioSessionEvents",
+            "IAudioSessionNotification", "IAudioVolumeDuckNotification",
             "IBindCtx", "IClassFactory",
             "IConnectionPoint", "IConnectionPointContainer", "ICreateErrorInfo",
             "IDirectMusic", "IDirectMusicAudioPath", "IDirectMusicBand",
@@ -229,6 +234,10 @@ SURFACES = {
             "IPropertyStore",
             "IWbemLocator", "IWbemServices", "IEnumWbemClassObject",
             "IWbemClassObject", "IWbemContext",
+            # 2026-09-01: the WMI sync out-types + the async sink.
+            "IWbemCallResult", "IWbemQualifierSet", "IWbemObjectSink",
+            # oaidl's IEnumVARIANT, for the NLM __NewEnum chain.
+            "IEnumVARIANT",
             "INetworkListManager", "IEnumNetworks", "INetwork",
             "IEnumNetworkConnections", "INetworkConnection",
         ],

@@ -83,6 +83,7 @@
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
+#define COBJMACROS   /* the 2026-09-01 walkers QI/Release native objects */
 
 #include "windef.h"
 #include "winbase.h"
@@ -90,6 +91,14 @@
 #include "propidl.h"   /* PROPVARIANT + the PropVariant* prototypes the
                         * guest-side trio below wraps */
 #include "oleauto.h"
+#include "ocidl.h"     /* CONNECTDATA, for the IEnumConnections walker */
+/* initguid BETWEEN the core headers and dmusici.h: the DirectMusic GUIDs
+ * (the param tags and IID_IDirectMusicSegmentState) are in no import
+ * library, so this TU defines them -- while everything included above
+ * stays extern and resolves against libuuid as always. */
+#include "initguid.h"
+#include "dmusici.h"   /* DMUS_PMSG/OBJECTDESC/NOTIFICATION + the param
+                        * tag GUIDs the 2026-09-01 walkers dispatch on */
 #include "winternl.h"
 #include "wine/debug.h"
 #include "wine/winecom.h"
@@ -604,6 +613,995 @@ static UINT64 hand_f_i( void *host, UINT slot, AMD64_CONTEXT *ctx )
                              (UINT32)winecom_read_arg( ctx, 2 ) );
 }
 
+/* =========================================================================
+ * The 2026-09-01 completeness pass: the walkers that emptied the refusal
+ * list's servable half.  Every function below serves a slot that used to
+ * answer E_NOTIMPL for a reason that was mechanical (a 16-byte aggregate, a
+ * tagged union, an interface member at a fixed offset), never semantic.
+ * What genuinely cannot cross refuses AT RUNTIME, per element or per tag,
+ * NAMING what it refused -- and scrubs what it refused into NULL/VT_EMPTY,
+ * per the refusal-hygiene rule (a caller that checks nothing must read
+ * nothing that was ours).
+ * ========================================================================= */
+
+/* MS-x64 passes any aggregate that is not 1/2/4/8 bytes by HIDDEN POINTER to
+ * a caller-owned temporary, so the guest's argument slot holds an address;
+ * ELFv2 passes small aggregates by value in GPRs.  These helpers read the
+ * hidden pointer and call a real by-value prototype -- the compiler emits
+ * the ELFv2 side, nothing is hand-packed.  (dlls/mfplat/mfcom.c worked this
+ * shape first; the reasoning lives there and in the GUID-case refusal text
+ * these rows used to carry.) */
+
+static UINT64 hand_nlm_get_network( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, GUID, void ** ) = host_slot( host, slot );
+    const GUID *id = (const GUID *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    void **out = (void **)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    HRESULT hr;
+
+    if (!id) return (UINT64)(UINT)E_POINTER;
+    hr = fn( host, *id, out );
+    if (SUCCEEDED(hr) && out && *out)
+        *out = winecom_wrap( *out, SYSCOM_IFACE_INetwork );
+    return (UINT64)(UINT)hr;
+}
+
+static UINT64 hand_nlm_get_network_connection( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, GUID, void ** ) = host_slot( host, slot );
+    const GUID *id = (const GUID *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    void **out = (void **)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    HRESULT hr;
+
+    if (!id) return (UINT64)(UINT)E_POINTER;
+    hr = fn( host, *id, out );
+    if (SUCCEEDED(hr) && out && *out)
+        *out = winecom_wrap( *out, SYSCOM_IFACE_INetworkConnection );
+    return (UINT64)(UINT)hr;
+}
+
+/* OnPropertyValueChanged(LPCWSTR, const PROPERTYKEY): the key is GUID+DWORD,
+ * 20 bytes, hidden-pointer on the guest side and by-value here. */
+static UINT64 hand_propkey_byval( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, const WCHAR *, PROPERTYKEY ) = host_slot( host, slot );
+    const WCHAR *dev = (const WCHAR *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    const PROPERTYKEY *key = (const PROPERTYKEY *)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    PROPERTYKEY k = { 0 };
+
+    if (key) k = *key;
+    return (UINT64)(UINT)fn( host, dev, k );
+}
+
+/* ---------------------------------------------- guest-authored PROPVARIANTs
+ *
+ * The tagged-union discipline, IN direction: plain tags are bytes both sides
+ * read identically and pass as the guest wrote them; VT_UNKNOWN/VT_DISPATCH
+ * unwrap a proxy to its host object (winecom_to_native with ~0u accepts any
+ * FORWARD proxy by identity and correctly fails a guest-authored object --
+ * reverse-proxying an arbitrary IUnknown is not licensed on this surface);
+ * the remaining interface-bearing arms refuse naming the VT.  The out-param
+ * scrub duty does not arise here: SetValue writes nothing back. */
+/* the shared tagged-union discipline; the wrappers below add this module's
+ * once-per-class logging on top */
+#include "wine/winecom_variant.h"
+
+#define mf_style_pv_is_iface_arm winecom_vt_is_untranslatable_iface_arm
+
+static BOOL syscom_pv_in( const PROPVARIANT *pv, PROPVARIANT *copy,
+                          const PROPVARIANT **use, UINT slot )
+{
+    static LONG logged;
+
+    *use = pv;
+    if (!pv) return TRUE;
+    switch (pv->vt)
+    {
+    case VT_UNKNOWN:
+    case VT_DISPATCH:
+    {
+        void *native;
+
+        *copy = *pv;
+        if (pv->punkVal &&
+            !winecom_to_native( pv->punkVal, ~0u, &native ))
+        {
+            if (!InterlockedExchange( &logged, 1 ))
+                FIXME( "syscom: slot %u was given a PROPVARIANT (vt 0x%04x) "
+                       "carrying a guest-authored object this surface cannot "
+                       "reverse-proxy; refusing the call\n", slot, pv->vt );
+            return FALSE;
+        }
+        copy->punkVal = pv->punkVal ? native : NULL;
+        *use = copy;
+        return TRUE;
+    }
+    default:
+        if (mf_style_pv_is_iface_arm( pv->vt ))
+        {
+            if (!InterlockedExchange( &logged, 1 ))
+                FIXME( "syscom: slot %u was given a PROPVARIANT of type "
+                       "0x%04x -- an interface arm nothing here translates "
+                       "(a VECTOR/ARRAY/BYREF of objects); refusing\n",
+                       slot, pv->vt );
+            return FALSE;
+        }
+        return TRUE;    /* plain data: strings, blobs, numbers */
+    }
+}
+
+static UINT64 hand_propstore_setvalue( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, const PROPERTYKEY *, const PROPVARIANT * ) =
+        host_slot( host, slot );
+    const PROPERTYKEY *key = (const PROPERTYKEY *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    const PROPVARIANT *pv = (const PROPVARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    const PROPVARIANT *use;
+    PROPVARIANT copy;
+
+    if (!syscom_pv_in( pv, &copy, &use, slot )) return (UINT64)(UINT)E_NOTIMPL;
+    return (UINT64)(UINT)fn( host, key, use );
+}
+
+/* ------------------------------------------------------- the enum-Next family
+ *
+ * Next(celt, rgelt, pceltFetched): celt travels BY VALUE, the array is the
+ * guest's own storage the native enumerator fills with NATIVE pointers, and
+ * pceltFetched is optional (NULL is legal when celt is 1).  The walker calls
+ * native into the guest's array and wraps each fetched element in place.
+ * An element the roster cannot wrap is RELEASED and scrubbed to NULL -- the
+ * hygiene rule -- and said once. */
+static UINT64 enum_next_core( void *host, UINT slot, AMD64_CONTEXT *ctx,
+                              UINT elem_iface )
+{
+    HRESULT (WINAPI *fn)( void *, ULONG, void **, ULONG * ) = host_slot( host, slot );
+    ULONG celt = (ULONG)winecom_read_arg( ctx, 1 );
+    void **rgelt = (void **)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    ULONG *fetched = (ULONG *)(ULONG_PTR)winecom_read_arg( ctx, 3 );
+    ULONG got, i;
+    HRESULT hr;
+
+    hr = fn( host, celt, rgelt, fetched );
+    if (FAILED(hr) || !rgelt) return (UINT64)(UINT)hr;
+    got = fetched ? *fetched : (hr == S_OK ? celt : 0);
+    for (i = 0; i < got; i++)
+        if (rgelt[i]) rgelt[i] = winecom_wrap( rgelt[i], elem_iface );
+    return (UINT64)(UINT)hr;
+}
+
+static UINT64 hand_enum_next_unknown( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    /* IEnumUnknown vends nameless objects; the one honest static type for
+     * the cell is IDispatch when the object answers it, else the element is
+     * released and scrubbed.  This surface's IEnumUnknown consumers
+     * (component categories) are IDispatch-shaped, and a miss is loud. */
+    HRESULT (WINAPI *fn)( void *, ULONG, void **, ULONG * ) = host_slot( host, slot );
+    ULONG celt = (ULONG)winecom_read_arg( ctx, 1 );
+    void **rgelt = (void **)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    ULONG *fetched = (ULONG *)(ULONG_PTR)winecom_read_arg( ctx, 3 );
+    static LONG logged;
+    ULONG got, i;
+    HRESULT hr;
+
+    hr = fn( host, celt, rgelt, fetched );
+    if (FAILED(hr) || !rgelt) return (UINT64)(UINT)hr;
+    got = fetched ? *fetched : (hr == S_OK ? celt : 0);
+    for (i = 0; i < got; i++)
+    {
+        IUnknown *u = rgelt[i];
+        void *disp;
+
+        if (!u) continue;
+        if (SUCCEEDED(IUnknown_QueryInterface( u, &IID_IDispatch, &disp )))
+        {
+            IUnknown_Release( u );
+            rgelt[i] = winecom_wrap( disp, SYSCOM_IFACE_IDispatch );
+            continue;
+        }
+        if (!InterlockedExchange( &logged, 1 ))
+            FIXME( "syscom: IEnumUnknown::Next fetched an object that is not "
+                   "IDispatch and has no static roster type; releasing it and "
+                   "scrubbing the cell to NULL\n" );
+        IUnknown_Release( u );
+        rgelt[i] = NULL;
+    }
+    return (UINT64)(UINT)hr;
+}
+
+static UINT64 hand_enum_next_moniker( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    return enum_next_core( host, slot, ctx, SYSCOM_IFACE_IMoniker );
+}
+
+static UINT64 hand_enum_next_cp( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    return enum_next_core( host, slot, ctx, SYSCOM_IFACE_IConnectionPoint );
+}
+
+static UINT64 hand_enum_next_connectdata( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    /* CONNECTDATA { IUnknown *pUnk; DWORD dwCookie }: wrap each element's
+     * pUnk.  The sink a guest registered arrives as a REVERSE proxy and
+     * winecom_wrap unwraps it to the guest's own pointer -- identity, the
+     * property Unadvise-by-cookie callers depend on. */
+    HRESULT (WINAPI *fn)( void *, ULONG, CONNECTDATA *, ULONG * ) = host_slot( host, slot );
+    ULONG celt = (ULONG)winecom_read_arg( ctx, 1 );
+    CONNECTDATA *rgcd = (CONNECTDATA *)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    ULONG *fetched = (ULONG *)(ULONG_PTR)winecom_read_arg( ctx, 3 );
+    static LONG logged;
+    ULONG got, i;
+    HRESULT hr;
+
+    hr = fn( host, celt, rgcd, fetched );
+    if (FAILED(hr) || !rgcd) return (UINT64)(UINT)hr;
+    got = fetched ? *fetched : (hr == S_OK ? celt : 0);
+    for (i = 0; i < got; i++)
+    {
+        IUnknown *u = rgcd[i].pUnk;
+        void *disp;
+
+        if (!u) continue;
+        if (SUCCEEDED(IUnknown_QueryInterface( u, &IID_IDispatch, &disp )))
+        {
+            IUnknown_Release( u );
+            rgcd[i].pUnk = winecom_wrap( disp, SYSCOM_IFACE_IDispatch );
+            continue;
+        }
+        if (!InterlockedExchange( &logged, 1 ))
+            FIXME( "syscom: IEnumConnections::Next fetched a sink with no "
+                   "static roster type; releasing and scrubbing to NULL\n" );
+        IUnknown_Release( u );
+        rgcd[i].pUnk = NULL;
+    }
+    return (UINT64)(UINT)hr;
+}
+
+static UINT64 hand_enum_next_variant( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    /* IEnumVARIANT::Next on this surface is the NLM enumerators' __NewEnum:
+     * the VARIANTs hold VT_UNKNOWN/VT_DISPATCH network objects.  Plain tags
+     * pass as filled; object tags wrap as IDispatch (every NLM object is
+     * IDispatch-derived, and the header proves it -- netlistmgr.idl);
+     * anything else object-shaped is released and scrubbed to VT_EMPTY. */
+    HRESULT (WINAPI *fn)( void *, ULONG, VARIANT *, ULONG * ) = host_slot( host, slot );
+    ULONG celt = (ULONG)winecom_read_arg( ctx, 1 );
+    VARIANT *rgv = (VARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    ULONG *fetched = (ULONG *)(ULONG_PTR)winecom_read_arg( ctx, 3 );
+    static LONG logged;
+    ULONG got, i;
+    HRESULT hr;
+
+    hr = fn( host, celt, rgv, fetched );
+    if (FAILED(hr) || !rgv) return (UINT64)(UINT)hr;
+    got = fetched ? *fetched : (hr == S_OK ? celt : 0);
+    for (i = 0; i < got; i++)
+    {
+        IUnknown *u;
+        void *disp;
+
+        if (V_VT(&rgv[i]) != VT_UNKNOWN && V_VT(&rgv[i]) != VT_DISPATCH)
+            continue;
+        u = (IUnknown *)V_UNKNOWN(&rgv[i]);
+        if (!u) continue;
+        if (SUCCEEDED(IUnknown_QueryInterface( u, &IID_IDispatch, &disp )))
+        {
+            IUnknown_Release( u );
+            V_VT(&rgv[i]) = VT_DISPATCH;
+            V_DISPATCH(&rgv[i]) = winecom_wrap( disp, SYSCOM_IFACE_IDispatch );
+            continue;
+        }
+        if (!InterlockedExchange( &logged, 1 ))
+            FIXME( "syscom: IEnumVARIANT::Next fetched a non-IDispatch "
+                   "object; releasing and scrubbing the VARIANT to EMPTY\n" );
+        IUnknown_Release( u );
+        VariantInit( &rgv[i] );
+    }
+    return (UINT64)(UINT)hr;
+}
+
+/* QueryMultipleInterfaces: the native call fills each element's pItf with a
+ * NATIVE pointer; each is then re-run through the ONE fail-closed choke
+ * point this module already trusts for every out-interface.  An element the
+ * roster cannot serve becomes E_NOINTERFACE + NULL (wrap_out_iface released
+ * it), and the aggregate HRESULT is recomputed per the MULTI_QI contract. */
+static UINT64 hand_multi_qi( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, ULONG, MULTI_QI * ) = host_slot( host, slot );
+    ULONG cmqi = (ULONG)winecom_read_arg( ctx, 1 );
+    MULTI_QI *mqi = (MULTI_QI *)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    ULONG i, served = 0;
+    HRESULT hr;
+
+    hr = fn( host, cmqi, mqi );
+    if (!mqi) return (UINT64)(UINT)hr;
+    for (i = 0; i < cmqi; i++)
+    {
+        if (FAILED(mqi[i].hr) || !mqi[i].pItf) continue;
+        mqi[i].hr = winecom_wrap_out_iface( mqi[i].hr, mqi[i].pIID,
+                                            (void **)&mqi[i].pItf );
+        if (SUCCEEDED(mqi[i].hr)) served++;
+    }
+    if (served == cmqi) return (UINT64)(UINT)S_OK;
+    if (!served) return (UINT64)(UINT)E_NOINTERFACE;
+    return (UINT64)(UINT)CO_S_NOTALLINTERFACES;
+}
+
+/* ---------------------------------------------------------- IDispatch::Invoke
+ *
+ * DISPPARAMS carries a VARIANTARG array the GUEST authored.  The array is
+ * cloned (never mutated -- it is the caller's memory), each element's object
+ * arms unwrapped through the same rule as syscom_pv_in; the result VARIANT
+ * and the byref out-arms are wrapped on the way back with the enum-Next
+ * discipline.  EXCEPINFO and puArgErr are plain memory. */
+static BOOL syscom_variant_in( VARIANTARG *v, UINT slot )
+{
+    static LONG logged;
+
+    if (winecom_variant_in( v )) return TRUE;
+    if (!InterlockedExchange( &logged, 1 ))
+        FIXME( "syscom: Invoke was given a VARIANT (vt 0x%04x) carrying a "
+               "guest-authored object or an untranslatable interface arm; "
+               "refusing the call\n", V_VT(v) );
+    return FALSE;
+}
+
+static void syscom_variant_out_fixup( VARIANT *v )
+{
+    static LONG logged;
+
+    if (winecom_variant_out_fixup( v, SYSCOM_IFACE_IDispatch ) &&
+        !InterlockedExchange( &logged, 1 ))
+        FIXME( "syscom: Invoke returned a non-IDispatch object in a VARIANT; "
+               "released and scrubbed to EMPTY\n" );
+}
+
+static UINT64 hand_dispatch_invoke( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, DISPID, REFIID, LCID, WORD, DISPPARAMS *,
+                          VARIANT *, EXCEPINFO *, UINT * ) = host_slot( host, slot );
+    DISPID member = (DISPID)winecom_read_arg( ctx, 1 );
+    REFIID riid = (REFIID)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    LCID lcid = (LCID)winecom_read_arg( ctx, 3 );
+    WORD flags = (WORD)winecom_read_arg( ctx, 4 );
+    DISPPARAMS *dp = (DISPPARAMS *)(ULONG_PTR)winecom_read_arg( ctx, 5 );
+    VARIANT *result = (VARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 6 );
+    EXCEPINFO *exc = (EXCEPINFO *)(ULONG_PTR)winecom_read_arg( ctx, 7 );
+    UINT *arg_err = (UINT *)(ULONG_PTR)winecom_read_arg( ctx, 8 );
+    VARIANTARG local[16], *args = local;
+    DISPPARAMS use;
+    HRESULT hr;
+    UINT i;
+
+    if (!dp) return (UINT64)(UINT)fn( host, member, riid, lcid, flags, dp,
+                                      result, exc, arg_err );
+    use = *dp;
+    if (dp->cArgs)
+    {
+        if (dp->cArgs > ARRAYSIZE(local))
+        {
+            args = RtlAllocateHeap( GetProcessHeap(), 0,
+                                    dp->cArgs * sizeof(*args) );
+            if (!args) return (UINT64)(UINT)E_OUTOFMEMORY;
+        }
+        memcpy( args, dp->rgvarg, dp->cArgs * sizeof(*args) );
+        for (i = 0; i < dp->cArgs; i++)
+            if (!syscom_variant_in( &args[i], slot ))
+            {
+                if (args != local)
+                    RtlFreeHeap( GetProcessHeap(), 0, args );
+                return (UINT64)(UINT)E_NOTIMPL;
+            }
+        use.rgvarg = args;
+    }
+    hr = fn( host, member, riid, lcid, flags, &use, result, exc, arg_err );
+    if (args != local) RtlFreeHeap( GetProcessHeap(), 0, args );
+    if (SUCCEEDED(hr)) syscom_variant_out_fixup( result );
+    return (UINT64)(UINT)hr;
+}
+
+/* Bind's BINDPTR is a union: the FUNCDESC and VARDESC arms are data, the
+ * ITypeComp arm is an object and *pDescKind says which was written.
+ * ITypeInfo out is the ordinary wrap. */
+static UINT64 hand_typecomp_bind( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, LPOLESTR, ULONG, WORD, void **, DESCKIND *,
+                          BINDPTR * ) = host_slot( host, slot );
+    LPOLESTR name = (LPOLESTR)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    ULONG hash = (ULONG)winecom_read_arg( ctx, 2 );
+    WORD flags = (WORD)winecom_read_arg( ctx, 3 );
+    void **ptinfo = (void **)(ULONG_PTR)winecom_read_arg( ctx, 4 );
+    DESCKIND *kind = (DESCKIND *)(ULONG_PTR)winecom_read_arg( ctx, 5 );
+    BINDPTR *bind = (BINDPTR *)(ULONG_PTR)winecom_read_arg( ctx, 6 );
+    HRESULT hr;
+
+    hr = fn( host, name, hash, flags, ptinfo, kind, bind );
+    if (FAILED(hr)) return (UINT64)(UINT)hr;
+    if (ptinfo && *ptinfo)
+        *ptinfo = winecom_wrap( *ptinfo, SYSCOM_IFACE_ITypeInfo );
+    if (kind && bind && *kind == DESCKIND_TYPECOMP && bind->lptcomp)
+        bind->lptcomp = winecom_wrap( bind->lptcomp, SYSCOM_IFACE_ITypeComp );
+    return (UINT64)(UINT)hr;
+}
+
+/* --------------------------------------------------- DirectMusic walkers
+ *
+ * The PMSG family: DMUS_PMSG's header (DMUS_PMSG_PART) carries three
+ * interface members at fixed offsets -- pTool, pGraph, punkUser -- and the
+ * struct's OWNERSHIP TRANSFERS on Send/Free (the guest must not touch a
+ * message it sent; dmusici.h says so), which is what licenses translating
+ * the members IN PLACE on those paths rather than cloning a variable-size
+ * struct whose allocator is the performance itself. */
+
+static BOOL dmus_pmsg_in( DMUS_PMSG *msg, UINT slot )
+{
+    static LONG logged;
+    void *native;
+
+    if (!msg) return TRUE;
+    if (msg->pTool)
+    {
+        if (!winecom_to_native( msg->pTool, ~0u, &native )) goto refuse;
+        msg->pTool = native;
+    }
+    if (msg->pGraph)
+    {
+        if (!winecom_to_native( msg->pGraph, ~0u, &native )) goto refuse;
+        msg->pGraph = (struct IDirectMusicGraph *)native;
+    }
+    if (msg->punkUser)
+    {
+        if (!winecom_to_native( msg->punkUser, ~0u, &native )) goto refuse;
+        msg->punkUser = native;
+    }
+    return TRUE;
+refuse:
+    if (!InterlockedExchange( &logged, 1 ))
+        FIXME( "syscom: slot %u's DMUS_PMSG carries a guest-authored object "
+               "this surface cannot reverse-proxy; refusing the call\n", slot );
+    return FALSE;
+}
+
+static void dmus_pmsg_out_fixup( DMUS_PMSG *msg )
+{
+    static LONG logged;
+
+    if (!msg) return;
+    if (msg->pTool)
+        msg->pTool = winecom_wrap( msg->pTool, SYSCOM_IFACE_IDirectMusicTool );
+    if (msg->pGraph)
+        msg->pGraph = winecom_wrap( msg->pGraph, SYSCOM_IFACE_IDirectMusicGraph );
+    if (msg->punkUser)
+    {
+        /* the one member with no static type: notifications carry a segment
+         * state; anything else is scrubbed rather than leaked */
+        void *ss;
+
+        if (SUCCEEDED(IUnknown_QueryInterface( msg->punkUser,
+                                               &IID_IDirectMusicSegmentState, &ss )))
+        {
+            IUnknown_Release( msg->punkUser );
+            msg->punkUser = winecom_wrap( ss, SYSCOM_IFACE_IDirectMusicSegmentState );
+        }
+        else
+        {
+            if (!InterlockedExchange( &logged, 1 ))
+                FIXME( "syscom: a DMUS_PMSG's punkUser is not a segment "
+                       "state; releasing and scrubbing to NULL\n" );
+            IUnknown_Release( msg->punkUser );
+            msg->punkUser = NULL;
+        }
+    }
+}
+
+/* (this, DMUS_PMSG*) with in-place member translation: SendPMsg, FreePMsg. */
+static UINT64 dmus_pmsg_in_call( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, DMUS_PMSG * ) = host_slot( host, slot );
+    DMUS_PMSG *msg = (DMUS_PMSG *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+
+    if (!dmus_pmsg_in( msg, slot )) return (UINT64)(UINT)E_NOTIMPL;
+    return (UINT64)(UINT)fn( host, msg );
+}
+
+static UINT64 hand_dmus_send_pmsg( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    return dmus_pmsg_in_call( host, slot, ctx );
+}
+
+static UINT64 hand_dmus_free_pmsg( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    return dmus_pmsg_in_call( host, slot, ctx );
+}
+
+static UINT64 hand_dmus_alloc_pmsg( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    /* a fresh message has no live members; the call is plain */
+    HRESULT (WINAPI *fn)( void *, ULONG, DMUS_PMSG ** ) = host_slot( host, slot );
+
+    return (UINT64)(UINT)fn( host, (ULONG)winecom_read_arg( ctx, 1 ),
+                             (DMUS_PMSG **)(ULONG_PTR)winecom_read_arg( ctx, 2 ) );
+}
+
+static UINT64 hand_dmus_stamp_pmsg( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    /* the graph reads pGraph/pTool and WRITES pTool (the next tool in the
+     * chain, AddRef'd) -- translate in, call, wrap what came back */
+    HRESULT (WINAPI *fn)( void *, DMUS_PMSG * ) = host_slot( host, slot );
+    DMUS_PMSG *msg = (DMUS_PMSG *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    HRESULT hr;
+
+    if (!dmus_pmsg_in( msg, slot )) return (UINT64)(UINT)E_NOTIMPL;
+    hr = fn( host, msg );
+    if (SUCCEEDED(hr)) dmus_pmsg_out_fixup( msg );
+    return (UINT64)(UINT)hr;
+}
+
+static UINT64 hand_dmus_clone_pmsg( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, DMUS_PMSG *, DMUS_PMSG ** ) = host_slot( host, slot );
+    DMUS_PMSG *src = (DMUS_PMSG *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    DMUS_PMSG **out = (DMUS_PMSG **)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    HRESULT hr;
+
+    if (!dmus_pmsg_in( src, slot )) return (UINT64)(UINT)E_NOTIMPL;
+    hr = fn( host, src, out );
+    /* the source's members are native now and its ownership stayed with the
+     * guest: wrap them back, and wrap the clone's own (AddRef'd) members */
+    dmus_pmsg_out_fixup( src );
+    if (SUCCEEDED(hr) && out) dmus_pmsg_out_fixup( *out );
+    return (UINT64)(UINT)hr;
+}
+
+static UINT64 hand_dmus_process_pmsg( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    /* IDirectMusicTool::ProcessPMsg(perf, pmsg) -- forward direction: the
+     * guest drives a NATIVE tool with its performance proxy */
+    HRESULT (WINAPI *fn)( void *, void *, DMUS_PMSG * ) = host_slot( host, slot );
+    void *perf = (void *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    DMUS_PMSG *msg = (DMUS_PMSG *)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    void *nperf = NULL;
+
+    if (perf && !winecom_to_native( perf, ~0u, &nperf ))
+        return (UINT64)(UINT)E_NOTIMPL;
+    if (!dmus_pmsg_in( msg, slot )) return (UINT64)(UINT)E_NOTIMPL;
+    return (UINT64)(UINT)fn( host, nperf, msg );
+}
+
+static UINT64 hand_dmus_flush( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, void *, DMUS_PMSG *, REFERENCE_TIME ) =
+        host_slot( host, slot );
+    void *perf = (void *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    DMUS_PMSG *msg = (DMUS_PMSG *)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    void *nperf = NULL;
+
+    if (perf && !winecom_to_native( perf, ~0u, &nperf ))
+        return (UINT64)(UINT)E_NOTIMPL;
+    if (!dmus_pmsg_in( msg, slot )) return (UINT64)(UINT)E_NOTIMPL;
+    return (UINT64)(UINT)fn( host, nperf, msg,
+                             (REFERENCE_TIME)winecom_read_arg( ctx, 3 ) );
+}
+
+static UINT64 hand_dmus_get_notification_pmsg( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, DMUS_NOTIFICATION_PMSG ** ) = host_slot( host, slot );
+    DMUS_NOTIFICATION_PMSG **out =
+        (DMUS_NOTIFICATION_PMSG **)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    HRESULT hr;
+
+    hr = fn( host, out );
+    if (hr == S_OK && out && *out) dmus_pmsg_out_fixup( (DMUS_PMSG *)*out );
+    return (UINT64)(UINT)hr;
+}
+
+/* ------------------------------------------- the OBJECTDESC family
+ *
+ * DMUS_OBJECTDESC carries one optional interface member, pStream, behind
+ * DMUS_OBJ_STREAM in dwValidData.  The IN direction clones the descriptor
+ * (caller memory is never mutated) and unwraps the stream; the OUT
+ * direction wraps what native filled. */
+
+static BOOL dmus_desc_in( const DMUS_OBJECTDESC *desc, DMUS_OBJECTDESC *copy,
+                          const DMUS_OBJECTDESC **use, UINT slot )
+{
+    static LONG logged;
+    void *native;
+
+    *use = desc;
+    if (!desc || !(desc->dwValidData & DMUS_OBJ_STREAM) || !desc->pStream)
+        return TRUE;
+    *copy = *desc;
+    if (!winecom_to_native( desc->pStream, ~0u, &native ))
+    {
+        if (!InterlockedExchange( &logged, 1 ))
+            FIXME( "syscom: slot %u's DMUS_OBJECTDESC carries a guest-"
+                   "authored stream this surface cannot reverse-proxy; "
+                   "refusing the call\n", slot );
+        return FALSE;
+    }
+    copy->pStream = native;
+    *use = copy;
+    return TRUE;
+}
+
+static void dmus_desc_out_fixup( DMUS_OBJECTDESC *desc )
+{
+    if (desc && (desc->dwValidData & DMUS_OBJ_STREAM) && desc->pStream)
+        desc->pStream = winecom_wrap( desc->pStream, SYSCOM_IFACE_IStream );
+}
+
+static UINT64 hand_dmus_objdesc_in( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, const DMUS_OBJECTDESC * ) = host_slot( host, slot );
+    const DMUS_OBJECTDESC *desc =
+        (const DMUS_OBJECTDESC *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    const DMUS_OBJECTDESC *use;
+    DMUS_OBJECTDESC copy;
+
+    if (!dmus_desc_in( desc, &copy, &use, slot )) return (UINT64)(UINT)E_NOTIMPL;
+    return (UINT64)(UINT)fn( host, use );
+}
+
+static UINT64 hand_dmus_objdesc_out( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, DMUS_OBJECTDESC * ) = host_slot( host, slot );
+    DMUS_OBJECTDESC *desc = (DMUS_OBJECTDESC *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    HRESULT hr;
+
+    hr = fn( host, desc );
+    if (SUCCEEDED(hr)) dmus_desc_out_fixup( desc );
+    return (UINT64)(UINT)hr;
+}
+
+static UINT64 hand_dmus_parse_descriptor( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    /* ParseDescriptor(LPSTREAM, LPDMUS_OBJECTDESC): stream IN, desc OUT */
+    HRESULT (WINAPI *fn)( void *, void *, DMUS_OBJECTDESC * ) = host_slot( host, slot );
+    void *stream = (void *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    DMUS_OBJECTDESC *desc = (DMUS_OBJECTDESC *)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    void *nstream = NULL;
+    HRESULT hr;
+
+    if (stream && !winecom_to_native( stream, ~0u, &nstream ))
+        return (UINT64)(UINT)E_NOTIMPL;
+    hr = fn( host, nstream, desc );
+    if (SUCCEEDED(hr)) dmus_desc_out_fixup( desc );
+    return (UINT64)(UINT)hr;
+}
+
+static UINT64 hand_dmus_loader_getobject( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, const DMUS_OBJECTDESC *, REFIID, void ** ) =
+        host_slot( host, slot );
+    const DMUS_OBJECTDESC *desc =
+        (const DMUS_OBJECTDESC *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    REFIID riid = (REFIID)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    void **ppv = (void **)(ULONG_PTR)winecom_read_arg( ctx, 3 );
+    const DMUS_OBJECTDESC *use;
+    DMUS_OBJECTDESC copy;
+    HRESULT hr;
+
+    if (!dmus_desc_in( desc, &copy, &use, slot )) return (UINT64)(UINT)E_NOTIMPL;
+    hr = fn( host, use, riid, ppv );
+    /* the ONE fail-closed choke point types the out cell by IID */
+    return (UINT64)(UINT)winecom_wrap_out_iface( hr, riid, ppv );
+}
+
+static UINT64 hand_dmus_enum_object( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, REFGUID, DWORD, DMUS_OBJECTDESC * ) =
+        host_slot( host, slot );
+    DMUS_OBJECTDESC *desc = (DMUS_OBJECTDESC *)(ULONG_PTR)winecom_read_arg( ctx, 3 );
+    HRESULT hr;
+
+    hr = fn( host, (REFGUID)(ULONG_PTR)winecom_read_arg( ctx, 1 ),
+             (DWORD)winecom_read_arg( ctx, 2 ), desc );
+    if (SUCCEEDED(hr)) dmus_desc_out_fixup( desc );
+    return (UINT64)(UINT)hr;
+}
+
+/* ------------------------------------------- the tag-dispatched params
+ *
+ * GetParam/SetParam's void* payload is typed by rguidType.  Known plain
+ * tags pass (bytes both sides read identically); known object tags
+ * translate; an unknown tag refuses AT RUNTIME naming the GUID -- and on
+ * the Get side an unknown tag's payload size is unknowable, so nothing is
+ * scrubbed there: the refusal is the whole answer, said loudly, and a
+ * checked caller sees E_NOTIMPL.  (Every KNOWN interface-bearing tag either
+ * translates below or names the roster gap that blocks it.) */
+
+enum dmus_tag_kind
+{
+    DMUS_TAG_PLAIN,        /* payload is data */
+    DMUS_TAG_BAND_PARAM,   /* DMUS_BAND_PARAM: pBand member */
+    DMUS_TAG_IFACE_CELL,   /* payload cell holds an interface pointer (Get) */
+    DMUS_TAG_IFACE_SELF,   /* pParam IS the interface pointer (Set) */
+    DMUS_TAG_UNSERVABLE,   /* names a roster gap; refused with that reason */
+};
+
+static const struct dmus_tag
+{
+    const GUID *tag;
+    enum dmus_tag_kind kind;
+    UINT iface;            /* roster index for the object kinds */
+    const char *note;      /* the UNSERVABLE reason */
+}
+dmus_tags[] =
+{
+    { &GUID_PerfMasterTempo,        DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_PerfMasterVolume,       DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_PerfMasterGrooveLevel,  DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_PerfAutoDownload,       DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_TempoParam,             DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_TimeSignature,          DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_ChordParam,             DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_RhythmParam,            DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_CommandParam,           DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_CommandParam2,          DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_CommandParamNext,       DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_MuteParam,              DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_Valid_Start_Time,       DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_Play_Marker,            DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_SeedVariations,         DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_Variations,             DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_DisableTempo,           DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_EnableTempo,            DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_DisableTimeSig,         DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_EnableTimeSig,          DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_Disable_Auto_Download,  DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_Enable_Auto_Download,   DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_Clear_All_Bands,        DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_StandardMIDIFile,       DMUS_TAG_PLAIN, 0, NULL },
+    { &GUID_BandParam,              DMUS_TAG_BAND_PARAM,
+      SYSCOM_IFACE_IDirectMusicBand, NULL },
+    { &GUID_IDirectMusicBand,       DMUS_TAG_IFACE_CELL,
+      SYSCOM_IFACE_IDirectMusicBand, NULL },
+    { &GUID_Download,               DMUS_TAG_IFACE_SELF, 0, NULL },
+    { &GUID_Unload,                 DMUS_TAG_IFACE_SELF, 0, NULL },
+    { &GUID_DownloadToAudioPath,    DMUS_TAG_IFACE_SELF, 0, NULL },
+    { &GUID_UnloadFromAudioPath,    DMUS_TAG_IFACE_SELF, 0, NULL },
+    { &GUID_ConnectToDLSCollection, DMUS_TAG_UNSERVABLE, 0,
+      "IDirectMusicCollection is not on the roster (nothing can vend one "
+      "to a guest either -- the same gap, said once)" },
+    { &GUID_IDirectMusicChordMap,   DMUS_TAG_UNSERVABLE, 0,
+      "IDirectMusicChordMap is not on the roster" },
+    { &GUID_IDirectMusicStyle,      DMUS_TAG_UNSERVABLE, 0,
+      "IDirectMusicStyle is not on the roster" },
+};
+
+static const struct dmus_tag *dmus_find_tag( const GUID *tag )
+{
+    UINT i;
+
+    for (i = 0; i < ARRAYSIZE(dmus_tags); i++)
+        if (IsEqualGUID( dmus_tags[i].tag, tag )) return &dmus_tags[i];
+    return NULL;
+}
+
+static BOOL dmus_tag_refuse( const GUID *tag, const struct dmus_tag *t,
+                             const char *dir )
+{
+    static LONG logged;
+
+    if (!InterlockedExchange( &logged, 1 ))
+        FIXME( "syscom: %s with tag %s: %s -- refusing this tag (every other "
+               "known tag is served)\n", dir, debugstr_guid( tag ),
+               t ? t->note : "a tag this walker does not know; add it to "
+                             "dmus_tags[] with its payload's shape" );
+    return FALSE;
+}
+
+/* Get side: returns the wrapped-up payload treatment.  pParam is the guest's
+ * own buffer; native fills it, and the object kinds are wrapped after. */
+static UINT64 dmus_getparam_call( void *host, UINT slot, const GUID *tag,
+                                  void *pParam, HRESULT hr )
+{
+    const struct dmus_tag *t = dmus_find_tag( tag );
+
+    if (FAILED(hr)) return (UINT64)(UINT)hr;
+    if (!t || t->kind == DMUS_TAG_UNSERVABLE)
+    {
+        /* the call ALREADY ran for a tag this walker cannot translate --
+         * that must not happen; the callers below check first */
+        return (UINT64)(UINT)hr;
+    }
+    switch (t->kind)
+    {
+    case DMUS_TAG_BAND_PARAM:
+    {
+        DMUS_BAND_PARAM *bp = pParam;
+        if (bp && bp->pBand)
+            bp->pBand = winecom_wrap( bp->pBand, t->iface );
+        break;
+    }
+    case DMUS_TAG_IFACE_CELL:
+    {
+        void **cell = pParam;
+        if (cell && *cell) *cell = winecom_wrap( *cell, t->iface );
+        break;
+    }
+    default:
+        break;
+    }
+    return (UINT64)(UINT)hr;
+}
+
+/* Set side: translate the payload IN.  Band params clone the struct;
+ * pointer-self tags unwrap the pointer value itself. */
+static BOOL dmus_setparam_in( const GUID *tag, void **pparam_io,
+                              DMUS_BAND_PARAM *bp_copy )
+{
+    const struct dmus_tag *t = dmus_find_tag( tag );
+    void *native;
+
+    if (!t || t->kind == DMUS_TAG_UNSERVABLE)
+        return dmus_tag_refuse( tag, t, "SetParam" );
+    switch (t->kind)
+    {
+    case DMUS_TAG_BAND_PARAM:
+    {
+        const DMUS_BAND_PARAM *bp = *pparam_io;
+        if (!bp) return TRUE;
+        *bp_copy = *bp;
+        if (bp->pBand)
+        {
+            if (!winecom_to_native( bp->pBand, ~0u, &native ))
+                return dmus_tag_refuse( tag, t, "SetParam" );
+            bp_copy->pBand = native;
+        }
+        *pparam_io = bp_copy;
+        return TRUE;
+    }
+    case DMUS_TAG_IFACE_SELF:
+        if (*pparam_io)
+        {
+            if (!winecom_to_native( *pparam_io, ~0u, &native ))
+                return dmus_tag_refuse( tag, t, "SetParam" );
+            *pparam_io = native;
+        }
+        return TRUE;
+    default:
+        return TRUE;
+    }
+}
+
+static BOOL dmus_getparam_ok( const GUID *tag )
+{
+    const struct dmus_tag *t = dmus_find_tag( tag );
+
+    if (!t || t->kind == DMUS_TAG_UNSERVABLE)
+        return dmus_tag_refuse( tag, t, "GetParam" );
+    return TRUE;
+}
+
+/* GetParam(REFGUID, DWORD, DWORD, MUSIC_TIME, MUSIC_TIME*, void*) */
+static UINT64 hand_dmus_getparam_p6( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, const GUID *, DWORD, DWORD, MUSIC_TIME,
+                          MUSIC_TIME *, void * ) = host_slot( host, slot );
+    const GUID *tag = (const GUID *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    void *pParam = (void *)(ULONG_PTR)winecom_read_arg( ctx, 6 );
+
+    if (!tag || !dmus_getparam_ok( tag )) return (UINT64)(UINT)E_NOTIMPL;
+    return dmus_getparam_call( host, slot, tag, pParam,
+        fn( host, tag, (DWORD)winecom_read_arg( ctx, 2 ),
+            (DWORD)winecom_read_arg( ctx, 3 ),
+            (MUSIC_TIME)winecom_read_arg( ctx, 4 ),
+            (MUSIC_TIME *)(ULONG_PTR)winecom_read_arg( ctx, 5 ),
+            pParam ) );
+}
+
+/* SetParam(REFGUID, DWORD, DWORD, MUSIC_TIME, void*) */
+static UINT64 hand_dmus_setparam_p5( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, const GUID *, DWORD, DWORD, MUSIC_TIME,
+                          void * ) = host_slot( host, slot );
+    const GUID *tag = (const GUID *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    void *pParam = (void *)(ULONG_PTR)winecom_read_arg( ctx, 5 );
+    DMUS_BAND_PARAM bp_copy;
+
+    if (!tag || !dmus_setparam_in( tag, &pParam, &bp_copy ))
+        return (UINT64)(UINT)E_NOTIMPL;
+    return (UINT64)(UINT)fn( host, tag, (DWORD)winecom_read_arg( ctx, 2 ),
+                             (DWORD)winecom_read_arg( ctx, 3 ),
+                             (MUSIC_TIME)winecom_read_arg( ctx, 4 ), pParam );
+}
+
+/* GetParam(REFGUID, MUSIC_TIME, MUSIC_TIME*, void*) -- the track shape */
+static UINT64 hand_dmus_getparam_t4( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, const GUID *, MUSIC_TIME, MUSIC_TIME *,
+                          void * ) = host_slot( host, slot );
+    const GUID *tag = (const GUID *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    void *pParam = (void *)(ULONG_PTR)winecom_read_arg( ctx, 4 );
+
+    if (!tag || !dmus_getparam_ok( tag )) return (UINT64)(UINT)E_NOTIMPL;
+    return dmus_getparam_call( host, slot, tag, pParam,
+        fn( host, tag, (MUSIC_TIME)winecom_read_arg( ctx, 2 ),
+            (MUSIC_TIME *)(ULONG_PTR)winecom_read_arg( ctx, 3 ), pParam ) );
+}
+
+/* SetParam(REFGUID, MUSIC_TIME, void*) -- the track shape */
+static UINT64 hand_dmus_setparam_t3( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, const GUID *, MUSIC_TIME, void * ) =
+        host_slot( host, slot );
+    const GUID *tag = (const GUID *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    void *pParam = (void *)(ULONG_PTR)winecom_read_arg( ctx, 3 );
+    DMUS_BAND_PARAM bp_copy;
+
+    if (!tag || !dmus_setparam_in( tag, &pParam, &bp_copy ))
+        return (UINT64)(UINT)E_NOTIMPL;
+    return (UINT64)(UINT)fn( host, tag,
+                             (MUSIC_TIME)winecom_read_arg( ctx, 2 ), pParam );
+}
+
+/* GetParamEx(REFGUID, DWORD, DWORD, DWORD, MUSIC_TIME, MUSIC_TIME*, void*) */
+static UINT64 hand_dmus_getparamex( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, const GUID *, DWORD, DWORD, DWORD,
+                          MUSIC_TIME, MUSIC_TIME *, void * ) = host_slot( host, slot );
+    const GUID *tag = (const GUID *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    void *pParam = (void *)(ULONG_PTR)winecom_read_arg( ctx, 7 );
+
+    if (!tag || !dmus_getparam_ok( tag )) return (UINT64)(UINT)E_NOTIMPL;
+    return dmus_getparam_call( host, slot, tag, pParam,
+        fn( host, tag, (DWORD)winecom_read_arg( ctx, 2 ),
+            (DWORD)winecom_read_arg( ctx, 3 ),
+            (DWORD)winecom_read_arg( ctx, 4 ),
+            (MUSIC_TIME)winecom_read_arg( ctx, 5 ),
+            (MUSIC_TIME *)(ULONG_PTR)winecom_read_arg( ctx, 6 ), pParam ) );
+}
+
+static UINT64 hand_dmus_init_audio( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    /* InitAudio(IDirectMusic**, IDirectSound**, HWND, DWORD, DWORD, DWORD,
+     * DMUS_AUDIOPARAMS*): the two interface cells are IN-OUT -- a non-NULL
+     * incoming value is the caller's own object (unwrapped), and whatever
+     * comes back is wrapped.  Local cells keep the guest's memory unmutated
+     * until the wrapped answer is ready. */
+    HRESULT (WINAPI *fn)( void *, void **, void **, HWND, DWORD, DWORD,
+                          DWORD, void * ) = host_slot( host, slot );
+    void **pdmus = (void **)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    void **pdsound = (void **)(ULONG_PTR)winecom_read_arg( ctx, 2 );
+    void *dmus_cell = NULL, *dsound_cell = NULL;
+    HRESULT hr;
+
+    if (pdmus && *pdmus && !winecom_to_native( *pdmus, ~0u, &dmus_cell ))
+        return (UINT64)(UINT)E_NOTIMPL;
+    if (pdsound && *pdsound && !winecom_to_native( *pdsound, ~0u, &dsound_cell ))
+        return (UINT64)(UINT)E_NOTIMPL;
+    hr = fn( host, pdmus ? &dmus_cell : NULL, pdsound ? &dsound_cell : NULL,
+             (HWND)(ULONG_PTR)winecom_read_arg( ctx, 3 ),
+             (DWORD)winecom_read_arg( ctx, 4 ),
+             (DWORD)winecom_read_arg( ctx, 5 ),
+             (DWORD)winecom_read_arg( ctx, 6 ),
+             (void *)(ULONG_PTR)winecom_read_arg( ctx, 7 ) );
+    if (SUCCEEDED(hr))
+    {
+        if (pdmus)
+            *pdmus = dmus_cell
+                ? winecom_wrap( dmus_cell, SYSCOM_IFACE_IDirectMusic ) : NULL;
+        if (pdsound)
+            *pdsound = dsound_cell
+                ? winecom_wrap( dsound_cell, SYSCOM_IFACE_IDirectSound ) : NULL;
+    }
+    return (UINT64)(UINT)hr;
+}
+
+/* (this, float, UINT32, const GUID *) -> HRESULT: OnSimpleVolumeChanged's
+ * forward form; the row's real value is the complete plan it gives the
+ * REVERSE direction, which is where a session-events sink is actually
+ * called. */
+static UINT64 hand_f_i_i( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    HRESULT (WINAPI *fn)( void *, float, UINT32, const void * ) = host_slot( host, slot );
+
+    return (UINT64)(UINT)fn( host, read_float_arg( ctx, 1 ),
+                             (UINT32)winecom_read_arg( ctx, 2 ),
+                             (const void *)(ULONG_PTR)winecom_read_arg( ctx, 3 ) );
+}
+
 /* The order here IS hand_funcs[] order in syscom_marshal.h. */
 static const winecom_hand_fn syscom_hand_funcs[] =
 {
@@ -615,7 +1613,42 @@ static const winecom_hand_fn syscom_hand_funcs[] =
     hand_mmdevice_activate,
     hand_mmdev_register_notify,
     hand_mmdev_unregister_notify,
+    /* the 2026-09-01 completeness pass: owned-family HAND_SLOTS order */
+    hand_nlm_get_network,
+    hand_nlm_get_network_connection,
+    hand_propkey_byval,
+    hand_propstore_setvalue,
+    hand_enum_next_variant,
+    /* FP_SHAPES, sorted by shape key: fi>i then fii>i */
     hand_f_i,
+    hand_f_i_i,
+    /* LEGACY_HAND, first-mention order (the generator dedups) */
+    hand_enum_next_unknown,
+    hand_enum_next_moniker,
+    hand_enum_next_cp,
+    hand_enum_next_connectdata,
+    hand_multi_qi,
+    hand_dispatch_invoke,
+    hand_typecomp_bind,
+    hand_dmus_stamp_pmsg,
+    hand_dmus_send_pmsg,
+    hand_dmus_alloc_pmsg,
+    hand_dmus_free_pmsg,
+    hand_dmus_clone_pmsg,
+    hand_dmus_process_pmsg,
+    hand_dmus_flush,
+    hand_dmus_get_notification_pmsg,
+    hand_dmus_loader_getobject,
+    hand_dmus_objdesc_in,
+    hand_dmus_enum_object,
+    hand_dmus_objdesc_out,
+    hand_dmus_parse_descriptor,
+    hand_dmus_getparam_p6,
+    hand_dmus_setparam_p5,
+    hand_dmus_getparamex,
+    hand_dmus_init_audio,
+    hand_dmus_getparam_t4,
+    hand_dmus_setparam_t3,
 };
 
 C_ASSERT( ARRAYSIZE(syscom_hand_funcs) == SYSCOM_HAND_COUNT );

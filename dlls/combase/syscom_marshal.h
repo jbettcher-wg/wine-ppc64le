@@ -1,13 +1,13 @@
 /* GENERATED -- do not edit.
  *
- * Marshal tables for the wine-syscom surface (86 interfaces, 1003 vtable
+ * Marshal tables for the wine-syscom surface (94 interfaces, 1056 vtable
  * slots).  Interface order is sorted by name -- the same order spec2thunk
  * COM mode gives the guest module's stub arrays, and the runtime
  * cross-checks the IIDs at attach so the two cannot silently disagree.
  * Slot/iface types and WINECOM_CA_* classes come from
  * include/wine/winecom.h, which must be included before this file.
  *
- * The 28 audio interfaces -- the XAudio2 2.7 family and the WASAPI device
+ * The 36 audio interfaces -- the XAudio2 2.7 family and the WASAPI device
  * chain -- are generated from interfaces_syscom.json by
  * ppc64le/syscom/gen_syscom_audio.py, which also owns the enum, the
  * interface array and the roster indices in every xaux[] here.  The other
@@ -47,91 +47,99 @@ enum syscom_iface_index
     SYSCOM_IFACE_IAudioClient = 2,
     SYSCOM_IFACE_IAudioRenderClient = 3,
     SYSCOM_IFACE_IAudioSessionControl = 4,
-    SYSCOM_IFACE_IAudioSessionManager = 5,
-    SYSCOM_IFACE_IAudioSessionManager2 = 6,
-    SYSCOM_IFACE_IBindCtx = 7,
-    SYSCOM_IFACE_IClassFactory = 8,
-    SYSCOM_IFACE_IConnectionPoint = 9,
-    SYSCOM_IFACE_IConnectionPointContainer = 10,
-    SYSCOM_IFACE_ICreateErrorInfo = 11,
-    SYSCOM_IFACE_IDirectMusic = 12,
-    SYSCOM_IFACE_IDirectMusicAudioPath = 13,
-    SYSCOM_IFACE_IDirectMusicBand = 14,
-    SYSCOM_IFACE_IDirectMusicBuffer = 15,
-    SYSCOM_IFACE_IDirectMusicDownloadedInstrument = 16,
-    SYSCOM_IFACE_IDirectMusicGetLoader = 17,
-    SYSCOM_IFACE_IDirectMusicGraph = 18,
-    SYSCOM_IFACE_IDirectMusicInstrument = 19,
-    SYSCOM_IFACE_IDirectMusicLoader = 20,
-    SYSCOM_IFACE_IDirectMusicLoader8 = 21,
-    SYSCOM_IFACE_IDirectMusicObject = 22,
-    SYSCOM_IFACE_IDirectMusicPerformance = 23,
-    SYSCOM_IFACE_IDirectMusicPerformance8 = 24,
-    SYSCOM_IFACE_IDirectMusicPort = 25,
-    SYSCOM_IFACE_IDirectMusicSegment = 26,
-    SYSCOM_IFACE_IDirectMusicSegment8 = 27,
-    SYSCOM_IFACE_IDirectMusicSegmentState = 28,
-    SYSCOM_IFACE_IDirectMusicTool = 29,
-    SYSCOM_IFACE_IDirectMusicTrack = 30,
-    SYSCOM_IFACE_IDirectSound = 31,
-    SYSCOM_IFACE_IDirectSoundBuffer = 32,
-    SYSCOM_IFACE_IDispatch = 33,
-    SYSCOM_IFACE_IEnumConnectionPoints = 34,
-    SYSCOM_IFACE_IEnumConnections = 35,
-    SYSCOM_IFACE_IEnumMoniker = 36,
-    SYSCOM_IFACE_IEnumNetworkConnections = 37,
-    SYSCOM_IFACE_IEnumNetworks = 38,
-    SYSCOM_IFACE_IEnumSTATSTG = 39,
-    SYSCOM_IFACE_IEnumString = 40,
-    SYSCOM_IFACE_IEnumUnknown = 41,
-    SYSCOM_IFACE_IEnumWbemClassObject = 42,
-    SYSCOM_IFACE_IErrorInfo = 43,
-    SYSCOM_IFACE_IGlobalInterfaceTable = 44,
-    SYSCOM_IFACE_IInspectable = 45,
-    SYSCOM_IFACE_ILockBytes = 46,
-    SYSCOM_IFACE_IMMDevice = 47,
-    SYSCOM_IFACE_IMMDeviceCollection = 48,
-    SYSCOM_IFACE_IMMDeviceEnumerator = 49,
-    SYSCOM_IFACE_IMMNotificationClient = 50,
-    SYSCOM_IFACE_IMalloc = 51,
-    SYSCOM_IFACE_IMarshal = 52,
-    SYSCOM_IFACE_IMoniker = 53,
-    SYSCOM_IFACE_IMultiQI = 54,
-    SYSCOM_IFACE_INetwork = 55,
-    SYSCOM_IFACE_INetworkConnection = 56,
-    SYSCOM_IFACE_INetworkListManager = 57,
-    SYSCOM_IFACE_IPersist = 58,
-    SYSCOM_IFACE_IPersistFile = 59,
-    SYSCOM_IFACE_IPersistStream = 60,
-    SYSCOM_IFACE_IPersistStreamInit = 61,
-    SYSCOM_IFACE_IPropertyStore = 62,
-    SYSCOM_IFACE_IRecordInfo = 63,
-    SYSCOM_IFACE_IReferenceClock = 64,
-    SYSCOM_IFACE_IRunningObjectTable = 65,
-    SYSCOM_IFACE_ISequentialStream = 66,
-    SYSCOM_IFACE_ISimpleAudioVolume = 67,
-    SYSCOM_IFACE_IStorage = 68,
-    SYSCOM_IFACE_IStream = 69,
-    SYSCOM_IFACE_ISupportErrorInfo = 70,
-    SYSCOM_IFACE_ITypeComp = 71,
-    SYSCOM_IFACE_ITypeInfo = 72,
-    SYSCOM_IFACE_ITypeLib = 73,
-    SYSCOM_IFACE_IUnknown = 74,
-    SYSCOM_IFACE_IWbemClassObject = 75,
-    SYSCOM_IFACE_IWbemContext = 76,
-    SYSCOM_IFACE_IWbemLocator = 77,
-    SYSCOM_IFACE_IWbemServices = 78,
-    SYSCOM_IFACE_IXAudio2 = 79,
-    SYSCOM_IFACE_IXAudio2EngineCallback = 80,
-    SYSCOM_IFACE_IXAudio2MasteringVoice = 81,
-    SYSCOM_IFACE_IXAudio2SourceVoice = 82,
-    SYSCOM_IFACE_IXAudio2SubmixVoice = 83,
-    SYSCOM_IFACE_IXAudio2Voice = 84,
-    SYSCOM_IFACE_IXAudio2VoiceCallback = 85,
-    SYSCOM_IFACE_COUNT = 86
+    SYSCOM_IFACE_IAudioSessionEnumerator = 5,
+    SYSCOM_IFACE_IAudioSessionEvents = 6,
+    SYSCOM_IFACE_IAudioSessionManager = 7,
+    SYSCOM_IFACE_IAudioSessionManager2 = 8,
+    SYSCOM_IFACE_IAudioSessionNotification = 9,
+    SYSCOM_IFACE_IAudioVolumeDuckNotification = 10,
+    SYSCOM_IFACE_IBindCtx = 11,
+    SYSCOM_IFACE_IClassFactory = 12,
+    SYSCOM_IFACE_IConnectionPoint = 13,
+    SYSCOM_IFACE_IConnectionPointContainer = 14,
+    SYSCOM_IFACE_ICreateErrorInfo = 15,
+    SYSCOM_IFACE_IDirectMusic = 16,
+    SYSCOM_IFACE_IDirectMusicAudioPath = 17,
+    SYSCOM_IFACE_IDirectMusicBand = 18,
+    SYSCOM_IFACE_IDirectMusicBuffer = 19,
+    SYSCOM_IFACE_IDirectMusicDownloadedInstrument = 20,
+    SYSCOM_IFACE_IDirectMusicGetLoader = 21,
+    SYSCOM_IFACE_IDirectMusicGraph = 22,
+    SYSCOM_IFACE_IDirectMusicInstrument = 23,
+    SYSCOM_IFACE_IDirectMusicLoader = 24,
+    SYSCOM_IFACE_IDirectMusicLoader8 = 25,
+    SYSCOM_IFACE_IDirectMusicObject = 26,
+    SYSCOM_IFACE_IDirectMusicPerformance = 27,
+    SYSCOM_IFACE_IDirectMusicPerformance8 = 28,
+    SYSCOM_IFACE_IDirectMusicPort = 29,
+    SYSCOM_IFACE_IDirectMusicSegment = 30,
+    SYSCOM_IFACE_IDirectMusicSegment8 = 31,
+    SYSCOM_IFACE_IDirectMusicSegmentState = 32,
+    SYSCOM_IFACE_IDirectMusicTool = 33,
+    SYSCOM_IFACE_IDirectMusicTrack = 34,
+    SYSCOM_IFACE_IDirectSound = 35,
+    SYSCOM_IFACE_IDirectSoundBuffer = 36,
+    SYSCOM_IFACE_IDispatch = 37,
+    SYSCOM_IFACE_IEnumConnectionPoints = 38,
+    SYSCOM_IFACE_IEnumConnections = 39,
+    SYSCOM_IFACE_IEnumMoniker = 40,
+    SYSCOM_IFACE_IEnumNetworkConnections = 41,
+    SYSCOM_IFACE_IEnumNetworks = 42,
+    SYSCOM_IFACE_IEnumSTATSTG = 43,
+    SYSCOM_IFACE_IEnumString = 44,
+    SYSCOM_IFACE_IEnumUnknown = 45,
+    SYSCOM_IFACE_IEnumVARIANT = 46,
+    SYSCOM_IFACE_IEnumWbemClassObject = 47,
+    SYSCOM_IFACE_IErrorInfo = 48,
+    SYSCOM_IFACE_IGlobalInterfaceTable = 49,
+    SYSCOM_IFACE_IInspectable = 50,
+    SYSCOM_IFACE_ILockBytes = 51,
+    SYSCOM_IFACE_IMMDevice = 52,
+    SYSCOM_IFACE_IMMDeviceCollection = 53,
+    SYSCOM_IFACE_IMMDeviceEnumerator = 54,
+    SYSCOM_IFACE_IMMNotificationClient = 55,
+    SYSCOM_IFACE_IMalloc = 56,
+    SYSCOM_IFACE_IMarshal = 57,
+    SYSCOM_IFACE_IMoniker = 58,
+    SYSCOM_IFACE_IMultiQI = 59,
+    SYSCOM_IFACE_INetwork = 60,
+    SYSCOM_IFACE_INetworkConnection = 61,
+    SYSCOM_IFACE_INetworkListManager = 62,
+    SYSCOM_IFACE_IPersist = 63,
+    SYSCOM_IFACE_IPersistFile = 64,
+    SYSCOM_IFACE_IPersistStream = 65,
+    SYSCOM_IFACE_IPersistStreamInit = 66,
+    SYSCOM_IFACE_IPropertyStore = 67,
+    SYSCOM_IFACE_IRecordInfo = 68,
+    SYSCOM_IFACE_IReferenceClock = 69,
+    SYSCOM_IFACE_IRunningObjectTable = 70,
+    SYSCOM_IFACE_ISequentialStream = 71,
+    SYSCOM_IFACE_ISimpleAudioVolume = 72,
+    SYSCOM_IFACE_IStorage = 73,
+    SYSCOM_IFACE_IStream = 74,
+    SYSCOM_IFACE_ISupportErrorInfo = 75,
+    SYSCOM_IFACE_ITypeComp = 76,
+    SYSCOM_IFACE_ITypeInfo = 77,
+    SYSCOM_IFACE_ITypeLib = 78,
+    SYSCOM_IFACE_IUnknown = 79,
+    SYSCOM_IFACE_IWbemCallResult = 80,
+    SYSCOM_IFACE_IWbemClassObject = 81,
+    SYSCOM_IFACE_IWbemContext = 82,
+    SYSCOM_IFACE_IWbemLocator = 83,
+    SYSCOM_IFACE_IWbemObjectSink = 84,
+    SYSCOM_IFACE_IWbemQualifierSet = 85,
+    SYSCOM_IFACE_IWbemServices = 86,
+    SYSCOM_IFACE_IXAudio2 = 87,
+    SYSCOM_IFACE_IXAudio2EngineCallback = 88,
+    SYSCOM_IFACE_IXAudio2MasteringVoice = 89,
+    SYSCOM_IFACE_IXAudio2SourceVoice = 90,
+    SYSCOM_IFACE_IXAudio2SubmixVoice = 91,
+    SYSCOM_IFACE_IXAudio2Voice = 92,
+    SYSCOM_IFACE_IXAudio2VoiceCallback = 93,
+    SYSCOM_IFACE_COUNT = 94
 };
 
-#define SYSCOM_HAND_COUNT 9
+#define SYSCOM_HAND_COUNT 41
 
 #define SYSCOM_SLOT_IXAudio2Voice_DestroyVoice 18
 
@@ -144,11 +152,43 @@ enum syscom_iface_index
  *   5 hand_mmdevice_activate
  *   6 hand_mmdev_register_notify
  *   7 hand_mmdev_unregister_notify
- *   8 hand_f_i
+ *   8 hand_nlm_get_network
+ *   9 hand_nlm_get_network_connection
+ *   10 hand_propkey_byval
+ *   11 hand_propstore_setvalue
+ *   12 hand_enum_next_variant
+ *   13 hand_f_i
+ *   14 hand_f_i_i
+ *   15 hand_enum_next_unknown
+ *   16 hand_enum_next_moniker
+ *   17 hand_enum_next_cp
+ *   18 hand_enum_next_connectdata
+ *   19 hand_multi_qi
+ *   20 hand_dispatch_invoke
+ *   21 hand_typecomp_bind
+ *   22 hand_dmus_stamp_pmsg
+ *   23 hand_dmus_send_pmsg
+ *   24 hand_dmus_alloc_pmsg
+ *   25 hand_dmus_free_pmsg
+ *   26 hand_dmus_clone_pmsg
+ *   27 hand_dmus_process_pmsg
+ *   28 hand_dmus_flush
+ *   29 hand_dmus_get_notification_pmsg
+ *   30 hand_dmus_loader_getobject
+ *   31 hand_dmus_objdesc_in
+ *   32 hand_dmus_enum_object
+ *   33 hand_dmus_objdesc_out
+ *   34 hand_dmus_parse_descriptor
+ *   35 hand_dmus_getparam_p6
+ *   36 hand_dmus_setparam_p5
+ *   37 hand_dmus_getparamex
+ *   38 hand_dmus_init_audio
+ *   39 hand_dmus_getparam_t4
+ *   40 hand_dmus_setparam_t3
  */
 
 static const unsigned char cls_IActivationFactory_6[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IActivationFactory_6[] = { 45 };
+static const unsigned char xaux_IActivationFactory_6[] = { 50 };
 static const struct winecom_slot slots_IActivationFactory[7] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -196,6 +236,10 @@ static const struct winecom_slot slots_IAudioRenderClient[5] =
     { "IAudioRenderClient::ReleaseBuffer", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
 };
 
+static const unsigned char cls_IAudioSessionControl_10[] = { WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IAudioSessionControl_10[] = { 6 };
+static const unsigned char cls_IAudioSessionControl_11[] = { WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IAudioSessionControl_11[] = { 6 };
 static const struct winecom_slot slots_IAudioSessionControl[12] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -208,18 +252,39 @@ static const struct winecom_slot slots_IAudioSessionControl[12] =
     { "IAudioSessionControl::SetIconPath", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IAudioSessionControl::GetGroupingParam", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IAudioSessionControl::SetGroupingParam", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
-    { "IAudioSessionControl::RegisterAudioSessionNotification",
-      "IAudioSessionControl::RegisterAudioSessionNotification: takes `IAudioSessionEvents *NewNotifications`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 2, 0, 0, 0 },
-    { "IAudioSessionControl::UnregisterAudioSessionNotification",
-      "IAudioSessionControl::UnregisterAudioSessionNotification: takes `IAudioSessionEvents *NewNotifications`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 2, 0, 0, 0 },
+    { "IAudioSessionControl::RegisterAudioSessionNotification", NULL, cls_IAudioSessionControl_10, xaux_IAudioSessionControl_10, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x01 },
+    { "IAudioSessionControl::UnregisterAudioSessionNotification", NULL, cls_IAudioSessionControl_11, xaux_IAudioSessionControl_11, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x01 },
+};
+
+static const unsigned char cls_IAudioSessionEnumerator_4[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IAudioSessionEnumerator_4[] = { 0, 4 };
+static const struct winecom_slot slots_IAudioSessionEnumerator[5] =
+{
+    { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
+    { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
+    { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
+    { "IAudioSessionEnumerator::GetCount", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IAudioSessionEnumerator::GetSession", NULL, cls_IAudioSessionEnumerator_4, xaux_IAudioSessionEnumerator_4, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x02 },
+};
+
+static const struct winecom_slot slots_IAudioSessionEvents[10] =
+{
+    { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
+    { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
+    { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
+    { "IAudioSessionEvents::OnDisplayNameChanged", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IAudioSessionEvents::OnIconPathChanged", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IAudioSessionEvents::OnSimpleVolumeChanged", NULL, NULL, NULL, 4, WINECOM_F_HAND|WINECOM_F_REV, 14, 0, NULL, 0x01, 0x00, 0x00 },
+    { "IAudioSessionEvents::OnChannelVolumeChanged", NULL, NULL, NULL, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IAudioSessionEvents::OnGroupingParamChanged", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IAudioSessionEvents::OnStateChanged", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IAudioSessionEvents::OnSessionDisconnected", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
 };
 
 static const unsigned char cls_IAudioSessionManager_3[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IAudioSessionManager_3[] = { 0, 0, 4 };
 static const unsigned char cls_IAudioSessionManager_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IAudioSessionManager_4[] = { 0, 0, 67 };
+static const unsigned char xaux_IAudioSessionManager_4[] = { 0, 0, 72 };
 static const struct winecom_slot slots_IAudioSessionManager[5] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -232,7 +297,17 @@ static const struct winecom_slot slots_IAudioSessionManager[5] =
 static const unsigned char cls_IAudioSessionManager2_3[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IAudioSessionManager2_3[] = { 0, 0, 4 };
 static const unsigned char cls_IAudioSessionManager2_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IAudioSessionManager2_4[] = { 0, 0, 67 };
+static const unsigned char xaux_IAudioSessionManager2_4[] = { 0, 0, 72 };
+static const unsigned char cls_IAudioSessionManager2_5[] = { WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IAudioSessionManager2_5[] = { 5 };
+static const unsigned char cls_IAudioSessionManager2_6[] = { WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IAudioSessionManager2_6[] = { 9 };
+static const unsigned char cls_IAudioSessionManager2_7[] = { WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IAudioSessionManager2_7[] = { 9 };
+static const unsigned char cls_IAudioSessionManager2_8[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IAudioSessionManager2_8[] = { 0, 10 };
+static const unsigned char cls_IAudioSessionManager2_9[] = { WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IAudioSessionManager2_9[] = { 10 };
 static const struct winecom_slot slots_IAudioSessionManager2[10] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -240,33 +315,42 @@ static const struct winecom_slot slots_IAudioSessionManager2[10] =
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IAudioSessionManager::GetAudioSessionControl", NULL, cls_IAudioSessionManager2_3, xaux_IAudioSessionManager2_3, 4, 0, 0, 0, NULL, 0x00, 0x00, 0x04 },
     { "IAudioSessionManager::GetSimpleAudioVolume", NULL, cls_IAudioSessionManager2_4, xaux_IAudioSessionManager2_4, 4, 0, 0, 0, NULL, 0x00, 0x00, 0x04 },
-    { "IAudioSessionManager2::GetSessionEnumerator",
-      "IAudioSessionManager2::GetSessionEnumerator: takes `IAudioSessionEnumerator **SessionEnum`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 2, 0, 0, 0 },
-    { "IAudioSessionManager2::RegisterSessionNotification",
-      "IAudioSessionManager2::RegisterSessionNotification: takes `IAudioSessionNotification *SessionNotification`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 2, 0, 0, 0 },
-    { "IAudioSessionManager2::UnregisterSessionNotification",
-      "IAudioSessionManager2::UnregisterSessionNotification: takes `IAudioSessionNotification *SessionNotification`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 2, 0, 0, 0 },
-    { "IAudioSessionManager2::RegisterDuckNotification",
-      "IAudioSessionManager2::RegisterDuckNotification: takes `IAudioVolumeDuckNotification *duckNotification`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 3, 0, 0, 0 },
-    { "IAudioSessionManager2::UnregisterDuckNotification",
-      "IAudioSessionManager2::UnregisterDuckNotification: takes `IAudioVolumeDuckNotification *duckNotification`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 2, 0, 0, 0 },
+    { "IAudioSessionManager2::GetSessionEnumerator", NULL, cls_IAudioSessionManager2_5, xaux_IAudioSessionManager2_5, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x01 },
+    { "IAudioSessionManager2::RegisterSessionNotification", NULL, cls_IAudioSessionManager2_6, xaux_IAudioSessionManager2_6, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x01 },
+    { "IAudioSessionManager2::UnregisterSessionNotification", NULL, cls_IAudioSessionManager2_7, xaux_IAudioSessionManager2_7, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x01 },
+    { "IAudioSessionManager2::RegisterDuckNotification", NULL, cls_IAudioSessionManager2_8, xaux_IAudioSessionManager2_8, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x02 },
+    { "IAudioSessionManager2::UnregisterDuckNotification", NULL, cls_IAudioSessionManager2_9, xaux_IAudioSessionManager2_9, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x01 },
+};
+
+static const unsigned char cls_IAudioSessionNotification_3[] = { WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IAudioSessionNotification_3[] = { 4 };
+static const struct winecom_slot slots_IAudioSessionNotification[4] =
+{
+    { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
+    { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
+    { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
+    { "IAudioSessionNotification::OnSessionCreated", NULL, cls_IAudioSessionNotification_3, xaux_IAudioSessionNotification_3, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+};
+
+static const struct winecom_slot slots_IAudioVolumeDuckNotification[5] =
+{
+    { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
+    { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
+    { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
+    { "IAudioVolumeDuckNotification::OnVolumeDuckNotification", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IAudioVolumeDuckNotification::OnVolumeUnduckNotification", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
 };
 
 static const unsigned char cls_IBindCtx_3[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IBindCtx_4[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IBindCtx_8[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IBindCtx_8[] = { 65 };
+static const unsigned char xaux_IBindCtx_8[] = { 70 };
 static const unsigned char cls_IBindCtx_11[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IBindCtx_11[] = { 40 };
+static const unsigned char xaux_IBindCtx_11[] = { 44 };
 static const unsigned char cls_IBindCtx_9[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IBindCtx_9[] = { 0, 74 };
+static const unsigned char xaux_IBindCtx_9[] = { 0, 79 };
 static const unsigned char cls_IBindCtx_10[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IBindCtx_10[] = { 0, 74 };
+static const unsigned char xaux_IBindCtx_10[] = { 0, 79 };
 static const struct winecom_slot slots_IBindCtx[13] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -298,10 +382,10 @@ static const struct winecom_slot slots_IClassFactory[5] =
 };
 
 static const unsigned char cls_IConnectionPoint_4[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IConnectionPoint_4[] = { 10 };
+static const unsigned char xaux_IConnectionPoint_4[] = { 14 };
 static const unsigned char cls_IConnectionPoint_5[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IConnectionPoint_7[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IConnectionPoint_7[] = { 35 };
+static const unsigned char xaux_IConnectionPoint_7[] = { 39 };
 static const struct winecom_slot slots_IConnectionPoint[8] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -315,9 +399,9 @@ static const struct winecom_slot slots_IConnectionPoint[8] =
 };
 
 static const unsigned char cls_IConnectionPointContainer_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IConnectionPointContainer_3[] = { 34 };
+static const unsigned char xaux_IConnectionPointContainer_3[] = { 38 };
 static const unsigned char cls_IConnectionPointContainer_4[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IConnectionPointContainer_4[] = { 0, 9 };
+static const unsigned char xaux_IConnectionPointContainer_4[] = { 0, 13 };
 static const struct winecom_slot slots_IConnectionPointContainer[5] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -343,12 +427,12 @@ static const struct winecom_slot slots_ICreateErrorInfo[8] =
 };
 
 static const unsigned char cls_IDirectMusic_4[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IDirectMusic_4[] = { 0, 15, 0 };
+static const unsigned char xaux_IDirectMusic_4[] = { 0, 19, 0 };
 static const unsigned char cls_IDirectMusic_5[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IDirectMusic_5[] = { 0, 0, 25, 0 };
+static const unsigned char xaux_IDirectMusic_5[] = { 0, 0, 29, 0 };
 static const unsigned char cls_IDirectMusic_11[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IDirectMusic_7[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusic_7[] = { 0, 64 };
+static const unsigned char xaux_IDirectMusic_7[] = { 0, 69 };
 static const struct winecom_slot slots_IDirectMusic[12] =
 {
     { "IDirectMusic::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -367,21 +451,21 @@ static const struct winecom_slot slots_IDirectMusic[12] =
     { "IDirectMusic::SetDirectSound", NULL, cls_IDirectMusic_11, NULL, 3, 0, 0, 0 },
 };
 
+static const unsigned char cls_IDirectMusicAudioPath_3[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const struct winecom_slot slots_IDirectMusicAudioPath[7] =
 {
     { "IDirectMusicAudioPath::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
     { "IDirectMusicAudioPath::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IDirectMusicAudioPath::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
-    { "IDirectMusicAudioPath::GetObjectInPath",
-      "IDirectMusicAudioPath::GetObjectInPath arg 6 is a void** with no preceding REFIID and is not in RAW_VOID_OUT",
-      NULL, NULL, 8, 0, 0, 0 },
+    /* upgraded from a legacy refusal -- see the banner */
+    { "IDirectMusicAudioPath::GetObjectInPath", NULL, cls_IDirectMusicAudioPath_3, NULL, 8, 0, 5, 0, NULL, 0x00, 0x00, 0x00 },
     { "IDirectMusicAudioPath::Activate", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicAudioPath::SetVolume", NULL, NULL, NULL, 3, 0, 0, 0 },
     { "IDirectMusicAudioPath::ConvertPChannel", NULL, NULL, NULL, 3, 0, 0, 0 },
 };
 
 static const unsigned char cls_IDirectMusicBand_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicBand_3[] = { 26 };
+static const unsigned char xaux_IDirectMusicBand_3[] = { 30 };
 static const unsigned char cls_IDirectMusicBand_4[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicBand_5[] = { WINECOM_CA_IFACE_IN };
 static const struct winecom_slot slots_IDirectMusicBand[6] =
@@ -429,7 +513,7 @@ static const struct winecom_slot slots_IDirectMusicDownloadedInstrument[3] =
 };
 
 static const unsigned char cls_IDirectMusicGetLoader_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicGetLoader_3[] = { 20 };
+static const unsigned char xaux_IDirectMusicGetLoader_3[] = { 24 };
 static const struct winecom_slot slots_IDirectMusicGetLoader[4] =
 {
     { "IDirectMusicGetLoader::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -440,16 +524,15 @@ static const struct winecom_slot slots_IDirectMusicGetLoader[4] =
 
 static const unsigned char cls_IDirectMusicGraph_4[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_IDirectMusicGraph_5[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicGraph_5[] = { 0, 29 };
+static const unsigned char xaux_IDirectMusicGraph_5[] = { 0, 33 };
 static const unsigned char cls_IDirectMusicGraph_6[] = { WINECOM_CA_IFACE_IN };
 static const struct winecom_slot slots_IDirectMusicGraph[7] =
 {
     { "IDirectMusicGraph::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
     { "IDirectMusicGraph::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IDirectMusicGraph::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
-    { "IDirectMusicGraph::StampPMsg",
-      "IDirectMusicGraph::StampPMsg: DMUS_PMSG carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 2, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_stamp_pmsg */
+    { "IDirectMusicGraph::StampPMsg", NULL, NULL, NULL, 2, WINECOM_F_HAND, 21, 0, NULL, 0, 0, 0 },
     { "IDirectMusicGraph::InsertTool", NULL, cls_IDirectMusicGraph_4, NULL, 5, 0, 0, 0 },
     { "IDirectMusicGraph::GetTool", NULL, cls_IDirectMusicGraph_5, xaux_IDirectMusicGraph_5, 3, 0, 0, 0 },
     { "IDirectMusicGraph::RemoveTool", NULL, cls_IDirectMusicGraph_6, NULL, 2, 0, 0, 0 },
@@ -471,51 +554,45 @@ static const struct winecom_slot slots_IDirectMusicLoader[12] =
     { "IDirectMusicLoader::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
     { "IDirectMusicLoader::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IDirectMusicLoader::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
-    { "IDirectMusicLoader::GetObject",
-      "IDirectMusicLoader::GetObject: DMUS_OBJECTDESC carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 4, 0, 0, 0 },
-    { "IDirectMusicLoader::SetObject",
-      "IDirectMusicLoader::SetObject: DMUS_OBJECTDESC carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 2, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_loader_getobject */
+    { "IDirectMusicLoader::GetObject", NULL, NULL, NULL, 4, WINECOM_F_HAND, 29, 0, NULL, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_objdesc_in */
+    { "IDirectMusicLoader::SetObject", NULL, NULL, NULL, 2, WINECOM_F_HAND, 30, 0, NULL, 0, 0, 0 },
     { "IDirectMusicLoader::SetSearchDirectory", NULL, NULL, NULL, 4, 0, 0, 0 },
     { "IDirectMusicLoader::ScanDirectory", NULL, NULL, NULL, 4, 0, 0, 0 },
     { "IDirectMusicLoader::CacheObject", NULL, cls_IDirectMusicLoader_7, NULL, 2, 0, 0, 0 },
     { "IDirectMusicLoader::ReleaseObject", NULL, cls_IDirectMusicLoader_8, NULL, 2, 0, 0, 0 },
     { "IDirectMusicLoader::ClearCache", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicLoader::EnableCache", NULL, NULL, NULL, 3, 0, 0, 0 },
-    { "IDirectMusicLoader::EnumObject",
-      "IDirectMusicLoader::EnumObject: DMUS_OBJECTDESC carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 4, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_enum_object */
+    { "IDirectMusicLoader::EnumObject", NULL, NULL, NULL, 4, WINECOM_F_HAND, 31, 0, NULL, 0, 0, 0 },
 };
 
 static const unsigned char cls_IDirectMusicLoader8_7[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicLoader8_8[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicLoader8_13[] = { WINECOM_CA_IFACE_IN };
+static const unsigned char cls_IDirectMusicLoader8_14[] = { WINECOM_CA_PASS, WINECOM_CA_RIID, WINECOM_CA_PASS, WINECOM_CA_PPV_OUT };
 static const struct winecom_slot slots_IDirectMusicLoader8[15] =
 {
     { "IDirectMusicLoader8::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
     { "IDirectMusicLoader8::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IDirectMusicLoader8::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
-    { "IDirectMusicLoader8::GetObject",
-      "IDirectMusicLoader8::GetObject: DMUS_OBJECTDESC carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 4, 0, 0, 0 },
-    { "IDirectMusicLoader8::SetObject",
-      "IDirectMusicLoader8::SetObject: DMUS_OBJECTDESC carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 2, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_loader_getobject */
+    { "IDirectMusicLoader8::GetObject", NULL, NULL, NULL, 4, WINECOM_F_HAND, 29, 0, NULL, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_objdesc_in */
+    { "IDirectMusicLoader8::SetObject", NULL, NULL, NULL, 2, WINECOM_F_HAND, 30, 0, NULL, 0, 0, 0 },
     { "IDirectMusicLoader8::SetSearchDirectory", NULL, NULL, NULL, 4, 0, 0, 0 },
     { "IDirectMusicLoader8::ScanDirectory", NULL, NULL, NULL, 4, 0, 0, 0 },
     { "IDirectMusicLoader8::CacheObject", NULL, cls_IDirectMusicLoader8_7, NULL, 2, 0, 0, 0 },
     { "IDirectMusicLoader8::ReleaseObject", NULL, cls_IDirectMusicLoader8_8, NULL, 2, 0, 0, 0 },
     { "IDirectMusicLoader8::ClearCache", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicLoader8::EnableCache", NULL, NULL, NULL, 3, 0, 0, 0 },
-    { "IDirectMusicLoader8::EnumObject",
-      "IDirectMusicLoader8::EnumObject: DMUS_OBJECTDESC carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 4, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_enum_object */
+    { "IDirectMusicLoader8::EnumObject", NULL, NULL, NULL, 4, WINECOM_F_HAND, 31, 0, NULL, 0, 0, 0 },
     { "IDirectMusicLoader8::CollectGarbage", NULL, NULL, NULL, 1, 1, 0, 0 },
     { "IDirectMusicLoader8::ReleaseObjectByUnknown", NULL, cls_IDirectMusicLoader8_13, NULL, 2, 0, 0, 0 },
-    { "IDirectMusicLoader8::LoadObjectFromFile",
-      "IDirectMusicLoader8::LoadObjectFromFile arg 3 is a void** with no preceding REFIID and is not in RAW_VOID_OUT",
-      NULL, NULL, 5, 0, 0, 0 },
+    /* upgraded from a legacy refusal -- see the banner */
+    { "IDirectMusicLoader8::LoadObjectFromFile", NULL, cls_IDirectMusicLoader8_14, NULL, 5, 0, 1, 0, NULL, 0x00, 0x00, 0x00 },
 };
 
 static const struct winecom_slot slots_IDirectMusicObject[6] =
@@ -523,36 +600,33 @@ static const struct winecom_slot slots_IDirectMusicObject[6] =
     { "IDirectMusicObject::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
     { "IDirectMusicObject::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IDirectMusicObject::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
-    { "IDirectMusicObject::GetDescriptor",
-      "IDirectMusicObject::GetDescriptor: DMUS_OBJECTDESC carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 2, 0, 0, 0 },
-    { "IDirectMusicObject::SetDescriptor",
-      "IDirectMusicObject::SetDescriptor: DMUS_OBJECTDESC carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 2, 0, 0, 0 },
-    { "IDirectMusicObject::ParseDescriptor",
-      "IDirectMusicObject::ParseDescriptor: DMUS_OBJECTDESC carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 3, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_objdesc_out */
+    { "IDirectMusicObject::GetDescriptor", NULL, NULL, NULL, 2, WINECOM_F_HAND, 32, 0, NULL, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_objdesc_in */
+    { "IDirectMusicObject::SetDescriptor", NULL, NULL, NULL, 2, WINECOM_F_HAND, 30, 0, NULL, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_parse_descriptor */
+    { "IDirectMusicObject::ParseDescriptor", NULL, NULL, NULL, 3, WINECOM_F_HAND, 33, 0, NULL, 0, 0, 0 },
 };
 
 static const unsigned char cls_IDirectMusicPerformance_3[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
-static const unsigned char xaux_IDirectMusicPerformance_3[] = { 12, 0, 0 };
+static const unsigned char xaux_IDirectMusicPerformance_3[] = { 16, 0, 0 };
 static const unsigned char cls_IDirectMusicPerformance_4[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicPerformance_4[] = { 0, 0, 0, 28 };
+static const unsigned char xaux_IDirectMusicPerformance_4[] = { 0, 0, 0, 32 };
 static const unsigned char cls_IDirectMusicPerformance_5[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_IDirectMusicPerformance_6[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS };
-static const unsigned char xaux_IDirectMusicPerformance_6[] = { 28, 0 };
+static const unsigned char xaux_IDirectMusicPerformance_6[] = { 32, 0 };
 static const unsigned char cls_IDirectMusicPerformance_14[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicPerformance_18[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicPerformance_18[] = { 18 };
+static const unsigned char xaux_IDirectMusicPerformance_18[] = { 22 };
 static const unsigned char cls_IDirectMusicPerformance_19[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicPerformance_24[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicPerformance_25[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicPerformance_26[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IDirectMusicPerformance_27[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_IDirectMusicPerformance_28[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IDirectMusicPerformance_28[] = { 0, 25, 0, 0 };
+static const unsigned char xaux_IDirectMusicPerformance_28[] = { 0, 29, 0, 0 };
 static const unsigned char cls_IDirectMusicPerformance_29[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IDirectMusicPerformance_29[] = { 0, 0, 16, 0, 0, 25, 0, 0 };
+static const unsigned char xaux_IDirectMusicPerformance_29[] = { 0, 0, 20, 0, 0, 29, 0, 0 };
 static const struct winecom_slot slots_IDirectMusicPerformance[44] =
 {
     { "IDirectMusicPerformance::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -566,25 +640,21 @@ static const struct winecom_slot slots_IDirectMusicPerformance[44] =
     { "IDirectMusicPerformance::GetPrepareTime", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicPerformance::SetBumperLength", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicPerformance::GetBumperLength", NULL, NULL, NULL, 2, 0, 0, 0 },
-    { "IDirectMusicPerformance::SendPMsg",
-      "IDirectMusicPerformance::SendPMsg: DMUS_PMSG carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 2, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_send_pmsg */
+    { "IDirectMusicPerformance::SendPMsg", NULL, NULL, NULL, 2, WINECOM_F_HAND, 22, 0, NULL, 0, 0, 0 },
     { "IDirectMusicPerformance::MusicToReferenceTime", NULL, NULL, NULL, 3, 0, 0, 0 },
     { "IDirectMusicPerformance::ReferenceToMusicTime", NULL, NULL, NULL, 3, 0, 0, 0 },
     { "IDirectMusicPerformance::IsPlaying", NULL, cls_IDirectMusicPerformance_14, NULL, 3, 0, 0, 0 },
     { "IDirectMusicPerformance::GetTime", NULL, NULL, NULL, 3, 0, 0, 0 },
-    { "IDirectMusicPerformance::AllocPMsg",
-      "IDirectMusicPerformance::AllocPMsg: DMUS_PMSG carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 3, 0, 0, 0 },
-    { "IDirectMusicPerformance::FreePMsg",
-      "IDirectMusicPerformance::FreePMsg: DMUS_PMSG carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 2, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_alloc_pmsg */
+    { "IDirectMusicPerformance::AllocPMsg", NULL, NULL, NULL, 3, WINECOM_F_HAND, 23, 0, NULL, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_free_pmsg */
+    { "IDirectMusicPerformance::FreePMsg", NULL, NULL, NULL, 2, WINECOM_F_HAND, 24, 0, NULL, 0, 0, 0 },
     { "IDirectMusicPerformance::GetGraph", NULL, cls_IDirectMusicPerformance_18, xaux_IDirectMusicPerformance_18, 2, 0, 0, 0 },
     { "IDirectMusicPerformance::SetGraph", NULL, cls_IDirectMusicPerformance_19, NULL, 2, 0, 0, 0 },
     { "IDirectMusicPerformance::SetNotificationHandle", NULL, NULL, NULL, 3, 0, 0, 0 },
-    { "IDirectMusicPerformance::GetNotificationPMsg",
-      "IDirectMusicPerformance::GetNotificationPMsg: DMUS_NOTIFICATION_PMSG carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 2, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_get_notification_pmsg */
+    { "IDirectMusicPerformance::GetNotificationPMsg", NULL, NULL, NULL, 2, WINECOM_F_HAND, 28, 0, NULL, 0, 0, 0 },
     { "IDirectMusicPerformance::AddNotificationType", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicPerformance::RemoveNotificationType", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicPerformance::AddPort", NULL, cls_IDirectMusicPerformance_24, NULL, 2, 0, 0, 0 },
@@ -594,12 +664,10 @@ static const struct winecom_slot slots_IDirectMusicPerformance[44] =
     { "IDirectMusicPerformance::PChannelInfo", NULL, cls_IDirectMusicPerformance_28, xaux_IDirectMusicPerformance_28, 5, 0, 0, 0 },
     { "IDirectMusicPerformance::DownloadInstrument", NULL, cls_IDirectMusicPerformance_29, xaux_IDirectMusicPerformance_29, 9, 0, 0, 0 },
     { "IDirectMusicPerformance::Invalidate", NULL, NULL, NULL, 3, 0, 0, 0 },
-    { "IDirectMusicPerformance::GetParam",
-      "IDirectMusicPerformance::GetParam: tag-dispatched void* payload (rguidType chooses the real type; GUID_BandParam's carries an IDirectMusicBand*)",
-      NULL, NULL, 7, 0, 0, 0 },
-    { "IDirectMusicPerformance::SetParam",
-      "IDirectMusicPerformance::SetParam: tag-dispatched void* payload (rguidType chooses the real type; GUID_BandParam's carries an IDirectMusicBand*)",
-      NULL, NULL, 6, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_getparam_p6 */
+    { "IDirectMusicPerformance::GetParam", NULL, NULL, NULL, 7, WINECOM_F_HAND, 34, 0, NULL, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_setparam_p5 */
+    { "IDirectMusicPerformance::SetParam", NULL, NULL, NULL, 6, WINECOM_F_HAND, 35, 0, NULL, 0, 0, 0 },
     { "IDirectMusicPerformance::GetGlobalParam", NULL, NULL, NULL, 4, 0, 0, 0 },
     { "IDirectMusicPerformance::SetGlobalParam", NULL, NULL, NULL, 4, 0, 0, 0 },
     { "IDirectMusicPerformance::GetLatencyTime", NULL, NULL, NULL, 2, 0, 0, 0 },
@@ -615,32 +683,34 @@ static const struct winecom_slot slots_IDirectMusicPerformance[44] =
 };
 
 static const unsigned char cls_IDirectMusicPerformance8_3[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
-static const unsigned char xaux_IDirectMusicPerformance8_3[] = { 12, 0, 0 };
+static const unsigned char xaux_IDirectMusicPerformance8_3[] = { 16, 0, 0 };
 static const unsigned char cls_IDirectMusicPerformance8_4[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicPerformance8_4[] = { 0, 0, 0, 28 };
+static const unsigned char xaux_IDirectMusicPerformance8_4[] = { 0, 0, 0, 32 };
 static const unsigned char cls_IDirectMusicPerformance8_5[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_IDirectMusicPerformance8_6[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS };
-static const unsigned char xaux_IDirectMusicPerformance8_6[] = { 28, 0 };
+static const unsigned char xaux_IDirectMusicPerformance8_6[] = { 32, 0 };
 static const unsigned char cls_IDirectMusicPerformance8_14[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicPerformance8_18[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicPerformance8_18[] = { 18 };
+static const unsigned char xaux_IDirectMusicPerformance8_18[] = { 22 };
 static const unsigned char cls_IDirectMusicPerformance8_19[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicPerformance8_24[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicPerformance8_25[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicPerformance8_26[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IDirectMusicPerformance8_27[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_IDirectMusicPerformance8_28[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IDirectMusicPerformance8_28[] = { 0, 25, 0, 0 };
+static const unsigned char xaux_IDirectMusicPerformance8_28[] = { 0, 29, 0, 0 };
 static const unsigned char cls_IDirectMusicPerformance8_29[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IDirectMusicPerformance8_29[] = { 0, 0, 16, 0, 0, 25, 0, 0 };
+static const unsigned char xaux_IDirectMusicPerformance8_29[] = { 0, 0, 20, 0, 0, 29, 0, 0 };
 static const unsigned char cls_IDirectMusicPerformance8_45[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IDirectMusicPerformance8_45[] = { 0, 0, 0, 0, 0, 28, 0, 0 };
+static const unsigned char xaux_IDirectMusicPerformance8_45[] = { 0, 0, 0, 0, 0, 32, 0, 0 };
 static const unsigned char cls_IDirectMusicPerformance8_46[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_IDirectMusicPerformance8_48[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicPerformance8_48[] = { 0, 0, 13 };
+static const unsigned char xaux_IDirectMusicPerformance8_48[] = { 0, 0, 17 };
 static const unsigned char cls_IDirectMusicPerformance8_50[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicPerformance8_51[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicPerformance8_51[] = { 13 };
+static const unsigned char xaux_IDirectMusicPerformance8_51[] = { 17 };
+static const unsigned char cls_IDirectMusicPerformance8_49[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IDirectMusicPerformance8_49[] = { 0, 0, 0, 17 };
 static const struct winecom_slot slots_IDirectMusicPerformance8[53] =
 {
     { "IDirectMusicPerformance8::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -654,25 +724,21 @@ static const struct winecom_slot slots_IDirectMusicPerformance8[53] =
     { "IDirectMusicPerformance8::GetPrepareTime", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicPerformance8::SetBumperLength", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicPerformance8::GetBumperLength", NULL, NULL, NULL, 2, 0, 0, 0 },
-    { "IDirectMusicPerformance8::SendPMsg",
-      "IDirectMusicPerformance8::SendPMsg: DMUS_PMSG carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 2, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_send_pmsg */
+    { "IDirectMusicPerformance8::SendPMsg", NULL, NULL, NULL, 2, WINECOM_F_HAND, 22, 0, NULL, 0, 0, 0 },
     { "IDirectMusicPerformance8::MusicToReferenceTime", NULL, NULL, NULL, 3, 0, 0, 0 },
     { "IDirectMusicPerformance8::ReferenceToMusicTime", NULL, NULL, NULL, 3, 0, 0, 0 },
     { "IDirectMusicPerformance8::IsPlaying", NULL, cls_IDirectMusicPerformance8_14, NULL, 3, 0, 0, 0 },
     { "IDirectMusicPerformance8::GetTime", NULL, NULL, NULL, 3, 0, 0, 0 },
-    { "IDirectMusicPerformance8::AllocPMsg",
-      "IDirectMusicPerformance8::AllocPMsg: DMUS_PMSG carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 3, 0, 0, 0 },
-    { "IDirectMusicPerformance8::FreePMsg",
-      "IDirectMusicPerformance8::FreePMsg: DMUS_PMSG carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 2, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_alloc_pmsg */
+    { "IDirectMusicPerformance8::AllocPMsg", NULL, NULL, NULL, 3, WINECOM_F_HAND, 23, 0, NULL, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_free_pmsg */
+    { "IDirectMusicPerformance8::FreePMsg", NULL, NULL, NULL, 2, WINECOM_F_HAND, 24, 0, NULL, 0, 0, 0 },
     { "IDirectMusicPerformance8::GetGraph", NULL, cls_IDirectMusicPerformance8_18, xaux_IDirectMusicPerformance8_18, 2, 0, 0, 0 },
     { "IDirectMusicPerformance8::SetGraph", NULL, cls_IDirectMusicPerformance8_19, NULL, 2, 0, 0, 0 },
     { "IDirectMusicPerformance8::SetNotificationHandle", NULL, NULL, NULL, 3, 0, 0, 0 },
-    { "IDirectMusicPerformance8::GetNotificationPMsg",
-      "IDirectMusicPerformance8::GetNotificationPMsg: DMUS_NOTIFICATION_PMSG carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 2, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_get_notification_pmsg */
+    { "IDirectMusicPerformance8::GetNotificationPMsg", NULL, NULL, NULL, 2, WINECOM_F_HAND, 28, 0, NULL, 0, 0, 0 },
     { "IDirectMusicPerformance8::AddNotificationType", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicPerformance8::RemoveNotificationType", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicPerformance8::AddPort", NULL, cls_IDirectMusicPerformance8_24, NULL, 2, 0, 0, 0 },
@@ -682,12 +748,10 @@ static const struct winecom_slot slots_IDirectMusicPerformance8[53] =
     { "IDirectMusicPerformance8::PChannelInfo", NULL, cls_IDirectMusicPerformance8_28, xaux_IDirectMusicPerformance8_28, 5, 0, 0, 0 },
     { "IDirectMusicPerformance8::DownloadInstrument", NULL, cls_IDirectMusicPerformance8_29, xaux_IDirectMusicPerformance8_29, 9, 0, 0, 0 },
     { "IDirectMusicPerformance8::Invalidate", NULL, NULL, NULL, 3, 0, 0, 0 },
-    { "IDirectMusicPerformance8::GetParam",
-      "IDirectMusicPerformance8::GetParam: tag-dispatched void* payload (rguidType chooses the real type; GUID_BandParam's carries an IDirectMusicBand*)",
-      NULL, NULL, 7, 0, 0, 0 },
-    { "IDirectMusicPerformance8::SetParam",
-      "IDirectMusicPerformance8::SetParam: tag-dispatched void* payload (rguidType chooses the real type; GUID_BandParam's carries an IDirectMusicBand*)",
-      NULL, NULL, 6, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_getparam_p6 */
+    { "IDirectMusicPerformance8::GetParam", NULL, NULL, NULL, 7, WINECOM_F_HAND, 34, 0, NULL, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_setparam_p5 */
+    { "IDirectMusicPerformance8::SetParam", NULL, NULL, NULL, 6, WINECOM_F_HAND, 35, 0, NULL, 0, 0, 0 },
     { "IDirectMusicPerformance8::GetGlobalParam", NULL, NULL, NULL, 4, 0, 0, 0 },
     { "IDirectMusicPerformance8::SetGlobalParam", NULL, NULL, NULL, 4, 0, 0, 0 },
     { "IDirectMusicPerformance8::GetLatencyTime", NULL, NULL, NULL, 2, 0, 0, 0 },
@@ -700,32 +764,28 @@ static const struct winecom_slot slots_IDirectMusicPerformance8[53] =
     { "IDirectMusicPerformance8::TimeToRhythm", NULL, NULL, NULL, 7, 0, 0, 0 },
     /* upgraded from a legacy refusal -- see the banner */
     { "IDirectMusicPerformance8::RhythmToTime", NULL, NULL, NULL, 7, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
-    { "IDirectMusicPerformance8::InitAudio",
-      "IDirectMusicPerformance8::InitAudio arg 0 (IDirectMusic **ppDirectMusic) is array-capable and the method declares a count argument, but ARRAY_SPECS has no entry",
-      NULL, NULL, 8, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_init_audio */
+    { "IDirectMusicPerformance8::InitAudio", NULL, NULL, NULL, 8, WINECOM_F_HAND, 37, 0, NULL, 0, 0, 0 },
     { "IDirectMusicPerformance8::PlaySegmentEx", NULL, cls_IDirectMusicPerformance8_45, xaux_IDirectMusicPerformance8_45, 9, 0, 0, 0 },
     { "IDirectMusicPerformance8::StopEx", NULL, cls_IDirectMusicPerformance8_46, NULL, 4, 0, 0, 0 },
-    { "IDirectMusicPerformance8::ClonePMsg",
-      "IDirectMusicPerformance8::ClonePMsg: DMUS_PMSG carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 3, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_clone_pmsg */
+    { "IDirectMusicPerformance8::ClonePMsg", NULL, NULL, NULL, 3, WINECOM_F_HAND, 25, 0, NULL, 0, 0, 0 },
     { "IDirectMusicPerformance8::CreateAudioPath", NULL, cls_IDirectMusicPerformance8_48, xaux_IDirectMusicPerformance8_48, 4, 0, 0, 0 },
-    { "IDirectMusicPerformance8::CreateStandardAudioPath",
-      "IDirectMusicPerformance8::CreateStandardAudioPath arg 3 (IDirectMusicAudioPath **ppNewPath) is array-capable and the method declares a count argument, but ARRAY_SPECS has no entry",
-      NULL, NULL, 5, 0, 0, 0 },
+    /* upgraded from a legacy refusal -- see the banner */
+    { "IDirectMusicPerformance8::CreateStandardAudioPath", NULL, cls_IDirectMusicPerformance8_49, xaux_IDirectMusicPerformance8_49, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x08 },
     { "IDirectMusicPerformance8::SetDefaultAudioPath", NULL, cls_IDirectMusicPerformance8_50, NULL, 2, 0, 0, 0 },
     { "IDirectMusicPerformance8::GetDefaultAudioPath", NULL, cls_IDirectMusicPerformance8_51, xaux_IDirectMusicPerformance8_51, 2, 0, 0, 0 },
-    { "IDirectMusicPerformance8::GetParamEx",
-      "IDirectMusicPerformance8::GetParamEx: tag-dispatched void* payload (rguidType chooses the real type; GUID_BandParam's carries an IDirectMusicBand*)",
-      NULL, NULL, 8, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_getparamex */
+    { "IDirectMusicPerformance8::GetParamEx", NULL, NULL, NULL, 8, WINECOM_F_HAND, 36, 0, NULL, 0, 0, 0 },
 };
 
 static const unsigned char cls_IDirectMusicPort_3[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicPort_5[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicPort_6[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IDirectMusicPort_6[] = { 0, 16, 0, 0 };
+static const unsigned char xaux_IDirectMusicPort_6[] = { 0, 20, 0, 0 };
 static const unsigned char cls_IDirectMusicPort_7[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicPort_8[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicPort_8[] = { 64 };
+static const unsigned char xaux_IDirectMusicPort_8[] = { 69 };
 static const unsigned char cls_IDirectMusicPort_18[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
 static const struct winecom_slot slots_IDirectMusicPort[20] =
 {
@@ -756,17 +816,17 @@ static const struct winecom_slot slots_IDirectMusicPort[20] =
 };
 
 static const unsigned char cls_IDirectMusicSegment_9[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicSegment_9[] = { 0, 0, 0, 30 };
+static const unsigned char xaux_IDirectMusicSegment_9[] = { 0, 0, 0, 34 };
 static const unsigned char cls_IDirectMusicSegment_10[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IDirectMusicSegment_11[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IDirectMusicSegment_12[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicSegment_13[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
-static const unsigned char xaux_IDirectMusicSegment_13[] = { 28, 0, 0 };
+static const unsigned char xaux_IDirectMusicSegment_13[] = { 32, 0, 0 };
 static const unsigned char cls_IDirectMusicSegment_14[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicSegment_14[] = { 18 };
+static const unsigned char xaux_IDirectMusicSegment_14[] = { 22 };
 static const unsigned char cls_IDirectMusicSegment_15[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicSegment_20[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicSegment_20[] = { 0, 0, 26 };
+static const unsigned char xaux_IDirectMusicSegment_20[] = { 0, 0, 30 };
 static const struct winecom_slot slots_IDirectMusicSegment[26] =
 {
     { "IDirectMusicSegment::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -787,12 +847,10 @@ static const struct winecom_slot slots_IDirectMusicSegment[26] =
     { "IDirectMusicSegment::SetGraph", NULL, cls_IDirectMusicSegment_15, NULL, 2, 0, 0, 0 },
     { "IDirectMusicSegment::AddNotificationType", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicSegment::RemoveNotificationType", NULL, NULL, NULL, 2, 0, 0, 0 },
-    { "IDirectMusicSegment::GetParam",
-      "IDirectMusicSegment::GetParam: tag-dispatched void* payload (rguidType chooses the real type; GUID_BandParam's carries an IDirectMusicBand*)",
-      NULL, NULL, 7, 0, 0, 0 },
-    { "IDirectMusicSegment::SetParam",
-      "IDirectMusicSegment::SetParam: tag-dispatched void* payload (rguidType chooses the real type; GUID_BandParam's carries an IDirectMusicBand*)",
-      NULL, NULL, 6, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_getparam_p6 */
+    { "IDirectMusicSegment::GetParam", NULL, NULL, NULL, 7, WINECOM_F_HAND, 34, 0, NULL, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_setparam_p5 */
+    { "IDirectMusicSegment::SetParam", NULL, NULL, NULL, 6, WINECOM_F_HAND, 35, 0, NULL, 0, 0, 0 },
     { "IDirectMusicSegment::Clone", NULL, cls_IDirectMusicSegment_20, xaux_IDirectMusicSegment_20, 4, 0, 0, 0 },
     { "IDirectMusicSegment::SetStartPoint", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicSegment::GetStartPoint", NULL, NULL, NULL, 2, 0, 0, 0 },
@@ -802,21 +860,21 @@ static const struct winecom_slot slots_IDirectMusicSegment[26] =
 };
 
 static const unsigned char cls_IDirectMusicSegment8_9[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicSegment8_9[] = { 0, 0, 0, 30 };
+static const unsigned char xaux_IDirectMusicSegment8_9[] = { 0, 0, 0, 34 };
 static const unsigned char cls_IDirectMusicSegment8_10[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IDirectMusicSegment8_11[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IDirectMusicSegment8_12[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicSegment8_13[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
-static const unsigned char xaux_IDirectMusicSegment8_13[] = { 28, 0, 0 };
+static const unsigned char xaux_IDirectMusicSegment8_13[] = { 32, 0, 0 };
 static const unsigned char cls_IDirectMusicSegment8_14[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicSegment8_14[] = { 18 };
+static const unsigned char xaux_IDirectMusicSegment8_14[] = { 22 };
 static const unsigned char cls_IDirectMusicSegment8_15[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicSegment8_20[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicSegment8_20[] = { 0, 0, 26 };
+static const unsigned char xaux_IDirectMusicSegment8_20[] = { 0, 0, 30 };
 static const unsigned char cls_IDirectMusicSegment8_27[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicSegment8_27[] = { 74 };
+static const unsigned char xaux_IDirectMusicSegment8_27[] = { 79 };
 static const unsigned char cls_IDirectMusicSegment8_28[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicSegment8_28[] = { 0, 0, 0, 26 };
+static const unsigned char xaux_IDirectMusicSegment8_28[] = { 0, 0, 0, 30 };
 static const unsigned char cls_IDirectMusicSegment8_29[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicSegment8_30[] = { WINECOM_CA_IFACE_IN };
 static const struct winecom_slot slots_IDirectMusicSegment8[31] =
@@ -839,12 +897,10 @@ static const struct winecom_slot slots_IDirectMusicSegment8[31] =
     { "IDirectMusicSegment8::SetGraph", NULL, cls_IDirectMusicSegment8_15, NULL, 2, 0, 0, 0 },
     { "IDirectMusicSegment8::AddNotificationType", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicSegment8::RemoveNotificationType", NULL, NULL, NULL, 2, 0, 0, 0 },
-    { "IDirectMusicSegment8::GetParam",
-      "IDirectMusicSegment8::GetParam: tag-dispatched void* payload (rguidType chooses the real type; GUID_BandParam's carries an IDirectMusicBand*)",
-      NULL, NULL, 7, 0, 0, 0 },
-    { "IDirectMusicSegment8::SetParam",
-      "IDirectMusicSegment8::SetParam: tag-dispatched void* payload (rguidType chooses the real type; GUID_BandParam's carries an IDirectMusicBand*)",
-      NULL, NULL, 6, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_getparam_p6 */
+    { "IDirectMusicSegment8::GetParam", NULL, NULL, NULL, 7, WINECOM_F_HAND, 34, 0, NULL, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_setparam_p5 */
+    { "IDirectMusicSegment8::SetParam", NULL, NULL, NULL, 6, WINECOM_F_HAND, 35, 0, NULL, 0, 0, 0 },
     { "IDirectMusicSegment8::Clone", NULL, cls_IDirectMusicSegment8_20, xaux_IDirectMusicSegment8_20, 4, 0, 0, 0 },
     { "IDirectMusicSegment8::SetStartPoint", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicSegment8::GetStartPoint", NULL, NULL, NULL, 2, 0, 0, 0 },
@@ -859,7 +915,7 @@ static const struct winecom_slot slots_IDirectMusicSegment8[31] =
 };
 
 static const unsigned char cls_IDirectMusicSegmentState_4[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicSegmentState_4[] = { 26 };
+static const unsigned char xaux_IDirectMusicSegmentState_4[] = { 30 };
 static const struct winecom_slot slots_IDirectMusicSegmentState[8] =
 {
     { "IDirectMusicSegmentState::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -882,35 +938,32 @@ static const struct winecom_slot slots_IDirectMusicTool[9] =
     { "IDirectMusicTool::GetMsgDeliveryType", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicTool::GetMediaTypeArraySize", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicTool::GetMediaTypes", NULL, NULL, NULL, 3, 0, 0, 0 },
-    { "IDirectMusicTool::ProcessPMsg",
-      "IDirectMusicTool::ProcessPMsg: DMUS_PMSG carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 3, 0, 0, 0 },
-    { "IDirectMusicTool::Flush",
-      "IDirectMusicTool::Flush: DMUS_PMSG carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 4, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_process_pmsg */
+    { "IDirectMusicTool::ProcessPMsg", NULL, NULL, NULL, 3, WINECOM_F_HAND, 26, 0, NULL, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_flush */
+    { "IDirectMusicTool::Flush", NULL, NULL, NULL, 4, WINECOM_F_HAND, 27, 0, NULL, 0, 0, 0 },
 };
 
 static const unsigned char cls_IDirectMusicTrack_3[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicTrack_6[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IDirectMusicTrack_12[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicTrack_12[] = { 0, 0, 30 };
+static const unsigned char xaux_IDirectMusicTrack_12[] = { 0, 0, 34 };
+static const unsigned char cls_IDirectMusicTrack_4[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
+static const unsigned char xaux_IDirectMusicTrack_4[] = { 32, 27, 0, 0, 0 };
 static const struct winecom_slot slots_IDirectMusicTrack[13] =
 {
     { "IDirectMusicTrack::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
     { "IDirectMusicTrack::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IDirectMusicTrack::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IDirectMusicTrack::Init", NULL, cls_IDirectMusicTrack_3, NULL, 2, 0, 0, 0 },
-    { "IDirectMusicTrack::InitPlay",
-      "IDirectMusicTrack::InitPlay arg 2 is a void** with no preceding REFIID and is not in RAW_VOID_OUT",
-      NULL, NULL, 6, 0, 0, 0 },
+    /* upgraded from a legacy refusal -- see the banner */
+    { "IDirectMusicTrack::InitPlay", NULL, cls_IDirectMusicTrack_4, xaux_IDirectMusicTrack_4, 6, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IDirectMusicTrack::EndPlay", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicTrack::Play", NULL, cls_IDirectMusicTrack_6, NULL, 9, 0, 0, 0 },
-    { "IDirectMusicTrack::GetParam",
-      "IDirectMusicTrack::GetParam: tag-dispatched void* payload (rguidType chooses the real type; GUID_BandParam's carries an IDirectMusicBand*)",
-      NULL, NULL, 5, 0, 0, 0 },
-    { "IDirectMusicTrack::SetParam",
-      "IDirectMusicTrack::SetParam: tag-dispatched void* payload (rguidType chooses the real type; GUID_BandParam's carries an IDirectMusicBand*)",
-      NULL, NULL, 4, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_getparam_t4 */
+    { "IDirectMusicTrack::GetParam", NULL, NULL, NULL, 5, WINECOM_F_HAND, 38, 0, NULL, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dmus_setparam_t3 */
+    { "IDirectMusicTrack::SetParam", NULL, NULL, NULL, 4, WINECOM_F_HAND, 39, 0, NULL, 0, 0, 0 },
     { "IDirectMusicTrack::IsParamSupported", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicTrack::AddNotificationType", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDirectMusicTrack::RemoveNotificationType", NULL, NULL, NULL, 2, 0, 0, 0 },
@@ -918,9 +971,9 @@ static const struct winecom_slot slots_IDirectMusicTrack[13] =
 };
 
 static const unsigned char cls_IDirectSound_3[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IDirectSound_3[] = { 0, 32, 74 };
+static const unsigned char xaux_IDirectSound_3[] = { 0, 36, 79 };
 static const unsigned char cls_IDirectSound_5[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectSound_5[] = { 32, 32 };
+static const unsigned char xaux_IDirectSound_5[] = { 36, 36 };
 static const struct winecom_slot slots_IDirectSound[11] =
 {
     { "IDirectSound::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -941,7 +994,7 @@ static const struct winecom_slot slots_IDirectSound[11] =
 };
 
 static const unsigned char cls_IDirectSoundBuffer_10[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
-static const unsigned char xaux_IDirectSoundBuffer_10[] = { 31, 0 };
+static const unsigned char xaux_IDirectSoundBuffer_10[] = { 35, 0 };
 static const struct winecom_slot slots_IDirectSoundBuffer[21] =
 {
     { "IDirectSoundBuffer::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -962,9 +1015,8 @@ static const struct winecom_slot slots_IDirectSoundBuffer[21] =
     { "IDirectSoundBuffer::GetStatus", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     /* upgraded from a legacy refusal -- see the banner */
     { "IDirectSoundBuffer::Initialize", NULL, cls_IDirectSoundBuffer_10, xaux_IDirectSoundBuffer_10, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
-    { "IDirectSoundBuffer::Lock",
-      "IDirectSoundBuffer::Lock: by-value LPDWORD is not provably integer-class",
-      NULL, NULL, 8, 0, 0, 0 },
+    /* upgraded from a legacy refusal -- see the banner */
+    { "IDirectSoundBuffer::Lock", NULL, NULL, NULL, 8, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IDirectSoundBuffer::Play", NULL, NULL, NULL, 4, 0, 0, 0 },
     { "IDirectSoundBuffer::SetCurrentPosition", NULL, NULL, NULL, 2, 0, 0, 0 },
     /* upgraded from a legacy refusal -- see the banner */
@@ -979,7 +1031,7 @@ static const struct winecom_slot slots_IDirectSoundBuffer[21] =
 };
 
 static const unsigned char cls_IDispatch_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDispatch_4[] = { 0, 0, 72 };
+static const unsigned char xaux_IDispatch_4[] = { 0, 0, 77 };
 static const struct winecom_slot slots_IDispatch[7] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -988,62 +1040,60 @@ static const struct winecom_slot slots_IDispatch[7] =
     { "IDispatch::GetTypeInfoCount", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IDispatch::GetTypeInfo", NULL, cls_IDispatch_4, xaux_IDispatch_4, 4, 0, 0, 0 },
     { "IDispatch::GetIDsOfNames", NULL, NULL, NULL, 6, 0, 0, 0 },
-    { "IDispatch::Invoke",
-      "IDispatch::Invoke: DISPPARAMS carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 9, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_dispatch_invoke */
+    { "IDispatch::Invoke", NULL, NULL, NULL, 9, WINECOM_F_HAND, 19, 0, NULL, 0, 0, 0 },
 };
 
 static const unsigned char cls_IEnumConnectionPoints_6[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IEnumConnectionPoints_6[] = { 34 };
+static const unsigned char xaux_IEnumConnectionPoints_6[] = { 38 };
 static const struct winecom_slot slots_IEnumConnectionPoints[7] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
-    { "IEnumConnectionPoints::Next",
-      "IEnumConnectionPoints::Next arg 1 (IConnectionPoint **ppCP) is array-capable and the method declares a count argument, but ARRAY_SPECS has no entry",
-      NULL, NULL, 4, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_enum_next_cp */
+    { "IEnumConnectionPoints::Next", NULL, NULL, NULL, 4, WINECOM_F_HAND, 16, 0, NULL, 0, 0, 0 },
     { "IEnumConnectionPoints::Skip", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IEnumConnectionPoints::Reset", NULL, NULL, NULL, 1, 0, 0, 0 },
     { "IEnumConnectionPoints::Clone", NULL, cls_IEnumConnectionPoints_6, xaux_IEnumConnectionPoints_6, 2, 0, 0, 0 },
 };
 
 static const unsigned char cls_IEnumConnections_6[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IEnumConnections_6[] = { 35 };
+static const unsigned char xaux_IEnumConnections_6[] = { 39 };
 static const struct winecom_slot slots_IEnumConnections[7] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
-    { "IEnumConnections::Next",
-      "IEnumConnections::Next: CONNECTDATA carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 4, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_enum_next_connectdata */
+    { "IEnumConnections::Next", NULL, NULL, NULL, 4, WINECOM_F_HAND, 17, 0, NULL, 0, 0, 0 },
     { "IEnumConnections::Skip", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IEnumConnections::Reset", NULL, NULL, NULL, 1, 0, 0, 0 },
     { "IEnumConnections::Clone", NULL, cls_IEnumConnections_6, xaux_IEnumConnections_6, 2, 0, 0, 0 },
 };
 
 static const unsigned char cls_IEnumMoniker_6[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IEnumMoniker_6[] = { 36 };
+static const unsigned char xaux_IEnumMoniker_6[] = { 40 };
 static const struct winecom_slot slots_IEnumMoniker[7] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
-    { "IEnumMoniker::Next",
-      "IEnumMoniker::Next arg 1 (IMoniker **rgelt) is array-capable and the method declares a count argument, but ARRAY_SPECS has no entry",
-      NULL, NULL, 4, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_enum_next_moniker */
+    { "IEnumMoniker::Next", NULL, NULL, NULL, 4, WINECOM_F_HAND, 15, 0, NULL, 0, 0, 0 },
     { "IEnumMoniker::Skip", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IEnumMoniker::Reset", NULL, NULL, NULL, 1, 0, 0, 0 },
     { "IEnumMoniker::Clone", NULL, cls_IEnumMoniker_6, xaux_IEnumMoniker_6, 2, 0, 0, 0 },
 };
 
 static const unsigned char cls_IEnumNetworkConnections_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IEnumNetworkConnections_4[] = { 0, 0, 72 };
+static const unsigned char xaux_IEnumNetworkConnections_4[] = { 0, 0, 77 };
+static const unsigned char cls_IEnumNetworkConnections_7[] = { WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IEnumNetworkConnections_7[] = { 46 };
 static const unsigned char cls_IEnumNetworkConnections_8[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS };
-static const unsigned char xaux_IEnumNetworkConnections_8[] = { 0, 56, 0 };
+static const unsigned char xaux_IEnumNetworkConnections_8[] = { 0, 61, 0 };
 static const unsigned char cls_IEnumNetworkConnections_11[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IEnumNetworkConnections_11[] = { 37 };
+static const unsigned char xaux_IEnumNetworkConnections_11[] = { 41 };
 static const struct winecom_slot slots_IEnumNetworkConnections[12] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1053,9 +1103,7 @@ static const struct winecom_slot slots_IEnumNetworkConnections[12] =
     { "IDispatch::GetTypeInfo", NULL, cls_IEnumNetworkConnections_4, xaux_IEnumNetworkConnections_4, 4, 0, 0, 0, NULL, 0x00, 0x00, 0x04 },
     { "IDispatch::GetIDsOfNames", NULL, NULL, NULL, 6, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IDispatch::Invoke", NULL, NULL, NULL, 9, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
-    { "IEnumNetworkConnections::get__NewEnum",
-      "IEnumNetworkConnections::get__NewEnum: takes `IEnumVARIANT **ppEnumVar`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 2, 0, 0, 0 },
+    { "IEnumNetworkConnections::get__NewEnum", NULL, cls_IEnumNetworkConnections_7, xaux_IEnumNetworkConnections_7, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x01 },
     { "IEnumNetworkConnections::Next", NULL, cls_IEnumNetworkConnections_8, xaux_IEnumNetworkConnections_8, 4, 0, 0, 0, NULL, 0x00, 0x00, 0x02 },
     { "IEnumNetworkConnections::Skip", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IEnumNetworkConnections::Reset", NULL, NULL, NULL, 1, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
@@ -1063,11 +1111,13 @@ static const struct winecom_slot slots_IEnumNetworkConnections[12] =
 };
 
 static const unsigned char cls_IEnumNetworks_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IEnumNetworks_4[] = { 0, 0, 72 };
+static const unsigned char xaux_IEnumNetworks_4[] = { 0, 0, 77 };
+static const unsigned char cls_IEnumNetworks_7[] = { WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IEnumNetworks_7[] = { 46 };
 static const unsigned char cls_IEnumNetworks_8[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS };
-static const unsigned char xaux_IEnumNetworks_8[] = { 0, 55, 0 };
+static const unsigned char xaux_IEnumNetworks_8[] = { 0, 60, 0 };
 static const unsigned char cls_IEnumNetworks_11[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IEnumNetworks_11[] = { 38 };
+static const unsigned char xaux_IEnumNetworks_11[] = { 42 };
 static const struct winecom_slot slots_IEnumNetworks[12] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1077,9 +1127,7 @@ static const struct winecom_slot slots_IEnumNetworks[12] =
     { "IDispatch::GetTypeInfo", NULL, cls_IEnumNetworks_4, xaux_IEnumNetworks_4, 4, 0, 0, 0, NULL, 0x00, 0x00, 0x04 },
     { "IDispatch::GetIDsOfNames", NULL, NULL, NULL, 6, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IDispatch::Invoke", NULL, NULL, NULL, 9, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
-    { "IEnumNetworks::get__NewEnum",
-      "IEnumNetworks::get__NewEnum: takes `IEnumVARIANT **ppEnumVar`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 2, 0, 0, 0 },
+    { "IEnumNetworks::get__NewEnum", NULL, cls_IEnumNetworks_7, xaux_IEnumNetworks_7, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x01 },
     { "IEnumNetworks::Next", NULL, cls_IEnumNetworks_8, xaux_IEnumNetworks_8, 4, 0, 0, 0, NULL, 0x00, 0x00, 0x02 },
     { "IEnumNetworks::Skip", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IEnumNetworks::Reset", NULL, NULL, NULL, 1, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
@@ -1087,7 +1135,7 @@ static const struct winecom_slot slots_IEnumNetworks[12] =
 };
 
 static const unsigned char cls_IEnumSTATSTG_6[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IEnumSTATSTG_6[] = { 39 };
+static const unsigned char xaux_IEnumSTATSTG_6[] = { 43 };
 static const struct winecom_slot slots_IEnumSTATSTG[7] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1100,7 +1148,7 @@ static const struct winecom_slot slots_IEnumSTATSTG[7] =
 };
 
 static const unsigned char cls_IEnumString_6[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IEnumString_6[] = { 40 };
+static const unsigned char xaux_IEnumString_6[] = { 44 };
 static const struct winecom_slot slots_IEnumString[7] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1113,24 +1161,38 @@ static const struct winecom_slot slots_IEnumString[7] =
 };
 
 static const unsigned char cls_IEnumUnknown_6[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IEnumUnknown_6[] = { 41 };
+static const unsigned char xaux_IEnumUnknown_6[] = { 45 };
 static const struct winecom_slot slots_IEnumUnknown[7] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
-    { "IEnumUnknown::Next",
-      "IEnumUnknown::Next arg 1 (IUnknown **rgelt) is array-capable and the method declares a count argument, but ARRAY_SPECS has no entry",
-      NULL, NULL, 4, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_enum_next_unknown */
+    { "IEnumUnknown::Next", NULL, NULL, NULL, 4, WINECOM_F_HAND, 14, 0, NULL, 0, 0, 0 },
     { "IEnumUnknown::Skip", NULL, NULL, NULL, 2, 0, 0, 0 },
     { "IEnumUnknown::Reset", NULL, NULL, NULL, 1, 0, 0, 0 },
     { "IEnumUnknown::Clone", NULL, cls_IEnumUnknown_6, xaux_IEnumUnknown_6, 2, 0, 0, 0 },
 };
 
+static const unsigned char cls_IEnumVARIANT_6[] = { WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IEnumVARIANT_6[] = { 46 };
+static const struct winecom_slot slots_IEnumVARIANT[7] =
+{
+    { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
+    { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
+    { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
+    { "IEnumVARIANT::Next", NULL, NULL, NULL, 4, WINECOM_F_HAND, 12, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IEnumVARIANT::Skip", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IEnumVARIANT::Reset", NULL, NULL, NULL, 1, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IEnumVARIANT::Clone", NULL, cls_IEnumVARIANT_6, xaux_IEnumVARIANT_6, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x01 },
+};
+
 static const unsigned char cls_IEnumWbemClassObject_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS };
-static const unsigned char xaux_IEnumWbemClassObject_4[] = { 0, 0, 75, 0 };
+static const unsigned char xaux_IEnumWbemClassObject_4[] = { 0, 0, 81, 0 };
+static const unsigned char cls_IEnumWbemClassObject_5[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IEnumWbemClassObject_5[] = { 0, 84 };
 static const unsigned char cls_IEnumWbemClassObject_6[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IEnumWbemClassObject_6[] = { 42 };
+static const unsigned char xaux_IEnumWbemClassObject_6[] = { 47 };
 static const struct winecom_slot slots_IEnumWbemClassObject[8] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1138,9 +1200,7 @@ static const struct winecom_slot slots_IEnumWbemClassObject[8] =
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IEnumWbemClassObject::Reset", NULL, NULL, NULL, 1, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IEnumWbemClassObject::Next", NULL, cls_IEnumWbemClassObject_4, xaux_IEnumWbemClassObject_4, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x04 },
-    { "IEnumWbemClassObject::NextAsync",
-      "IEnumWbemClassObject::NextAsync: takes `IWbemObjectSink *pSink`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 3, 0, 0, 0 },
+    { "IEnumWbemClassObject::NextAsync", NULL, cls_IEnumWbemClassObject_5, xaux_IEnumWbemClassObject_5, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x02 },
     { "IEnumWbemClassObject::Clone", NULL, cls_IEnumWbemClassObject_6, xaux_IEnumWbemClassObject_6, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x01 },
     { "IEnumWbemClassObject::Skip", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
 };
@@ -1194,7 +1254,7 @@ static const struct winecom_slot slots_ILockBytes[10] =
 };
 
 static const unsigned char cls_IMMDevice_4[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMMDevice_4[] = { 0, 62 };
+static const unsigned char xaux_IMMDevice_4[] = { 0, 67 };
 static const struct winecom_slot slots_IMMDevice[7] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1207,7 +1267,7 @@ static const struct winecom_slot slots_IMMDevice[7] =
 };
 
 static const unsigned char cls_IMMDeviceCollection_4[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMMDeviceCollection_4[] = { 0, 47 };
+static const unsigned char xaux_IMMDeviceCollection_4[] = { 0, 52 };
 static const struct winecom_slot slots_IMMDeviceCollection[5] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1218,11 +1278,11 @@ static const struct winecom_slot slots_IMMDeviceCollection[5] =
 };
 
 static const unsigned char cls_IMMDeviceEnumerator_3[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMMDeviceEnumerator_3[] = { 0, 0, 48 };
+static const unsigned char xaux_IMMDeviceEnumerator_3[] = { 0, 0, 53 };
 static const unsigned char cls_IMMDeviceEnumerator_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMMDeviceEnumerator_4[] = { 0, 0, 47 };
+static const unsigned char xaux_IMMDeviceEnumerator_4[] = { 0, 0, 52 };
 static const unsigned char cls_IMMDeviceEnumerator_5[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMMDeviceEnumerator_5[] = { 0, 47 };
+static const unsigned char xaux_IMMDeviceEnumerator_5[] = { 0, 52 };
 static const struct winecom_slot slots_IMMDeviceEnumerator[8] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1244,9 +1304,7 @@ static const struct winecom_slot slots_IMMNotificationClient[8] =
     { "IMMNotificationClient::OnDeviceAdded", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IMMNotificationClient::OnDeviceRemoved", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IMMNotificationClient::OnDefaultDeviceChanged", NULL, NULL, NULL, 4, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
-    { "IMMNotificationClient::OnPropertyValueChanged",
-      "IMMNotificationClient::OnPropertyValueChanged: by-value parameter `const PROPERTYKEY key` is of a type this generator cannot prove is integer-class on both ABIs; refusing rather than assuming it is an enum",
-      NULL, NULL, 3, 0, 0, 0 },
+    { "IMMNotificationClient::OnPropertyValueChanged", NULL, NULL, NULL, 3, WINECOM_F_HAND, 10, 0, NULL, 0x00, 0x00, 0x00 },
 };
 
 static const struct winecom_slot slots_IMalloc[9] =
@@ -1254,9 +1312,8 @@ static const struct winecom_slot slots_IMalloc[9] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
-    { "IMalloc::Alloc",
-      "IMalloc::Alloc: return type LPVOID is not provably integer-class",
-      NULL, NULL, 2, 0, 0, 0 },
+    /* upgraded from a legacy refusal -- see the banner */
+    { "IMalloc::Alloc", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     /* upgraded from a legacy refusal -- see the banner */
     { "IMalloc::Realloc", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     /* upgraded from a legacy refusal -- see the banner */
@@ -1289,23 +1346,23 @@ static const unsigned char cls_IMoniker_6[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_
 static const unsigned char cls_IMoniker_8[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_IMoniker_9[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_IMoniker_10[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMoniker_10[] = { 0, 0, 53, 53 };
+static const unsigned char xaux_IMoniker_10[] = { 0, 0, 58, 58 };
 static const unsigned char cls_IMoniker_11[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMoniker_11[] = { 0, 0, 53 };
+static const unsigned char xaux_IMoniker_11[] = { 0, 0, 58 };
 static const unsigned char cls_IMoniker_12[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMoniker_12[] = { 0, 36 };
+static const unsigned char xaux_IMoniker_12[] = { 0, 40 };
 static const unsigned char cls_IMoniker_13[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IMoniker_15[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IMoniker_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IMoniker_17[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMoniker_17[] = { 53 };
+static const unsigned char xaux_IMoniker_17[] = { 58 };
 static const unsigned char cls_IMoniker_18[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMoniker_18[] = { 0, 53 };
+static const unsigned char xaux_IMoniker_18[] = { 0, 58 };
 static const unsigned char cls_IMoniker_19[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMoniker_19[] = { 0, 53 };
+static const unsigned char xaux_IMoniker_19[] = { 0, 58 };
 static const unsigned char cls_IMoniker_20[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IMoniker_21[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMoniker_21[] = { 7, 53, 0, 0, 53 };
+static const unsigned char xaux_IMoniker_21[] = { 11, 58, 0, 0, 58 };
 static const struct winecom_slot slots_IMoniker[23] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1339,15 +1396,14 @@ static const struct winecom_slot slots_IMultiQI[4] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
-    { "IMultiQI::QueryMultipleInterfaces",
-      "IMultiQI::QueryMultipleInterfaces: MULTI_QI carries interface pointers inside a struct and has no hand-written walker",
-      NULL, NULL, 3, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_multi_qi */
+    { "IMultiQI::QueryMultipleInterfaces", NULL, NULL, NULL, 3, WINECOM_F_HAND, 18, 0, NULL, 0, 0, 0 },
 };
 
 static const unsigned char cls_INetwork_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_INetwork_4[] = { 0, 0, 72 };
+static const unsigned char xaux_INetwork_4[] = { 0, 0, 77 };
 static const unsigned char cls_INetwork_13[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_INetwork_13[] = { 37 };
+static const unsigned char xaux_INetwork_13[] = { 41 };
 static const struct winecom_slot slots_INetwork[20] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1373,9 +1429,9 @@ static const struct winecom_slot slots_INetwork[20] =
 };
 
 static const unsigned char cls_INetworkConnection_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_INetworkConnection_4[] = { 0, 0, 72 };
+static const unsigned char xaux_INetworkConnection_4[] = { 0, 0, 77 };
 static const unsigned char cls_INetworkConnection_7[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_INetworkConnection_7[] = { 55 };
+static const unsigned char xaux_INetworkConnection_7[] = { 60 };
 static const struct winecom_slot slots_INetworkConnection[14] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1395,11 +1451,11 @@ static const struct winecom_slot slots_INetworkConnection[14] =
 };
 
 static const unsigned char cls_INetworkListManager_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_INetworkListManager_4[] = { 0, 0, 72 };
+static const unsigned char xaux_INetworkListManager_4[] = { 0, 0, 77 };
 static const unsigned char cls_INetworkListManager_7[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_INetworkListManager_7[] = { 0, 38 };
+static const unsigned char xaux_INetworkListManager_7[] = { 0, 42 };
 static const unsigned char cls_INetworkListManager_9[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_INetworkListManager_9[] = { 37 };
+static const unsigned char xaux_INetworkListManager_9[] = { 41 };
 static const struct winecom_slot slots_INetworkListManager[14] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1410,13 +1466,9 @@ static const struct winecom_slot slots_INetworkListManager[14] =
     { "IDispatch::GetIDsOfNames", NULL, NULL, NULL, 6, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IDispatch::Invoke", NULL, NULL, NULL, 9, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "INetworkListManager::GetNetworks", NULL, cls_INetworkListManager_7, xaux_INetworkListManager_7, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x02 },
-    { "INetworkListManager::GetNetwork",
-      "INetworkListManager::GetNetwork: by-value parameter `GUID gdNetworkId` is of a type this generator cannot prove is integer-class on both ABIs; refusing rather than assuming it is an enum",
-      NULL, NULL, 3, 0, 0, 0 },
+    { "INetworkListManager::GetNetwork", NULL, NULL, NULL, 3, WINECOM_F_HAND, 8, 0, NULL, 0x00, 0x00, 0x00 },
     { "INetworkListManager::GetNetworkConnections", NULL, cls_INetworkListManager_9, xaux_INetworkListManager_9, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x01 },
-    { "INetworkListManager::GetNetworkConnection",
-      "INetworkListManager::GetNetworkConnection: by-value parameter `GUID gdNetworkConnectionId` is of a type this generator cannot prove is integer-class on both ABIs; refusing rather than assuming it is an enum",
-      NULL, NULL, 3, 0, 0, 0 },
+    { "INetworkListManager::GetNetworkConnection", NULL, NULL, NULL, 3, WINECOM_F_HAND, 9, 0, NULL, 0x00, 0x00, 0x00 },
     { "INetworkListManager::IsConnectedToInternet", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "INetworkListManager::IsConnected", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "INetworkListManager::GetConnectivity", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
@@ -1483,14 +1535,12 @@ static const struct winecom_slot slots_IPropertyStore[8] =
     { "IPropertyStore::GetCount", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IPropertyStore::GetAt", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IPropertyStore::GetValue", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
-    { "IPropertyStore::SetValue",
-      "IPropertyStore::SetValue: takes a guest-authored REFPROPVARIANT; a PROPVARIANT the GUEST fills can carry VT_UNKNOWN -- an interface pointer with no type in the signature -- and the device property store is read-only on every measured path anyway",
-      NULL, NULL, 3, 0, 0, 0 },
+    { "IPropertyStore::SetValue", NULL, NULL, NULL, 3, WINECOM_F_HAND, 11, 0, NULL, 0x00, 0x00, 0x00 },
     { "IPropertyStore::Commit", NULL, NULL, NULL, 1, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
 };
 
 static const unsigned char cls_IRecordInfo_9[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IRecordInfo_9[] = { 72 };
+static const unsigned char xaux_IRecordInfo_9[] = { 77 };
 static const unsigned char cls_IRecordInfo_15[] = { WINECOM_CA_IFACE_IN };
 static const struct winecom_slot slots_IRecordInfo[19] =
 {
@@ -1509,21 +1559,18 @@ static const struct winecom_slot slots_IRecordInfo[19] =
     { "IRecordInfo::GetTypeInfo", NULL, cls_IRecordInfo_9, xaux_IRecordInfo_9, 2, 0, 0, 0 },
     /* upgraded from a legacy refusal -- see the banner */
     { "IRecordInfo::GetField", NULL, NULL, NULL, 4, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
-    { "IRecordInfo::GetFieldNoCopy",
-      "IRecordInfo::GetFieldNoCopy: by-value PVOID is not provably integer-class",
-      NULL, NULL, 5, 0, 0, 0 },
+    /* upgraded from a legacy refusal -- see the banner */
+    { "IRecordInfo::GetFieldNoCopy", NULL, NULL, NULL, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     /* upgraded from a legacy refusal -- see the banner */
     { "IRecordInfo::PutField", NULL, NULL, NULL, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     /* upgraded from a legacy refusal -- see the banner */
     { "IRecordInfo::PutFieldNoCopy", NULL, NULL, NULL, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IRecordInfo::GetFieldNames", NULL, NULL, NULL, 3, 0, 0, 0 },
     { "IRecordInfo::IsMatchingType", NULL, cls_IRecordInfo_15, NULL, 2, 0, 0, 0 },
-    { "IRecordInfo::RecordCreate",
-      "IRecordInfo::RecordCreate: return type PVOID is not provably integer-class",
-      NULL, NULL, 1, 0, 0, 0 },
-    { "IRecordInfo::RecordCreateCopy",
-      "IRecordInfo::RecordCreateCopy: by-value PVOID is not provably integer-class",
-      NULL, NULL, 3, 0, 0, 0 },
+    /* upgraded from a legacy refusal -- see the banner */
+    { "IRecordInfo::RecordCreate", NULL, NULL, NULL, 1, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    /* upgraded from a legacy refusal -- see the banner */
+    { "IRecordInfo::RecordCreateCopy", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     /* upgraded from a legacy refusal -- see the banner */
     { "IRecordInfo::RecordDestroy", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
 };
@@ -1534,22 +1581,20 @@ static const struct winecom_slot slots_IReferenceClock[7] =
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IReferenceClock::GetTime", NULL, NULL, NULL, 2, 0, 0, 0 },
-    { "IReferenceClock::AdviseTime",
-      "IReferenceClock::AdviseTime: by-value HEVENT is not provably integer-class",
-      NULL, NULL, 5, 0, 0, 0 },
-    { "IReferenceClock::AdvisePeriodic",
-      "IReferenceClock::AdvisePeriodic: by-value HSEMAPHORE is not provably integer-class",
-      NULL, NULL, 5, 0, 0, 0 },
+    /* upgraded from a legacy refusal -- see the banner */
+    { "IReferenceClock::AdviseTime", NULL, NULL, NULL, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    /* upgraded from a legacy refusal -- see the banner */
+    { "IReferenceClock::AdvisePeriodic", NULL, NULL, NULL, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IReferenceClock::Unadvise", NULL, NULL, NULL, 2, 0, 0, 0 },
 };
 
 static const unsigned char cls_IRunningObjectTable_3[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IRunningObjectTable_5[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IRunningObjectTable_6[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IRunningObjectTable_6[] = { 0, 74 };
+static const unsigned char xaux_IRunningObjectTable_6[] = { 0, 79 };
 static const unsigned char cls_IRunningObjectTable_8[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IRunningObjectTable_9[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IRunningObjectTable_9[] = { 36 };
+static const unsigned char xaux_IRunningObjectTable_9[] = { 40 };
 static const struct winecom_slot slots_IRunningObjectTable[10] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1578,24 +1623,26 @@ static const struct winecom_slot slots_ISimpleAudioVolume[7] =
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
-    { "ISimpleAudioVolume::SetMasterVolume", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_REV, 8, 0, NULL, 0x01, 0x00, 0x00 },
+    { "ISimpleAudioVolume::SetMasterVolume", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_REV, 13, 0, NULL, 0x01, 0x00, 0x00 },
     { "ISimpleAudioVolume::GetMasterVolume", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "ISimpleAudioVolume::SetMute", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "ISimpleAudioVolume::GetMute", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
 };
 
 static const unsigned char cls_IStorage_11[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IStorage_11[] = { 0, 0, 0, 39 };
+static const unsigned char xaux_IStorage_11[] = { 0, 0, 0, 43 };
 static const unsigned char cls_IStorage_3[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IStorage_3[] = { 0, 0, 0, 0, 69 };
+static const unsigned char xaux_IStorage_3[] = { 0, 0, 0, 0, 74 };
 static const unsigned char cls_IStorage_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IStorage_4[] = { 0, 0, 0, 0, 69 };
+static const unsigned char xaux_IStorage_4[] = { 0, 0, 0, 0, 74 };
 static const unsigned char cls_IStorage_5[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IStorage_5[] = { 0, 0, 0, 0, 68 };
+static const unsigned char xaux_IStorage_5[] = { 0, 0, 0, 0, 73 };
 static const unsigned char cls_IStorage_8[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IStorage_8[] = { 0, 68, 0, 0 };
+static const unsigned char xaux_IStorage_8[] = { 0, 73, 0, 0 };
 static const unsigned char cls_IStorage_6[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IStorage_6[] = { 0, 68, 0, 0, 0, 68 };
+static const unsigned char xaux_IStorage_6[] = { 0, 73, 0, 0, 0, 73 };
+static const unsigned char cls_IStorage_7[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IStorage_7[] = { 0, 0, 0, 73 };
 static const struct winecom_slot slots_IStorage[18] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1609,9 +1656,8 @@ static const struct winecom_slot slots_IStorage[18] =
     { "IStorage::CreateStorage", NULL, cls_IStorage_5, xaux_IStorage_5, 6, 0, 0, 0, NULL, 0x00, 0x00, 0x10 },
     /* upgraded from a legacy refusal -- see the banner */
     { "IStorage::OpenStorage", NULL, cls_IStorage_6, xaux_IStorage_6, 7, 0, 0, 0, NULL, 0x00, 0x00, 0x20 },
-    { "IStorage::CopyTo",
-      "IStorage::CopyTo: by-value SNB is not provably integer-class",
-      NULL, NULL, 5, 0, 0, 0 },
+    /* upgraded from a legacy refusal -- see the banner */
+    { "IStorage::CopyTo", NULL, cls_IStorage_7, xaux_IStorage_7, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     /* upgraded from a legacy refusal -- see the banner */
     { "IStorage::MoveElementTo", NULL, cls_IStorage_8, xaux_IStorage_8, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IStorage::Commit", NULL, NULL, NULL, 2, 0, 0, 0 },
@@ -1630,7 +1676,7 @@ static const struct winecom_slot slots_IStorage[18] =
 
 static const unsigned char cls_IStream_7[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_IStream_13[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IStream_13[] = { 69 };
+static const unsigned char xaux_IStream_13[] = { 74 };
 static const struct winecom_slot slots_IStream[14] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1658,28 +1704,27 @@ static const struct winecom_slot slots_ISupportErrorInfo[4] =
 };
 
 static const unsigned char cls_ITypeComp_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_ITypeComp_4[] = { 0, 0, 72, 71 };
+static const unsigned char xaux_ITypeComp_4[] = { 0, 0, 77, 76 };
 static const struct winecom_slot slots_ITypeComp[5] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
-    { "ITypeComp::Bind",
-      "ITypeComp::Bind: by-value LPOLESTR is not provably integer-class",
-      NULL, NULL, 7, 0, 0, 0 },
+    /* hand-served: was a legacy refusal -- the walker is hand_typecomp_bind */
+    { "ITypeComp::Bind", NULL, NULL, NULL, 7, WINECOM_F_HAND, 20, 0, NULL, 0, 0, 0 },
     /* upgraded from a legacy refusal -- see the banner */
     { "ITypeComp::BindType", NULL, cls_ITypeComp_4, xaux_ITypeComp_4, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x0c },
 };
 
 static const unsigned char cls_ITypeInfo_4[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_ITypeInfo_4[] = { 71 };
+static const unsigned char xaux_ITypeInfo_4[] = { 76 };
 static const unsigned char cls_ITypeInfo_14[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_ITypeInfo_14[] = { 0, 72 };
+static const unsigned char xaux_ITypeInfo_14[] = { 0, 77 };
 static const unsigned char cls_ITypeInfo_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ITypeInfo_18[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS };
-static const unsigned char xaux_ITypeInfo_18[] = { 73, 0 };
+static const unsigned char xaux_ITypeInfo_18[] = { 78, 0 };
 static const unsigned char cls_up_ITypeInfo_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
-static const unsigned char xaux_up_ITypeInfo_16[] = { 74, 0, 0 };
+static const unsigned char xaux_up_ITypeInfo_16[] = { 79, 0, 0 };
 static const struct winecom_slot slots_ITypeInfo[22] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1709,13 +1754,13 @@ static const struct winecom_slot slots_ITypeInfo[22] =
 };
 
 static const unsigned char cls_ITypeLib_4[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_ITypeLib_4[] = { 0, 72 };
+static const unsigned char xaux_ITypeLib_4[] = { 0, 77 };
 static const unsigned char cls_ITypeLib_6[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_ITypeLib_6[] = { 0, 72 };
+static const unsigned char xaux_ITypeLib_6[] = { 0, 77 };
 static const unsigned char cls_ITypeLib_8[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_ITypeLib_8[] = { 71 };
+static const unsigned char xaux_ITypeLib_8[] = { 76 };
 static const unsigned char cls_ITypeLib_11[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_ITypeLib_11[] = { 0, 0, 72, 0, 0 };
+static const unsigned char xaux_ITypeLib_11[] = { 0, 0, 77, 0, 0 };
 static const struct winecom_slot slots_ITypeLib[13] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1742,28 +1787,47 @@ static const struct winecom_slot slots_IUnknown[3] =
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
 };
 
+static const unsigned char cls_IWbemCallResult_3[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IWbemCallResult_3[] = { 0, 81 };
+static const unsigned char cls_IWbemCallResult_5[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IWbemCallResult_5[] = { 0, 86 };
+static const struct winecom_slot slots_IWbemCallResult[7] =
+{
+    { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
+    { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
+    { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
+    { "IWbemCallResult::GetResultObject", NULL, cls_IWbemCallResult_3, xaux_IWbemCallResult_3, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x02 },
+    { "IWbemCallResult::GetResultString", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IWbemCallResult::GetResultServices", NULL, cls_IWbemCallResult_5, xaux_IWbemCallResult_5, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x02 },
+    { "IWbemCallResult::GetCallStatus", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+};
+
+static const unsigned char cls_IWbemClassObject_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IWbemClassObject_3[] = { 85 };
+static const unsigned char cls_IWbemClassObject_11[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IWbemClassObject_11[] = { 0, 85 };
 static const unsigned char cls_IWbemClassObject_12[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemClassObject_12[] = { 75 };
+static const unsigned char xaux_IWbemClassObject_12[] = { 81 };
 static const unsigned char cls_IWbemClassObject_14[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemClassObject_14[] = { 0, 75 };
+static const unsigned char xaux_IWbemClassObject_14[] = { 0, 81 };
 static const unsigned char cls_IWbemClassObject_15[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemClassObject_15[] = { 0, 75 };
+static const unsigned char xaux_IWbemClassObject_15[] = { 0, 81 };
 static const unsigned char cls_IWbemClassObject_16[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IWbemClassObject_16[] = { 0, 75 };
+static const unsigned char xaux_IWbemClassObject_16[] = { 0, 81 };
 static const unsigned char cls_IWbemClassObject_19[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemClassObject_19[] = { 0, 0, 75, 75 };
+static const unsigned char xaux_IWbemClassObject_19[] = { 0, 0, 81, 81 };
 static const unsigned char cls_IWbemClassObject_20[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IWbemClassObject_20[] = { 0, 0, 75, 75 };
+static const unsigned char xaux_IWbemClassObject_20[] = { 0, 0, 81, 81 };
 static const unsigned char cls_IWbemClassObject_23[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemClassObject_23[] = { 0, 0, 75, 75 };
+static const unsigned char xaux_IWbemClassObject_23[] = { 0, 0, 81, 81 };
+static const unsigned char cls_IWbemClassObject_25[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IWbemClassObject_25[] = { 0, 85 };
 static const struct winecom_slot slots_IWbemClassObject[27] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
-    { "IWbemClassObject::GetQualifierSet",
-      "IWbemClassObject::GetQualifierSet: takes `IWbemQualifierSet **ppQualSet`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 2, 0, 0, 0 },
+    { "IWbemClassObject::GetQualifierSet", NULL, cls_IWbemClassObject_3, xaux_IWbemClassObject_3, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x01 },
     { "IWbemClassObject::Get", NULL, NULL, NULL, 6, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IWbemClassObject::Put", NULL, NULL, NULL, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IWbemClassObject::Delete", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
@@ -1771,9 +1835,7 @@ static const struct winecom_slot slots_IWbemClassObject[27] =
     { "IWbemClassObject::BeginEnumeration", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IWbemClassObject::Next", NULL, NULL, NULL, 6, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IWbemClassObject::EndEnumeration", NULL, NULL, NULL, 1, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
-    { "IWbemClassObject::GetPropertyQualifierSet",
-      "IWbemClassObject::GetPropertyQualifierSet: takes `IWbemQualifierSet **ppQualSet`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 3, 0, 0, 0 },
+    { "IWbemClassObject::GetPropertyQualifierSet", NULL, cls_IWbemClassObject_11, xaux_IWbemClassObject_11, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x02 },
     { "IWbemClassObject::Clone", NULL, cls_IWbemClassObject_12, xaux_IWbemClassObject_12, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x01 },
     { "IWbemClassObject::GetObjectText", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IWbemClassObject::SpawnDerivedClass", NULL, cls_IWbemClassObject_14, xaux_IWbemClassObject_14, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x02 },
@@ -1787,14 +1849,12 @@ static const struct winecom_slot slots_IWbemClassObject[27] =
     { "IWbemClassObject::BeginMethodEnumeration", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IWbemClassObject::NextMethod", NULL, cls_IWbemClassObject_23, xaux_IWbemClassObject_23, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x0c },
     { "IWbemClassObject::EndMethodEnumeration", NULL, NULL, NULL, 1, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
-    { "IWbemClassObject::GetMethodQualifierSet",
-      "IWbemClassObject::GetMethodQualifierSet: takes `IWbemQualifierSet **ppQualSet`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 3, 0, 0, 0 },
+    { "IWbemClassObject::GetMethodQualifierSet", NULL, cls_IWbemClassObject_25, xaux_IWbemClassObject_25, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x02 },
     { "IWbemClassObject::GetMethodOrigin", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
 };
 
 static const unsigned char cls_IWbemContext_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemContext_3[] = { 76 };
+static const unsigned char xaux_IWbemContext_3[] = { 82 };
 static const struct winecom_slot slots_IWbemContext[12] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1812,7 +1872,7 @@ static const struct winecom_slot slots_IWbemContext[12] =
 };
 
 static const unsigned char cls_IWbemLocator_3[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemLocator_3[] = { 0, 0, 0, 0, 0, 0, 76, 78 };
+static const unsigned char xaux_IWbemLocator_3[] = { 0, 0, 0, 0, 0, 0, 82, 86 };
 static const struct winecom_slot slots_IWbemLocator[4] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1821,86 +1881,113 @@ static const struct winecom_slot slots_IWbemLocator[4] =
     { "IWbemLocator::ConnectServer", NULL, cls_IWbemLocator_3, xaux_IWbemLocator_3, 9, 0, 0, 0, NULL, 0x00, 0x00, 0x80 },
 };
 
+static const unsigned char cls_IWbemObjectSink_3[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_IN };
+static const unsigned char xaux_IWbemObjectSink_3[] = { 0, 81 };
+static const unsigned char cls_IWbemObjectSink_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IWbemObjectSink_4[] = { 0, 0, 0, 81 };
+static const struct winecom_slot slots_IWbemObjectSink[5] =
+{
+    { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
+    { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
+    { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
+    { "IWbemObjectSink::Indicate", NULL, cls_IWbemObjectSink_3, xaux_IWbemObjectSink_3, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x02 },
+    { "IWbemObjectSink::SetStatus", NULL, cls_IWbemObjectSink_4, xaux_IWbemObjectSink_4, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+};
+
+static const struct winecom_slot slots_IWbemQualifierSet[10] =
+{
+    { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
+    { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
+    { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
+    { "IWbemQualifierSet::Get", NULL, NULL, NULL, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IWbemQualifierSet::Put", NULL, NULL, NULL, 4, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IWbemQualifierSet::Delete", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IWbemQualifierSet::GetNames", NULL, NULL, NULL, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IWbemQualifierSet::BeginEnumeration", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IWbemQualifierSet::Next", NULL, NULL, NULL, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+    { "IWbemQualifierSet::EndEnumeration", NULL, NULL, NULL, 1, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
+};
+
+static const unsigned char cls_IWbemServices_3[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IWbemServices_3[] = { 0, 0, 82, 86, 80 };
+static const unsigned char cls_IWbemServices_4[] = { WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IWbemServices_4[] = { 84 };
+static const unsigned char cls_IWbemServices_5[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IWbemServices_5[] = { 0, 84 };
+static const unsigned char cls_IWbemServices_6[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IWbemServices_6[] = { 0, 0, 82, 81, 80 };
+static const unsigned char cls_IWbemServices_7[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IWbemServices_7[] = { 0, 0, 82, 84 };
+static const unsigned char cls_IWbemServices_8[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IWbemServices_8[] = { 81, 0, 82, 80 };
+static const unsigned char cls_IWbemServices_9[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IWbemServices_9[] = { 81, 0, 82, 84 };
+static const unsigned char cls_IWbemServices_10[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IWbemServices_10[] = { 0, 0, 82, 80 };
+static const unsigned char cls_IWbemServices_11[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IWbemServices_11[] = { 0, 0, 82, 84 };
 static const unsigned char cls_IWbemServices_12[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemServices_12[] = { 0, 0, 76, 42 };
+static const unsigned char xaux_IWbemServices_12[] = { 0, 0, 82, 47 };
+static const unsigned char cls_IWbemServices_13[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IWbemServices_13[] = { 0, 0, 82, 84 };
+static const unsigned char cls_IWbemServices_14[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IWbemServices_14[] = { 81, 0, 82, 80 };
+static const unsigned char cls_IWbemServices_15[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IWbemServices_15[] = { 81, 0, 82, 84 };
+static const unsigned char cls_IWbemServices_16[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IWbemServices_16[] = { 0, 0, 82, 80 };
+static const unsigned char cls_IWbemServices_17[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IWbemServices_17[] = { 0, 0, 82, 84 };
 static const unsigned char cls_IWbemServices_18[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemServices_18[] = { 0, 0, 76, 42 };
+static const unsigned char xaux_IWbemServices_18[] = { 0, 0, 82, 47 };
+static const unsigned char cls_IWbemServices_19[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IWbemServices_19[] = { 0, 0, 82, 84 };
 static const unsigned char cls_IWbemServices_20[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemServices_20[] = { 0, 0, 0, 76, 42 };
+static const unsigned char xaux_IWbemServices_20[] = { 0, 0, 0, 82, 47 };
+static const unsigned char cls_IWbemServices_21[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IWbemServices_21[] = { 0, 0, 0, 82, 84 };
 static const unsigned char cls_IWbemServices_22[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemServices_22[] = { 0, 0, 0, 76, 42 };
+static const unsigned char xaux_IWbemServices_22[] = { 0, 0, 0, 82, 47 };
+static const unsigned char cls_IWbemServices_23[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IWbemServices_23[] = { 0, 0, 0, 82, 84 };
+static const unsigned char cls_IWbemServices_24[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
+static const unsigned char xaux_IWbemServices_24[] = { 0, 0, 0, 82, 81, 81, 80 };
+static const unsigned char cls_IWbemServices_25[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
+static const unsigned char xaux_IWbemServices_25[] = { 0, 0, 0, 82, 81, 84 };
 static const struct winecom_slot slots_IWbemServices[26] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
     { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
     { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
-    { "IWbemServices::OpenNamespace",
-      "IWbemServices::OpenNamespace: takes `IWbemCallResult **ppResult`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 6, 0, 0, 0 },
-    { "IWbemServices::CancelAsyncCall",
-      "IWbemServices::CancelAsyncCall: takes `IWbemObjectSink *pSink`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 2, 0, 0, 0 },
-    { "IWbemServices::QueryObjectSink",
-      "IWbemServices::QueryObjectSink: takes `IWbemObjectSink **ppResponseHandler`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 3, 0, 0, 0 },
-    { "IWbemServices::GetObject",
-      "IWbemServices::GetObject: takes `IWbemCallResult **ppCallResult`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 6, 0, 0, 0 },
-    { "IWbemServices::GetObjectAsync",
-      "IWbemServices::GetObjectAsync: takes `IWbemObjectSink *pResponseHandler`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 5, 0, 0, 0 },
-    { "IWbemServices::PutClass",
-      "IWbemServices::PutClass: takes `IWbemCallResult **ppCallResult`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 5, 0, 0, 0 },
-    { "IWbemServices::PutClassAsync",
-      "IWbemServices::PutClassAsync: takes `IWbemObjectSink *pResponseHandler`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 5, 0, 0, 0 },
-    { "IWbemServices::DeleteClass",
-      "IWbemServices::DeleteClass: takes `IWbemCallResult **ppCallResult`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 5, 0, 0, 0 },
-    { "IWbemServices::DeleteClassAsync",
-      "IWbemServices::DeleteClassAsync: takes `IWbemObjectSink *pResponseHandler`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 5, 0, 0, 0 },
+    { "IWbemServices::OpenNamespace", NULL, cls_IWbemServices_3, xaux_IWbemServices_3, 6, 0, 0, 0, NULL, 0x00, 0x00, 0x18 },
+    { "IWbemServices::CancelAsyncCall", NULL, cls_IWbemServices_4, xaux_IWbemServices_4, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x01 },
+    { "IWbemServices::QueryObjectSink", NULL, cls_IWbemServices_5, xaux_IWbemServices_5, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x02 },
+    { "IWbemServices::GetObject", NULL, cls_IWbemServices_6, xaux_IWbemServices_6, 6, 0, 0, 0, NULL, 0x00, 0x00, 0x18 },
+    { "IWbemServices::GetObjectAsync", NULL, cls_IWbemServices_7, xaux_IWbemServices_7, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x08 },
+    { "IWbemServices::PutClass", NULL, cls_IWbemServices_8, xaux_IWbemServices_8, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x08 },
+    { "IWbemServices::PutClassAsync", NULL, cls_IWbemServices_9, xaux_IWbemServices_9, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x08 },
+    { "IWbemServices::DeleteClass", NULL, cls_IWbemServices_10, xaux_IWbemServices_10, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x08 },
+    { "IWbemServices::DeleteClassAsync", NULL, cls_IWbemServices_11, xaux_IWbemServices_11, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x08 },
     { "IWbemServices::CreateClassEnum", NULL, cls_IWbemServices_12, xaux_IWbemServices_12, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x08 },
-    { "IWbemServices::CreateClassEnumAsync",
-      "IWbemServices::CreateClassEnumAsync: takes `IWbemObjectSink *pResponseHandler`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 5, 0, 0, 0 },
-    { "IWbemServices::PutInstance",
-      "IWbemServices::PutInstance: takes `IWbemCallResult **ppCallResult`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 5, 0, 0, 0 },
-    { "IWbemServices::PutInstanceAsync",
-      "IWbemServices::PutInstanceAsync: takes `IWbemObjectSink *pResponseHandler`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 5, 0, 0, 0 },
-    { "IWbemServices::DeleteInstance",
-      "IWbemServices::DeleteInstance: takes `IWbemCallResult **ppCallResult`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 5, 0, 0, 0 },
-    { "IWbemServices::DeleteInstanceAsync",
-      "IWbemServices::DeleteInstanceAsync: takes `IWbemObjectSink *pResponseHandler`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 5, 0, 0, 0 },
+    { "IWbemServices::CreateClassEnumAsync", NULL, cls_IWbemServices_13, xaux_IWbemServices_13, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x08 },
+    { "IWbemServices::PutInstance", NULL, cls_IWbemServices_14, xaux_IWbemServices_14, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x08 },
+    { "IWbemServices::PutInstanceAsync", NULL, cls_IWbemServices_15, xaux_IWbemServices_15, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x08 },
+    { "IWbemServices::DeleteInstance", NULL, cls_IWbemServices_16, xaux_IWbemServices_16, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x08 },
+    { "IWbemServices::DeleteInstanceAsync", NULL, cls_IWbemServices_17, xaux_IWbemServices_17, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x08 },
     { "IWbemServices::CreateInstanceEnum", NULL, cls_IWbemServices_18, xaux_IWbemServices_18, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x08 },
-    { "IWbemServices::CreateInstanceEnumAsync",
-      "IWbemServices::CreateInstanceEnumAsync: takes `IWbemObjectSink *pResponseHandler`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 5, 0, 0, 0 },
+    { "IWbemServices::CreateInstanceEnumAsync", NULL, cls_IWbemServices_19, xaux_IWbemServices_19, 5, 0, 0, 0, NULL, 0x00, 0x00, 0x08 },
     { "IWbemServices::ExecQuery", NULL, cls_IWbemServices_20, xaux_IWbemServices_20, 6, 0, 0, 0, NULL, 0x00, 0x00, 0x10 },
-    { "IWbemServices::ExecQueryAsync",
-      "IWbemServices::ExecQueryAsync: takes `IWbemObjectSink *pResponseHandler`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 6, 0, 0, 0 },
+    { "IWbemServices::ExecQueryAsync", NULL, cls_IWbemServices_21, xaux_IWbemServices_21, 6, 0, 0, 0, NULL, 0x00, 0x00, 0x10 },
     { "IWbemServices::ExecNotificationQuery", NULL, cls_IWbemServices_22, xaux_IWbemServices_22, 6, 0, 0, 0, NULL, 0x00, 0x00, 0x10 },
-    { "IWbemServices::ExecNotificationQueryAsync",
-      "IWbemServices::ExecNotificationQueryAsync: takes `IWbemObjectSink *pResponseHandler`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 6, 0, 0, 0 },
-    { "IWbemServices::ExecMethod",
-      "IWbemServices::ExecMethod: takes `IWbemCallResult **ppCallResult`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 8, 0, 0, 0 },
-    { "IWbemServices::ExecMethodAsync",
-      "IWbemServices::ExecMethodAsync: takes `IWbemObjectSink *pResponseHandler`, an interface pointer of a type the wine-syscom roster does not carry -- there is no guest stub vtable for it, so it can be neither wrapped on the way out nor recognised on the way in",
-      NULL, NULL, 7, 0, 0, 0 },
+    { "IWbemServices::ExecNotificationQueryAsync", NULL, cls_IWbemServices_23, xaux_IWbemServices_23, 6, 0, 0, 0, NULL, 0x00, 0x00, 0x10 },
+    { "IWbemServices::ExecMethod", NULL, cls_IWbemServices_24, xaux_IWbemServices_24, 8, 0, 0, 0, NULL, 0x00, 0x00, 0x60 },
+    { "IWbemServices::ExecMethodAsync", NULL, cls_IWbemServices_25, xaux_IWbemServices_25, 7, 0, 0, 0, NULL, 0x00, 0x00, 0x20 },
 };
 
 static const unsigned char cls_IXAudio2_6[] = { WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IXAudio2_6[] = { 80 };
+static const unsigned char xaux_IXAudio2_6[] = { 88 };
 static const unsigned char cls_IXAudio2_7[] = { WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IXAudio2_7[] = { 80 };
+static const unsigned char xaux_IXAudio2_7[] = { 88 };
 static const struct winecom_slot slots_IXAudio2[16] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1929,13 +2016,13 @@ static const struct winecom_slot slots_IXAudio2EngineCallback[3] =
 };
 
 static const unsigned char cls_IXAudio2MasteringVoice_10[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2MasteringVoice_10[] = { 84, 0, 0 };
+static const unsigned char xaux_IXAudio2MasteringVoice_10[] = { 92, 0, 0 };
 static const unsigned char cls_IXAudio2MasteringVoice_11[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2MasteringVoice_11[] = { 84, 0 };
+static const unsigned char xaux_IXAudio2MasteringVoice_11[] = { 92, 0 };
 static const unsigned char cls_IXAudio2MasteringVoice_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2MasteringVoice_16[] = { 84, 0, 0, 0, 0 };
+static const unsigned char xaux_IXAudio2MasteringVoice_16[] = { 92, 0, 0, 0, 0 };
 static const unsigned char cls_IXAudio2MasteringVoice_17[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2MasteringVoice_17[] = { 84, 0, 0, 0 };
+static const unsigned char xaux_IXAudio2MasteringVoice_17[] = { 92, 0, 0, 0 };
 static const struct winecom_slot slots_IXAudio2MasteringVoice[19] =
 {
     { "IXAudio2Voice::GetVoiceDetails", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
@@ -1950,7 +2037,7 @@ static const struct winecom_slot slots_IXAudio2MasteringVoice[19] =
     { "IXAudio2Voice::GetFilterParameters", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2Voice::SetOutputFilterParameters", NULL, cls_IXAudio2MasteringVoice_10, xaux_IXAudio2MasteringVoice_10, 4, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2Voice::GetOutputFilterParameters", NULL, cls_IXAudio2MasteringVoice_11, xaux_IXAudio2MasteringVoice_11, 3, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
-    { "IXAudio2Voice::SetVolume", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_REV, 8, 0, NULL, 0x01, 0x00, 0x00 },
+    { "IXAudio2Voice::SetVolume", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_REV, 13, 0, NULL, 0x01, 0x00, 0x00 },
     { "IXAudio2Voice::GetVolume", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2Voice::SetChannelVolumes", NULL, NULL, NULL, 4, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2Voice::GetChannelVolumes", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
@@ -1960,13 +2047,13 @@ static const struct winecom_slot slots_IXAudio2MasteringVoice[19] =
 };
 
 static const unsigned char cls_IXAudio2SourceVoice_10[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2SourceVoice_10[] = { 84, 0, 0 };
+static const unsigned char xaux_IXAudio2SourceVoice_10[] = { 92, 0, 0 };
 static const unsigned char cls_IXAudio2SourceVoice_11[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2SourceVoice_11[] = { 84, 0 };
+static const unsigned char xaux_IXAudio2SourceVoice_11[] = { 92, 0 };
 static const unsigned char cls_IXAudio2SourceVoice_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2SourceVoice_16[] = { 84, 0, 0, 0, 0 };
+static const unsigned char xaux_IXAudio2SourceVoice_16[] = { 92, 0, 0, 0, 0 };
 static const unsigned char cls_IXAudio2SourceVoice_17[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2SourceVoice_17[] = { 84, 0, 0, 0 };
+static const unsigned char xaux_IXAudio2SourceVoice_17[] = { 92, 0, 0, 0 };
 static const struct winecom_slot slots_IXAudio2SourceVoice[29] =
 {
     { "IXAudio2Voice::GetVoiceDetails", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
@@ -1981,7 +2068,7 @@ static const struct winecom_slot slots_IXAudio2SourceVoice[29] =
     { "IXAudio2Voice::GetFilterParameters", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2Voice::SetOutputFilterParameters", NULL, cls_IXAudio2SourceVoice_10, xaux_IXAudio2SourceVoice_10, 4, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2Voice::GetOutputFilterParameters", NULL, cls_IXAudio2SourceVoice_11, xaux_IXAudio2SourceVoice_11, 3, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
-    { "IXAudio2Voice::SetVolume", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_REV, 8, 0, NULL, 0x01, 0x00, 0x00 },
+    { "IXAudio2Voice::SetVolume", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_REV, 13, 0, NULL, 0x01, 0x00, 0x00 },
     { "IXAudio2Voice::GetVolume", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2Voice::SetChannelVolumes", NULL, NULL, NULL, 4, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2Voice::GetChannelVolumes", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
@@ -1995,19 +2082,19 @@ static const struct winecom_slot slots_IXAudio2SourceVoice[29] =
     { "IXAudio2SourceVoice::Discontinuity", NULL, NULL, NULL, 1, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2SourceVoice::ExitLoop", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2SourceVoice::GetState", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
-    { "IXAudio2SourceVoice::SetFrequencyRatio", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_REV, 8, 0, NULL, 0x01, 0x00, 0x00 },
+    { "IXAudio2SourceVoice::SetFrequencyRatio", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_REV, 13, 0, NULL, 0x01, 0x00, 0x00 },
     { "IXAudio2SourceVoice::GetFrequencyRatio", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2SourceVoice::SetSourceSampleRate", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
 };
 
 static const unsigned char cls_IXAudio2SubmixVoice_10[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2SubmixVoice_10[] = { 84, 0, 0 };
+static const unsigned char xaux_IXAudio2SubmixVoice_10[] = { 92, 0, 0 };
 static const unsigned char cls_IXAudio2SubmixVoice_11[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2SubmixVoice_11[] = { 84, 0 };
+static const unsigned char xaux_IXAudio2SubmixVoice_11[] = { 92, 0 };
 static const unsigned char cls_IXAudio2SubmixVoice_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2SubmixVoice_16[] = { 84, 0, 0, 0, 0 };
+static const unsigned char xaux_IXAudio2SubmixVoice_16[] = { 92, 0, 0, 0, 0 };
 static const unsigned char cls_IXAudio2SubmixVoice_17[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2SubmixVoice_17[] = { 84, 0, 0, 0 };
+static const unsigned char xaux_IXAudio2SubmixVoice_17[] = { 92, 0, 0, 0 };
 static const struct winecom_slot slots_IXAudio2SubmixVoice[19] =
 {
     { "IXAudio2Voice::GetVoiceDetails", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
@@ -2022,7 +2109,7 @@ static const struct winecom_slot slots_IXAudio2SubmixVoice[19] =
     { "IXAudio2Voice::GetFilterParameters", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2Voice::SetOutputFilterParameters", NULL, cls_IXAudio2SubmixVoice_10, xaux_IXAudio2SubmixVoice_10, 4, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2Voice::GetOutputFilterParameters", NULL, cls_IXAudio2SubmixVoice_11, xaux_IXAudio2SubmixVoice_11, 3, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
-    { "IXAudio2Voice::SetVolume", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_REV, 8, 0, NULL, 0x01, 0x00, 0x00 },
+    { "IXAudio2Voice::SetVolume", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_REV, 13, 0, NULL, 0x01, 0x00, 0x00 },
     { "IXAudio2Voice::GetVolume", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2Voice::SetChannelVolumes", NULL, NULL, NULL, 4, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2Voice::GetChannelVolumes", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
@@ -2032,13 +2119,13 @@ static const struct winecom_slot slots_IXAudio2SubmixVoice[19] =
 };
 
 static const unsigned char cls_IXAudio2Voice_10[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2Voice_10[] = { 84, 0, 0 };
+static const unsigned char xaux_IXAudio2Voice_10[] = { 92, 0, 0 };
 static const unsigned char cls_IXAudio2Voice_11[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2Voice_11[] = { 84, 0 };
+static const unsigned char xaux_IXAudio2Voice_11[] = { 92, 0 };
 static const unsigned char cls_IXAudio2Voice_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2Voice_16[] = { 84, 0, 0, 0, 0 };
+static const unsigned char xaux_IXAudio2Voice_16[] = { 92, 0, 0, 0, 0 };
 static const unsigned char cls_IXAudio2Voice_17[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2Voice_17[] = { 84, 0, 0, 0 };
+static const unsigned char xaux_IXAudio2Voice_17[] = { 92, 0, 0, 0 };
 static const struct winecom_slot slots_IXAudio2Voice[19] =
 {
     { "IXAudio2Voice::GetVoiceDetails", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
@@ -2053,7 +2140,7 @@ static const struct winecom_slot slots_IXAudio2Voice[19] =
     { "IXAudio2Voice::GetFilterParameters", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2Voice::SetOutputFilterParameters", NULL, cls_IXAudio2Voice_10, xaux_IXAudio2Voice_10, 4, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2Voice::GetOutputFilterParameters", NULL, cls_IXAudio2Voice_11, xaux_IXAudio2Voice_11, 3, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
-    { "IXAudio2Voice::SetVolume", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_REV, 8, 0, NULL, 0x01, 0x00, 0x00 },
+    { "IXAudio2Voice::SetVolume", NULL, NULL, NULL, 3, WINECOM_F_HAND|WINECOM_F_REV, 13, 0, NULL, 0x01, 0x00, 0x00 },
     { "IXAudio2Voice::GetVolume", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2Voice::SetChannelVolumes", NULL, NULL, NULL, 4, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
     { "IXAudio2Voice::GetChannelVolumes", NULL, NULL, NULL, 3, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
@@ -2085,10 +2172,18 @@ static const struct winecom_iface syscom_com_ifaces[SYSCOM_IFACE_COUNT] =
       5, slots_IAudioRenderClient, 0 },
     { "IAudioSessionControl", {0xf4b1a599,0x7266,0x4319,{0xa8,0xca,0xe7,0x0a,0xcb,0x11,0xe8,0xcd}},
       12, slots_IAudioSessionControl, 0 },
+    { "IAudioSessionEnumerator", {0xe2f5bb11,0x0570,0x40ca,{0xac,0xdd,0x3a,0xa0,0x12,0x77,0xde,0xe8}},
+      5, slots_IAudioSessionEnumerator, 0 },
+    { "IAudioSessionEvents", {0x24918acc,0x64b3,0x37c1,{0x8c,0xa9,0x74,0xa6,0x6e,0x99,0x57,0xa8}},
+      10, slots_IAudioSessionEvents, 0 },
     { "IAudioSessionManager", {0xbfa971f1,0x4d5e,0x40bb,{0x93,0x5e,0x96,0x70,0x39,0xbf,0xbe,0xe4}},
       5, slots_IAudioSessionManager, 0 },
     { "IAudioSessionManager2", {0x77aa99a0,0x1bd6,0x484f,{0x8b,0xc7,0x2c,0x65,0x4c,0x9a,0x9b,0x6f}},
       10, slots_IAudioSessionManager2, 0 },
+    { "IAudioSessionNotification", {0x641dd20b,0x4d41,0x49cc,{0xab,0xa3,0x17,0x4b,0x94,0x77,0xbb,0x08}},
+      4, slots_IAudioSessionNotification, 0 },
+    { "IAudioVolumeDuckNotification", {0xc3b284d4,0x6d39,0x4359,{0xb3,0xcf,0xb5,0x6d,0xdb,0x3b,0xb3,0x9c}},
+      5, slots_IAudioVolumeDuckNotification, 0 },
     { "IBindCtx", {0x0000000e,0x0000,0x0000,{0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}},
       13, slots_IBindCtx, 0 },
     { "IClassFactory", {0x00000001,0x0000,0x0000,{0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}},
@@ -2159,6 +2254,8 @@ static const struct winecom_iface syscom_com_ifaces[SYSCOM_IFACE_COUNT] =
       7, slots_IEnumString, 0 },
     { "IEnumUnknown", {0x00000100,0x0000,0x0000,{0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}},
       7, slots_IEnumUnknown, 0 },
+    { "IEnumVARIANT", {0x00020404,0x0000,0x0000,{0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}},
+      7, slots_IEnumVARIANT, 0 },
     { "IEnumWbemClassObject", {0x027947e1,0xd731,0x11ce,{0xa3,0x57,0x00,0x00,0x00,0x00,0x00,0x01}},
       8, slots_IEnumWbemClassObject, 0 },
     { "IErrorInfo", {0x1cf2b120,0x547d,0x101b,{0x8e,0x65,0x08,0x00,0x2b,0x2b,0xd1,0x19}},
@@ -2225,12 +2322,18 @@ static const struct winecom_iface syscom_com_ifaces[SYSCOM_IFACE_COUNT] =
       13, slots_ITypeLib, 0 },
     { "IUnknown", {0x00000000,0x0000,0x0000,{0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}},
       3, slots_IUnknown, 0 },
+    { "IWbemCallResult", {0x44aca675,0xe8fc,0x11d0,{0xa0,0x7c,0x00,0xc0,0x4f,0xb6,0x88,0x20}},
+      7, slots_IWbemCallResult, 0 },
     { "IWbemClassObject", {0xdc12a681,0x737f,0x11cf,{0x88,0x4d,0x00,0xaa,0x00,0x4b,0x2e,0x24}},
       27, slots_IWbemClassObject, 0 },
     { "IWbemContext", {0x44aca674,0xe8fc,0x11d0,{0xa0,0x7c,0x00,0xc0,0x4f,0xb6,0x88,0x20}},
       12, slots_IWbemContext, 0 },
     { "IWbemLocator", {0xdc12a687,0x737f,0x11cf,{0x88,0x4d,0x00,0xaa,0x00,0x4b,0x2e,0x24}},
       4, slots_IWbemLocator, 0 },
+    { "IWbemObjectSink", {0x7c857801,0x7381,0x11cf,{0x88,0x4d,0x00,0xaa,0x00,0x4b,0x2e,0x24}},
+      5, slots_IWbemObjectSink, 0 },
+    { "IWbemQualifierSet", {0xdc12a680,0x737f,0x11cf,{0x88,0x4d,0x00,0xaa,0x00,0x4b,0x2e,0x24}},
+      10, slots_IWbemQualifierSet, 0 },
     { "IWbemServices", {0x9556dc99,0x828c,0x11cf,{0xa3,0x7e,0x00,0xaa,0x00,0x32,0x40,0xc7}},
       26, slots_IWbemServices, 0 },
     { "IXAudio2", {0x8bcf1f58,0x9fe7,0x4583,{0x8a,0xc6,0xe2,0xad,0xc4,0x65,0xc8,0xbb}},
@@ -2260,8 +2363,12 @@ static const unsigned char syscom_iface_local[SYSCOM_IFACE_COUNT] =
     0,  /* IAudioClient */
     0,  /* IAudioRenderClient */
     0,  /* IAudioSessionControl */
+    0,  /* IAudioSessionEnumerator */
+    0,  /* IAudioSessionEvents */
     0,  /* IAudioSessionManager */
     0,  /* IAudioSessionManager2 */
+    0,  /* IAudioSessionNotification */
+    0,  /* IAudioVolumeDuckNotification */
     0,  /* IBindCtx */
     0,  /* IClassFactory */
     0,  /* IConnectionPoint */
@@ -2297,6 +2404,7 @@ static const unsigned char syscom_iface_local[SYSCOM_IFACE_COUNT] =
     0,  /* IEnumSTATSTG */
     0,  /* IEnumString */
     0,  /* IEnumUnknown */
+    0,  /* IEnumVARIANT */
     0,  /* IEnumWbemClassObject */
     0,  /* IErrorInfo */
     0,  /* IGlobalInterfaceTable */
@@ -2330,9 +2438,12 @@ static const unsigned char syscom_iface_local[SYSCOM_IFACE_COUNT] =
     0,  /* ITypeInfo */
     0,  /* ITypeLib */
     0,  /* IUnknown */
+    0,  /* IWbemCallResult */
     0,  /* IWbemClassObject */
     0,  /* IWbemContext */
     0,  /* IWbemLocator */
+    0,  /* IWbemObjectSink */
+    0,  /* IWbemQualifierSet */
     0,  /* IWbemServices */
     0,  /* IXAudio2 */
     1,  /* IXAudio2EngineCallback */
@@ -2343,15 +2454,15 @@ static const unsigned char syscom_iface_local[SYSCOM_IFACE_COUNT] =
     1,  /* IXAudio2VoiceCallback */
 };
 
-/* wine-syscom: 86 interface(s), 1003 vtable slot(s).
- * The 28 audio row(s) generated here: 229 slot(s) marshalled, 20 hand-written
- * (6 of them float-bearing, routed by argument shape), 36 refused with a
- * named reason, 66 IUnknown slot(s) served by the runtime, 6 interface(s)
+/* wine-syscom: 94 interface(s), 1056 vtable slot(s).
+ * The 36 audio row(s) generated here: 288 slot(s) marshalled, 26 hand-written
+ * (7 of them float-bearing, routed by argument shape), 0 refused with a
+ * named reason, 90 IUnknown slot(s) served by the runtime, 6 interface(s)
  * [local] and served by combase's own dispatcher.  The 58 reused row(s):
- * 426 marshalled (61 of those upgraded from legacy refusals by the
+ * 478 marshalled (73 of those upgraded from legacy refusals by the
  * reclassification pass -- see gen_syscom_audio.py's UPGRADE_LICENSED_RE --
  * and 1 REFINED where a typed out-interface was passing RAW),
- * 52 refused, 174 IUnknown; 421 of them re-derived from
+ * 0 refused, 174 IUnknown; 477 of them re-derived from
  * the roster and cross-checked against this file.
- * Reverse-proxy licence: IMMNotificationClient, IXAudio2EngineCallback.  137 interface IN-parameter(s)
+ * Reverse-proxy licence: IAudioSessionEvents, IAudioSessionNotification, IAudioVolumeDuckNotification, IMMNotificationClient, IWbemObjectSink, IXAudio2EngineCallback.  165 interface IN-parameter(s)
  * withheld, each of which fails closed. */

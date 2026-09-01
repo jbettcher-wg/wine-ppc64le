@@ -216,14 +216,23 @@ PROPSTORE_IFACES = ["IPropertyStore"]
 # the same hand_f_i with no new code.
 SESSION_HEADERS = [os.path.join("include", "audiopolicy.h")]
 SESSION_IFACES = ["IAudioSessionManager", "IAudioSessionManager2",
-                  "IAudioSessionControl", "ISimpleAudioVolume"]
+                  "IAudioSessionControl", "ISimpleAudioVolume",
+                  # The 2026-09-01 completeness pass: "nothing on the
+                  # measured path needs them" is not a refusal reason on
+                  # this port any more (the user's rule, after the GetShader
+                  # class), so the session family is now WHOLE.  The three
+                  # sink interfaces are application-implemented and carry
+                  # the reverse-proxy licence below -- each is either a leaf
+                  # or takes only NATIVE-minted interface arguments, which
+                  # the relaxed licence check proves per slot.
+                  "IAudioSessionEnumerator", "IAudioSessionEvents",
+                  "IAudioSessionNotification",
+                  "IAudioVolumeDuckNotification"]
 # IAudioSessionManager is here because Manager2 derives from it and its two
 # slots (GetAudioSessionControl / GetSimpleAudioVolume) are the ones the
-# volume path actually calls.  NOT here: IAudioSessionEnumerator,
-# IAudioSessionControl2, IAudioSessionEvents, IAudioSessionNotification,
-# IAudioVolumeDuckNotification -- nothing on the measured path needs them,
-# and the events/notification pair would need the reverse-proxy licence
-# besides.
+# volume path actually calls.  NOT here: IAudioSessionControl2 (derives from
+# Control; its three extra slots are session-identity strings a QI can grow
+# later without unbalancing the roster).
 
 AUDIO_IFACES = XAUDIO2_IFACES + MMDEV_IFACES + PROPSTORE_IFACES + SESSION_IFACES
 
@@ -268,13 +277,27 @@ SYSINFO_BASE_HEADERS = [os.path.join("include", "oaidl.h"),
                         os.path.join("include", "wtypes.h")]
 
 WBEM_IFACES = ["IWbemLocator", "IWbemServices", "IEnumWbemClassObject",
-               "IWbemClassObject", "IWbemContext"]
+               "IWbemClassObject", "IWbemContext",
+               # 2026-09-01: the WMI completeness pass.  IWbemCallResult and
+               # IWbemQualifierSet were the unrostered types behind eleven
+               # refused rows on the SYNCHRONOUS surface; IWbemObjectSink is
+               # the application-implemented sink behind the thirteen ASYNC
+               # rows, licensed as a reverse sink below (its interface
+               # arguments all flow NATIVE->guest, the safe direction).
+               "IWbemCallResult", "IWbemQualifierSet", "IWbemObjectSink"]
 # IWbemContext is rostered for TYPE visibility: ConnectServer and ExecQuery
 # take an IWbemContext* in-parameter (games pass NULL), and a slot whose
 # parameter names an unrostered interface refuses.  Its own methods can all
 # refuse; nothing on the measured path calls them.
 NLM_IFACES = ["INetworkListManager", "IEnumNetworks", "INetwork",
-              "IEnumNetworkConnections", "INetworkConnection"]
+              "IEnumNetworkConnections", "INetworkConnection",
+              # 2026-09-01: get__NewEnum on both NLM enumerators returns an
+              # IEnumVARIANT, whose Next fills VARIANTs that on THIS surface
+              # hold VT_UNKNOWN/VT_DISPATCH INetwork objects -- so the
+              # interface is rostered (oaidl.h joins the extraction set for
+              # it) and its Next is a HAND slot that post-wraps the
+              # interface-bearing elements.  See hand_enum_next_variant.
+              "IEnumVARIANT"]
 
 SYSINFO_IFACES = WBEM_IFACES + NLM_IFACES
 
@@ -342,6 +365,85 @@ BYVAL_INTEGER_TYPEDEFS = {
     "CIMTYPE": "include/wbemcli.h (widl): typedef long CIMTYPE",
     "MUSIC_TIME": "include/dmusici.h: typedef long MUSIC_TIME",
     "MEMBERID": "include/oaidl.h (widl): typedef DISPID MEMBERID (-> LONG)",
+    # The DirectShow reference-clock handles (2026-09-01, the completeness
+    # pass).  These LOOK like objects and are the reason AdviseTime and
+    # AdvisePeriodic were refused -- but the header says what they are:
+    # a DWORD_PTR is integer-class on both ABIs, and on THIS surface the
+    # native side is Wine's own quartz in the same process, so the guest's
+    # event HANDLE names exactly the object quartz expects (there is no
+    # foreign handle namespace here -- contrast dlls/d3d11's DXVK rows).
+    "HEVENT": "include/axcore.idl: typedef DWORD_PTR HEVENT",
+    "HSEMAPHORE": "include/axcore.idl: typedef DWORD_PTR HSEMAPHORE",
+}
+
+# --------------------------------------------------------------------------
+# void** OUT-parameters that are PLAIN MEMORY, not interfaces (2026-09-01,
+# the completeness pass).  classify() refuses a void** with no REFIID beside
+# it because an UNTYPED INTERFACE cannot be given a guest vtable -- but that
+# reasoning only bites when the pointee IS an interface.  Each entry below
+# licenses one slot's void** as raw data, with the header/doc fact that
+# proves it; the key is "Iface::Method", the value maps the parameter index
+# (after `this`, 0-based) to the proof.  A licence here turns the class into
+# CA_PASS -- the address crosses, both sides read the same memory.
+# --------------------------------------------------------------------------
+RAW_VOID_OUT = {
+    "IDirectSoundBuffer::Lock": {
+        2: "include/dsound.h: ppvAudioPtr1 receives a pointer INTO the "
+           "sound buffer's own memory -- bytes, not an object",
+        4: "ppvAudioPtr2 likewise (the wrap half of the circular buffer)",
+    },
+    "IDirectMusicTrack::InitPlay": {
+        2: "include/dmusici.h: ppStateData receives the track's own opaque "
+           "per-play state, defined and consumed only by the same track "
+           "object -- it round-trips through Play/EndPlay untouched",
+    },
+    "IRecordInfo::RecordCreateCopy": {
+        1: "include/oaidl.h: ppvNew receives a freshly allocated RECORD "
+           "(field data described by this IRecordInfo), not an object",
+    },
+    "IRecordInfo::GetFieldNoCopy": {
+        3: "include/oaidl.h: ppvDataCArray receives a pointer into the "
+           "record's own storage (the no-copy in the name) -- bytes the "
+           "caller reads through GetFieldNoCopy's contract, not an object",
+    },
+}
+
+# `Iface **` OUT-parameters the offline extractor refused as ARRAY-CAPABLE
+# because a count-looking argument sits in the same signature.  Each entry
+# licenses one slot's Iface** as the SINGULAAR out-cell it really is, with
+# the header fact; classify() then serves it as an ordinary
+# CA_IFACE_OUT_STATIC.  (Spelled per slot, never as a heuristic -- the
+# heuristic is what refused these.  classify() cannot re-detect array-ness,
+# so the upgrade pass admits this family ONLY for keys listed here.)
+SINGULAR_IFACE_OUT = {
+    # CreateStandardAudioPath(DWORD dwType, DWORD dwPChannelCount,
+    #                         BOOL fActivate, IDirectMusicAudioPath **ppNewPath)
+    "IDirectMusicPerformance8::CreateStandardAudioPath":
+        "include/dmusici.h: dwPChannelCount is the CHANNEL count of the new "
+        "path, not an element count; ppNewPath receives exactly one object",
+}
+
+# void** OUT-parameters whose typing REFIID exists but is NOT the adjacent
+# parameter.  classify() pairs a void** with the parameter directly before
+# it; these slots put a filename or index between the two.  The value is
+# (ppv_index, riid_index), both 0-based after `this`, checked against the
+# signature at classification time.
+PPV_RIID_AT = {
+    # LoadObjectFromFile(REFGUID rguidClassID, REFIID iidInterfaceID,
+    #                    WCHAR *pwzFilePath, void **ppObject)
+    "IDirectMusicLoader8::LoadObjectFromFile": (3, 1),
+}
+
+# Interface ARRAYS spelled `Iface **` that classify() would read as a single
+# OUT.  The classifier cannot tell an array from an out-cell -- the
+# signature text is identical -- so array-ness is licensed per slot, with the
+# count parameter's index (0-based after `this`, count BY VALUE there).
+# Today's one consumer is the reverse direction: IWbemObjectSink::Indicate is
+# the WMI async sink's delivery slot, its array arrives NATIVE->guest, and
+# libs/winecom/reverse.c's CA_IFACE_ARR_IN arm forward-mints each element.
+IFACE_ARR_IN_AT = {
+    # Indicate(long lObjectCount, IWbemClassObject **apObjArray)
+    "IWbemObjectSink::Indicate": {1: 0},
 }
 
 FLOAT_TOKENS = re.compile(r'\b(FLOAT|float|double|DOUBLE)\b')
@@ -357,6 +459,11 @@ UNROSTERED_IFACE_RE = re.compile(r'^I[A-Z]\w*$')
 FP_SHAPES = {
     # IXAudio2Voice::SetVolume, IXAudio2SourceVoice::SetFrequencyRatio
     "fi>i": "hand_f_i",
+    # IAudioSessionEvents::OnSimpleVolumeChanged (float, BOOL, LPCGUID) --
+    # a REVERSE sink slot; the forward hand exists so the row carries a
+    # complete plan (cls + fpmask + F_REV), which is what the reverse
+    # direction marshals the delivery by.
+    "fii>i": "hand_f_i_i",
 }
 
 # Slots served by a hand-written function in dlls/combase/syscom.c.  Each takes
@@ -384,6 +491,90 @@ HAND_SLOTS = [
                                         "hand_mmdev_register_notify"),
     ("IMMDeviceEnumerator::UnregisterEndpointNotificationCallback",
                                         "hand_mmdev_unregister_notify"),
+    # ---- the 2026-09-01 completeness pass, owned families ----------------
+    # The two NLM 16-byte GUID-by-value slots: MS-x64 passes any aggregate
+    # that is not 1/2/4/8 bytes by hidden pointer, ELFv2 passes 16 bytes in
+    # two GPRs -- the walker dereferences the guest's hidden pointer and
+    # calls a real by-value prototype (the mf lane's worked shape).
+    ("INetworkListManager::GetNetwork",  "hand_nlm_get_network"),
+    ("INetworkListManager::GetNetworkConnection",
+                                        "hand_nlm_get_network_connection"),
+    # PROPERTYKEY (GUID + DWORD, 20 bytes -> also hidden-pointer on MS-x64)
+    # by value, forward direction.
+    ("IMMNotificationClient::OnPropertyValueChanged",
+                                        "hand_propkey_byval"),
+    # The device property store's WRITE path: the guest authors the
+    # PROPVARIANT, so the walker translates the tagged union (VT_UNKNOWN
+    # unwraps through winecom_to_native) instead of refusing the slot.
+    ("IPropertyStore::SetValue",        "hand_propstore_setvalue"),
+    # IEnumVARIANT::Next fills VARIANTs that hold INetwork objects on this
+    # surface: post-wrap the interface-bearing elements, pass the rest.
+    ("IEnumVARIANT::Next",              "hand_enum_next_variant"),
+]
+
+# LEGACY rows served by hand functions: the reused blocks' refusals whose
+# reasons are SEMANTIC (interface-bearing structs, tagged unions, enum-Next
+# arrays) and whose service is a walker in dlls/combase/syscom.c rather than
+# a class the table could carry.  The rewrite pass swaps the refusal row for
+# a WINECOM_F_HAND row with the function's index; everything about the
+# signature lives in the C function, exactly as HAND_SLOTS above.  Keys must
+# be refused rows in the reused corpus -- rewriting a SERVED row from here is
+# fatal, because it would hide a disagreement about what the row is.
+LEGACY_HAND = [
+    ("IEnumUnknown::Next",              "hand_enum_next_unknown"),
+    ("IEnumMoniker::Next",              "hand_enum_next_moniker"),
+    ("IEnumConnectionPoints::Next",     "hand_enum_next_cp"),
+    ("IEnumConnections::Next",          "hand_enum_next_connectdata"),
+    ("IMultiQI::QueryMultipleInterfaces", "hand_multi_qi"),
+    ("IDispatch::Invoke",               "hand_dispatch_invoke"),
+    ("ITypeComp::Bind",                 "hand_typecomp_bind"),
+    # DirectMusic: the PMSG family (interface members at fixed offsets in a
+    # struct whose ownership TRANSFERS on send/free), the OBJECTDESC family
+    # (an optional IStream member behind a validity flag), and the
+    # tag-dispatched GetParam/SetParam payloads (known tags served, unknown
+    # tags refused AT RUNTIME naming the GUID).
+    ("IDirectMusicGraph::StampPMsg",    "hand_dmus_stamp_pmsg"),
+    ("IDirectMusicPerformance::SendPMsg", "hand_dmus_send_pmsg"),
+    ("IDirectMusicPerformance::AllocPMsg", "hand_dmus_alloc_pmsg"),
+    ("IDirectMusicPerformance::FreePMsg", "hand_dmus_free_pmsg"),
+    ("IDirectMusicPerformance8::SendPMsg", "hand_dmus_send_pmsg"),
+    ("IDirectMusicPerformance8::AllocPMsg", "hand_dmus_alloc_pmsg"),
+    ("IDirectMusicPerformance8::FreePMsg", "hand_dmus_free_pmsg"),
+    ("IDirectMusicPerformance8::ClonePMsg", "hand_dmus_clone_pmsg"),
+    ("IDirectMusicTool::ProcessPMsg",   "hand_dmus_process_pmsg"),
+    ("IDirectMusicTool::Flush",         "hand_dmus_flush"),
+    ("IDirectMusicPerformance::GetNotificationPMsg",
+                                        "hand_dmus_get_notification_pmsg"),
+    ("IDirectMusicPerformance8::GetNotificationPMsg",
+                                        "hand_dmus_get_notification_pmsg"),
+    ("IDirectMusicLoader::GetObject",   "hand_dmus_loader_getobject"),
+    ("IDirectMusicLoader::SetObject",   "hand_dmus_objdesc_in"),
+    ("IDirectMusicLoader::EnumObject",  "hand_dmus_enum_object"),
+    ("IDirectMusicLoader8::GetObject",  "hand_dmus_loader_getobject"),
+    ("IDirectMusicLoader8::SetObject",  "hand_dmus_objdesc_in"),
+    ("IDirectMusicLoader8::EnumObject", "hand_dmus_enum_object"),
+    ("IDirectMusicObject::GetDescriptor", "hand_dmus_objdesc_out"),
+    ("IDirectMusicObject::SetDescriptor", "hand_dmus_objdesc_in"),
+    ("IDirectMusicObject::ParseDescriptor", "hand_dmus_parse_descriptor"),
+    # The param positions differ between the performance/segment shape and
+    # the track shape, and a hand function knows its signature by BEING
+    # slot-specific (it receives no argc) -- so one variant per shape:
+    #   _p6: GetParam(REFGUID, DWORD, DWORD, MUSIC_TIME, MUSIC_TIME*, void*)
+    #   _t4: GetParam(REFGUID, MUSIC_TIME, MUSIC_TIME*, void*)
+    #   _p5: SetParam(REFGUID, DWORD, DWORD, MUSIC_TIME, void*)
+    #   _t3: SetParam(REFGUID, MUSIC_TIME, void*)
+    ("IDirectMusicPerformance::GetParam", "hand_dmus_getparam_p6"),
+    ("IDirectMusicPerformance::SetParam", "hand_dmus_setparam_p5"),
+    ("IDirectMusicPerformance8::GetParam", "hand_dmus_getparam_p6"),
+    ("IDirectMusicPerformance8::SetParam", "hand_dmus_setparam_p5"),
+    ("IDirectMusicPerformance8::GetParamEx", "hand_dmus_getparamex"),
+    ("IDirectMusicPerformance8::InitAudio", "hand_dmus_init_audio"),
+    ("IDirectMusicSegment::GetParam",   "hand_dmus_getparam_p6"),
+    ("IDirectMusicSegment::SetParam",   "hand_dmus_setparam_p5"),
+    ("IDirectMusicSegment8::GetParam",  "hand_dmus_getparam_p6"),
+    ("IDirectMusicSegment8::SetParam",  "hand_dmus_setparam_p5"),
+    ("IDirectMusicTrack::GetParam",     "hand_dmus_getparam_t4"),
+    ("IDirectMusicTrack::SetParam",     "hand_dmus_setparam_t3"),
 ]
 
 # --------------------------------------------------------------------------
@@ -428,6 +619,32 @@ REVERSE_SINKS = {
         "mmdevapi's device-notification sink.  mmdevapi stores the pointer in "
         "a list, calls the five On* methods from its own notification thread, "
         "and never asks it for another interface.",
+    # 2026-09-01, the completeness pass.  The leaf rule below was relaxed
+    # from "no interface anywhere in any slot" to "no interface may flow
+    # guest->native through a sink slot" -- an interface IN-parameter of a
+    # sink method arrives NATIVE->guest and is FORWARD-minted by
+    # libs/winecom/reverse.c's CA_IFACE_IN arm, which cannot pull a second
+    # guest object across.  What the licence still forbids, and the check
+    # still proves, is a sink slot that RETURNS an interface to native: that
+    # is a guest object crossing INTO Wine at a moment nothing marshals it.
+    "IAudioSessionEvents":
+        "the per-session notification sink.  audiopolicy's session manager "
+        "stores the pointer and calls the seven On* methods from its own "
+        "thread; every parameter is plain data (floats, GUIDs, LPCWSTR).",
+    "IAudioSessionNotification":
+        "the session-created sink.  OnSessionCreated's one parameter is an "
+        "IAudioSessionControl the SERVER minted -- native->guest, "
+        "forward-wrapped by the reverse path's own CA_IFACE_IN arm.",
+    "IAudioVolumeDuckNotification":
+        "the ducking sink.  Two On* methods, LPCWSTR and UINT32 parameters, "
+        "nothing crossing back.",
+    "IWbemObjectSink":
+        "WMI's asynchronous result sink -- the whole async half of "
+        "IWbemServices is 'you implement this, wbemprox calls it'.  "
+        "Indicate hands the guest an ARRAY of IWbemClassObject the SERVER "
+        "minted (native->guest, each element forward-wrapped by the reverse "
+        "path's CA_IFACE_ARR_IN arm); SetStatus hands one more the same "
+        "way.  Nothing flows guest->native through any slot.",
 }
 
 # Slots the client recognises by NUMBER rather than by name, emitted as
@@ -466,19 +683,14 @@ NOTABLE_SLOTS = ["IXAudio2Voice::DestroyVoice"]
 # and answer E_NOTFOUND for anything else, WITHOUT touching it.  That is the
 # same shape as the live-voice registry in dlls/combase/syscom.c and it exists
 # for the same kind of reason.
-REFUSALS = {
-    # The read path of a device property store is data (a PROPVARIANT the
-    # NATIVE side filled with a VT_BLOB wave format or a VT_LPWSTR name); the
-    # write path is the one direction where the GUEST authors the tagged
-    # union, and a guest-written VT_UNKNOWN would hand mmdevapi a proxy it
-    # would call as ppc64 code.  Nothing on the measured path writes device
-    # properties, so the honest answer is a named refusal.
-    "IPropertyStore::SetValue":
-        "takes a guest-authored REFPROPVARIANT; a PROPVARIANT the GUEST "
-        "fills can carry VT_UNKNOWN -- an interface pointer with no type in "
-        "the signature -- and the device property store is read-only on "
-        "every measured path anyway",
-}
+# EMPTY again (2026-09-01): IPropertyStore::SetValue was the one entry, and
+# the completeness pass moved it to HAND_SLOTS -- the walker translates the
+# guest-authored PROPVARIANT per tag (VT_UNKNOWN unwraps through
+# winecom_to_native, unknown interface arms refuse AT RUNTIME naming the VT)
+# instead of refusing the whole slot.  "Read-only on every measured path" was
+# half the old reason, and that half is not a refusal reason on this port any
+# more.
+REFUSALS = {}
 
 
 class Refused(Exception):
@@ -822,9 +1034,10 @@ def classify(key, slot, ifaces, iface_index, typedefs, byval_ok, bearing,
     params = [Param(p) for p in slot["params"]]
     cls = [CA["PASS"]] * len(params)
     xaux = [0] * len(params)
+    caux = [0] * len(params)
     aux = 0
     fpmask = fpwide = 0
-    want_xaux = False
+    want_xaux = want_caux = False
     shape = []
 
     if FLOAT_TOKENS.search(slot["ret"]) and "*" not in slot["ret"]:
@@ -854,6 +1067,20 @@ def classify(key, slot, ifaces, iface_index, typedefs, byval_ok, bearing,
         shape.append("i")            # every pointer is an integer register
 
         if base == "void" and stars == 2:
+            if i in RAW_VOID_OUT.get(key, ()):
+                # licensed plain memory; the proof is in the table above
+                cls[i] = CA["PASS"]
+                continue
+            if key in PPV_RIID_AT:
+                ppv_i, riid_i = PPV_RIID_AT[key]
+                if ppv_i != i or not params[riid_i].is_riid():
+                    raise Refused(
+                        "has a PPV_RIID_AT licence that no longer matches its "
+                        "signature (the parameter list moved); re-derive it")
+                cls[i] = CA["PPV_OUT"]
+                cls[riid_i] = CA["RIID"]
+                aux = riid_i
+                continue
             prev = params[i - 1] if i else None
             if prev is not None and prev.is_riid():
                 cls[i] = CA["PPV_OUT"]
@@ -874,6 +1101,17 @@ def classify(key, slot, ifaces, iface_index, typedefs, byval_ok, bearing,
                 "refuses the rest by name" % (base, why_bearing.get(base, base)))
 
         if base in ifaces:
+            if i in IFACE_ARR_IN_AT.get(key, ()):
+                cnt = IFACE_ARR_IN_AT[key][i]
+                if stars != 2:
+                    raise Refused(
+                        "carries an IFACE_ARR_IN_AT licence but `%s` is not "
+                        "an Iface** any more; re-derive the licence" % p.raw)
+                cls[i] = CA["IFACE_ARR_IN"]
+                xaux[i] = iface_index[base]
+                caux[i] = cnt
+                want_xaux = want_caux = True
+                continue
             if stars == 1:
                 cls[i] = CA["IFACE_IN"]
                 # The roster index goes in xaux even though the FORWARD
@@ -895,6 +1133,15 @@ def classify(key, slot, ifaces, iface_index, typedefs, byval_ok, bearing,
             want_xaux = True
             continue
 
+        if base in byval_ok or base in ("GUID", "IID", "CLSID", "FMTID"):
+            # a POINTER to a scalar or a GUID-family struct is plain memory;
+            # without this, `INT *` and `IID *` fall into the interface
+            # regex below (^I[A-Z] matches INT and IID) -- [MEASURED]
+            # 2026-09-01, IAudioSessionEnumerator::GetCount and
+            # IStorage::CopyTo both refused on exactly that.
+            cls[i] = CA["PASS"]
+            continue
+
         if UNROSTERED_IFACE_RE.match(base):
             raise Refused(
                 "takes `%s`, an interface pointer of a type the wine-syscom "
@@ -908,7 +1155,8 @@ def classify(key, slot, ifaces, iface_index, typedefs, byval_ok, bearing,
 
     fp = "".join(shape) + ">" + ("f" if FLOAT_TOKENS.search(slot["ret"]) else "i")
     return (cls, xaux, aux, (fp if "f" in "".join(shape) else None),
-            fpmask, fpwide, want_xaux)
+            fpmask, fpwide, want_xaux,
+            (caux if want_caux else None))
 
 
 # --------------------------------------------------------------------------
@@ -1058,13 +1306,17 @@ DECL_RE = re.compile(
     r'static const unsigned char (\w+)\[\] = \{ ([^}]*) \};')
 
 
-def derive_row(params, ifaces, iface_index, typedefs):
+def derive_row(params, ifaces, iface_index, typedefs, key=None):
     """The roster's parameter text -> (cls[], xaux[]) for ONE slot, using the
     same rules classify() uses, but from the roster alone: no header text and
     no refusal, because a reused row's refusal was already decided by the
     generator that wrote it.  Returns None when the text does not determine the
     row (an untyped void**, an unrostered interface, an indirection with no
-    class), which is itself a fail-closed answer."""
+    class), which is itself a fail-closed answer.  `key` brings the per-slot
+    licences (RAW_VOID_OUT, PPV_RIID_AT) along, so this independent prover
+    reaches the same answer classify() does for a licensed slot -- the
+    cross-check must compare like with like or every licensed upgrade dies
+    at the derive fence."""
     P = [Param(x) for x in params]
     cls = [CA["PASS"]] * len(P)
     xaux = [0] * len(P)
@@ -1073,6 +1325,14 @@ def derive_row(params, ifaces, iface_index, typedefs):
         if stars == 0:
             continue
         if base == "void" and stars == 2:
+            if key is not None and i in RAW_VOID_OUT.get(key, ()):
+                continue                       # licensed plain memory
+            if key is not None and key in PPV_RIID_AT:
+                ppv_i, riid_i = PPV_RIID_AT[key]
+                if ppv_i == i and P[riid_i].is_riid():
+                    cls[i] = CA["PPV_OUT"]
+                    cls[riid_i] = CA["RIID"]
+                    continue
             if i and P[i - 1].is_riid():
                 cls[i] = CA["PPV_OUT"]
                 cls[i - 1] = CA["RIID"]
@@ -1087,6 +1347,11 @@ def derive_row(params, ifaces, iface_index, typedefs):
                 return None
             xaux[i] = iface_index[base]
             continue
+        if (base in BYVAL_INTEGER or base in BYVAL_INTEGER_TYPEDEFS or
+                base in ("GUID", "IID", "CLSID", "FMTID")):
+            continue          # a pointer to a scalar/GUID: plain memory --
+                              # same fact classify() carries, same [MEASURED]
+                              # INT/IID regex trap
         if UNROSTERED_IFACE_RE.match(base):
             return None
     return cls, xaux
@@ -1120,7 +1385,8 @@ def derive_legacy(old, roster, order, iface_index, typedefs):
                 sys.exit("gen_syscom_audio: %s slot %d says argc %s and the "
                          "roster says %d" % (name, slot, argc,
                                              1 + len(s["params"])))
-            got = derive_row(s["params"], ifaces, iface_index, typedefs)
+            got = derive_row(s["params"], ifaces, iface_index, typedefs,
+                             key="%s::%s" % (s["owner"], s["name"]))
             emit_cls = ([CA[v.replace("WINECOM_CA_", "")] for v in decls[cname]]
                         if cname != "NULL" else [CA["PASS"]] * len(s["params"]))
             emit_x = ([iface_index[old["order"][int(v)]] if int(v) else 0
@@ -1211,10 +1477,34 @@ def derive_legacy(old, roster, order, iface_index, typedefs):
 UPGRADE_LICENSED_RE = re.compile(
     r': by-value (LPOLESTR|LPCOLESTR|PVOID|LPVOID|LPDWORD|LPLONG|LPBYTE|'
     r'LPGUID|LPCGUID|LPREFERENCE_TIME|LPWAVEFORMATEX|LPCWAVEFORMATEX|'
-    r'LPCDSBUFFERDESC|LPLPDIRECTSOUNDBUFFER|SNB|short) is not provably '
-    r'integer-class$|'
+    r'LPCDSBUFFERDESC|LPLPDIRECTSOUNDBUFFER|SNB|short|HEVENT|HSEMAPHORE) '
+    r'is not provably integer-class$|'
     r': by-value parameter `(?:LCID|DISPID|CIMTYPE|MUSIC_TIME|short)'
-    r'[^`]*` is of a type this generator cannot prove is integer-class')
+    r'[^`]*` is of a type this generator cannot prove is integer-class|'
+    # A POINTER return is integer-class by the same one-hop licence as the
+    # parameter form: it travels whole in RAX on MS-x64 and in r3 on ELFv2,
+    # and both sides are Wine PE code in one address space, so the address
+    # means the same thing.  classify() only ever refuses FLOAT returns, so
+    # gate 2 holds these to the same whole-signature proof as everything
+    # else.  (2026-09-01: IMalloc::Alloc, IRecordInfo::RecordCreate.)
+    r': return type (?:LPVOID|PVOID) is not provably integer-class$|'
+    # The void**-with-no-REFIID family joined the licence 2026-09-01 with a
+    # narrower claim than the doc-comment above assumed: classify() CAN
+    # re-detect this one -- its own void** branch refuses exactly when no
+    # typing REFIID exists -- so gate 2 does the real work, and the
+    # RAW_VOID_OUT / PPV_RIID_AT licences (each entry with its proof) are
+    # what let a specific slot through it.  An entry-less slot stays refused
+    # by classify() itself, byte-identical.
+    r' arg \d+ is a void\*\* with no preceding REFIID|'
+    # array-capable Iface** rows: admitted ONLY when the key sits in
+    # SINGULAR_IFACE_OUT (checked in try_upgrade -- classify() cannot
+    # re-detect array-ness, so the per-slot proof is the whole gate here).
+    r' is array-capable and the method declares a count argument')
+
+# the licence families whose SECOND gate is a membership table rather than
+# classify() itself; try_upgrade consults these before calling classify.
+ARRAY_CAPABLE_RE = re.compile(
+    r' is array-capable and the method declares a count argument')
 
 LEGACY_SERVED_ROW_RE = re.compile(
     r'    \{ "([\w:~]+)", (NULL), (NULL|\w+), (NULL|\w+), (\d+), 0, 0, 0 \},(?!\s*/\* runtime \*/)')
@@ -1226,7 +1516,7 @@ LEGACY_REFUSED_ROW_RE = re.compile(
 
 def upgrade_legacy_block(name, para, ifaces, order, iface_index, typedefs,
                          byval_ok, bearing, why_bearing, stats, upgrade_log,
-                         withheld):
+                         withheld, legacy_hand, legacy_hand_hits):
     """One reused block -> the same block with its LICENSED refusals
     reclassified.  Returns (paragraph, decls_to_prepend)."""
     slots = ifaces[name]["slots"]
@@ -1236,16 +1526,47 @@ def upgrade_legacy_block(name, para, ifaces, order, iface_index, typedefs,
 
     def try_upgrade(m):
         key, reason, argc = m.group(1), m.group(2), int(m.group(3))
+        # LEGACY_HAND first: these rows' reasons are the SEMANTIC families
+        # the licence regex deliberately excludes -- their service is a
+        # walker in dlls/combase/syscom.c, and the row only has to say so.
+        # RET_VOID comes from the roster, checked the same way argc is.
+        if key in legacy_hand:
+            s = key_to_slot.get(key)
+            if s is None or 1 + len(s["params"]) != argc:
+                sys.exit("gen_syscom_audio: LEGACY_HAND cannot find %s "
+                         "(argc %d) in the roster" % (key, argc))
+            legacy_hand_hits.add(key)
+            stats["run_upgraded"] += 1
+            upgrade_log.append((name, key, reason,
+                                "HAND-SERVED: %s" % legacy_hand[key][1]))
+            flags = "WINECOM_F_HAND"
+            if s["ret"] == "void":
+                flags += "|WINECOM_F_RET_VOID"
+            return ('    /* hand-served: was a legacy refusal -- the walker '
+                    'is %s */\n'
+                    '    { "%s", NULL, NULL, NULL, %d, %s, %d, 0, NULL, '
+                    '0, 0, 0 },'
+                    % (legacy_hand[key][1], key, argc, flags,
+                       legacy_hand[key][0]))
         if not UPGRADE_LICENSED_RE.search(reason):
+            return m.group(0)
+        if ARRAY_CAPABLE_RE.search(reason) and key not in SINGULAR_IFACE_OUT:
+            upgrade_log.append((name, key, reason,
+                                "STAYS: array-capable and not licensed "
+                                "SINGULAR_IFACE_OUT"))
             return m.group(0)
         s = key_to_slot.get(key)
         if s is None or 1 + len(s["params"]) != argc:
             sys.exit("gen_syscom_audio: upgrade pass cannot find %s (argc %d) "
                      "in the roster" % (key, argc))
         try:
-            (cls, xaux, aux, fp, fpmask, fpwide, want_xaux) = classify(
+            # the legacy corpus licenses no interface arrays, so the eighth
+            # element (arr_caux) can only be None here; asserted below.
+            (cls, xaux, aux, fp, fpmask, fpwide, want_xaux,
+             arr_caux) = classify(
                 key, s, ifaces, iface_index, typedefs, byval_ok,
                 bearing, why_bearing)
+            assert arr_caux is None, key
         except Refused as e:
             upgrade_log.append((name, key, reason, "STAYS: %s" % e))
             return m.group(0)
@@ -1307,7 +1628,7 @@ def upgrade_legacy_block(name, para, ifaces, order, iface_index, typedefs,
         n = slot_no[key]
         if n < 3:
             return m.group(0)          # IUnknown, served by the runtime
-        got = derive_row(s["params"], ifaces, iface_index, typedefs)
+        got = derive_row(s["params"], ifaces, iface_index, typedefs, key=key)
         if got is None:
             return m.group(0)
         dcls, dx = got
@@ -1364,21 +1685,53 @@ def upgrade_legacy_block(name, para, ifaces, order, iface_index, typedefs,
 
 
 def assert_sinks_are_leaves(ifaces, typedefs):
-    """A licensed reverse sink must be a LEAF: no slot of it may take or return
-    an interface pointer.  That is what makes the licence bounded -- accepting
-    one guest object cannot pull a second across behind it -- and it is checked
-    here rather than believed."""
+    """A licensed reverse sink must not let a GUEST object flow INTO native
+    code through any of its slots.  The original spelling of that rule was
+    'leaf' -- no interface anywhere in any slot -- which was sufficient but
+    stronger than the danger: an interface IN-parameter of a sink method
+    arrives NATIVE->guest, and libs/winecom/reverse.c forward-mints it (the
+    CA_IFACE_IN and CA_IFACE_ARR_IN arms), which cannot pull a guest object
+    across.  So the check now proves, per slot:
+
+      * a single-star interface parameter must resolve to a ROSTERED type
+        (the reverse table needs its xaux index to mint the proxy) -- an
+        unrostered one still stops generation;
+      * a double-star interface parameter (an OUT, a guest object crossing
+        into Wine) is still fatal, as is an interface RETURN;
+      * everything else is plain data and crosses as before.
+
+    Bounded is still bounded: accepting one guest sink can only ever mint
+    FORWARD proxies at the guest, never a second reverse proxy."""
     for name in sorted(REVERSE_SINKS):
         if name not in ifaces:
             sys.exit("gen_syscom_audio: REVERSE_SINKS names %s, which is not "
                      "on the roster" % name)
         for s in ifaces[name]["slots"]:
-            for prm in s["params"]:
-                base, _ = Param(prm).resolve(typedefs, ifaces)
-                if base in ifaces or UNROSTERED_IFACE_RE.match(base):
-                    sys.exit("gen_syscom_audio: %s::%s takes `%s`, so %s is "
-                             "not a leaf and cannot be a licensed reverse sink"
-                             % (name, s["name"], prm, name))
+            if s["ret"] not in ("void",):
+                rbase, rstars = Param(s["ret"] + " r").resolve(typedefs, ifaces)
+                if rbase in ifaces or UNROSTERED_IFACE_RE.match(rbase):
+                    sys.exit("gen_syscom_audio: %s::%s returns `%s` -- a guest "
+                             "object would flow into native code, which the "
+                             "reverse licence forbids"
+                             % (name, s["name"], s["ret"]))
+            for pi, prm in enumerate(s["params"]):
+                base, stars = Param(prm).resolve(typedefs, ifaces)
+                if base in ifaces:
+                    if stars >= 2:
+                        key = "%s::%s" % (s["owner"], s["name"])
+                        if pi in IFACE_ARR_IN_AT.get(key, ()):
+                            continue  # a licensed IN-array: forward-minted
+                        sys.exit("gen_syscom_audio: %s::%s takes `%s` -- an "
+                                 "interface OUT on a sink slot is a guest "
+                                 "object flowing into native code, which the "
+                                 "reverse licence forbids"
+                                 % (name, s["name"], prm))
+                    continue          # rostered IN: forward-minted, safe
+                if UNROSTERED_IFACE_RE.match(base):
+                    sys.exit("gen_syscom_audio: %s::%s takes `%s`, an "
+                             "UNROSTERED interface -- the reverse table would "
+                             "have no xaux index to mint the argument with"
+                             % (name, s["name"], prm))
 
 
 def generate(roster, texts, old):
@@ -1404,6 +1757,8 @@ def generate(roster, texts, old):
 
     hand_index = {key: hand_slot(fn) for key, fn in HAND_SLOTS}
     shape_index = {shape: hand_slot(fn) for shape, fn in sorted(FP_SHAPES.items())}
+    legacy_hand = {key: (hand_slot(fn), fn) for key, fn in LEGACY_HAND}
+    legacy_hand_hits = set()
 
     stats = dict(marshalled=0, refused=0, hand=0, iunknown=0, fp=0,
                  legacy_marshalled=0, legacy_refused=0, legacy_iunknown=0,
@@ -1433,7 +1788,8 @@ def generate(roster, texts, old):
         # already in the new order, and the renumber regex never sees them.
         para = upgrade_legacy_block(name, para, ifaces, order, iface_index,
                                     typedefs, byval_ok, bearing, why_bearing,
-                                    stats, upgrade_log, withheld)
+                                    stats, upgrade_log, withheld,
+                                    legacy_hand, legacy_hand_hits)
         blocks[name] = para
         # Counted rather than carried over, so the closing statistics describe
         # the file that is actually being written.  A row that opens with the
@@ -1466,6 +1822,19 @@ def generate(roster, texts, old):
         old, roster, order, iface_index, typedefs)
     withheld.extend(legacy_withheld)
 
+    # Every LEGACY_HAND key must have rewritten a refused row THIS run or a
+    # previous one (the marker comment survives regeneration): a miss means
+    # the table and the walker list disagree about what exists, which is
+    # exactly the drift this check exists to stop.
+    for key in legacy_hand:
+        if key in legacy_hand_hits:
+            continue
+        if any(('{ "%s", NULL, NULL, NULL,' % key) in p
+               for p in blocks.values()):
+            continue                    # rewritten by an earlier regeneration
+        sys.exit("gen_syscom_audio: LEGACY_HAND names %s but no refused (or "
+                 "previously hand-served) legacy row carries it" % key)
+
     # ---- this generator's own blocks --------------------------------------
     for name in OWNED_IFACES:
         if name not in ifaces:
@@ -1485,10 +1854,11 @@ def generate(roster, texts, old):
             cls = xaux = None
             aux = fpmask = fpwide = 0
             want_xaux = False
+            arr_caux = None
             if reason is None and hand is None:
                 try:
                     (cls, xaux, aux, fp, fpmask, fpwide,
-                     want_xaux) = classify(
+                     want_xaux, arr_caux) = classify(
                         key, s, ifaces, iface_index, typedefs, byval_ok,
                         bearing, why_bearing)
                     if fp is not None:
@@ -1565,10 +1935,22 @@ def generate(roster, texts, old):
                                fpmask, fpwide, xmask))
                 stats["hand"] += 1
                 continue
-            rows.append('    { "%s", NULL, %s, %s, %d, %s, %d, 0, NULL, '
+            # aux2 carries CA_IFACE_ARR_IN's count-parameter index (the field
+            # comment in winecom.h); every other row leaves it zero.  There is
+            # at most one licensed array per slot (IFACE_ARR_IN_AT).
+            aux2 = 0
+            if arr_caux is not None and cls is not None:
+                for i, c in enumerate(cls):
+                    if c == CA["IFACE_ARR_IN"]:
+                        aux2 = arr_caux[i]
+                        # the arm mints elements at the guest; the withheld
+                        # rule does not apply (nothing flows guest->native),
+                        # so the xmask bit is granted for the element type.
+                        xmask |= 1 << i
+            rows.append('    { "%s", NULL, %s, %s, %d, %s, %d, %d, NULL, '
                         '0x%02x, 0x%02x, 0x%02x },'
                         % (key, cname, xname, argc, "|".join(flags) or "0",
-                           aux, fpmask, fpwide, xmask))
+                           aux, aux2, fpmask, fpwide, xmask))
             stats["marshalled"] += 1
         blocks[name] = "\n".join(
             decls + ["static const struct winecom_slot slots_%s[%d] =\n{" % (name, len(rows))]

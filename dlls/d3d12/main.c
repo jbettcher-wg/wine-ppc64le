@@ -105,6 +105,114 @@ static UINT64 hand_begin_render_pass( void *host, UINT slot, AMD64_CONTEXT *ctx 
 static UINT64 hand_barrier_groups( void *host, UINT slot, AMD64_CONTEXT *ctx );
 static UINT64 hand_create_state_object( void *host, UINT slot, AMD64_CONTEXT *ctx );
 static UINT64 hand_add_to_state_object( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static UINT64 hand_node_id_byval( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static UINT64 hand_dred_breadcrumbs( void *host, UINT slot, AMD64_CONTEXT *ctx );
+static void *com_wrap( void *host, UINT iface );
+
+/* --------------------------------------------------------------------------
+ * The 2026-09-01 completeness pass: the WorkGraph 16-byte aggregate and the
+ * DRED breadcrumb chain.
+ * ------------------------------------------------------------------------ */
+
+/* D3D12_NODE_ID by value: MS-x64 put a HIDDEN POINTER in the argument slot;
+ * the fields cross the unixlib flat and the unix side calls the real
+ * by-value prototype (unix.c).  Returns UINT (an index, not an HRESULT). */
+static UINT64 hand_node_id_byval( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    struct d3d12_nodeid_params p;
+    const struct { const WCHAR *name; UINT arrindex; } *id =
+        (const void *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    NTSTATUS status;
+
+    p.name = id ? (UINT64)(ULONG_PTR)id->name : 0;
+    p.arrindex = id ? id->arrindex : 0;
+    p.slot = slot;
+    p.host = (UINT64)(ULONG_PTR)host;
+    p.ret = 0;
+    if ((status = D3D12_UNIX_CALL( call_nodeid, &p )))
+    {
+        ERR( "nodeid call failed, status %#x\n", (UINT)status );
+        return 0;
+    }
+    return p.ret;
+}
+
+/* DRED's breadcrumb chain: native-owned nodes carrying a command list and a
+ * queue per node.  Mutating DRED's own list would corrupt native state, so
+ * the chain is DEEP-COPIED with the two interfaces wrapped per node; the
+ * copy is freed at the NEXT call, which is DRED's own post-mortem usage
+ * shape (documented lifetime: valid until the next GetAutoBreadcrumbsOutput).
+ * The node layout is transcribed from the D3D12 SDK headers -- vkd3d builds
+ * against the same ABI. */
+struct dred_node
+{
+    const char *list_name_a;
+    const WCHAR *list_name_w;
+    const char *queue_name_a;
+    const WCHAR *queue_name_w;
+    void *command_list;
+    void *command_queue;
+    UINT breadcrumb_count;
+    const UINT *last_value;
+    const UINT *history;
+    const struct dred_node *next;
+};
+
+struct dred_output { const struct dred_node *head; };
+
+static struct dred_node *dred_prev_copy;
+
+static UINT64 hand_dred_breadcrumbs( void *host, UINT slot, AMD64_CONTEXT *ctx )
+{
+    struct dred_output *out = (struct dred_output *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
+    UINT64 args[16] = { 0 };
+    UINT64 ret;
+    const struct dred_node *n;
+    struct dred_node *copy = NULL, **tail = &copy, *old;
+    UINT count = 0;
+
+    args[1] = (UINT64)(ULONG_PTR)out;
+    ret = unix_vtbl_call( host, slot, 2, args );
+    if (FAILED((HRESULT)(UINT)ret) || !out || !out->head) return ret;
+
+    for (n = out->head; n && count < 4096; n = n->next, count++)
+    {
+        struct dred_node *c = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(*c) );
+
+        if (!c) break;
+        *c = *n;
+        /* the chain LENDS its pointers and com_wrap CONSUMES a reference:
+         * take one first (slot 1 is AddRef on every COM vtable), so DRED's
+         * own release balance is untouched and the interned proxy owns
+         * what it holds -- the dinput8 shim's rule, same reason. */
+        if (c->command_list)
+        {
+            UINT64 a[2] = { 0 };
+            unix_vtbl_call( c->command_list, 1, 1, a );
+            c->command_list = com_wrap( c->command_list,
+                                        D3D12_IFACE_ID3D12GraphicsCommandList );
+        }
+        if (c->command_queue)
+        {
+            UINT64 a[2] = { 0 };
+            unix_vtbl_call( c->command_queue, 1, 1, a );
+            c->command_queue = com_wrap( c->command_queue,
+                                         D3D12_IFACE_ID3D12CommandQueue );
+        }
+        c->next = NULL;
+        *tail = c;
+        tail = (struct dred_node **)&c->next;
+    }
+    old = InterlockedExchangePointer( (void **)&dred_prev_copy, copy );
+    while (old)
+    {
+        struct dred_node *next = (struct dred_node *)old->next;
+        RtlFreeHeap( GetProcessHeap(), 0, old );
+        old = next;
+    }
+    out->head = copy;
+    return ret;
+}
 
 /* Order is the generated header's hand_funcs[] order -- see the
  * "hand_funcs[] order" comment ppc64le/vkd3d/gen_winecom.py emits there. */
@@ -126,6 +234,8 @@ static const winecom_hand_fn d3d12_hand_funcs[] =
     hand_barrier_groups,
     hand_create_state_object,
     hand_add_to_state_object,
+    hand_node_id_byval,
+    hand_dred_breadcrumbs,
 };
 
 C_ASSERT( ARRAYSIZE(d3d12_hand_funcs) == D3D12_HAND_COUNT );
