@@ -372,22 +372,41 @@ static UINT64 hand_create_source_voice( void *host, UINT slot, AMD64_CONTEXT *ct
      * the two struct arguments below have no argument class, so this function
      * names the callback's interface index itself instead of reading one out
      * of a generated row. */
+    /* REFUSAL HYGIENE, BY HAND, because no generated scrub mask reaches a
+     * WINECOM_F_HAND row: a hand walker that refuses owns its out-params the
+     * way scrub_refused_outs() owns a table refusal's.  Every refusal below
+     * NULLs the voice/interface cell FIRST, because leaving it is the
+     * GetShader class verbatim -- the caller reads its own stack residue,
+     * calls through it, and the emulator decodes a HOST module's bytes as
+     * x86.  [MEASURED] The Witcher 3's load regression: IMMDevice::Activate's
+     * unscrubbed refusal below fired on every run, and the guest ended up
+     * executing wined3d.dll's ppc64le bytes -- the fault report's
+     * native-pc line named this file's hole.  A native failure path stays
+     * untouched: real XAudio2 leaves *out alone on failure too, and matching
+     * Windows means scrubbing only the refusals this side invented. */
     if (cb && !winecom_to_native( (void *)cb, SYSCOM_IFACE_IXAudio2VoiceCallback,
                                   &cb_host ))
     {
         FIXME( "xaudio2: IXAudio2::CreateSourceVoice could not give the "
                "IXAudio2VoiceCallback at %p a reverse proxy; refusing rather "
                "than handing the mixer thread an x86-64 vtable\n", cb );
+        if (out) *out = NULL;
         return (UINT64)(UINT)E_NOTIMPL;
     }
     if (sends)
+    {
+        if (out) *out = NULL;
         return (UINT64)(UINT)refuse_bearing( "IXAudio2::CreateSourceVoice",
                  "its XAUDIO2_VOICE_SENDS, whose descriptors carry "
                  "IXAudio2Voice pointers", sends );
+    }
     if (chain)
+    {
+        if (out) *out = NULL;
         return (UINT64)(UINT)refuse_bearing( "IXAudio2::CreateSourceVoice",
                  "its XAUDIO2_EFFECT_CHAIN, whose descriptors carry IUnknown "
                  "pointers", chain );
+    }
 
     /* NOTE what is NOT here: a matching winecom_to_native_end.  XAudio2 keeps
      * pCallback for the voice's whole life and never AddRefs it, because
@@ -416,14 +435,21 @@ static UINT64 hand_create_submix_voice( void *host, UINT slot, AMD64_CONTEXT *ct
     const void *chain = (const void *)(ULONG_PTR)winecom_read_arg( ctx, 7 );
     HRESULT hr;
 
+    /* refusal hygiene by hand -- see CreateSourceVoice */
     if (sends)
+    {
+        if (out) *out = NULL;
         return (UINT64)(UINT)refuse_bearing( "IXAudio2::CreateSubmixVoice",
                  "its XAUDIO2_VOICE_SENDS, whose descriptors carry "
                  "IXAudio2Voice pointers", sends );
+    }
     if (chain)
+    {
+        if (out) *out = NULL;
         return (UINT64)(UINT)refuse_bearing( "IXAudio2::CreateSubmixVoice",
                  "its XAUDIO2_EFFECT_CHAIN, whose descriptors carry IUnknown "
                  "pointers", chain );
+    }
 
     hr = fn( host, out, (UINT32)winecom_read_arg( ctx, 2 ),
              (UINT32)winecom_read_arg( ctx, 3 ),
@@ -450,10 +476,14 @@ static UINT64 hand_create_mastering_voice( void *host, UINT slot, AMD64_CONTEXT 
     const void *chain = (const void *)(ULONG_PTR)winecom_read_arg( ctx, 6 );
     HRESULT hr;
 
+    /* refusal hygiene by hand -- see CreateSourceVoice */
     if (chain)
+    {
+        if (out) *out = NULL;
         return (UINT64)(UINT)refuse_bearing( "IXAudio2::CreateMasteringVoice",
                  "its XAUDIO2_EFFECT_CHAIN, whose descriptors carry IUnknown "
                  "pointers", chain );
+    }
 
     hr = fn( host, out, (UINT32)winecom_read_arg( ctx, 2 ),
              (UINT32)winecom_read_arg( ctx, 3 ),
@@ -509,10 +539,17 @@ static UINT64 hand_mmdevice_activate( void *host, UINT slot, AMD64_CONTEXT *ctx 
     void **ppv      = (void **)(ULONG_PTR)winecom_read_arg( ctx, 4 );
     HRESULT hr;
 
+    /* refusal hygiene by hand -- see CreateSourceVoice.  THIS is the site the
+     * Witcher 3 hit on every load: the game passes a non-NULL
+     * pActivationParams, never checks the HRESULT closely enough, and read
+     * whatever its stack held where *ppv was never written. */
     if (params)
+    {
+        if (ppv) *ppv = NULL;
         return (UINT64)(UINT)refuse_bearing( "IMMDevice::Activate",
                  "its PROPVARIANT pActivationParams, whose union carries an "
                  "IUnknown pointer", params );
+    }
 
     hr = fn( host, iid, (DWORD)winecom_read_arg( ctx, 2 ), NULL, ppv );
     return (UINT64)(UINT)winecom_wrap_out_iface( hr, iid, ppv );
@@ -989,6 +1026,13 @@ static UINT64 hand_dispatch_invoke( void *host, UINT slot, AMD64_CONTEXT *ctx )
             {
                 if (args != local)
                     RtlFreeHeap( GetProcessHeap(), 0, args );
+                /* refusal hygiene by hand -- see CreateSourceVoice.  Zeroed
+                 * VARIANT/EXCEPINFO are the valid empty values (VT_EMPTY is
+                 * 0), so an unchecked caller VariantClear()s nothing instead
+                 * of a stack ghost. */
+                if (result) memset( result, 0, sizeof(*result) );
+                if (exc) memset( exc, 0, sizeof(*exc) );
+                if (arg_err) *arg_err = 0;
                 return (UINT64)(UINT)E_NOTIMPL;
             }
         use.rgvarg = args;
@@ -1281,7 +1325,12 @@ static UINT64 hand_dmus_loader_getobject( void *host, UINT slot, AMD64_CONTEXT *
     DMUS_OBJECTDESC copy;
     HRESULT hr;
 
-    if (!dmus_desc_in( desc, &copy, &use, slot )) return (UINT64)(UINT)E_NOTIMPL;
+    /* refusal hygiene by hand -- see CreateSourceVoice */
+    if (!dmus_desc_in( desc, &copy, &use, slot ))
+    {
+        if (ppv) *ppv = NULL;
+        return (UINT64)(UINT)E_NOTIMPL;
+    }
     hr = fn( host, use, riid, ppv );
     /* the ONE fail-closed choke point types the out cell by IID */
     return (UINT64)(UINT)winecom_wrap_out_iface( hr, riid, ppv );
