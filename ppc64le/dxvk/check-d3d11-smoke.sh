@@ -38,9 +38,21 @@
 #      the method and the word "refusing" -- and the process must still
 #      reach its own next line rather than crash.  A defect refused loudly
 #      is not this gate's problem; a defect served silently would be.
+#   H  FENCE FLAGS: the D3D11_FENCE_FLAG enumerators this tree's IDL declares
+#      and the ones DXVK's own vendored header declares are the same numbers.
+#      CreateFence's flags cross BY VALUE, so they have to be.  Source-level
+#      and cheap, and run before leg G because leg G is the leg that creates a
+#      fence.
+#   G  EVENTS: the fence-event relay, the windowless composition swapchain and
+#      the canary pins -- guest-only, and the ONE leg that runs inside a
+#      compositor of this gate's own (check-present-smoke.sh's weston pattern;
+#      the weston_up banner says what that does and does not buy, including the
+#      premise it corrects).  Every other leg stays headless with no session at
+#      all, and leg G falls back to ambient where there is no weston.
 #
-# --sabotage runs a negative control instead, in two parts, and requires
-# BOTH to go red:
+# --sabotage runs negative controls instead, and requires EVERY one to go red.
+# The first two are the gate's original pair; parts 3 to 5 arrived with the
+# legs they falsify, each naming the lever it pulls:
 #
 #   1  WINEEMUNOCOMWRAP=1 hands the guest raw host pointers -- the exact
 #      defect this port's proxy runtime exists to fix -- and the guest run
@@ -102,6 +114,124 @@ fail=0
 
 INCL="-I$BUILD/include -I$SRC/include -I$SRC/include/msvcrt"
 TIMEOUT=${TIMEOUT:-120}
+
+# ---- leg G's presentation session -------------------------------------------
+#
+# LEG G ALONE runs inside a compositor of this gate's own, and every other leg
+# keeps the bare headless environment it has always had.
+#
+# WHY, AND WHAT THE PREMISE TURNED OUT TO BE.  Leg G was filed as failing on a
+# bare Xvfb -- an X server with no compositor and, on this lane, no winewayland
+# session behind it -- on the reading that DXVK's fence-event path is armed by
+# the presentation loop.  [MEASURED 2026-09-01, and it is a correction] it is
+# NOT: with DXVK's foreign WSI in headless mode the fence signals on a bare
+# Xvfb too, and the probe reports signaled=yes either way.  So the session
+# below is not what makes leg G pass today.
+#
+# It stays, and stays only around leg G, for the reason that survives the
+# correction: leg G is the one leg that touches presentation at all (a
+# composition swapchain, a fence armed against a device that has one), and a
+# leg that presents should be measured in the environment a title presents in
+# rather than in whatever the caller's terminal happened to inherit.  Running
+# it under a compositor of this gate's own is also what makes it SAFE to run
+# beside a machine somebody is using, which the ambient path never was.  When
+# no compositor is available the leg still runs, ambiently, and says so -- the
+# other seven legs are worth keeping on a machine with no weston.
+#
+# This is check-present-smoke.sh's pattern, borrowed whole, including the two
+# things that make it safe:
+#
+#   * ITS OWN SOCKET IN ITS OWN XDG_RUNTIME_DIR, and $DISPLAY /
+#     $WAYLAND_DISPLAY unset for every process started inside it.  Unsetting
+#     the display variables is the load-bearing part: with XDG_RUNTIME_DIR
+#     left alone a Wayland client finds the caller's compositor through the
+#     DEFAULT socket name even with WAYLAND_DISPLAY unset, which is how a
+#     probe ends up drawing on somebody's desktop.
+#   * KILLED BY PID, never by pattern.  `env` execs its argument, so the pid
+#     recorded below really is weston's; a shell function backgrounded with &
+#     would have left $! naming a subshell, which is how two compositors were
+#     once left running on this machine, one per red run.
+G_RUNDIR=$OUT/runtime
+G_SOCKET=wine-d3d11-events
+WESTON_PID=
+
+g_iso() { env -u DISPLAY -u WAYLAND_DISPLAY XDG_RUNTIME_DIR="$G_RUNDIR" "$@"; }
+
+weston_down() {
+    [ -n "${WESTON_PID:-}" ] || return 0
+    kill "$WESTON_PID" 2>/dev/null
+    wait "$WESTON_PID" 2>/dev/null
+    WESTON_PID=
+    _n=0
+    while [ $_n -lt 50 ] && [ -S "$G_RUNDIR/$G_SOCKET" ]; do
+        _n=$((_n + 1)); sleep 0.1
+    done
+}
+trap weston_down EXIT INT TERM
+
+# Three answers, never a skip of the whole gate: legs A-F have already run by
+# the time this is called and their verdicts are worth keeping.
+#   0  a session is up; run leg G inside it
+#   1  a session was WANTED and could not be built -- the gate is already red
+#   2  this machine has no compositor to build one from; run leg G ambiently
+weston_up() {
+    [ -n "${WESTON_PID:-}" ] && return 0
+    if ! command -v weston >/dev/null || \
+       [ ! -f "$BUILD/dlls/winewayland.drv/winewayland.so" ]; then
+        note "leg G: no weston or no winewayland.drv, so this leg runs in the \
+ambient environment instead of a session of its own; it still measures the \
+relay, it just shares whatever display the caller has"
+        return 2
+    fi
+    rm -rf "$G_RUNDIR" && mkdir -p "$G_RUNDIR" && chmod 700 "$G_RUNDIR" || {
+        bad "leg G: cannot create a private runtime directory at $G_RUNDIR"
+        return 1
+    }
+    env -u DISPLAY -u WAYLAND_DISPLAY XDG_RUNTIME_DIR="$G_RUNDIR" \
+        weston --backend=headless --renderer=gl \
+        --width=640 --height=480 --socket="$G_SOCKET" \
+        >"$OUT/weston.log" 2>&1 &
+    WESTON_PID=$!
+    _i=0
+    while [ $_i -lt 200 ]; do
+        [ -S "$G_RUNDIR/$G_SOCKET" ] && break
+        kill -0 "$WESTON_PID" 2>/dev/null || break
+        _i=$((_i + 1)); sleep 0.1
+    done
+    if [ ! -S "$G_RUNDIR/$G_SOCKET" ]; then
+        sed 's/^/  weston| /' "$OUT/weston.log" >&2
+        WESTON_PID=
+        bad "leg G: weston did not come up on a private socket"
+        return 1
+    fi
+    say "leg G: headless weston 640x480 on $G_RUNDIR/$G_SOCKET"
+    return 0
+}
+
+# One guest run inside that session.  Everything else about it -- the
+# winedbg override, the timeout -- is what every other run in this file uses.
+run_wine_session() {   # <exe> <extra env assignment>... ; WINEDEBUG from $WDBG
+    _exe=$1; shift
+    g_iso timeout -k 5 "$TIMEOUT" env WAYLAND_DISPLAY="$G_SOCKET" \
+        WINEDEBUG="$WDBG" WINEDLLOVERRIDES="winedbg.exe=d" "$@" \
+        "$BUILD/wine" "$_exe"
+}
+
+# ---- leg H's two authorities ------------------------------------------------
+# The value of a D3D11_FENCE_FLAG is agreed by two files that were never
+# checked against each other: this tree's IDL, from which widl generates the
+# d3d11_3.h a guest compiles against, and the MinGW-w64-derived header DXVK
+# vendors and its own fence code reads.  Named here rather than inline so the
+# sabotage control can doctor a copy of one of them.
+WINE_FENCE_IDL="$SRC/include/d3d11_3.idl"
+DXVK_FENCE_H="$HERE/src/include/native/directx/d3d11_3.h"
+
+# Both spellings normalised to decimal, so "0x2" and "2" cannot read as a
+# difference and a difference that IS one cannot hide in a base.
+fence_flags() {   # <file> -> "NONE=1 SHARED=2 ..."
+    sed -n 's/.*D3D11_FENCE_FLAG_\([A-Z_][A-Z_]*\)[ 	]*=[ 	]*\([0-9xXa-fA-F]*\).*/\1 \2/p' \
+        "$1" | while read -r _n _v; do printf '%s=%d ' "$_n" "$((_v))"; done
+}
 
 # ---- A: build check --------------------------------------------------------
 # meson bakes DT_RUNPATH $ORIGIN/../dxgi (etc.) into these exact locations
@@ -266,11 +396,18 @@ refusal-hygiene control (run the gate without --sabotage first)"
     # G observed was not the relay.  (The probe itself treats the clean
     # refusal as its own pass -- both worlds are correct worlds; the LEVER
     # is what this control tests.)
-    if [ -f "$OUT/events.exe" ]; then
-        timeout -k 5 "$TIMEOUT" \
-            env WINEDEBUG=+winecom WINEDLLOVERRIDES="winedbg.exe=d" \
-            WINEEMUNOCOMEVENT=1 \
-            "$BUILD/wine" "$OUT/events.exe" \
+    if [ ! -f "$OUT/events.exe" ]; then
+        note "sabotage: no events.exe from a prior full run; skipping the \
+event-relay control (run the gate without --sabotage first)"
+    elif ! { weston_up; [ $? != 1 ]; }; then
+        ok=0
+    else
+        # In leg G's own session, for leg G's own reason: the control has to
+        # fail where the positive leg passes, or it is falsifying a different
+        # run.  The two assignments after the helper's own override its
+        # WINEDEBUG (env takes the last spelling) and arm the lever.
+        run_wine_session "$OUT/events.exe" \
+            WINEDEBUG=+winecom WINEEMUNOCOMEVENT=1 \
             > "$OUT/sabotage_event.out" 2>"$OUT/sabotage_event.err"
         if grep -q "signaled=yes" "$OUT/sabotage_event.out"; then
             bad "WINEEMUNOCOMEVENT=1 did not stop the event relay \
@@ -282,9 +419,21 @@ trace never named a refusal; the failure is not the lever's"; ok=0
             say "sabotage: WINEEMUNOCOMEVENT=1 refused the event and the \
 wait never paid out, as it must"
         fi
+    fi
+    weston_down
+
+    # part 5: the fence-flag pin's own control.  Leg H compares two files that
+    # AGREE; a check that only ever compares equal things has never been shown
+    # to notice a difference.  Doctor one enumerator in a COPY of the DXVK
+    # header and require the comparison to go red.
+    sed 's/D3D11_FENCE_FLAG_SHARED = 0x2/D3D11_FENCE_FLAG_SHARED = 0x20/' \
+        "$DXVK_FENCE_H" > "$OUT/fence_doctored.h" 2>/dev/null
+    if [ "$(fence_flags "$OUT/fence_doctored.h")" = "$(fence_flags "$WINE_FENCE_IDL")" ]; then
+        bad "the fence-flag comparison does not notice a moved value; leg H \
+cannot go red"; ok=0
     else
-        note "sabotage: no events.exe from a prior full run; skipping the \
-event-relay control (run the gate without --sabotage first)"
+        say "sabotage: a moved D3D11_FENCE_FLAG_SHARED broke the pin, as it \
+must ($(fence_flags "$OUT/fence_doctored.h"))"
     fi
 
     [ "$ok" = 1 ] && say "SABOTAGE PASS"
@@ -416,6 +565,57 @@ unscrubbed: $(grep -o 'osr_scrubbed=[a-zA-Z]*' "$OUT/refusal.out" | head -1)"
     fi
 fi
 
+# ---- leg H: the D3D11_FENCE_FLAG value pin ---------------------------------
+#
+# LOOK BEFORE ANY TITLE PASSES SHARED.  ID3D11Device5::CreateFence's flags
+# parameter crosses this boundary as a plain by-value integer -- the marshal
+# row classes it WINECOM_CA_PASS, with only the 32-bit extension the two ABIs
+# disagree about applied -- so the NUMBER the guest wrote is the number DXVK
+# reads.  That is correct exactly as long as the two sides spell the enumerator
+# with the same number, and nothing had ever checked that they do.  Two files,
+# neither of which knows about the other:
+#
+#   * $SRC/include/d3d11_3.idl, which widl turns into the d3d11_3.h a guest
+#     application compiles D3D11_FENCE_FLAG_SHARED from;
+#   * DXVK's vendored include/native/directx/d3d11_3.h, which
+#     src/d3d11/d3d11_fence.cpp reads when it decides whether to ask Vulkan for
+#     an external semaphore.
+#
+# [AUDITED 2026-09-01] THEY AGREE, value for value: NONE 0x1, SHARED 0x2,
+# SHARED_CROSS_ADAPTER 0x4, NON_MONITORED 0x8.  Both descend from the same
+# MinGW-w64 lineage, which is why they agree and also why the agreement is
+# worth pinning rather than assuming -- it is a shared ancestor, not a shared
+# authority, and either can be regenerated from somewhere else.  So there is
+# NO translation to do at the boundary and none is added; what is added is the
+# assertion that makes drift go red instead of going unnoticed.
+#
+# ONE THING THE AUDIT FOUND that is worth writing down where the next reader
+# will look: this lineage spells NONE as 0x1, not as the 0 an enumerator named
+# NONE reads like.  DXVK's fence constructor logs "Fence flags 0x1 not
+# supported" for anything outside SHARED -- so a title (or leg G's own probe)
+# passing the literal D3D11_FENCE_FLAG_NONE produces that line in every DXVK
+# log.  It is noise and not a defect: the fence is still created, and the bit
+# is not SHARED, so no external semaphore is asked for.  A future reader
+# hunting that log line should stop here rather than at the boundary.
+WINE_FF=$(fence_flags "$WINE_FENCE_IDL")
+DXVK_FF=$(fence_flags "$DXVK_FENCE_H")
+WANT_FF="NONE=1 SHARED=2 SHARED_CROSS_ADAPTER=4 NON_MONITORED=8 "
+if [ -z "$WINE_FF" ] || [ -z "$DXVK_FF" ]; then
+    bad "leg H: could not read D3D11_FENCE_FLAG out of one of the two \
+headers (wine='$WINE_FF' dxvk='$DXVK_FF'); the pin is asserting nothing"
+elif [ "$WINE_FF" != "$DXVK_FF" ]; then
+    bad "leg H: D3D11_FENCE_FLAG SKEW -- the guest's header says '$WINE_FF' \
+and DXVK's says '$DXVK_FF'.  CreateFence's flags cross by value, so a title \
+passing SHARED is asking DXVK for a different flag than it wrote"
+elif [ "$WINE_FF" != "$WANT_FF" ]; then
+    bad "leg H: both sides agree on '$WINE_FF', but that is not the audited \
+value set '$WANT_FF' -- they moved together, which is a change to what a \
+guest binary compiled against an older header means"
+else
+    say "leg H: D3D11_FENCE_FLAG agrees on both sides and is unmoved since \
+the audit ($WINE_FF)"
+fi
+
 # ---- leg G: events, windowless swapchains, and the canaries (guest-only) ---
 #
 # d3d11_events_smoke.c -- see its header.  GUEST-ONLY by nature: the winecom
@@ -451,10 +651,21 @@ if ! $GUESTCC -c -o "$OUT/events.o" "$HERE/probes/d3d11_events_smoke.c" \
     bad "leg G: the events probe failed to build"
     tail -5 "$OUT/events.build.err" | sed 's/^/  events| /' >&2
 else
-    timeout -k 5 "$TIMEOUT" \
-        env WINEDEBUG="$WDBG" WINEDLLOVERRIDES="winedbg.exe=d" \
-        "$BUILD/wine" "$OUT/events.exe" > "$OUT/events.out" 2>"$OUT/events.err"
-    est=$?
+    weston_up; g_session=$?
+    if [ $g_session = 1 ]; then
+        est=0   # weston_up already said what went wrong and set the gate red
+        : > "$OUT/events.out"; : > "$OUT/events.err"
+    elif [ $g_session = 0 ]; then
+        # IN ITS OWN SESSION, and only this leg -- see the weston_up banner for
+        # why the session is here and what it does and does not prove.
+        run_wine_session "$OUT/events.exe" \
+            > "$OUT/events.out" 2>"$OUT/events.err"
+        est=$?
+    else
+        run_wine "$OUT/events.exe" "$TIMEOUT" \
+            > "$OUT/events.out" 2>"$OUT/events.err"
+        est=$?
+    fi
     sed 's/^/  events| /' "$OUT/events.out"
     if [ $est -eq 124 ] || [ $est -eq 137 ]; then
         bad "leg G: the events probe HUNG"
@@ -473,6 +684,7 @@ changed; reclassify the row (see CANARY_SERVE_DXVK)"
         say "leg G: fence event relayed, composition swapchain served, \
 canaries hold, annotations alive"
     fi
+    weston_down
 fi
 
 [ $fail -eq 0 ] && say "PASS"
