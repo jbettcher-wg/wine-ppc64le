@@ -147,8 +147,11 @@ static HRESULT refuse_with_nulls( const char *fn, const char *why,
                                   ID3DBlob **a, ID3DBlob **b )
 {
     FIXME( "d3dcompiler: %s is refused for a guest because %s\n", fn, why );
-    if (a) *a = NULL;
-    if (b) *b = NULL;
+    /* the lever-honouring family, not inline stores: WINEEMUNOREFUSESCRUB=1
+     * must be able to turn these off, or the hygiene gate's sabotage arm
+     * cannot prove them load-bearing (winecom.h, the by-hand scrub banner) */
+    winecom_refused_scrub_ptr( a );
+    winecom_refused_scrub_ptr( b );
     return E_NOTIMPL;
 }
 
