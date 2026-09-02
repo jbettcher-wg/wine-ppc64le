@@ -2803,12 +2803,8 @@ static void refuse_once( UINT iface, UINT slot, const char *name, const char *wh
  * survives and the hygiene gate goes red. */
 static int refuse_scrub_off = -1;
 
-static void scrub_refused_outs( const struct winecom_slot *sl, const UINT64 *rawargs,
-                                BOOL is_guest32 )
+static BOOL refuse_scrub_disabled(void)
 {
-    UINT i;
-
-    if (!sl || !(sl->scrubptr | sl->scrubdw | sl->scrubq)) return;
     if (refuse_scrub_off == -1)
     {
         refuse_scrub_off = com_env_flag( L"WINEEMUNOREFUSESCRUB" );
@@ -2817,7 +2813,66 @@ static void scrub_refused_outs( const struct winecom_slot *sl, const UINT64 *raw
                  "out-params; unchecked callers read uninitialized locals, "
                  "which is the sabotage this lever exists to prove\n" );
     }
-    if (refuse_scrub_off) return;
+    return refuse_scrub_off != 0;
+}
+
+/* ---------------------------------------------------- the by-hand scrubs ---
+ *
+ * The masks above are GENERATED, and reach only WINECOM_F_TABLE rows.  A
+ * hand walker owns its out-params itself, so it needs the same three writes
+ * with the same lever behind them -- these three exports are that, and are
+ * the ONLY sanctioned way a hand walker scrubs.  Writing `*out = NULL`
+ * inline compiles, but no gate can then prove the write load-bearing:
+ * WINEEMUNOREFUSESCRUB cannot turn off a store it does not own, so the
+ * sabotage arm passes for the wrong reason and the site's hygiene is
+ * untested.  Every one is NULL-safe -- a hand walker may legitimately be
+ * handed a NULL out cell, and a refusal is exactly the moment not to fault. */
+
+/* An out INTERFACE/pointer cell -> NULL, at the GUEST's pointer width: an
+ * 8-byte store into a 32-bit guest's void** clobbers its neighbour. */
+void winecom_refused_scrub_ptr( void *cell )
+{
+    if (!cell || refuse_scrub_disabled()) return;
+    winecom_store_guest_ptr( cell, NULL );
+}
+
+/* A 4-byte out cell (a count, a size, a flags word) -> 0. */
+void winecom_refused_scrub_dw( void *cell )
+{
+    if (!cell || refuse_scrub_disabled()) return;
+    *(UINT *)cell = 0;
+}
+
+/* An out AGGREGATE -> all zero bytes.  For VARIANT/PROPVARIANT this is the
+ * VALID empty value (VT_EMPTY is 0), so an unchecked caller VariantClear()s
+ * nothing instead of freeing a stack ghost; for a struct-shaped out it is
+ * the closest thing to "nothing was written" the caller can survive. */
+void winecom_refused_scrub_mem( void *p, SIZE_T len )
+{
+    if (!p || !len || refuse_scrub_disabled()) return;
+    memset( p, 0, len );
+}
+
+/* The generated-mask scrub, for a client that runs its OWN table dispatcher
+ * over these same rows -- dlls/combase/syscom.c's local_dispatch() is the one
+ * such client, and its three refusal exits had no scrub at all because this
+ * function was private.  Same lever, same masks, same widths. */
+static void scrub_refused_outs( const struct winecom_slot *sl, const UINT64 *rawargs,
+                                BOOL is_guest32 );
+
+void winecom_refused_scrub_slot( const struct winecom_slot *sl, const UINT64 *rawargs,
+                                 BOOL is_guest32 )
+{
+    scrub_refused_outs( sl, rawargs, is_guest32 );
+}
+
+static void scrub_refused_outs( const struct winecom_slot *sl, const UINT64 *rawargs,
+                                BOOL is_guest32 )
+{
+    UINT i;
+
+    if (!sl || !(sl->scrubptr | sl->scrubdw | sl->scrubq)) return;
+    if (refuse_scrub_disabled()) return;
     for (i = 1; i < sl->argc && i <= 16; i++)
     {
         UINT bit = 1u << (i - 1);

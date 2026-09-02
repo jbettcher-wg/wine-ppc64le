@@ -834,6 +834,30 @@ extern HRESULT winecom_wrap_out_iface( HRESULT hr, const GUID *riid,
 /* Wrap a statically-typed out interface in place (no-op on NULL). */
 extern void winecom_wrap_static( void **p, UINT iface );
 
+/* ------------------------------------------- refusal hygiene, by hand -----
+ *
+ * Refused means INERT.  The generated scrubptr/scrubdw/scrubq masks serve
+ * WINECOM_F_TABLE rows only; a WINECOM_F_HAND walker owns its own
+ * out-params, and these three are how it scrubs them.  Use them INSTEAD of
+ * an inline `*out = NULL`: they honour WINEEMUNOREFUSESCRUB=1, which is the
+ * negative control the hygiene gate needs to prove a given site's scrub is
+ * load-bearing -- an inline store the lever cannot reach makes the gate's
+ * sabotage arm pass for the wrong reason.  All three are NULL-safe.
+ *
+ * Scrub only refusals THIS SIDE invented.  A native failure passed through
+ * leaves its out-params exactly as the native call left them, because that
+ * is what real Windows does and matching Windows is the whole point. */
+extern void winecom_refused_scrub_ptr( void *cell );        /* -> NULL, guest width */
+extern void winecom_refused_scrub_dw( void *cell );         /* -> 0, 4 bytes */
+extern void winecom_refused_scrub_mem( void *p, SIZE_T len );/* -> zero bytes */
+
+/* The GENERATED-mask scrub, for a client running its own table dispatcher
+ * over these rows (dlls/combase/syscom.c's [local] dispatcher).  rawargs[i]
+ * is argument i as winecom_read_arg(ctx, i) would produce it; index 0 is
+ * ignored.  Same lever, same masks, same widths as the in-tree refusals. */
+extern void winecom_refused_scrub_slot( const struct winecom_slot *sl,
+                                        const UINT64 *rawargs, BOOL is_guest32 );
+
 extern UINT winecom_iface_from_iid( const GUID *riid );  /* ~0u on miss */
 extern UINT64 winecom_read_arg( const AMD64_CONTEXT *ctx, UINT n );
 extern void winecom_host_release( void *host );
