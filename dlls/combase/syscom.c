@@ -1123,6 +1123,17 @@ static BOOL dmus_pmsg_in( DMUS_PMSG *msg, UINT slot )
     }
     return TRUE;
 refuse:
+    /* The originals go back -- and NO winecom_to_native_end goes with them,
+     * which is deliberate and is a property of the ~0u above, not an
+     * oversight.  winecom_to_native( x, ~0u, ... ) can only ever succeed down
+     * its FORWARD-proxy branch ("borrowed, so no reference moves" --
+     * libs/winecom/reverse.c), because the guest-implemented branch below it
+     * refuses outright when the caller supplied no roster type.  A member
+     * translated before the failing one therefore took no reference, and
+     * there is nothing to give back.  THE DAY ANY ~0u IN THIS FUNCTION
+     * BECOMES A REAL ROSTER INDEX, that stops being true: the reverse-proxy
+     * branch AddRefs, and this label acquires an obligation to
+     * winecom_to_native_end() every member it had already translated. */
     msg->pTool = tool;
     msg->pGraph = (struct IDirectMusicGraph *)graph;
     msg->punkUser = unk;
