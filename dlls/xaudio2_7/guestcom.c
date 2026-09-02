@@ -273,22 +273,40 @@ static UINT64 hand_create_source_voice( void *host, UINT slot, AMD64_CONTEXT *ct
     void *cb_host = NULL;
     HRESULT hr;
 
+    /* REFUSAL HYGIENE, BY HAND, because no generated scrub mask reaches a
+     * WINECOM_F_HAND row: a hand walker that refuses owns its out-params the
+     * way scrub_refused_outs() owns a table refusal's, and an unwritten voice
+     * cell is stack residue the caller submits buffers through.  [MEASURED]
+     * dlls/combase/syscom.c's IMMDevice::Activate is the twin that cost days:
+     * the Witcher 3 read a never-written *ppv and the emulator decoded a host
+     * module's ppc64le bytes as x86.  These are the 2.7 twins of the six
+     * scrubbed there.  The writes go through winecom_refused_scrub_ptr, which
+     * honours WINEEMUNOREFUSESCRUB so the hygiene gate can prove them
+     * load-bearing; a NATIVE failure stays untouched, because real XAudio2
+     * leaves *out alone on failure too. */
     if (cb && !winecom_to_native( (void *)cb, XAUDIO2_IFACE_IXAudio2VoiceCallback,
                                   &cb_host ))
     {
         FIXME( "xaudio2: CreateSourceVoice could not give the "
                "IXAudio2VoiceCallback at %p a reverse proxy; refusing rather "
                "than handing the mixer thread an x86-64 vtable\n", cb );
+        winecom_refused_scrub_ptr( out );
         return (UINT64)(UINT)E_NOTIMPL;
     }
     if (sends)
+    {
+        winecom_refused_scrub_ptr( out );
         return (UINT64)(UINT)refuse_reverse( "IXAudio2::CreateSourceVoice",
                  "its XAUDIO2_VOICE_SENDS, whose descriptors carry "
                  "IXAudio2Voice pointers", sends );
+    }
     if (chain)
+    {
+        winecom_refused_scrub_ptr( out );
         return (UINT64)(UINT)refuse_reverse( "IXAudio2::CreateSourceVoice",
                  "its XAUDIO2_EFFECT_CHAIN, whose descriptors carry IUnknown "
                  "pointers", chain );
+    }
 
     /* NOTE what is NOT here: a matching winecom_to_native_end.  XAudio2 keeps
      * pCallback for the voice's whole life and never AddRefs it, because
@@ -319,14 +337,21 @@ static UINT64 hand_create_submix_voice( void *host, UINT slot, AMD64_CONTEXT *ct
     const void *chain = (const void *)(ULONG_PTR)winecom_read_arg( ctx, 7 );
     HRESULT hr;
 
+    /* refusal hygiene by hand -- see CreateSourceVoice */
     if (sends)
+    {
+        winecom_refused_scrub_ptr( out );
         return (UINT64)(UINT)refuse_reverse( "IXAudio2::CreateSubmixVoice",
                  "its XAUDIO2_VOICE_SENDS, whose descriptors carry "
                  "IXAudio2Voice pointers", sends );
+    }
     if (chain)
+    {
+        winecom_refused_scrub_ptr( out );
         return (UINT64)(UINT)refuse_reverse( "IXAudio2::CreateSubmixVoice",
                  "its XAUDIO2_EFFECT_CHAIN, whose descriptors carry IUnknown "
                  "pointers", chain );
+    }
 
     hr = fn( host, out, (UINT32)winecom_read_arg( ctx, 2 ),
              (UINT32)winecom_read_arg( ctx, 3 ),
@@ -354,10 +379,14 @@ static UINT64 hand_create_mastering_voice( void *host, UINT slot, AMD64_CONTEXT 
     const void *chain = (const void *)(ULONG_PTR)winecom_read_arg( ctx, 6 );
     HRESULT hr;
 
+    /* refusal hygiene by hand -- see CreateSourceVoice */
     if (chain)
+    {
+        winecom_refused_scrub_ptr( out );
         return (UINT64)(UINT)refuse_reverse( "IXAudio2::CreateMasteringVoice",
                  "its XAUDIO2_EFFECT_CHAIN, whose descriptors carry IUnknown "
                  "pointers", chain );
+    }
 
     hr = fn( host, out, (UINT32)winecom_read_arg( ctx, 2 ),
              (UINT32)winecom_read_arg( ctx, 3 ),
@@ -515,6 +544,19 @@ static void refuse_once( UINT iface, UINT slot, const char *name, const char *wh
            why ? why : "no marshal plan" );
 }
 
+/* This module runs its own table dispatcher for the [local] interfaces, so
+ * its refusal exits owe the same generated-mask scrub the runtime's do -- see
+ * the twin in dlls/combase/syscom.c. */
+static void local_scrub_refused( const struct winecom_slot *sl, AMD64_CONTEXT *ctx )
+{
+    UINT64 raw[16] = { 0 };
+    UINT i;
+
+    for (i = 1; i < sl->argc && i < ARRAYSIZE(raw); i++)
+        raw[i] = winecom_read_arg( ctx, i );
+    winecom_refused_scrub_slot( sl, raw, FALSE );
+}
+
 static NTSTATUS local_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
 {
     const struct winecom_iface *itf = &xaudio2_com_ifaces[iface];
@@ -532,6 +574,7 @@ static NTSTATUS local_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
     {
         ERR( "%s slot %u called on %p, which is not one of our proxies\n",
              itf->name, slot, (void *)(ULONG_PTR)ctx->R10 );
+        local_scrub_refused( sl, ctx );
         ctx->Rax = (UINT)E_INVALIDARG;
         return STATUS_SUCCESS;
     }
@@ -539,6 +582,7 @@ static NTSTATUS local_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
     if (sl->refuse)
     {
         refuse_once( iface, slot, sl->name, sl->refuse );
+        local_scrub_refused( sl, ctx );
         ctx->Rax = (UINT)E_NOTIMPL;
         return STATUS_SUCCESS;
     }
@@ -579,6 +623,7 @@ static NTSTATUS local_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
                              "an in-parameter this surface cannot translate; "
                              "the generated table records no interface type "
                              "for it" );
+                local_scrub_refused( sl, ctx );
                 ctx->Rax = (UINT)E_NOTIMPL;
                 return STATUS_SUCCESS;
             }
@@ -594,6 +639,7 @@ static NTSTATUS local_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
             refuse_once( iface, slot, sl->name,
                          "argument class with no marshal path in this "
                          "module's [local] dispatcher" );
+            local_scrub_refused( sl, ctx );
             ctx->Rax = (UINT)E_NOTIMPL;
             return STATUS_SUCCESS;
         }

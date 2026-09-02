@@ -385,6 +385,24 @@ static UINT64 hand_clear_dsv( void *host, UINT slot, AMD64_CONTEXT *ctx )
 /* ID3D12Device::CreateComputePipelineState( const
  * D3D12_COMPUTE_PIPELINE_STATE_DESC *desc, REFIID riid, void **ppv ):
  * the desc carries ID3D12RootSignature *pRootSignature. */
+/* REFUSAL HYGIENE, BY HAND, because no generated scrub mask reaches a
+ * WINECOM_F_HAND row: a hand walker that refuses owns its out-params the way
+ * scrub_refused_outs() owns a table refusal's, and an unwritten *ppv is stack
+ * residue the caller calls through.  [MEASURED] dlls/combase/syscom.c's
+ * IMMDevice::Activate cost days exactly so: the Witcher 3 read a never-written
+ * *ppv and the emulator decoded a host module's ppc64le bytes as x86.  This
+ * file has NO E_NOTIMPL sites -- its refusals wear other spellings
+ * (E_INVALIDARG for an argument shape it cannot walk, E_OUTOFMEMORY for its
+ * own copy) and they are refusals all the same.  The write goes through
+ * winecom_refused_scrub_ptr, which honours WINEEMUNOREFUSESCRUB so the hygiene
+ * gate can prove it load-bearing.  A NATIVE failure stays untouched, and the
+ * *ppv = NULL that follows a winecom_host_release below is NOT this: that one
+ * is mandatory memory safety and must run whatever the lever says. */
+static void refuse_scrub_ppv( void **ppv )
+{
+    winecom_refused_scrub_ptr( ppv );
+}
+
 static UINT64 hand_create_compute_pso( void *host, UINT slot, AMD64_CONTEXT *ctx )
 {
     const D3D12_COMPUTE_PIPELINE_STATE_DESC *src = (const void *)(ULONG_PTR)read_arg( ctx, 1 );
@@ -395,7 +413,11 @@ static UINT64 hand_create_compute_pso( void *host, UINT slot, AMD64_CONTEXT *ctx
     HRESULT hr;
     UINT idx;
 
-    if (!src || !ppv) return (UINT64)(UINT)E_INVALIDARG;
+    if (!src || !ppv)
+    {
+        refuse_scrub_ppv( ppv );          /* refusal hygiene by hand */
+        return (UINT64)(UINT)E_INVALIDARG;
+    }
     desc = *src;
     desc.pRootSignature = com_unwrap( desc.pRootSignature );
     args[1] = (UINT64)(ULONG_PTR)&desc;
@@ -464,7 +486,11 @@ static UINT64 hand_create_graphics_pso( void *host, UINT slot, AMD64_CONTEXT *ct
     HRESULT hr;
     UINT idx;
 
-    if (!src || !ppv) return (UINT64)(UINT)E_INVALIDARG;
+    if (!src || !ppv)
+    {
+        refuse_scrub_ppv( ppv );          /* refusal hygiene by hand */
+        return (UINT64)(UINT)E_INVALIDARG;
+    }
     desc = *src;
     desc.pRootSignature = com_unwrap( desc.pRootSignature );
     args[1] = (UINT64)(ULONG_PTR)&desc;
@@ -592,9 +618,17 @@ static UINT64 hand_create_pipeline_state( void *host, UINT slot, AMD64_CONTEXT *
     char *copy;
     HRESULT hr;
 
-    if (!src || !ppv) return (UINT64)(UINT)E_INVALIDARG;
+    if (!src || !ppv)
+    {
+        refuse_scrub_ppv( ppv );          /* refusal hygiene by hand */
+        return (UINT64)(UINT)E_INVALIDARG;
+    }
     desc = *src;
-    if (FAILED(hr = pso_stream_unwrap( &desc, &copy ))) return (UINT64)(UINT)hr;
+    if (FAILED(hr = pso_stream_unwrap( &desc, &copy )))
+    {
+        refuse_scrub_ppv( ppv );          /* refusal hygiene by hand */
+        return (UINT64)(UINT)hr;
+    }
     args[1] = (UINT64)(ULONG_PTR)&desc;
     args[2] = (UINT64)(ULONG_PTR)riid;
     args[3] = (UINT64)(ULONG_PTR)ppv;
@@ -652,7 +686,11 @@ static UINT64 hand_load_graphics_pipeline( void *host, UINT slot, AMD64_CONTEXT 
     UINT64 args[D3D12_UNIX_MAX_ARGS] = { 0 };
     HRESULT hr;
 
-    if (!src || !ppv) return (UINT64)(UINT)E_INVALIDARG;
+    if (!src || !ppv)
+    {
+        refuse_scrub_ppv( ppv );          /* refusal hygiene by hand */
+        return (UINT64)(UINT)E_INVALIDARG;
+    }
     desc = *src;
     desc.pRootSignature = com_unwrap( desc.pRootSignature );
     args[1] = (UINT64)(ULONG_PTR)name;
@@ -675,7 +713,11 @@ static UINT64 hand_load_compute_pipeline( void *host, UINT slot, AMD64_CONTEXT *
     UINT64 args[D3D12_UNIX_MAX_ARGS] = { 0 };
     HRESULT hr;
 
-    if (!src || !ppv) return (UINT64)(UINT)E_INVALIDARG;
+    if (!src || !ppv)
+    {
+        refuse_scrub_ppv( ppv );          /* refusal hygiene by hand */
+        return (UINT64)(UINT)E_INVALIDARG;
+    }
     desc = *src;
     desc.pRootSignature = com_unwrap( desc.pRootSignature );
     args[1] = (UINT64)(ULONG_PTR)name;
@@ -700,9 +742,17 @@ static UINT64 hand_load_pipeline( void *host, UINT slot, AMD64_CONTEXT *ctx )
     char *copy;
     HRESULT hr;
 
-    if (!src || !ppv) return (UINT64)(UINT)E_INVALIDARG;
+    if (!src || !ppv)
+    {
+        refuse_scrub_ppv( ppv );          /* refusal hygiene by hand */
+        return (UINT64)(UINT)E_INVALIDARG;
+    }
     desc = *src;
-    if (FAILED(hr = pso_stream_unwrap( &desc, &copy ))) return (UINT64)(UINT)hr;
+    if (FAILED(hr = pso_stream_unwrap( &desc, &copy )))
+    {
+        refuse_scrub_ppv( ppv );          /* refusal hygiene by hand */
+        return (UINT64)(UINT)hr;
+    }
     args[1] = (UINT64)(ULONG_PTR)name;
     args[2] = (UINT64)(ULONG_PTR)&desc;
     args[3] = (UINT64)(ULONG_PTR)riid;
@@ -1034,9 +1084,16 @@ static UINT64 hand_create_state_object( void *host, UINT slot, AMD64_CONTEXT *ct
     void *blob;
     HRESULT hr;
 
-    if (!src || !ppv) return (UINT64)(UINT)E_INVALIDARG;
+    if (!src || !ppv)
+    {
+        refuse_scrub_ppv( ppv );          /* refusal hygiene by hand */
+        return (UINT64)(UINT)E_INVALIDARG;
+    }
     if (FAILED(hr = state_object_desc_unwrap( src, &desc, &blob )))
+    {
+        refuse_scrub_ppv( ppv );          /* refusal hygiene by hand */
         return (UINT64)(UINT)hr;
+    }
     args[1] = (UINT64)(ULONG_PTR)&desc;
     args[2] = (UINT64)(ULONG_PTR)riid;
     args[3] = (UINT64)(ULONG_PTR)ppv;
@@ -1059,9 +1116,16 @@ static UINT64 hand_add_to_state_object( void *host, UINT slot, AMD64_CONTEXT *ct
     void *blob;
     HRESULT hr;
 
-    if (!src || !ppv) return (UINT64)(UINT)E_INVALIDARG;
+    if (!src || !ppv)
+    {
+        refuse_scrub_ppv( ppv );          /* refusal hygiene by hand */
+        return (UINT64)(UINT)E_INVALIDARG;
+    }
     if (FAILED(hr = state_object_desc_unwrap( src, &desc, &blob )))
+    {
+        refuse_scrub_ppv( ppv );          /* refusal hygiene by hand */
         return (UINT64)(UINT)hr;
+    }
     args[1] = (UINT64)(ULONG_PTR)&desc;
     args[2] = (UINT64)(ULONG_PTR)com_unwrap( grow_from );
     args[3] = (UINT64)(ULONG_PTR)riid;

@@ -633,7 +633,24 @@ static UINT64 hand_get_private_data( void *host, UINT slot, AMD64_CONTEXT *ctx )
     UINT64 args[D3D11_UNIX_MAX_ARGS] = { 0 };
     struct private_iface *p;
 
-    if (!guid || !size) return (UINT64)(UINT)E_INVALIDARG;
+    /* REFUSAL HYGIENE, BY HAND, because no generated scrub mask reaches a
+     * WINECOM_F_HAND row or a flat GUEST-IMPL wrapper: each owns its
+     * out-params the way scrub_refused_outs() owns a table refusal's, and a
+     * refusal that leaves one unwritten hands the guest its own stack residue.
+     * [MEASURED] dlls/combase/syscom.c's IMMDevice::Activate is the site that
+     * cost days -- the Witcher 3 read a never-written *ppv back off its stack
+     * and the emulator decoded a host module's ppc64le bytes as x86.  The
+     * writes go through winecom_refused_scrub_*, which honour
+     * WINEEMUNOREFUSESCRUB so the hygiene gate's sabotage arm can prove them
+     * load-bearing.  Native failures stay untouched: real D3D11 leaves *out
+     * alone on failure and matching Windows means scrubbing only the refusals
+     * this side invented.  Pointer cells go through the helper's guest-width
+     * store, which is what an i386 guest's four-byte cell needs. */
+    if (!guid || !size)
+    {
+        winecom_refused_scrub_dw( size );
+        return (UINT64)(UINT)E_INVALIDARG;
+    }
 
     RtlEnterCriticalSection( &priv_cs );
     for (p = private_ifaces; p; p = p->next)
@@ -658,7 +675,13 @@ static UINT64 hand_get_private_data( void *host, UINT slot, AMD64_CONTEXT *ctx )
          * proxy stands for, then re-intern: that is one more guest reference
          * on the same proxy and no net change to the host's count. */
         if (!(proxy_host = winecom_unwrap( p->guest )))
+        {
+            /* refusal hygiene by hand: *data is exactly the cell the caller
+             * would have read an interface pointer out of. */
+            winecom_refused_scrub_ptr( data );
+            winecom_refused_scrub_dw( size );
             return (UINT64)(UINT)E_FAIL;
+        }
         *(void **)data = host_addref_wrap( proxy_host, p->iface );
         *size = sizeof(void *);
         return (UINT64)(UINT)S_OK;
@@ -981,11 +1004,17 @@ static UINT64 hand_create_swapchain( void *host, UINT slot, AMD64_CONTEXT *ctx )
     void *host_device = NULL, *host_swapchain;
     HRESULT hr;
 
-    if (!desc || !out) return (UINT64)(UINT)E_INVALIDARG;
+    /* refusal hygiene by hand -- see hand_get_private_data */
+    if (!desc || !out)
+    {
+        winecom_refused_scrub_ptr( out );
+        return (UINT64)(UINT)E_INVALIDARG;
+    }
     if (guest_device && !winecom_translate_in( guest_device, &host_device ))
     {
         FIXME( "CreateSwapChain with a guest-implemented device %p; reverse "
                "proxies do not exist yet\n", guest_device );
+        winecom_refused_scrub_ptr( out );
         return (UINT64)(UINT)E_NOTIMPL;
     }
 
@@ -1058,6 +1087,10 @@ static UINT64 hand_create_swapchain_for_hwnd( void *host, UINT slot, AMD64_CONTE
         }
         FIXME( "CreateSwapChainForHwnd with a guest-implemented device or "
                "output; reverse proxies do not exist yet\n" );
+        /* refusal hygiene by hand -- see hand_get_private_data.  The d3d12
+         * hand-off above may have written *out already; it did not, or it
+         * would have returned rather than fallen through to here. */
+        winecom_refused_scrub_ptr( out );
         return (UINT64)(UINT)E_NOTIMPL;
     }
 
@@ -1160,7 +1193,12 @@ static UINT64 hand32_get_private_data( void *host, UINT slot, I386_CONTEXT *ctx 
     UINT64 args[D3D11_UNIX_MAX_ARGS] = { 0 };
     struct private_iface *p;
 
-    if (!guid || !size) return (UINT64)(UINT)E_INVALIDARG;
+    /* refusal hygiene by hand -- see hand_get_private_data */
+    if (!guid || !size)
+    {
+        winecom_refused_scrub_dw( size );
+        return (UINT64)(UINT)E_INVALIDARG;
+    }
 
     RtlEnterCriticalSection( &priv_cs );
     for (p = private_ifaces; p; p = p->next)
@@ -1183,7 +1221,12 @@ static UINT64 hand32_get_private_data( void *host, UINT slot, I386_CONTEXT *ctx 
             return (UINT64)(UINT)DXGI_ERROR_MORE_DATA;
         }
         if (!(proxy_host = winecom_unwrap( p->guest )))
+        {
+            /* refusal hygiene by hand -- the i386 cell is four bytes */
+            winecom_refused_scrub_dw( data );
+            winecom_refused_scrub_dw( size );
             return (UINT64)(UINT)E_FAIL;
+        }
         *(UINT *)data = (UINT)(ULONG_PTR)host_addref_wrap( proxy_host, p->iface );
         *size = sizeof(UINT);
         return (UINT64)(UINT)S_OK;
@@ -1306,10 +1349,16 @@ static UINT64 hand32_create_swapchain( void *host, UINT slot, I386_CONTEXT *ctx 
     void *host_device = NULL, *host_swapchain = NULL;
     HRESULT hr;
 
-    if (!desc32 || !out) return (UINT64)(UINT)E_INVALIDARG;
+    /* refusal hygiene by hand -- see hand_get_private_data */
+    if (!desc32 || !out)
+    {
+        winecom_refused_scrub_dw( out );
+        return (UINT64)(UINT)E_INVALIDARG;
+    }
     if (guest_device && !winecom_translate_in( guest_device, &host_device ))
     {
         FIXME( "CreateSwapChain with a guest-implemented device %p\n", guest_device );
+        winecom_refused_scrub_dw( out );
         return (UINT64)(UINT)E_NOTIMPL;
     }
 
@@ -1350,6 +1399,7 @@ static UINT64 hand32_create_swapchain_for_hwnd( void *host, UINT slot, I386_CONT
         FIXME( "CreateSwapChainForHwnd with an untranslatable device or "
                "output on the i386 lane (the d3d12 handoff has no 32-bit "
                "path yet)\n" );
+        winecom_refused_scrub_dw( out );      /* refusal hygiene by hand */
         return (UINT64)(UINT)E_NOTIMPL;
     }
 
@@ -1536,6 +1586,8 @@ static UINT64 hand32_map( void *host, UINT slot, I386_CONTEXT *ctx )
     if (!winecom_translate_in( guest_res, &res_host ) || !res_host)
     {
         FIXME( "Map on an untranslatable resource %p\n", guest_res );
+        /* refusal hygiene by hand: pData is the residue cell here */
+        winecom_refused_scrub_mem( out, 3 * sizeof(UINT) );
         return (UINT64)(UINT)E_INVALIDARG;
     }
 
@@ -1584,7 +1636,7 @@ static UINT64 hand32_map( void *host, UINT slot, I386_CONTEXT *ctx )
             args[1] = (UINT64)(ULONG_PTR)res_host;
             args[2] = sub;
             unix_vtbl_call( host, slot + 1 /* Unmap */, 3, args );
-            out[0] = out[1] = out[2] = 0;
+            winecom_refused_scrub_mem( out, 3 * sizeof(UINT) );
             return (UINT64)(UINT)E_NOTIMPL;
         }
 
@@ -1768,7 +1820,12 @@ static UINT64 create_texture32_common( void *host, UINT slot, I386_CONTEXT *ctx,
     void *heap = NULL;
     HRESULT hr;
 
-    if (!desc) return (UINT64)(UINT)E_INVALIDARG;
+    /* refusal hygiene by hand -- see hand_get_private_data */
+    if (!desc)
+    {
+        winecom_refused_scrub_dw( out );
+        return (UINT64)(UINT)E_INVALIDARG;
+    }
     if (init32 && nsub)
     {
         char *dst;
@@ -1776,7 +1833,10 @@ static UINT64 create_texture32_common( void *host, UINT slot, I386_CONTEXT *ctx,
 
         if (!(heap = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0,
                                       nsub * (SIZE_T)16 )))
+        {
+            winecom_refused_scrub_dw( out );
             return (UINT64)(UINT)E_OUTOFMEMORY;
+        }
         for (k = 0, dst = heap; k < nsub; k++, dst += 16)
             wine_repack32_D3D11_SUBRESOURCE_DATA( dst, init32 + (SIZE_T)k * 12 );
         C_ASSERT( WINE_REPACK32_SIZE_D3D11_SUBRESOURCE_DATA == 12 );
@@ -1901,6 +1961,10 @@ HRESULT WINAPI __wine_guest_D3D11CreateDevice( void *adapter, UINT driver_type,
     TRACE( "adapter %p, driver_type %#x, flags %#x, levels %u, device %p, "
            "context %p\n", adapter, driver_type, flags, levels, device, context );
 
+    /* refusal hygiene by hand -- see hand_get_private_data */
+    winecom_refused_scrub_ptr( device );
+    winecom_refused_scrub_ptr( context );
+    winecom_refused_scrub_dw( feature_level );
     if (!com_runtime_init()) return E_FAIL;
     if (adapter && !winecom_translate_in( adapter, &host_adapter ))
     {
@@ -1951,6 +2015,8 @@ HRESULT WINAPI __wine_guest_D3D11CoreCreateDevice( void *factory, void *adapter,
     TRACE( "factory %p, adapter %p, flags %#x, levels %u, device %p\n",
            factory, adapter, flags, levels, device );
 
+    /* refusal hygiene by hand -- see hand_get_private_data */
+    winecom_refused_scrub_ptr( device );
     if (!com_runtime_init()) return E_FAIL;
     if ((factory && !winecom_translate_in( factory, &host_factory )) ||
         (adapter && !winecom_translate_in( adapter, &host_adapter )))
@@ -2000,6 +2066,11 @@ HRESULT WINAPI __wine_guest_D3D11CreateDeviceAndSwapChain( void *adapter, UINT d
            "swapchain %p, device %p, context %p\n", adapter, driver_type, flags,
            levels, desc, swapchain, device, context );
 
+    /* refusal hygiene by hand -- see hand_get_private_data */
+    winecom_refused_scrub_ptr( swapchain );
+    winecom_refused_scrub_ptr( device );
+    winecom_refused_scrub_ptr( context );
+    winecom_refused_scrub_dw( feature_level );
     if (!com_runtime_init()) return E_FAIL;
     if (adapter && !winecom_translate_in( adapter, &host_adapter ))
     {
@@ -2079,8 +2150,10 @@ HRESULT WINAPI __wine_guest_D3D11On12CreateDevice( void *device12, UINT flags,
                "refused a frame later, in the middle of a resource wrap, where "
                "the reason would be illegible.  Refused here instead.\n" );
     }
-    if (device) winecom_store_guest_ptr( device, NULL );
-    if (context) winecom_store_guest_ptr( context, NULL );
+    /* refusal hygiene by hand -- see hand_get_private_data */
+    winecom_refused_scrub_ptr( device );
+    winecom_refused_scrub_ptr( context );
+    winecom_refused_scrub_dw( feature_level );
     return E_NOTIMPL;
 }
 
@@ -2219,7 +2292,7 @@ HRESULT WINAPI __wine_guest_DXGID3D10CreateDevice( void *d3d11_module, void *fac
                "argument is an HMODULE of Wine's d3d11, which does not exist "
                "here.\n" );
     }
-    if (device) winecom_store_guest_ptr( device, NULL );
+    winecom_refused_scrub_ptr( device );   /* refusal hygiene by hand */
     return E_NOTIMPL;
 }
 
@@ -2252,6 +2325,8 @@ HRESULT WINAPI __wine_guest_D3D10CoreCreateDevice( void *factory, void *adapter,
     TRACE( "factory %p, adapter %p, flags %#x, feature_level %#x, device %p\n",
            factory, adapter, flags, feature_level, device );
 
+    /* refusal hygiene by hand -- see hand_get_private_data */
+    winecom_refused_scrub_ptr( device );
     if (!com_runtime_init()) return E_FAIL;
     if ((factory && !winecom_translate_in( factory, &host_factory )) ||
         (adapter && !winecom_translate_in( adapter, &host_adapter )))
@@ -2404,6 +2479,8 @@ HRESULT WINAPI __wine_guest_D3D10CreateDevice( void *adapter, UINT driver_type,
     TRACE( "adapter %p, driver_type %#x, flags %#x, sdk_version %u, device %p\n",
            adapter, driver_type, flags, sdk_version, device );
 
+    /* refusal hygiene by hand -- see hand_get_private_data */
+    winecom_refused_scrub_ptr( device );
     if (!device) return E_INVALIDARG;
     if (sdk_version != D3D10_SDK_VERSION_VALUE)
     {
@@ -2461,6 +2538,9 @@ HRESULT WINAPI __wine_guest_D3D10CreateDeviceAndSwapChain( void *adapter, UINT d
     TRACE( "adapter %p, flags %#x, desc %p, swapchain %p, device %p\n",
            adapter, flags, desc, swapchain, device );
 
+    /* refusal hygiene by hand -- see hand_get_private_data */
+    winecom_refused_scrub_ptr( device );
+    winecom_refused_scrub_ptr( swapchain );
     if (!device) return E_INVALIDARG;
     if (sdk_version != D3D10_SDK_VERSION_VALUE)
     {

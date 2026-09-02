@@ -444,9 +444,26 @@ static UINT64 hand_pv_in_mid( void *host, UINT slot, AMD64_CONTEXT *ctx )
     struct mf_pv_in_state st;
     UINT64 ret;
 
+    /* REFUSAL HYGIENE, BY HAND, because no generated scrub mask reaches a
+     * WINECOM_F_HAND row or a flat GUEST-IMPL wrapper: both own their
+     * out-params the way scrub_refused_outs() owns a table refusal's.  Every
+     * refusal below scrubs what it can prove -- interface/pointer cells to
+     * NULL, PROPVARIANT/VARIANT to zeroed (VT_EMPTY is 0), counts and keys to
+     * 0 -- through winecom_refused_scrub_*, which honours WINEEMUNOREFUSESCRUB
+     * so the hygiene gate's sabotage arm can prove the write load-bearing.
+     * [MEASURED] dlls/combase/syscom.c's IMMDevice::Activate is the site that
+     * cost days: the Witcher 3 read a never-written *ppv off its own stack and
+     * the emulator decoded a host module's ppc64le bytes as x86.  Native
+     * failures stay untouched -- real MF leaves *out alone on failure, and
+     * matching Windows means scrubbing only the refusals this side invented.
+     * A buffer whose length the caller already knows is left alone too; the
+     * one out this file deliberately does not scrub is named where it is. */
     if (!mf_pv_in( (const PROPVARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 2 ),
                    &st, slot ))
+    {
+        winecom_refused_scrub_dw( (void *)(ULONG_PTR)winecom_read_arg( ctx, 3 ) );
         return (UINT64)(UINT)E_NOTIMPL;
+    }
     args[1] = winecom_read_arg( ctx, 1 );
     args[2] = (UINT64)(ULONG_PTR)st.use;
     args[3] = winecom_read_arg( ctx, 3 );
@@ -544,9 +561,14 @@ static UINT64 hand_pv_keyframes( void *host, UINT slot, AMD64_CONTEXT *ctx )
 
     prev = (PROPVARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 3 );
     next = (PROPVARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 4 );
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
     if (!mf_pv_in( (const PROPVARIANT *)(ULONG_PTR)winecom_read_arg( ctx, 2 ),
                    &st, slot ))
+    {
+        winecom_refused_scrub_mem( prev, sizeof(*prev) );
+        winecom_refused_scrub_mem( next, sizeof(*next) );
         return (UINT64)(UINT)E_NOTIMPL;
+    }
     args[1] = winecom_read_arg( ctx, 1 );
     args[2] = (UINT64)(ULONG_PTR)st.use;
     args[3] = (UINT64)(ULONG_PTR)prev;
@@ -751,10 +773,14 @@ static UINT64 hand_process_output( void *host, UINT slot, AMD64_CONTEXT *ctx )
 
     if (count && src)
     {
+        /* refusal hygiene by hand -- see hand_pv_in_mid.  Only pdwStatus: the
+         * MFT_OUTPUT_DATA_BUFFER array is IN-OUT and already holds the guest's
+         * own values, so scrubbing it would destroy the caller's input. */
         if (!(copy = calloc( count, sizeof(*copy) )) ||
             !(borrowed = calloc( count, sizeof(*borrowed) )))
         {
             free( copy );
+            winecom_refused_scrub_dw( (void *)(ULONG_PTR)winecom_read_arg( ctx, 4 ) );
             return (UINT64)(UINT)E_OUTOFMEMORY;
         }
         memcpy( copy, src, count * sizeof(*copy) );
@@ -774,6 +800,7 @@ static UINT64 hand_process_output( void *host, UINT slot, AMD64_CONTEXT *ctx )
                 while (i--) winecom_to_native_end( borrowed[i] );
                 free( borrowed );
                 free( copy );
+                winecom_refused_scrub_dw( (void *)(ULONG_PTR)winecom_read_arg( ctx, 4 ) );
                 return (UINT64)(UINT)E_NOTIMPL;
             }
             borrowed[i] = copy[i].pSample;
@@ -845,6 +872,18 @@ static UINT64 hand_nss_set_property( void *host, UINT slot, AMD64_CONTEXT *ctx )
  * include/wine/winecom_variant.h -- the guest's rgvarg is cloned and each
  * element's object arm unwrapped; the result VARIANT is wrapped (or
  * scrubbed, loudly) under this surface's own IDispatch row. */
+/* refusal hygiene by hand -- see hand_pv_in_mid.  Invoke's three outs, the
+ * syscom twin's treatment verbatim: a zeroed VARIANT/EXCEPINFO is the valid
+ * empty value, so an unchecked caller VariantClear()s nothing. */
+static void mf_invoke_scrub_outs( AMD64_CONTEXT *ctx )
+{
+    winecom_refused_scrub_mem( (void *)(ULONG_PTR)winecom_read_arg( ctx, 6 ),
+                               sizeof(VARIANT) );
+    winecom_refused_scrub_mem( (void *)(ULONG_PTR)winecom_read_arg( ctx, 7 ),
+                               sizeof(EXCEPINFO) );
+    winecom_refused_scrub_dw( (void *)(ULONG_PTR)winecom_read_arg( ctx, 8 ) );
+}
+
 static UINT64 hand_dispatch_invoke( void *host, UINT slot, AMD64_CONTEXT *ctx )
 {
     UINT64 args[16] = { 0 };
@@ -864,7 +903,11 @@ static UINT64 hand_dispatch_invoke( void *host, UINT slot, AMD64_CONTEXT *ctx )
         {
             cloned = RtlAllocateHeap( GetProcessHeap(), 0,
                                       dp->cArgs * sizeof(*cloned) );
-            if (!cloned) return (UINT64)(UINT)E_OUTOFMEMORY;
+            if (!cloned)
+            {
+                mf_invoke_scrub_outs( ctx );
+                return (UINT64)(UINT)E_OUTOFMEMORY;
+            }
         }
         memcpy( cloned, dp->rgvarg, dp->cArgs * sizeof(*cloned) );
         for (i = 0; i < dp->cArgs; i++)
@@ -877,6 +920,7 @@ static UINT64 hand_dispatch_invoke( void *host, UINT slot, AMD64_CONTEXT *ctx )
                            V_VT(&dp->rgvarg[i]) );
                 if (cloned != local)
                     RtlFreeHeap( GetProcessHeap(), 0, cloned );
+                mf_invoke_scrub_outs( ctx );
                 return (UINT64)(UINT)E_NOTIMPL;
             }
         use.rgvarg = cloned;
@@ -1338,9 +1382,13 @@ HRESULT WINAPI __wine_guest_MFCreateMediaBufferFromMediaType( IMFMediaType *medi
     HRESULT hr;
 
     if (!mf_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
     if (!__wine_mf_translate_in( &logged, "MFCreateMediaBufferFromMediaType",
                                  "IMFMediaType", media_type, &host ))
+    {
+        winecom_refused_scrub_ptr( buffer );
         return E_NOTIMPL;
+    }
     hr = MFCreateMediaBufferFromMediaType( host, duration, min_length, min_alignment, buffer );
     if (SUCCEEDED(hr)) winecom_wrap_static( (void **)buffer, MF_IFACE_IMFMediaBuffer );
     return hr;
@@ -1354,9 +1402,13 @@ HRESULT WINAPI __wine_guest_MFWrapMediaType( IMFMediaType *original, REFGUID maj
     HRESULT hr;
 
     if (!mf_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
     if (!__wine_mf_translate_in( &logged, "MFWrapMediaType", "IMFMediaType",
                                  original, &host ))
+    {
+        winecom_refused_scrub_ptr( wrapped );
         return E_NOTIMPL;
+    }
     hr = MFWrapMediaType( host, major, subtype, wrapped );
     if (SUCCEEDED(hr)) winecom_wrap_static( (void **)wrapped, MF_IFACE_IMFMediaType );
     return hr;
@@ -1369,9 +1421,13 @@ HRESULT WINAPI __wine_guest_MFUnwrapMediaType( IMFMediaType *wrapped, IMFMediaTy
     HRESULT hr;
 
     if (!mf_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
     if (!__wine_mf_translate_in( &logged, "MFUnwrapMediaType", "IMFMediaType",
                                  wrapped, &host ))
+    {
+        winecom_refused_scrub_ptr( original );
         return E_NOTIMPL;
+    }
     hr = MFUnwrapMediaType( host, original );
     if (SUCCEEDED(hr)) winecom_wrap_static( (void **)original, MF_IFACE_IMFMediaType );
     return hr;
@@ -1414,10 +1470,14 @@ HRESULT WINAPI __wine_guest_MFCreateStreamDescriptor( DWORD identifier, DWORD co
     HRESULT hr;
 
     if (!mf_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
     if (FAILED(hr = mf_translate_in_array( &logged, "MFCreateStreamDescriptor",
                                            "IMFMediaType", (void **)types, count,
                                            &hosts, stackbuf, ARRAYSIZE(stackbuf) )))
+    {
+        winecom_refused_scrub_ptr( descriptor );
         return hr;
+    }
     hr = MFCreateStreamDescriptor( identifier, count, (IMFMediaType **)hosts, descriptor );
     if (hosts && hosts != stackbuf) free( hosts );
     if (SUCCEEDED(hr))
@@ -1434,10 +1494,14 @@ HRESULT WINAPI __wine_guest_MFCreatePresentationDescriptor( DWORD count,
     HRESULT hr;
 
     if (!mf_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
     if (FAILED(hr = mf_translate_in_array( &logged, "MFCreatePresentationDescriptor",
                                            "IMFStreamDescriptor", (void **)descriptors,
                                            count, &hosts, stackbuf, ARRAYSIZE(stackbuf) )))
+    {
+        winecom_refused_scrub_ptr( out );
         return hr;
+    }
     hr = MFCreatePresentationDescriptor( count, (IMFStreamDescriptor **)hosts, out );
     if (hosts && hosts != stackbuf) free( hosts );
     if (SUCCEEDED(hr))
@@ -1463,7 +1527,10 @@ BOOL WINAPI __wine_guest_MFCompareFullToPartialMediaType( IMFMediaType *full_typ
 /* One shape covers the ten "take an IMFMediaType and fill in plain data"
  * exports; writing them out is not repetition for its own sake, because each
  * has to name itself in the refusal. */
-#define MF_TRANSLATE_MEDIATYPE( name, decl_args, call_args )                  \
+/* refusal hygiene by hand -- see hand_pv_in_mid: the refuse_scrub argument is
+ * the statement that makes THIS export's refusal inert; the ones that take
+ * only const inputs pass (void)0 and are audited as having no outs. */
+#define MF_TRANSLATE_MEDIATYPE( name, decl_args, call_args, refuse_scrub )    \
     HRESULT WINAPI __wine_guest_##name decl_args                              \
     {                                                                         \
         static LONG logged;                                                   \
@@ -1472,44 +1539,51 @@ BOOL WINAPI __wine_guest_MFCompareFullToPartialMediaType( IMFMediaType *full_typ
         if (!mf_ready()) return E_FAIL;                                       \
         if (!__wine_mf_translate_in( &logged, #name, "IMFMediaType",          \
                                      media_type, &host ))                     \
+        {                                                                     \
+            refuse_scrub;                                                     \
             return E_NOTIMPL;                                                 \
+        }                                                                     \
         return name call_args;                                                \
     }
 
 MF_TRANSLATE_MEDIATYPE( MFCreateMFVideoFormatFromMFMediaType,
                         ( IMFMediaType *media_type, MFVIDEOFORMAT **format, UINT32 *size ),
-                        ( host, format, size ) )
+                        ( host, format, size ),
+                        ( winecom_refused_scrub_ptr( format ),
+                          winecom_refused_scrub_dw( size ) ) )
 MF_TRANSLATE_MEDIATYPE( MFCreateWaveFormatExFromMFMediaType,
                         ( IMFMediaType *media_type, WAVEFORMATEX **format, UINT32 *size,
                           UINT32 flags ),
-                        ( host, format, size, flags ) )
+                        ( host, format, size, flags ),
+                        ( winecom_refused_scrub_ptr( format ),
+                          winecom_refused_scrub_dw( size ) ) )
 MF_TRANSLATE_MEDIATYPE( MFInitMediaTypeFromWaveFormatEx,
                         ( IMFMediaType *media_type, const WAVEFORMATEX *format, UINT32 size ),
-                        ( host, format, size ) )
+                        ( host, format, size ), (void)0 )
 MF_TRANSLATE_MEDIATYPE( MFInitMediaTypeFromMFVideoFormat,
                         ( IMFMediaType *media_type, const MFVIDEOFORMAT *format, UINT32 size ),
-                        ( host, format, size ) )
+                        ( host, format, size ), (void)0 )
 MF_TRANSLATE_MEDIATYPE( MFInitMediaTypeFromAMMediaType,
                         ( IMFMediaType *media_type, const AM_MEDIA_TYPE *am_type ),
-                        ( host, am_type ) )
+                        ( host, am_type ), (void)0 )
 MF_TRANSLATE_MEDIATYPE( MFInitMediaTypeFromVideoInfoHeader,
                         ( IMFMediaType *media_type, const VIDEOINFOHEADER *vih, UINT32 size,
                           const GUID *subtype ),
-                        ( host, vih, size, subtype ) )
+                        ( host, vih, size, subtype ), (void)0 )
 MF_TRANSLATE_MEDIATYPE( MFInitMediaTypeFromVideoInfoHeader2,
                         ( IMFMediaType *media_type, const VIDEOINFOHEADER2 *vih, UINT32 size,
                           const GUID *subtype ),
-                        ( host, vih, size, subtype ) )
+                        ( host, vih, size, subtype ), (void)0 )
 MF_TRANSLATE_MEDIATYPE( MFInitMediaTypeFromMPEG1VideoInfo,
                         ( IMFMediaType *media_type, const MPEG1VIDEOINFO *vih, UINT32 size,
                           const GUID *subtype ),
-                        ( host, vih, size, subtype ) )
+                        ( host, vih, size, subtype ), (void)0 )
 MF_TRANSLATE_MEDIATYPE( MFInitMediaTypeFromMPEG2VideoInfo,
                         ( IMFMediaType *media_type, const MPEG2VIDEOINFO *vih, UINT32 size,
                           const GUID *subtype ),
-                        ( host, vih, size, subtype ) )
+                        ( host, vih, size, subtype ), (void)0 )
 
-#define MF_TRANSLATE_ATTRIBUTES( name, decl_args, call_args )                 \
+#define MF_TRANSLATE_ATTRIBUTES( name, decl_args, call_args, refuse_scrub )   \
     HRESULT WINAPI __wine_guest_##name decl_args                              \
     {                                                                         \
         static LONG logged;                                                   \
@@ -1518,19 +1592,25 @@ MF_TRANSLATE_MEDIATYPE( MFInitMediaTypeFromMPEG2VideoInfo,
         if (!mf_ready()) return E_FAIL;                                       \
         if (!__wine_mf_translate_in( &logged, #name, "IMFAttributes",         \
                                      attributes, &host ))                     \
+        {                                                                     \
+            refuse_scrub;                                                     \
             return E_NOTIMPL;                                                 \
+        }                                                                     \
         return name call_args;                                                \
     }
 
+/* MFGetAttributesAsBlob's buffer is left alone: the caller supplied it AND
+ * its length, so an unwritten buffer tells it nothing it did not already
+ * know -- the buffer-out exception the file banner names. */
 MF_TRANSLATE_ATTRIBUTES( MFGetAttributesAsBlob,
                          ( IMFAttributes *attributes, UINT8 *buffer, UINT size ),
-                         ( host, buffer, size ) )
+                         ( host, buffer, size ), (void)0 )
 MF_TRANSLATE_ATTRIBUTES( MFGetAttributesAsBlobSize,
                          ( IMFAttributes *attributes, UINT32 *size ),
-                         ( host, size ) )
+                         ( host, size ), winecom_refused_scrub_dw( size ) )
 MF_TRANSLATE_ATTRIBUTES( MFInitAttributesFromBlob,
                          ( IMFAttributes *attributes, const UINT8 *buffer, UINT size ),
-                         ( host, buffer, size ) )
+                         ( host, buffer, size ), (void)0 )
 
 /* An IMFActivate the application registers as a local handler.  A game that
  * ships its own byte-stream handler hands a guest-implemented object here,
@@ -1613,7 +1693,10 @@ HRESULT WINAPI __wine_guest_MFCreateAsyncResult( IUnknown *object, IMFAsyncCallb
     void *obj = NULL, *cb = NULL, *st = NULL;
     HRESULT hr;
 
-    if (result) *result = NULL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid: this prologue scrub IS
+     * the refusal scrub for every exit below, so it goes through the helper
+     * and the lever can take it away. */
+    winecom_refused_scrub_ptr( result );
     if (!mf_ready()) return E_FAIL;
     if (!MF_IN( "MFCreateAsyncResult", "IUnknown", MF_IFACE_IUnknown, object, &obj ) ||
         !MF_IN( "MFCreateAsyncResult", "IMFAsyncCallback", MF_IFACE_IMFAsyncCallback,
@@ -1782,9 +1865,13 @@ HRESULT WINAPI __wine_guest_MFPutWaitingWorkItem( HANDLE event, LONG priority,
     HRESULT hr;
 
     if (!mf_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
     if (!MF_IN( "MFPutWaitingWorkItem", "IMFAsyncResult", MF_IFACE_IMFAsyncResult,
                 result, &res ))
+    {
+        winecom_refused_scrub_mem( key, sizeof(*key) );
         hr = E_NOTIMPL;
+    }
     else hr = RtwqPutWaitingWorkItem( event, priority, res, (UINT64 *)key );
     __wine_mf_translate_in_end( res );
     return hr;
@@ -1800,9 +1887,13 @@ HRESULT WINAPI __wine_guest_MFScheduleWorkItem( IMFAsyncCallback *callback, IUnk
     if (!mf_ready()) return E_FAIL;
     if (!MF_IN( "MFScheduleWorkItem", "IMFAsyncCallback", MF_IFACE_IMFAsyncCallback,
                 callback, &cb ) ||
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
         !MF_IN( "MFScheduleWorkItem", "IUnknown (the state)", MF_IFACE_IUnknown,
                 state, &st ))
+    {
+        winecom_refused_scrub_mem( key, sizeof(*key) );
         hr = E_NOTIMPL;
+    }
     else hr = MFScheduleWorkItem( cb, st, timeout, key );
     __wine_mf_translate_in_end( cb );
     __wine_mf_translate_in_end( st );
@@ -1817,9 +1908,13 @@ HRESULT WINAPI __wine_guest_MFScheduleWorkItemEx( IMFAsyncResult *result, INT64 
     HRESULT hr;
 
     if (!mf_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
     if (!MF_IN( "MFScheduleWorkItemEx", "IMFAsyncResult", MF_IFACE_IMFAsyncResult,
                 result, &res ))
+    {
+        winecom_refused_scrub_mem( key, sizeof(*key) );
         hr = E_NOTIMPL;
+    }
     else hr = RtwqScheduleWorkItem( res, timeout, (UINT64 *)key );
     __wine_mf_translate_in_end( res );
     return hr;
@@ -1838,9 +1933,13 @@ HRESULT WINAPI __wine_guest_MFBeginCreateFile( MF_FILE_ACCESSMODE access_mode,
     if (!mf_ready()) return E_FAIL;
     if (!MF_IN( "MFBeginCreateFile", "IMFAsyncCallback", MF_IFACE_IMFAsyncCallback,
                 callback, &cb ) ||
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
         !MF_IN( "MFBeginCreateFile", "IUnknown (the state)", MF_IFACE_IUnknown,
                 state, &st ))
+    {
+        winecom_refused_scrub_ptr( cancel_cookie );
         hr = E_NOTIMPL;
+    }
     else
     {
         hr = MFBeginCreateFile( access_mode, open_mode, flags, path, cb, st, cancel_cookie );
@@ -1861,8 +1960,12 @@ HRESULT WINAPI __wine_guest_MFEndCreateFile( IMFAsyncResult *result, IMFByteStre
     HRESULT hr;
 
     if (!mf_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
     if (!MF_IN( "MFEndCreateFile", "IMFAsyncResult", MF_IFACE_IMFAsyncResult, result, &res ))
+    {
+        winecom_refused_scrub_ptr( stream );
         hr = E_NOTIMPL;
+    }
     else
     {
         hr = MFEndCreateFile( res, stream );
@@ -1940,9 +2043,13 @@ HRESULT WINAPI __wine_guest_MFEndRegisterWorkQueueWithMMCSS( IMFAsyncResult *res
     HRESULT hr;
 
     if (!mf_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
     if (!MF_IN( "MFEndRegisterWorkQueueWithMMCSS", "IMFAsyncResult",
                 MF_IFACE_IMFAsyncResult, result, &res ))
+    {
+        winecom_refused_scrub_dw( taskid );
         hr = E_NOTIMPL;
+    }
     else hr = RtwqEndRegisterWorkQueueWithMMCSS( res, taskid );
     __wine_mf_translate_in_end( res );
     return hr;
@@ -1997,6 +2104,8 @@ HRESULT WINAPI __wine_guest_MFAddPeriodicCallback( MFPERIODICCALLBACK callback,
     void *host = NULL;
 
     if (!mf_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
+    winecom_refused_scrub_dw( key );
     if (!MF_IN( "MFAddPeriodicCallback", "IUnknown (the callback context)",
                 MF_IFACE_IUnknown, context, &host ))
         return E_NOTIMPL;
@@ -2257,9 +2366,13 @@ HRESULT WINAPI __wine_guest___wine_winecom_reverse_nest( IMFAttributes *attribut
     HRESULT hr;
 
     if (!mf_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
     if (!MF_IN( "__wine_winecom_reverse_nest", "IMFAttributes",
                 MF_IFACE_IMFAttributes, attributes, &attr ))
+    {
+        winecom_refused_scrub_dw( depth_reached );
         hr = E_NOTIMPL;
+    }
     else hr = __wine_winecom_reverse_nest( attr, depth_reached );
     __wine_mf_translate_in_end( attr );
     return hr;
@@ -2280,9 +2393,13 @@ HRESULT WINAPI __wine_guest___wine_winecom_reverse_selftest(
     if (!mf_ready()) return E_FAIL;
     if (!MF_IN( "__wine_winecom_reverse_selftest", "IMFAttributes",
                 MF_IFACE_IMFAttributes, attributes, &attr ) ||
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
         !MF_IN( "__wine_winecom_reverse_selftest", "IMFSimpleAudioVolume",
                 MF_IFACE_IMFSimpleAudioVolume, volume, &vol ))
+    {
+        winecom_refused_scrub_mem( report, sizeof(*report) );
         hr = E_NOTIMPL;
+    }
     else hr = __wine_winecom_reverse_selftest( attr, vol, report );
     __wine_mf_translate_in_end( attr );
     __wine_mf_translate_in_end( vol );
@@ -2298,7 +2415,8 @@ HRESULT WINAPI __wine_guest_MFCreateMFByteStreamOnStream( IStream *stream,
 {
     static LONG logged;
 
-    if (bytestream) *bytestream = NULL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
+    winecom_refused_scrub_ptr( bytestream );
     return __wine_mf_refuse_cross_surface( &logged, "MFCreateMFByteStreamOnStream",
                                            "IStream", "system-COM (combase)" );
 }
@@ -2308,7 +2426,8 @@ HRESULT WINAPI __wine_guest_MFCreateMFByteStreamOnStreamEx( IUnknown *stream,
 {
     static LONG logged;
 
-    if (bytestream) *bytestream = NULL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
+    winecom_refused_scrub_ptr( bytestream );
     return __wine_mf_refuse_cross_surface( &logged, "MFCreateMFByteStreamOnStreamEx",
                                            "IUnknown (an IStream or IRandomAccessStream)",
                                            "system-COM (combase)" );
@@ -2337,7 +2456,9 @@ HRESULT WINAPI __wine_guest_MFCreateDXGIDeviceManager( UINT *token,
 {
     static LONG logged;
 
-    if (manager) *manager = NULL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
+    winecom_refused_scrub_ptr( manager );
+    winecom_refused_scrub_dw( token );
     return __wine_mf_refuse_cross_surface( &logged, "MFCreateDXGIDeviceManager",
                                            "IMFDXGIDeviceManager (which takes an "
                                            "ID3D11Device)", "d3d11" );
@@ -2348,7 +2469,9 @@ HRESULT WINAPI __wine_guest_MFLockDXGIDeviceManager( UINT *token,
 {
     static LONG logged;
 
-    if (manager) *manager = NULL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
+    winecom_refused_scrub_ptr( manager );
+    winecom_refused_scrub_dw( token );
     return __wine_mf_refuse_cross_surface( &logged, "MFLockDXGIDeviceManager",
                                            "IMFDXGIDeviceManager (which takes an "
                                            "ID3D11Device)", "d3d11" );
@@ -2360,7 +2483,8 @@ HRESULT WINAPI __wine_guest_MFCreateDXGISurfaceBuffer( REFIID riid, IUnknown *su
 {
     static LONG logged;
 
-    if (buffer) *buffer = NULL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
+    winecom_refused_scrub_ptr( buffer );
     return __wine_mf_refuse_cross_surface( &logged, "MFCreateDXGISurfaceBuffer",
                                            "ID3D11Texture2D", "d3d11" );
 }
@@ -2370,7 +2494,8 @@ HRESULT WINAPI __wine_guest_MFCreateDXSurfaceBuffer( REFIID riid, IUnknown *surf
 {
     static LONG logged;
 
-    if (buffer) *buffer = NULL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
+    winecom_refused_scrub_ptr( buffer );
     return __wine_mf_refuse_cross_surface( &logged, "MFCreateDXSurfaceBuffer",
                                            "IDirect3DSurface9", "d3d9" );
 }
@@ -2382,7 +2507,8 @@ HRESULT WINAPI __wine_guest_MFCreateLegacyMediaBufferOnMFMediaBuffer( IMFSample 
 {
     static LONG logged;
 
-    if (obj) *obj = NULL;
+    /* refusal hygiene by hand -- see hand_pv_in_mid */
+    winecom_refused_scrub_ptr( obj );
     return __wine_mf_refuse_cross_surface( &logged, "MFCreateLegacyMediaBufferOnMFMediaBuffer",
                                            "IMediaBuffer (a DirectShow/DMO interface)",
                                            "no rostered" );
@@ -2405,7 +2531,8 @@ HRESULT WINAPI __wine_guest_MFCreateMediaEvent( MediaEventType type, REFGUID ext
             FIXME( "mf: MFCreateMediaEvent was given a PROPVARIANT of type 0x%04x, "
                    "which carries an interface pointer the guest owns; there is no "
                    "IID in the signature to translate it by.  Refusing.\n", value->vt );
-        if (event) *event = NULL;
+        /* refusal hygiene by hand -- see hand_pv_in_mid */
+        winecom_refused_scrub_ptr( event );
         return E_NOTIMPL;
     }
     hr = MFCreateMediaEvent( type, extended_type, status, value, event );

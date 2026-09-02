@@ -1624,7 +1624,22 @@ static UINT64 hand32_d3d9_surface_lock_rect( void *host, UINT slot, I386_CONTEXT
     s.origin = lock_origin_from_rect( (const LONG *)(ULONG_PTR)esp[3], origin ) ? origin : NULL;
     s.pitch = lr.Pitch;
     s.bits = &lr.pBits;
-    if (FAILED(hr = lock_serve( &s ))) return (UINT64)(UINT)hr;
+    /* REFUSAL HYGIENE, BY HAND, because no generated scrub mask reaches a
+     * WINECOM_F_HAND row: a hand walker that refuses owns its out-params the
+     * way scrub_refused_outs() owns a table refusal's.  lock_serve() refuses
+     * when it cannot size the mapping, and the guest's D3DLOCKED_RECT is then
+     * whatever its stack held -- read as pBits and dereferenced.  [MEASURED]
+     * dlls/combase/syscom.c's IMMDevice::Activate is the same hole one API
+     * over: the Witcher 3 read a never-written *ppv and the emulator decoded
+     * a host module's ppc64le bytes as x86.  The write goes through
+     * winecom_refused_scrub_mem, which honours WINEEMUNOREFUSESCRUB so the
+     * hygiene gate can prove it load-bearing.  A NATIVE failure above stays
+     * untouched -- real D3D9 leaves the struct alone on failure too. */
+    if (FAILED(hr = lock_serve( &s )))
+    {
+        winecom_refused_scrub_mem( out, 2 * sizeof(UINT) );
+        return (UINT64)(UINT)hr;
+    }
 
     out[0] = (UINT)lr.Pitch;
     out[1] = (UINT)(ULONG_PTR)lr.pBits;
@@ -1671,7 +1686,12 @@ static UINT64 hand32_d3d9_texture_lock_rect( void *host, UINT slot, I386_CONTEXT
     s.origin = lock_origin_from_rect( (const LONG *)(ULONG_PTR)esp[4], origin ) ? origin : NULL;
     s.pitch = lr.Pitch;
     s.bits = &lr.pBits;
-    if (FAILED(hr = lock_serve( &s ))) return (UINT64)(UINT)hr;
+    /* refusal hygiene by hand -- see hand32_d3d9_surface_lock_rect */
+    if (FAILED(hr = lock_serve( &s )))
+    {
+        winecom_refused_scrub_mem( out, 2 * sizeof(UINT) );
+        return (UINT64)(UINT)hr;
+    }
 
     out[0] = (UINT)lr.Pitch;
     out[1] = (UINT)(ULONG_PTR)lr.pBits;
@@ -1722,7 +1742,12 @@ static UINT64 hand32_d3d9_cube_lock_rect( void *host, UINT slot, I386_CONTEXT *c
     s.origin = lock_origin_from_rect( (const LONG *)(ULONG_PTR)esp[5], origin ) ? origin : NULL;
     s.pitch = lr.Pitch;
     s.bits = &lr.pBits;
-    if (FAILED(hr = lock_serve( &s ))) return (UINT64)(UINT)hr;
+    /* refusal hygiene by hand -- see hand32_d3d9_surface_lock_rect */
+    if (FAILED(hr = lock_serve( &s )))
+    {
+        winecom_refused_scrub_mem( out, 2 * sizeof(UINT) );
+        return (UINT64)(UINT)hr;
+    }
 
     out[0] = (UINT)lr.Pitch;
     out[1] = (UINT)(ULONG_PTR)lr.pBits;
@@ -1771,7 +1796,12 @@ static UINT64 hand32_d3d9_volume_lock_box( void *host, UINT slot, I386_CONTEXT *
     s.slice_pitch = lb.SlicePitch;
     s.have_slice = TRUE;
     s.bits = &lb.pBits;
-    if (FAILED(hr = lock_serve( &s ))) return (UINT64)(UINT)hr;
+    /* refusal hygiene by hand -- see hand32_d3d9_surface_lock_rect */
+    if (FAILED(hr = lock_serve( &s )))
+    {
+        winecom_refused_scrub_mem( out, 3 * sizeof(UINT) );
+        return (UINT64)(UINT)hr;
+    }
 
     out[0] = (UINT)lb.RowPitch;
     out[1] = (UINT)lb.SlicePitch;
@@ -1822,7 +1852,12 @@ static UINT64 hand32_d3d9_volumetex_lock_box( void *host, UINT slot, I386_CONTEX
     s.slice_pitch = lb.SlicePitch;
     s.have_slice = TRUE;
     s.bits = &lb.pBits;
-    if (FAILED(hr = lock_serve( &s ))) return (UINT64)(UINT)hr;
+    /* refusal hygiene by hand -- see hand32_d3d9_surface_lock_rect */
+    if (FAILED(hr = lock_serve( &s )))
+    {
+        winecom_refused_scrub_mem( out, 3 * sizeof(UINT) );
+        return (UINT64)(UINT)hr;
+    }
 
     out[0] = (UINT)lb.RowPitch;
     out[1] = (UINT)lb.SlicePitch;
@@ -1892,6 +1927,8 @@ static UINT64 hand32_d3d9_buffer_lock( void *host, UINT slot, I386_CONTEXT *ctx 
                  desc[4], offset );
             memset( d, 0, sizeof(d) );
             unix_vtbl_call( host, slot + 1 /* Unlock */, 1, d );
+            /* refusal hygiene by hand -- see hand32_d3d9_surface_lock_rect */
+            winecom_refused_scrub_dw( out );
             return (UINT64)(UINT)E_NOTIMPL;
         }
         size = desc[4] - offset;
@@ -2028,7 +2065,8 @@ static HRESULT refuse_on12( const char *name )
 HRESULT WINAPI __wine_guest_Direct3DCreate9On12Ex( UINT sdk_version, void *override_list,
                                                    UINT override_entries, void **d3d9ex )
 {
-    if (d3d9ex) *d3d9ex = NULL;
+    /* refusal hygiene by hand -- see hand32_d3d9_surface_lock_rect */
+    winecom_refused_scrub_ptr( d3d9ex );
     return refuse_on12( "Direct3DCreate9On12Ex" );
 }
 

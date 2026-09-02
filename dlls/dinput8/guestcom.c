@@ -467,7 +467,16 @@ HRESULT WINAPI __wine_guest_DirectInput8Create( HINSTANCE hinst, DWORD version,
     {
         ERR( "dinput8: the guest COM runtime did not attach; refusing "
              "DirectInput8Create rather than handing out a native vtable\n" );
-        if (out) *out = NULL;
+        /* REFUSAL HYGIENE, BY HAND: a flat GUEST-IMPL wrapper owns its
+         * out-params the way scrub_refused_outs() owns a table refusal's, and
+         * an unwritten *out is stack residue the caller calls through.
+         * [MEASURED] dlls/combase/syscom.c's IMMDevice::Activate is the site
+         * that cost days.  The write goes through winecom_refused_scrub_ptr so
+         * WINEEMUNOREFUSESCRUB can take it away and the hygiene gate can prove
+         * it load-bearing.  Native failures stay untouched.  Every walker
+         * refusal in this file is on an Enum* slot, which has no out-param at
+         * all -- the callback and its pvRef are both IN. */
+        winecom_refused_scrub_ptr( out );
         return E_FAIL;
     }
     if (outer)
@@ -479,7 +488,7 @@ HRESULT WINAPI __wine_guest_DirectInput8Create( HINSTANCE hinst, DWORD version,
          * that the reason is legible if that ever changes. */
         FIXME( "dinput8: DirectInput8Create with a non-NULL punkOuter %p is "
                "refused for a guest until reverse proxies land\n", outer );
-        if (out) *out = NULL;
+        winecom_refused_scrub_ptr( out );   /* refusal hygiene by hand */
         return DIERR_NOAGGREGATION;
     }
     hr = DirectInput8Create( hinst, version, iid, out, NULL );

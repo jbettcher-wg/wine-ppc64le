@@ -395,19 +395,19 @@ static UINT64 hand_create_source_voice( void *host, UINT slot, AMD64_CONTEXT *ct
         FIXME( "xaudio2: IXAudio2::CreateSourceVoice could not give the "
                "IXAudio2VoiceCallback at %p a reverse proxy; refusing rather "
                "than handing the mixer thread an x86-64 vtable\n", cb );
-        if (out) *out = NULL;
+        winecom_refused_scrub_ptr( out );
         return (UINT64)(UINT)E_NOTIMPL;
     }
     if (sends)
     {
-        if (out) *out = NULL;
+        winecom_refused_scrub_ptr( out );
         return (UINT64)(UINT)refuse_bearing( "IXAudio2::CreateSourceVoice",
                  "its XAUDIO2_VOICE_SENDS, whose descriptors carry "
                  "IXAudio2Voice pointers", sends );
     }
     if (chain)
     {
-        if (out) *out = NULL;
+        winecom_refused_scrub_ptr( out );
         return (UINT64)(UINT)refuse_bearing( "IXAudio2::CreateSourceVoice",
                  "its XAUDIO2_EFFECT_CHAIN, whose descriptors carry IUnknown "
                  "pointers", chain );
@@ -443,14 +443,14 @@ static UINT64 hand_create_submix_voice( void *host, UINT slot, AMD64_CONTEXT *ct
     /* refusal hygiene by hand -- see CreateSourceVoice */
     if (sends)
     {
-        if (out) *out = NULL;
+        winecom_refused_scrub_ptr( out );
         return (UINT64)(UINT)refuse_bearing( "IXAudio2::CreateSubmixVoice",
                  "its XAUDIO2_VOICE_SENDS, whose descriptors carry "
                  "IXAudio2Voice pointers", sends );
     }
     if (chain)
     {
-        if (out) *out = NULL;
+        winecom_refused_scrub_ptr( out );
         return (UINT64)(UINT)refuse_bearing( "IXAudio2::CreateSubmixVoice",
                  "its XAUDIO2_EFFECT_CHAIN, whose descriptors carry IUnknown "
                  "pointers", chain );
@@ -484,7 +484,7 @@ static UINT64 hand_create_mastering_voice( void *host, UINT slot, AMD64_CONTEXT 
     /* refusal hygiene by hand -- see CreateSourceVoice */
     if (chain)
     {
-        if (out) *out = NULL;
+        winecom_refused_scrub_ptr( out );
         return (UINT64)(UINT)refuse_bearing( "IXAudio2::CreateMasteringVoice",
                  "its XAUDIO2_EFFECT_CHAIN, whose descriptors carry IUnknown "
                  "pointers", chain );
@@ -550,7 +550,7 @@ static UINT64 hand_mmdevice_activate( void *host, UINT slot, AMD64_CONTEXT *ctx 
      * whatever its stack held where *ppv was never written. */
     if (params)
     {
-        if (ppv) *ppv = NULL;
+        winecom_refused_scrub_ptr( ppv );
         return (UINT64)(UINT)refuse_bearing( "IMMDevice::Activate",
                  "its PROPVARIANT pActivationParams, whose union carries an "
                  "IUnknown pointer", params );
@@ -681,7 +681,14 @@ static UINT64 hand_nlm_get_network( void *host, UINT slot, AMD64_CONTEXT *ctx )
     void **out = (void **)(ULONG_PTR)winecom_read_arg( ctx, 2 );
     HRESULT hr;
 
-    if (!id) return (UINT64)(UINT)E_POINTER;
+    /* refusal hygiene by hand -- see CreateSourceVoice.  The GUID travels by
+     * hidden pointer from a guest that cannot pass NULL by value, so a NULL
+     * here is OUR refusal to read the aggregate, not native's answer. */
+    if (!id)
+    {
+        winecom_refused_scrub_ptr( out );
+        return (UINT64)(UINT)E_POINTER;
+    }
     hr = fn( host, *id, out );
     if (SUCCEEDED(hr) && out && *out)
         *out = winecom_wrap( *out, SYSCOM_IFACE_INetwork );
@@ -695,7 +702,12 @@ static UINT64 hand_nlm_get_network_connection( void *host, UINT slot, AMD64_CONT
     void **out = (void **)(ULONG_PTR)winecom_read_arg( ctx, 2 );
     HRESULT hr;
 
-    if (!id) return (UINT64)(UINT)E_POINTER;
+    /* refusal hygiene by hand -- see CreateSourceVoice */
+    if (!id)
+    {
+        winecom_refused_scrub_ptr( out );
+        return (UINT64)(UINT)E_POINTER;
+    }
     hr = fn( host, *id, out );
     if (SUCCEEDED(hr) && out && *out)
         *out = winecom_wrap( *out, SYSCOM_IFACE_INetworkConnection );
@@ -1035,9 +1047,9 @@ static UINT64 hand_dispatch_invoke( void *host, UINT slot, AMD64_CONTEXT *ctx )
                  * VARIANT/EXCEPINFO are the valid empty values (VT_EMPTY is
                  * 0), so an unchecked caller VariantClear()s nothing instead
                  * of a stack ghost. */
-                if (result) memset( result, 0, sizeof(*result) );
-                if (exc) memset( exc, 0, sizeof(*exc) );
-                if (arg_err) *arg_err = 0;
+                winecom_refused_scrub_mem( result, sizeof(*result) );
+                winecom_refused_scrub_mem( exc, sizeof(*exc) );
+                winecom_refused_scrub_dw( arg_err );
                 return (UINT64)(UINT)E_NOTIMPL;
             }
         use.rgvarg = args;
@@ -1084,9 +1096,16 @@ static UINT64 hand_typecomp_bind( void *host, UINT slot, AMD64_CONTEXT *ctx )
 static BOOL dmus_pmsg_in( DMUS_PMSG *msg, UINT slot )
 {
     static LONG logged;
+    void *tool, *graph, *unk;
     void *native;
 
     if (!msg) return TRUE;
+    /* refusal hygiene by hand -- see CreateSourceVoice, in the IN direction:
+     * these members are translated IN PLACE in the guest's own message, so a
+     * refusal on the SECOND or THIRD member would otherwise leave the first
+     * one holding a HOST pointer in guest-visible memory.  That is the
+     * GetShader class with the arrow reversed, so the originals go back. */
+    tool = msg->pTool; graph = msg->pGraph; unk = msg->punkUser;
     if (msg->pTool)
     {
         if (!winecom_to_native( msg->pTool, ~0u, &native )) goto refuse;
@@ -1104,6 +1123,9 @@ static BOOL dmus_pmsg_in( DMUS_PMSG *msg, UINT slot )
     }
     return TRUE;
 refuse:
+    msg->pTool = tool;
+    msg->pGraph = (struct IDirectMusicGraph *)graph;
+    msg->punkUser = unk;
     if (!InterlockedExchange( &logged, 1 ))
         FIXME( "syscom: slot %u's DMUS_PMSG carries a guest-authored object "
                "this surface cannot reverse-proxy; refusing the call\n", slot );
@@ -1192,7 +1214,12 @@ static UINT64 hand_dmus_clone_pmsg( void *host, UINT slot, AMD64_CONTEXT *ctx )
     DMUS_PMSG **out = (DMUS_PMSG **)(ULONG_PTR)winecom_read_arg( ctx, 2 );
     HRESULT hr;
 
-    if (!dmus_pmsg_in( src, slot )) return (UINT64)(UINT)E_NOTIMPL;
+    /* refusal hygiene by hand -- see CreateSourceVoice */
+    if (!dmus_pmsg_in( src, slot ))
+    {
+        winecom_refused_scrub_ptr( out );
+        return (UINT64)(UINT)E_NOTIMPL;
+    }
     hr = fn( host, src, out );
     /* the source's members are native now and its ownership stayed with the
      * guest: wrap them back, and wrap the clone's own (AddRef'd) members */
@@ -1311,8 +1338,15 @@ static UINT64 hand_dmus_parse_descriptor( void *host, UINT slot, AMD64_CONTEXT *
     void *nstream = NULL;
     HRESULT hr;
 
+    /* refusal hygiene by hand -- see CreateSourceVoice.  desc is the OUT
+     * descriptor; zeroing dwValidData (rather than the whole struct, whose
+     * dwSize the caller filled in) says NO member is valid, pStream and its
+     * would-be residue included. */
     if (stream && !winecom_to_native( stream, ~0u, &nstream ))
+    {
+        if (desc) winecom_refused_scrub_dw( &desc->dwValidData );
         return (UINT64)(UINT)E_NOTIMPL;
+    }
     hr = fn( host, nstream, desc );
     if (SUCCEEDED(hr)) dmus_desc_out_fixup( desc );
     return (UINT64)(UINT)hr;
@@ -1333,7 +1367,7 @@ static UINT64 hand_dmus_loader_getobject( void *host, UINT slot, AMD64_CONTEXT *
     /* refusal hygiene by hand -- see CreateSourceVoice */
     if (!dmus_desc_in( desc, &copy, &use, slot ))
     {
-        if (ppv) *ppv = NULL;
+        winecom_refused_scrub_ptr( ppv );
         return (UINT64)(UINT)E_NOTIMPL;
     }
     hr = fn( host, use, riid, ppv );
@@ -1536,7 +1570,14 @@ static UINT64 hand_dmus_getparam_p6( void *host, UINT slot, AMD64_CONTEXT *ctx )
     const GUID *tag = (const GUID *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
     void *pParam = (void *)(ULONG_PTR)winecom_read_arg( ctx, 6 );
 
-    if (!tag || !dmus_getparam_ok( tag )) return (UINT64)(UINT)E_NOTIMPL;
+    /* refusal hygiene by hand -- see CreateSourceVoice.  Only pmtNext: the
+     * payload's size is unknowable for the very tag being refused (the tag
+     * banner above), so it is the one out this file deliberately leaves. */
+    if (!tag || !dmus_getparam_ok( tag ))
+    {
+        winecom_refused_scrub_dw( (void *)(ULONG_PTR)winecom_read_arg( ctx, 5 ) );
+        return (UINT64)(UINT)E_NOTIMPL;
+    }
     return dmus_getparam_call( host, slot, tag, pParam,
         fn( host, tag, (DWORD)winecom_read_arg( ctx, 2 ),
             (DWORD)winecom_read_arg( ctx, 3 ),
@@ -1569,7 +1610,12 @@ static UINT64 hand_dmus_getparam_t4( void *host, UINT slot, AMD64_CONTEXT *ctx )
     const GUID *tag = (const GUID *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
     void *pParam = (void *)(ULONG_PTR)winecom_read_arg( ctx, 4 );
 
-    if (!tag || !dmus_getparam_ok( tag )) return (UINT64)(UINT)E_NOTIMPL;
+    /* refusal hygiene by hand -- see CreateSourceVoice (pmtNext only) */
+    if (!tag || !dmus_getparam_ok( tag ))
+    {
+        winecom_refused_scrub_dw( (void *)(ULONG_PTR)winecom_read_arg( ctx, 3 ) );
+        return (UINT64)(UINT)E_NOTIMPL;
+    }
     return dmus_getparam_call( host, slot, tag, pParam,
         fn( host, tag, (MUSIC_TIME)winecom_read_arg( ctx, 2 ),
             (MUSIC_TIME *)(ULONG_PTR)winecom_read_arg( ctx, 3 ), pParam ) );
@@ -1598,7 +1644,12 @@ static UINT64 hand_dmus_getparamex( void *host, UINT slot, AMD64_CONTEXT *ctx )
     const GUID *tag = (const GUID *)(ULONG_PTR)winecom_read_arg( ctx, 1 );
     void *pParam = (void *)(ULONG_PTR)winecom_read_arg( ctx, 7 );
 
-    if (!tag || !dmus_getparam_ok( tag )) return (UINT64)(UINT)E_NOTIMPL;
+    /* refusal hygiene by hand -- see CreateSourceVoice (pmtNext only) */
+    if (!tag || !dmus_getparam_ok( tag ))
+    {
+        winecom_refused_scrub_dw( (void *)(ULONG_PTR)winecom_read_arg( ctx, 6 ) );
+        return (UINT64)(UINT)E_NOTIMPL;
+    }
     return dmus_getparam_call( host, slot, tag, pParam,
         fn( host, tag, (DWORD)winecom_read_arg( ctx, 2 ),
             (DWORD)winecom_read_arg( ctx, 3 ),
@@ -1764,6 +1815,21 @@ static void local_refuse_once( UINT iface, UINT slot, const char *name,
            why ? why : "no marshal plan" );
 }
 
+/* combase runs its OWN table dispatcher for the [local] interfaces, over the
+ * same generated rows -- so its refusal exits owe the same scrub the runtime's
+ * do, and until now paid none of it (winecom's was private).  This reads the
+ * arguments back out of the trap frame exactly as the dispatcher would and
+ * hands them to the shared, lever-honouring mask scrub. */
+static void local_scrub_refused( const struct winecom_slot *sl, AMD64_CONTEXT *ctx )
+{
+    UINT64 raw[16] = { 0 };
+    UINT i;
+
+    for (i = 1; i < sl->argc && i < ARRAYSIZE(raw); i++)
+        raw[i] = winecom_read_arg( ctx, i );
+    winecom_refused_scrub_slot( sl, raw, FALSE );
+}
+
 static NTSTATUS local_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
 {
     const struct winecom_iface *itf = &syscom_com_ifaces[iface];
@@ -1781,6 +1847,7 @@ static NTSTATUS local_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
     {
         ERR( "%s slot %u called on %p, which is not one of our proxies\n",
              itf->name, slot, (void *)(ULONG_PTR)ctx->R10 );
+        local_scrub_refused( sl, ctx );
         ctx->Rax = (UINT)E_INVALIDARG;
         return STATUS_SUCCESS;
     }
@@ -1788,6 +1855,7 @@ static NTSTATUS local_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
     if (sl->refuse)
     {
         local_refuse_once( iface, slot, sl->name, sl->refuse );
+        local_scrub_refused( sl, ctx );
         ctx->Rax = (UINT)E_NOTIMPL;
         return STATUS_SUCCESS;
     }
@@ -1832,6 +1900,7 @@ static NTSTATUS local_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
                              "guest-implemented object as an in-parameter whose "
                              "interface type the generated table does not "
                              "record (no xmask bit for it)" );
+                local_scrub_refused( sl, ctx );
                 ctx->Rax = (UINT)E_NOTIMPL;
                 return STATUS_SUCCESS;
             }
@@ -1847,6 +1916,7 @@ static NTSTATUS local_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
             local_refuse_once( iface, slot, sl->name,
                          "argument class with no marshal path in combase's "
                          "[local] dispatcher" );
+            local_scrub_refused( sl, ctx );
             ctx->Rax = (UINT)E_NOTIMPL;
             return STATUS_SUCCESS;
         }
@@ -2035,15 +2105,24 @@ static HRESULT syscom_xaudio2_class_gate( REFCLSID rclsid )
     return S_OK;
 }
 
+/* Every __wine_guest_* export below opens with the same not-ready refusal --
+ * E_FAIL because this surface never attached, an error THIS side invented --
+ * so each one that has an out-param scrubs it there, and again at whatever
+ * marshal refusal it owns.  winecom_guest32() deliberately reads process
+ * state rather than attach state, so the scrub is correct before attach. */
 HRESULT WINAPI __wine_guest_CoCreateInstance( REFCLSID rclsid, IUnknown *outer,
                                               DWORD ctx, REFIID riid, void **ppv )
 {
     HRESULT hr;
 
-    if (!syscom_ready()) return E_FAIL;
+    if (!syscom_ready())
+    {
+        winecom_refused_scrub_ptr( ppv );
+        return E_FAIL;
+    }
     if ((hr = syscom_xaudio2_class_gate( rclsid )) != S_OK)
     {
-        if (ppv) *ppv = NULL;
+        winecom_refused_scrub_ptr( ppv );
         return hr;
     }
     if (outer)
@@ -2060,7 +2139,7 @@ HRESULT WINAPI __wine_guest_CoCreateInstance( REFCLSID rclsid, IUnknown *outer,
                "refused: an aggregated inner object delegates QueryInterface "
                "for arbitrary IIDs to it, which this roster cannot bound\n",
                outer );
-        if (ppv) *ppv = NULL;
+        winecom_refused_scrub_ptr( ppv );
         return CLASS_E_NOAGGREGATION;
     }
     hr = CoCreateInstance( rclsid, NULL, ctx, riid, ppv );
@@ -2083,7 +2162,12 @@ HRESULT WINAPI __wine_guest_CoGetMalloc( DWORD context, IMalloc **ppMalloc )
 {
     HRESULT hr;
 
-    if (!syscom_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see __wine_guest_CoCreateInstance */
+    if (!syscom_ready())
+    {
+        winecom_refused_scrub_ptr( ppMalloc );
+        return E_FAIL;
+    }
     hr = CoGetMalloc( context, ppMalloc );
     return __wine_com_wrap_out_iface( hr, &IID_IMalloc, (void **)ppMalloc );
 }
@@ -2094,10 +2178,15 @@ HRESULT WINAPI __wine_guest_CoGetClassObject( REFCLSID rclsid, DWORD ctx,
 {
     HRESULT hr;
 
-    if (!syscom_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see __wine_guest_CoCreateInstance */
+    if (!syscom_ready())
+    {
+        winecom_refused_scrub_ptr( ppv );
+        return E_FAIL;
+    }
     if ((hr = syscom_xaudio2_class_gate( rclsid )) != S_OK)
     {
-        if (ppv) *ppv = NULL;
+        winecom_refused_scrub_ptr( ppv );
         return hr;
     }
     hr = CoGetClassObject( rclsid, ctx, info, riid, ppv );
@@ -2109,7 +2198,12 @@ HRESULT WINAPI __wine_guest_CreateStreamOnHGlobal( HGLOBAL hglobal, BOOL delete_
 {
     HRESULT hr;
 
-    if (!syscom_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see __wine_guest_CoCreateInstance */
+    if (!syscom_ready())
+    {
+        winecom_refused_scrub_ptr( out );
+        return E_FAIL;
+    }
     hr = CreateStreamOnHGlobal( hglobal, delete_on_release, out );
     if (SUCCEEDED(hr))
         __wine_com_wrap_static( (void **)out, SYSCOM_IFACE_IStream );
@@ -2120,7 +2214,12 @@ HRESULT WINAPI __wine_guest_GetHGlobalFromStream( IStream *stream, HGLOBAL *phgl
 {
     void *host;
 
-    if (!syscom_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see __wine_guest_CoCreateInstance */
+    if (!syscom_ready())
+    {
+        winecom_refused_scrub_ptr( phglobal );
+        return E_FAIL;
+    }
     if (!__wine_com_translate_in( stream, &host ))
     {
         /* Not a direction problem and not fixed by reverse proxies: this
@@ -2131,6 +2230,7 @@ HRESULT WINAPI __wine_guest_GetHGlobalFromStream( IStream *stream, HGLOBAL *phgl
         FIXME( "syscom: GetHGlobalFromStream on the guest-implemented stream "
                "%p is refused: only a stream ole32 itself created on an HGLOBAL "
                "has one to report\n", stream );
+        winecom_refused_scrub_ptr( phglobal );
         return E_NOTIMPL;
     }
     return GetHGlobalFromStream( host, phglobal );
@@ -2429,7 +2529,16 @@ HRESULT WINAPI __wine_guest_PropVariantClear( PROPVARIANT *pvar )
 
 HRESULT WINAPI __wine_guest_PropVariantCopy( PROPVARIANT *dest, const PROPVARIANT *src )
 {
-    if (!syscom_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see __wine_guest_CoCreateInstance.  dest is
+     * a pure OUT: unlike PropVariantClear's in-out pvar (which already holds
+     * the guest's own valid value and is left alone on every refusal here),
+     * an unwritten dest is stack residue an unchecked caller PropVariantClears.
+     * Zeroed is VT_EMPTY, which clears to nothing. */
+    if (!syscom_ready())
+    {
+        winecom_refused_scrub_mem( dest, sizeof(*dest) );
+        return E_FAIL;
+    }
     if (!dest || !src) return E_INVALIDARG;
 
     if (syscom_propvt_iface( src->vt ))
@@ -2450,6 +2559,7 @@ HRESULT WINAPI __wine_guest_PropVariantCopy( PROPVARIANT *dest, const PROPVARIAN
         FIXME( "syscom: PropVariantCopy refuses vt %#x over %p: a "
                "guest-implemented object's AddRef runs guest code this "
                "wrapper cannot enter\n", src->vt, punk );
+        winecom_refused_scrub_mem( dest, sizeof(*dest) );
         return E_NOTIMPL;
     }
     if ((src->vt & VT_VECTOR) && (src->vt & VT_TYPEMASK) == VT_VARIANT)
@@ -2457,6 +2567,7 @@ HRESULT WINAPI __wine_guest_PropVariantCopy( PROPVARIANT *dest, const PROPVARIAN
         FIXME( "syscom: PropVariantCopy refuses VT_VECTOR|VT_VARIANT %p: "
                "elements could carry interface pointers and v1 does not "
                "recurse\n", src );
+        winecom_refused_scrub_mem( dest, sizeof(*dest) );
         return E_NOTIMPL;
     }
     return PropVariantCopy( dest, src );
@@ -2522,7 +2633,12 @@ HRESULT WINAPI __wine_guest_CreateErrorInfo( ICreateErrorInfo **pperrinfo )
 {
     HRESULT hr;
 
-    if (!syscom_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see __wine_guest_CoCreateInstance */
+    if (!syscom_ready())
+    {
+        winecom_refused_scrub_ptr( pperrinfo );
+        return E_FAIL;
+    }
     hr = CreateErrorInfo( pperrinfo );
     return __wine_com_wrap_out_iface( hr, &IID_ICreateErrorInfo,
                                       (void **)pperrinfo );
@@ -2532,7 +2648,12 @@ HRESULT WINAPI __wine_guest_GetErrorInfo( ULONG reserved, IErrorInfo **pperrinfo
 {
     HRESULT hr;
 
-    if (!syscom_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see __wine_guest_CoCreateInstance */
+    if (!syscom_ready())
+    {
+        winecom_refused_scrub_ptr( pperrinfo );
+        return E_FAIL;
+    }
     hr = GetErrorInfo( reserved, pperrinfo );
     /* S_FALSE = no error info pending, *pperrinfo already NULL */
     if (hr != S_OK) return hr;
@@ -2562,7 +2683,12 @@ HRESULT WINAPI __wine_guest_CoGetObjectContext( REFIID riid, void **ppv )
 {
     HRESULT hr;
 
-    if (!syscom_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see __wine_guest_CoCreateInstance */
+    if (!syscom_ready())
+    {
+        winecom_refused_scrub_ptr( ppv );
+        return E_FAIL;
+    }
     hr = CoGetObjectContext( riid, ppv );
     return __wine_com_wrap_out_iface( hr, riid, ppv );
 }
@@ -2571,7 +2697,12 @@ HRESULT WINAPI __wine_guest_CoGetCallContext( REFIID riid, void **ppv )
 {
     HRESULT hr;
 
-    if (!syscom_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see __wine_guest_CoCreateInstance */
+    if (!syscom_ready())
+    {
+        winecom_refused_scrub_ptr( ppv );
+        return E_FAIL;
+    }
     hr = CoGetCallContext( riid, ppv );
     return __wine_com_wrap_out_iface( hr, riid, ppv );
 }
@@ -2649,11 +2780,17 @@ HRESULT WINAPI __wine_guest_CoUnmarshalHresult( IStream *stm, HRESULT *phresult 
     void *host;
     HRESULT hr;
 
-    if (!syscom_ready()) return E_FAIL;
+    /* refusal hygiene by hand -- see __wine_guest_CoCreateInstance */
+    if (!syscom_ready())
+    {
+        winecom_refused_scrub_dw( phresult );
+        return E_FAIL;
+    }
     if (!winecom_to_native( stm, ~0u, &host ))
     {
         FIXME( "syscom: CoUnmarshalHresult from the guest-implemented stream "
                "%p is refused\n", stm );
+        winecom_refused_scrub_dw( phresult );
         return E_NOTIMPL;
     }
     hr = CoUnmarshalHresult( (IStream *)host, phresult );

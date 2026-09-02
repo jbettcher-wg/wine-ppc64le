@@ -177,7 +177,20 @@ static UINT64 hand_create_sound_buffer( void *host, UINT slot, AMD64_CONTEXT *ct
     IUnknown *outer = (IUnknown *)(ULONG_PTR)winecom_read_arg( ctx, 3 );
     HRESULT hr;
 
-    if (outer) return (UINT64)(UINT)refuse_aggregation( "CreateSoundBuffer", outer );
+    /* REFUSAL HYGIENE, BY HAND, because no generated scrub mask reaches a
+     * WINECOM_F_HAND row or a flat GUEST-IMPL wrapper: each owns its
+     * out-params the way scrub_refused_outs() owns a table refusal's.  An
+     * unwritten buffer cell is the caller's own stack residue, and the caller
+     * then Locks through it.  [MEASURED] dlls/combase/syscom.c's
+     * IMMDevice::Activate is the site that cost days.  The write goes through
+     * winecom_refused_scrub_ptr, which honours WINEEMUNOREFUSESCRUB so the
+     * hygiene gate can prove it load-bearing; a NATIVE DirectSound failure
+     * stays untouched. */
+    if (outer)
+    {
+        winecom_refused_scrub_ptr( out );
+        return (UINT64)(UINT)refuse_aggregation( "CreateSoundBuffer", outer );
+    }
 
     hr = fn( host, (LPCDSBUFFERDESC)(ULONG_PTR)winecom_read_arg( ctx, 1 ), out, NULL );
     if (SUCCEEDED(hr))
@@ -195,7 +208,12 @@ static UINT64 hand_create_capture_buffer( void *host, UINT slot, AMD64_CONTEXT *
     IUnknown *outer = (IUnknown *)(ULONG_PTR)winecom_read_arg( ctx, 3 );
     HRESULT hr;
 
-    if (outer) return (UINT64)(UINT)refuse_aggregation( "CreateCaptureBuffer", outer );
+    /* refusal hygiene by hand -- see hand_create_sound_buffer */
+    if (outer)
+    {
+        winecom_refused_scrub_ptr( out );
+        return (UINT64)(UINT)refuse_aggregation( "CreateCaptureBuffer", outer );
+    }
 
     hr = fn( host, (LPCDSCBUFFERDESC)(ULONG_PTR)winecom_read_arg( ctx, 1 ), out, NULL );
     if (SUCCEEDED(hr))
@@ -269,6 +287,8 @@ HRESULT WINAPI __wine_com_refuse(void)
                                         IUnknown *outer )                    \
     {                                                                        \
         HRESULT hr;                                                          \
+        /* refusal hygiene by hand -- see hand_create_sound_buffer */        \
+        winecom_refused_scrub_ptr( out );                                    \
         if (!dsound_com_ready()) return E_FAIL;                              \
         if (outer) return refuse_aggregation( #name, outer );                \
         if ((hr = name( guid, out, NULL )) == DS_OK)                         \
@@ -292,6 +312,11 @@ HRESULT WINAPI __wine_guest_DirectSoundFullDuplexCreate(
 {
     HRESULT hr;
 
+    /* refusal hygiene by hand -- see hand_create_sound_buffer.  All three
+     * cells, because DirectSound writes all three or none. */
+    winecom_refused_scrub_ptr( duplex );
+    winecom_refused_scrub_ptr( cbuf );
+    winecom_refused_scrub_ptr( rbuf );
     if (!dsound_com_ready()) return E_FAIL;
     if (outer) return refuse_aggregation( "DirectSoundFullDuplexCreate", outer );
 
