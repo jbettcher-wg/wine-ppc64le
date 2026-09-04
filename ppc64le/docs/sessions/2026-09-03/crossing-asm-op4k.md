@@ -228,6 +228,23 @@ was stale, and the hitches are not PSO creation.
 Crossing: **219 -> 202 ns** (201.7 / 202.3 / 202.5; 203.5 over 20M), gates
 green including check-rip-cache.  The day's total: 313 -> 202, -35%.
 
+## 10. Two C layers fold into the bridge-facing thunks: 202 -> 192 ns
+
+emu_view_dispatch and emu_trap_dispatch_common were two of the four C
+frames between FexBridgeEcTrampoline and call_user_mode_callback, each a
+prologue, an epilogue and an argument shuffle per crossing (8.8% + 11.6%
+of the samples as separate symbols).  FORCEINLINE'd into emu_ec_thunk and
+emu_trap_view_thunk (372 instructions, one frame), with the guest-context
+publish's once-per-process env check moved out of line so it inlines
+too.  [MEASURED] 192.0 / 191.6 / 191.1 ns; gates green including
+check-rip-cache.  Day total: **313 -> 192 ns, -39%**.
+
+Not done from the list: narrowing call_user_mode_callback's FP/VMX entry
+save.  It exists for a mid-dispatch SuspendThread's GetThreadContext, and
+the signal's own ucontext cannot stand in for it (a native callee may have
+parked a callee-saved register in its frame by then) -- the same argument
+as 2026-08-29/fpvmx-save-gate.md, unchanged by the EC path.
+
 ## 4. What is still on the table, by measured size
 
 1. **PE ntdll.dll.so still builds with `-mlongcall`** (it is a .so builtin
