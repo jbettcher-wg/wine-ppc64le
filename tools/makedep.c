@@ -4220,6 +4220,11 @@ static void output_source_one_arch( struct makefile *make, struct incl_file *sou
         {
             strarray_addall( &cflags, dll_flags );
             if (source->use_msvcrt) strarray_addall( &cflags, msvcrt_flags );
+            /* per-module flags for objects the NATIVE compiler builds (the
+             * host arch's builtins and translated archs), appended last so a
+             * module can undo a tree-wide flag it does not need; see
+             * NATIVE_EXTRACFLAGS in dlls/ntdll/Makefile.in */
+            strarray_addall( &cflags, get_expanded_make_var_array( make, "NATIVE_EXTRACFLAGS" ));
             if (!unix_lib_supported &&
                 ((make->module && is_crt_module( make->module )) ||
                  (make->testdll && is_crt_module( make->testdll ))))
