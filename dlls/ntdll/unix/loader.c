@@ -1375,18 +1375,22 @@ static void emu_publish_guest_state( int state )
     data->emu_guest_ctx_state = state;
 }
 
-static void emu_publish_guest_context( const AMD64_CONTEXT *ctx, int state )
+static void __attribute__((noinline)) emu_no_dbg_ctx_init(void)
+{
+    const char *str = getenv( "WINEEMUNODBGCTX" );
+    emu_no_dbg_ctx = (str && *str == '1');
+    if (emu_no_dbg_ctx)
+        ERR( "WINEEMUNODBGCTX: the guest register file will not be published; "
+             "a debugger attaching to this process sees the emulator's registers only\n" );
+}
+
+/* the hot path is two stores; the once-per-process env check and its ERR
+ * live out of line so this inlines into the crossing */
+static FORCEINLINE void emu_publish_guest_context( const AMD64_CONTEXT *ctx, int state )
 {
     struct thread_data *data = get_thread_data();
 
-    if (emu_no_dbg_ctx == -1)
-    {
-        const char *str = getenv( "WINEEMUNODBGCTX" );
-        emu_no_dbg_ctx = (str && *str == '1');
-        if (emu_no_dbg_ctx)
-            ERR( "WINEEMUNODBGCTX: the guest register file will not be published; "
-                 "a debugger attaching to this process sees the emulator's registers only\n" );
-    }
+    if (__builtin_expect( emu_no_dbg_ctx == -1, 0 )) emu_no_dbg_ctx_init();
     if (emu_no_dbg_ctx || !data) return;
     if (state == EMU_GUEST_TRAP)
     {
@@ -1626,7 +1630,13 @@ static void emu_teb_stack_switch( const struct emu_teb_stack *in, struct emu_teb
     emu_teb_stack_install( teb, in );
 }
 
-static NTSTATUS emu_trap_dispatch_common( AMD64_CONTEXT *ctx, void *cookie )
+/* FORCEINLINE, and emu_view_dispatch below too: these are two of the four C
+ * frames between the bridge's trampoline and call_user_mode_callback, each
+ * paying a prologue, an epilogue and an argument shuffle per crossing.
+ * Inlined into the two bridge-facing thunks they cost nothing but code
+ * size.  [MEASURED] op4k 2026-09-04: 8.8% + 11.6% of a crossing's samples
+ * sat in the two of them as separate symbols. */
+static FORCEINLINE NTSTATUS emu_trap_dispatch_common( AMD64_CONTEXT *ctx, void *cookie )
 {
     struct thread_data *data = get_thread_data();
     NTSTATUS status;
@@ -1751,7 +1761,7 @@ static inline void copy_gregs( UINT64 *dst, const UINT64 *src )
     for (i = 0; i < 16; i++) dst[i] = src[i];
 }
 
-static int emu_view_dispatch( void *thread, struct emu_trap_view *view, BOOL ec, void *cookie )
+static FORCEINLINE int emu_view_dispatch( void *thread, struct emu_trap_view *view, BOOL ec, void *cookie )
 {
     AMD64_CONTEXT shell;    /* deliberately NOT zeroed: only the groups named
                              * by ContextFlags carry values, which is exactly
