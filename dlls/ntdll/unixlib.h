@@ -115,7 +115,35 @@ struct emu_run_entry_params
      * does; see call_guest_function() in signal_ppc64.c.  NULL on every
      * other ending, where the run frees its own stack as before. */
     void      *kept_stack;
+    /* PE-side entry for the EC LEAF path: a transitioned call whose resolved
+     * row names a plain flat export that cannot make a syscall, raise, or
+     * call back into the guest (the PE side's own allowlist, thunk_leaf_
+     * exports in signal_ppc64.c, checked against the native bodies).  Such
+     * a call needs none of what call_user_mode_callback exists for -- no
+     * callback frame, no 48-register entry save, no Win32-stack switch --
+     * so the unix side CALLS this as an ordinary function, on the kernel
+     * stack it is already on, with the trap CONTEXT and the row cookie.
+     * Answers EMU_LEAF_DECLINED when it cannot serve (unresolved cell,
+     * not a leaf, something armed that wants to watch), and the caller
+     * takes the full path with nothing to undo; otherwise the status the
+     * full dispatch would have returned.  NULL: no leaf path. */
+    NTSTATUS (*leaf_dispatcher)( AMD64_CONTEXT *ctx, void *cookie );
 };
+
+/* emu_run_entry_params.leaf_dispatcher's "take the full path" answer.
+ * Customer-bit status, produced by no dispatch anywhere; same family as
+ * EMU_LEAN_RETURN_FALLBACK below. */
+#define EMU_LEAF_DECLINED ((NTSTATUS)0xE0EC0FA2)
+
+/* The ONE thing the unix side reads out of an EC row cell: its first
+ * 32-bit word is the cell's state, and equals this exactly when the row
+ * is resolved AND a leaf (signal_ppc64.c, EC_CELL_LEAF).  A pre-check, so
+ * a non-leaf row -- most crossings: every COM slot, every export that can
+ * wait -- declines the leaf path with one load and one branch instead of
+ * a call into PE code.  [MEASURED] op4k 2026-09-04: the call-and-decline
+ * was +14 ns on a non-leaf crossing (215 -> 229).  The PE side's own
+ * acquire read stays the authority; this is a hint. */
+#define EMU_EC_CELL_LEAF 5
 
 /* What emu_exception_dispatch receives: the guest state to dispatch against
  * and the record built where the fault was taken.  Two register files exist
@@ -275,7 +303,9 @@ struct emu_name_host_addr_params
  * `cell_size`-byte cell per SLOT, index-aligned with the stub array --
  * skipped slots simply own a cell nobody ever resolves): slot i's cell
  * address rides to the bridge as that stub's per-rip cookie and comes back
- * to emu_trap_dispatch on every transition.  Opaque to the unix side.
+ * to emu_trap_dispatch on every transition.  Opaque to the unix side but
+ * for its first word, the state, which the EC thunk compares against
+ * EMU_EC_CELL_LEAF (below) before trying the leaf path.
  *
  * A `count` of zero is the arming PROBE: nothing is registered, only
  * `armed` is answered, so the PE side can skip allocating cells in a

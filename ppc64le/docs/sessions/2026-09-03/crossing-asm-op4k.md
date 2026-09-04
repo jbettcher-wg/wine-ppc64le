@@ -254,6 +254,87 @@ the signal's own ucontext cannot stand in for it (a native callee may have
 parked a callee-saved register in its frame by then) -- the same argument
 as 2026-08-29/fpvmx-save-gate.md, unchanged by the EC path.
 
+## 11. The EC leaf path: 185 -> 131 ns for the exports that cannot syscall
+
+Item 4 below, built (2026-09-04).  A transitioned call whose resolved row
+names an export that cannot make a syscall, raise, or call back into the
+guest needs none of what `call_user_mode_callback` exists for: no callback
+frame, no 18 GPR + 18 FPR + 12 VR entry save, no Win32-stack switch, no PE
+dispatcher frame, no lean return.  So the unix EC thunk now calls a PE
+entry (`emu_trap_leaf`) as an ordinary function on the kernel stack it is
+already on, and that calls the export.  Three pieces:
+
+- **The class** is an allowlist by (module, export) --
+  `thunk_leaf_exports` in signal_ppc64.c -- each row checked against the
+  native body in this tree: the TEB/PEB readers (GetCurrentProcessId,
+  GetCurrentThreadId, GetCurrentProcess/Thread, GetLastError,
+  SetLastError, GetProcessHeap, IsDebuggerPresent, TlsGetValue,
+  FlsGetValue), the user_shared_data readers (GetTickCount, GetTickCount64)
+  and QueryPerformanceFrequency, on kernel32, kernelbase and ntdll.  The
+  file says why TlsSetValue, lstrlen, GetSystemTime*, QueryPerformanceCounter
+  and SwitchToThread are NOT in it.  Stamped at resolve into the cache
+  entry, published through the EC cell as a fourth state value
+  (`EC_CELL_LEAF` = 5).
+- **The decline is one load on the unix side**: the cell's state word is
+  the only thing the unix side reads out of a cell (`EMU_EC_CELL_LEAF`,
+  unixlib.h).  The first build called into PE to decline and that cost
+  every non-leaf crossing +14 ns (215 -> 229 on the new `nonleaf` bench
+  line); with the pre-check the non-leaf line is back on stock.
+- **What the leaf still does**: the crossing-log push/pop and the TRAP
+  publication (a mid-call SuspendThread reads the same shell the full path
+  publishes; a fault inside the callee is reported against this crossing),
+  the trap-ctx pair around the call, and the run-ending flag reads.  What
+  it skips, and why that is safe only for the class: the kernel-stack depth
+  check (a leaf nests nothing), the TEB stack-limit swap (a leaf probes no
+  stack and raises nothing), the callback frame (no syscall ever looks for
+  one).
+
+`bench-crossing.sh` grew a `nonleaf` line (IsProcessorFeaturePresent: a
+plain flat thunk, a trivial body, one argument, not in the class) so the
+two paths are measured side by side from the same probe.  [MEASURED],
+three interleaved rounds, stock / leaf on / leaf off by the kill switch:
+
+| line | stock | leaf on | `WINE_PPC64LE_NO_EC_LEAF=1` |
+|---|---:|---:|---:|
+| crossing (GetCurrentProcessId, a leaf) | 185.7 / 189.4 / 184.9 | **131.3 / 132.3 / 131.0** | 187.9 / 186.6 / 187.0 |
+| nonleaf (IsProcessorFeaturePresent) | 215.0 / 219.0 / 214.3 | 217.1 / 218.8 / 216.8 | 216.4 / 216.3 / 215.5 |
+
+**A leaf crossing: 185 -> 131 ns, -29%; day total for that class 313 ->
+131, -58%.**  A non-leaf crossing: unchanged inside the round-to-round
+spread.  Gates green in both modes: the new `check-ec-leaf.sh` (pid, tid,
+last-error, TLS and tick-count value checks; sabotage flips RAX on every
+leaf-served call and the kill switch must lift it -- 1999 of 2000 wrong
+under sabotage, the one being the cell-filling transition), plus
+check-ec-transition, check-lean-return-fpvr, check-lazy-ctx,
+check-rip-cache, check-cs-fastpath, check-peek-fastpath.
+(check-qpc-fastpath's "interval disagrees" leg fails on the stock tree
+too, 0.35% clock drift under ondemand; not this change.)
+
+One bug on the way, caught by check-cs-fastpath and worth its line: the
+RIP cache's seqlock copies name every field by hand, and the new `leaf`
+byte was in neither the get nor the put for one build.  The cell then took
+a stack byte for its leaf bit and served wsprintfA -- a variadic -- as a
+leaf, without its va_list.  The struct now says so next to the field.
+
+One Cyberpunk `-benchmark` leg on the leaf tree, headless weston with the
+GL renderer (`--backend=headless --renderer=gl --xwayland`; the default
+renderer gives an Xwayland vkd3d cannot present to), box quiet: ran to the
+end, rc 0, 24.29 avg / 17.46 min fps over 1607 frames, and the same two
+pre-existing err lines the stock tree's 01:26 log has (one guest thread
+ending c000001d holding fls_section, mfc140u missing for the Chroma
+plugin).  A smoke run, not an A/B: the box's legs tonight sit anywhere in
+19-24 fps by governor and load, and this one was not paired.
+
+**In games, expect nothing visible.**  The census (crossings-cp2077-
+benchmark.txt) puts the leaf-class exports that still cross at ~8k/s
+(GetLastError + SetLastError 5.1k, FlsGetValue 1.8k, TlsGetValue 0.8k,
+GetTickCount 0.2k); GetCurrentThreadId and QueryPerformanceFrequency
+already have guest-side fast bodies and never cross.  ~55 ns off 8k
+crossings a second is 0.04% of a second.  The value is structural: the
+crossing floor for an export is now the bridge's own trampoline plus ~45
+ns of wine, and the class can grow (any export proven syscall-free,
+raise-free and callback-free is one table row).
+
 ## 4. What is still on the table, by measured size
 
 1. **PE ntdll.dll.so still builds with `-mlongcall`** (it is a .so builtin
@@ -266,8 +347,11 @@ as 2026-08-29/fpvmx-save-gate.md, unchanged by the EC path.
    can read `ppc64_current_teb` directly.
 3. The JIT side: ~7 mispredicts per crossing in the dispatcher's `bctr`
    (block linking is forced off in the bridge lane -- fastppcx86 5bfad107d).
-4. Layer count: eight frames between the EC trampoline and the export for a
-   zero-argument leaf.  A resolved cell already knows sig/fp/cb/com; a leaf
-   class that skips `call_user_mode_callback`'s 48-register save and the
-   CONTEXT shell is the next structural step, and the only one that gets
-   under ~150 ns.
+4. **DONE (section 11)**: the EC leaf class skips `call_user_mode_callback`
+   and the PE dispatcher frame for exports that cannot syscall, raise or
+   call back -- 185 -> 131 ns.  Still on the table for a leaf: the
+   CONTEXT shell itself (two 128-byte gregs copies per crossing) -- a
+   leaf reads at most four GPRs and Rsp and writes Rax/Rip/Rsp, so a view
+   handler that marshals straight from the live register file would drop
+   the copies; and for every crossing, the bridge's trampoline and the
+   JIT's ~7 mispredicts per crossing (item 3).

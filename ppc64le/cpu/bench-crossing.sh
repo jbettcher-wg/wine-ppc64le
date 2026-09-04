@@ -20,7 +20,11 @@
 # GetCurrentProcessId is the measured export and guest-side QPC the clock.
 # Output (guest stdout, passed through):
 #     BENCH qpc_only_ns_per_call=...   the clock's own cost (noise check)
-#     BENCH crossing_ns_per_call=...   the number
+#     BENCH crossing_ns_per_call=...   the number: GetCurrentProcessId, an
+#                                      EC LEAF export since 2026-09-04
+#     BENCH nonleaf_ns_per_call=...    IsProcessorFeaturePresent: the
+#                                      callback-frame path every other flat
+#                                      export takes (crossing_bench.c says why)
 #
 # Exit 0 = ran and printed, 2 = could not run.
 set -u
@@ -46,6 +50,7 @@ EXPORTS
 QueryPerformanceCounter
 QueryPerformanceFrequency
 GetCurrentProcessId
+IsProcessorFeaturePresent
 GetStdHandle
 WriteFile
 ExitProcess

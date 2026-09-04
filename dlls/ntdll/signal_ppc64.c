@@ -42,6 +42,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(seh);
 WINE_DECLARE_DEBUG_CHANNEL(relay);
+WINE_DECLARE_DEBUG_CHANNEL(snoop);
 
 /* PowerPC64 has no Microsoft ABI, no PE unwind format and no .pdata producer.
  * On this port every "PE" module is in fact an ELF shared object built by
@@ -2690,6 +2691,7 @@ static ULONG_PTR emu_vkGetProcAddr( const ULONG_PTR *a, void *native )
 }
 
 void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len );
+NTSTATUS WINAPI emu_trap_leaf( AMD64_CONTEXT *ctx, void *cookie );
 
 /***********************************************************************
  *           call_guest_function
@@ -2747,6 +2749,7 @@ static ULONG_PTR call_guest_function( void *entry, void *arg )
     NTSTATUS status;
 
     params.exception_dispatcher = emu_exception_dispatch;
+    params.leaf_dispatcher = emu_trap_leaf;
     xstat_event( XSTAT_EV_NESTED_RUN, "nested guest run (call_guest_function)" );
     guest_run_depth++;
     status = WINE_UNIX_CALL( unix_emu_run_entry, &params );
@@ -8556,6 +8559,89 @@ static const struct thunk_override thunk_overrides[] =
 };
 
 /***********************************************************************
+ *           the EC leaf class
+ *
+ * A transitioned call to one of these skips the whole callback machinery:
+ * no call_user_mode_callback frame (18 GPR + 18 FPR + 12 VR saves), no
+ * Win32-stack switch, no PE dispatcher frame, no lean return -- the unix
+ * side calls emu_trap_leaf below as an ordinary function on the kernel
+ * stack it is already on, and emu_trap_leaf calls the export.  What the
+ * callback frame EXISTS for is the two things a Win32 callee may do that
+ * unix code on the kernel stack may not: make an NT syscall (the syscall
+ * dispatcher would reuse the syscall frame that still describes the unix
+ * call the emulator is running inside -- the failure the emu_trap_dispatch
+ * banner records) and raise (the dispatch walks frames and needs the
+ * Win32 stack's limits).  So membership here is a claim about the NATIVE
+ * BODY reached, and every row was checked against it in this tree:
+ *
+ *   GetCurrentProcessId/ThreadId/Process/Thread, GetLastError,
+ *   GetProcessHeap, IsDebuggerPresent: a TEB or PEB read (kernelbase
+ *   thread.c/process.c/debug.c; kernel32's own KERNEL32_* namesakes are
+ *   the same one-liners).
+ *   SetLastError: kernel32/kernelbase forward to RtlSetLastWin32Error, a
+ *   TEB store.  TlsGetValue: TEB reads plus SetLastError; the out-of-range
+ *   arm stores an error and returns.  FlsGetValue: RtlFlsGetValue reads
+ *   the TEB's FLS chunks without a lock, then set_ntstatus/SetLastError.
+ *   GetTickCount/GetTickCount64: user_shared_data reads (both modules).
+ *   QueryPerformanceFrequency: RtlQueryPerformanceFrequency, a constant.
+ *
+ * NOT here, and why, so nobody adds them by analogy: TlsSetValue (its
+ * expansion arm HeapAlloc's -- a lock, hence a possible wait), lstrlen*
+ * (__try/__except: a raise), GetSystemTimeAsFileTime (NtQuerySystemTime is
+ * a syscall), GetSystemTimePreciseAsFileTime (a unixcall goes through the
+ * syscall dispatcher's stack switch), QueryPerformanceCounter (a syscall;
+ * the guest-side fast body serves it anyway), SwitchToThread (a syscall),
+ * the SRW/condition-variable family (they wait).  Anything that takes a
+ * lock, calls into the loader, or touches a handle is out.
+ *
+ * Module names compare case-insensitively (the thunk module's BaseDllName
+ * is however the guest spelled the import; the census says KERNEL32.dll).
+ * The class is only ever READ from an EC cell (emu_trap_leaf), so the
+ * i386 lane and every trap-protocol path never see it. */
+static const struct { const WCHAR *module; const char *name; } thunk_leaf_exports[] =
+{
+    { L"kernel32.dll",   "GetCurrentProcessId" },
+    { L"kernel32.dll",   "GetCurrentThreadId" },
+    { L"kernel32.dll",   "GetCurrentProcess" },
+    { L"kernel32.dll",   "GetCurrentThread" },
+    { L"kernel32.dll",   "GetLastError" },
+    { L"kernel32.dll",   "SetLastError" },
+    { L"kernel32.dll",   "GetProcessHeap" },
+    { L"kernel32.dll",   "IsDebuggerPresent" },
+    { L"kernel32.dll",   "TlsGetValue" },
+    { L"kernel32.dll",   "FlsGetValue" },
+    { L"kernel32.dll",   "GetTickCount" },
+    { L"kernel32.dll",   "GetTickCount64" },
+    { L"kernel32.dll",   "QueryPerformanceFrequency" },
+    { L"kernelbase.dll", "GetCurrentProcessId" },
+    { L"kernelbase.dll", "GetCurrentThreadId" },
+    { L"kernelbase.dll", "GetCurrentProcess" },
+    { L"kernelbase.dll", "GetCurrentThread" },
+    { L"kernelbase.dll", "GetLastError" },
+    { L"kernelbase.dll", "SetLastError" },
+    { L"kernelbase.dll", "GetProcessHeap" },
+    { L"kernelbase.dll", "IsDebuggerPresent" },
+    { L"kernelbase.dll", "TlsGetValue" },
+    { L"kernelbase.dll", "FlsGetValue" },
+    { L"kernelbase.dll", "GetTickCount" },
+    { L"kernelbase.dll", "GetTickCount64" },
+    { L"kernelbase.dll", "QueryPerformanceFrequency" },
+    { L"ntdll.dll",      "RtlGetLastWin32Error" },
+    { L"ntdll.dll",      "RtlSetLastWin32Error" },
+    { L"ntdll.dll",      "RtlQueryPerformanceFrequency" },
+};
+
+static BOOL thunk_export_is_leaf( const WCHAR *module, const char *name )
+{
+    UINT i;
+
+    for (i = 0; i < ARRAY_SIZE(thunk_leaf_exports); i++)
+        if (!strcmp( name, thunk_leaf_exports[i].name ) &&
+            !wcsicmp( module, thunk_leaf_exports[i].module )) return TRUE;
+    return FALSE;
+}
+
+/***********************************************************************
  *           native surfaces larger than a native export table
  *
  * A trapping stub is resolved by looking its name up in the native namesake's
@@ -8936,6 +9022,20 @@ struct thunk_rip_cache_entry
                                     (i386 images sit below 4 GiB, the x86-64
                                     thunk base is 0x180000000), so this is a
                                     cross-check, not a namespace. */
+    UCHAR leaf;                  /* the EC leaf class (thunk_leaf_exports):
+                                    a plain flat export -- proc set, no
+                                    override, FP, callback or va_list -- whose
+                                    native body makes no syscall, raises
+                                    nothing and calls nothing back.  Stamped
+                                    at resolve, read only through an EC cell
+                                    by emu_trap_leaf.  A FIELD ADDED HERE MUST
+                                    BE ADDED TO thunk_rip_cache_get AND _put:
+                                    the seqlock copies name every field, and
+                                    this one was left out of both for one
+                                    build -- the cell then took a stack byte
+                                    for its leaf bit and served wsprintfA, a
+                                    variadic, without its va_list (check-cs-
+                                    fastpath caught it, 2026-09-04). */
     struct com_thunk_hit com;    /* com.dispatch NULL unless this RIP is a slot */
     UINT stat_row;               /* WINE_PPC64LE_TRAP_STATS row, or XSTAT_NO_ROW.
                                   * Here rather than in a table of its own for
@@ -9044,6 +9144,7 @@ static BOOL thunk_rip_cache_get( ULONG_PTR rip, struct thunk_rip_cache_entry *ou
     out->signs        = e->signs;
     out->geom32       = e->geom32;
     out->lane32       = e->lane32;
+    out->leaf         = e->leaf;
     out->com.dispatch = e->com.dispatch;
     out->com.iface    = e->com.iface;
     out->com.slot     = e->com.slot;
@@ -9171,6 +9272,7 @@ static void thunk_rip_cache_put( ULONG_PTR rip, const struct thunk_rip_cache_ent
     e->signs        = val->signs;
     e->geom32       = val->geom32;
     e->lane32       = val->lane32;
+    e->leaf         = val->leaf;
     e->com.dispatch = val->com.dispatch;
     e->com.iface    = val->com.iface;
     e->com.slot     = val->com.slot;
@@ -9371,7 +9473,12 @@ struct ec_row_cell
     LONG state;                      /* EC_CELL_*; release-published */
     struct thunk_rip_cache_entry e;  /* valid only once RESOLVED */
 };
-enum { EC_CELL_UNRESOLVED = 0, EC_CELL_RESOLVED = 1, EC_CELL_SLOW = 2 };
+/* RESOLVED is a bit: LEAF is RESOLVED with the leaf bit on top, the value
+ * the unix side pre-checks against (EMU_EC_CELL_LEAF, unixlib.h), so a
+ * resolved-row reader tests the bit and the leaf reader tests the value. */
+enum { EC_CELL_UNRESOLVED = 0, EC_CELL_RESOLVED = 1, EC_CELL_SLOW = 2, EC_CELL_LEAF = EMU_EC_CELL_LEAF };
+C_ASSERT( (EC_CELL_LEAF & EC_CELL_RESOLVED) && !(EC_CELL_SLOW & EC_CELL_RESOLVED) );
+C_ASSERT( offsetof( struct ec_row_cell, state ) == 0 && sizeof(((struct ec_row_cell *)0)->state) == 4 );
 
 static void ec_cell_fill( struct ec_row_cell *cell, ULONG_PTR rip )
 {
@@ -9392,7 +9499,13 @@ static void ec_cell_fill( struct ec_row_cell *cell, ULONG_PTR rip )
      * and this read) -- stay UNRESOLVED and let a later call retry. */
     if (!thunk_rip_cache_get( rip, &tmp ) || tmp.rip != rip) return;
     cell->e = tmp;
-    WriteRelease( &cell->state, EC_CELL_RESOLVED );
+    /* Not LEAF under +relay or +snoop, decided here once per cell rather
+     * than per call: either wraps the export in a stub that prints through
+     * a unixcall, and a unixcall from the kernel stack is the very frame
+     * reuse the callback frame exists to prevent.  RESOLVED still serves
+     * the row through the fast path, which traces normally. */
+    WriteRelease( &cell->state, (tmp.leaf && !TRACE_ON(relay) && !TRACE_ON(snoop))
+                                ? EC_CELL_LEAF : EC_CELL_RESOLVED );
 }
 
 
@@ -9512,6 +9625,7 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
     LIST_ENTRY *mark, *entry;
     UINT stat_row = XSTAT_NO_ROW;
     void *ret = NULL;
+    BOOL leaf = FALSE;
     ULONG_PTR magic;
 
     if (no_cache == -1) no_cache = emu_env_flag( L"WINEEMUNORIPCACHE" );
@@ -9721,6 +9835,12 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
         }
 
         ret = proc;
+        /* the leaf class, decided once here with the name in hand: only a
+         * plain flat export can be one, whatever the allowlist says */
+        leaf = proc && !*override && !*fp && !*cb_mask && !(sig & THUNK_SIG_VARIADIC) &&
+               thunk_export_is_leaf( mod->BaseDllName.Buffer, (const char *)(base + names[idx]) );
+        if (leaf) TRACE( "%s.%s is an ec leaf\n", debugstr_w(mod->BaseDllName.Buffer),
+                         (const char *)(base + names[idx]) );
         if (xstat)
         {
             char name[EMU_XSTAT_NAME];
@@ -9744,6 +9864,7 @@ static void *find_guest_thunk_target( ULONG_PTR rip, UINT *sig_out, thunk_overri
             val.fp       = *fp;
             val.widths   = *widths;
             val.signs    = *signs;
+            val.leaf     = leaf;
             thunk_rip_cache_put( rip, &val );
         }
         goto done;
@@ -10154,34 +10275,24 @@ static void __attribute__((noinline)) emu_trap_dispatch_slow( ULONG id, void *ar
  * not.  [MEASURED] op4k 2026-09-04: the prologue/epilogue stores and loads
  * were ~3% of a crossing.  Anything else falls through to the full path,
  * which also owns every TRACE, so tracing takes the full path too. */
-void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
+/* The plain-export arm, shared by the fast path and the leaf: marshal from
+ * the trap CONTEXT, call, pop the guest's return address, store RAX.  The
+ * trap-ctx pair is kept around the call even though neither caller admits
+ * an override: a fault inside the callee is reported against
+ * emu_current_trap_ctx, and a stale outer value there would name the wrong
+ * guest site.  Four thread-local ops. */
+static FORCEINLINE void call_resolved_flat_export( AMD64_CONTEXT *ctx,
+                                                   const struct thunk_rip_cache_entry *e )
 {
-    AMD64_CONTEXT *ctx = *(AMD64_CONTEXT **)args;
-    struct ec_row_cell *cell = len >= 2 * sizeof(void *) ? ((void **)args)[1] : NULL;
-    NTSTATUS (*lean_return)( NTSTATUS, TEB * ) =
-        len >= 3 * sizeof(void *) ? (NTSTATUS (*)( NTSTATUS, TEB * ))((void **)args)[2] : NULL;
-    const struct thunk_rip_cache_entry *e;
-    AMD64_CONTEXT *prev_trap_ctx;
-    BOOL prev_ctx_rewritten;
+    AMD64_CONTEXT *prev_trap_ctx = emu_current_trap_ctx;
+    BOOL prev_ctx_rewritten = emu_trap_ctx_rewritten;
     ULONG_PTR a[THUNK_MAX_ARGS] = { 0 };
     ULONG_PTR ret;
-    NTSTATUS status, lr;
-    UINT sig;
+    UINT sig = e->sig;
 
-    if (!cell || !lean_return || xstat || TRACE_ON(seh) ||
-        ReadAcquire( &cell->state ) != EC_CELL_RESOLVED)
-        goto full;
-    e = &cell->e;
-    if (e->com.dispatch || e->override || e->fp || e->cb_mask || !e->proc ||
-        (e->sig & THUNK_SIG_VARIADIC))
-        goto full;
-
-    prev_trap_ctx = emu_current_trap_ctx;
-    prev_ctx_rewritten = emu_trap_ctx_rewritten;
     emu_current_trap_ctx = ctx;
     emu_trap_ctx_rewritten = FALSE;
 
-    sig = e->sig;
     marshal_thunk_args( ctx, THUNK_SIG_ARGC(sig), THUNK_SIG_NARROW(sig), e->widths, e->signs, a );
     ret = call_native_thunk( e->proc, a );
     if (!emu_trap_ctx_rewritten)
@@ -10193,10 +10304,64 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
 
     emu_current_trap_ctx = prev_trap_ctx;
     emu_trap_ctx_rewritten = prev_ctx_rewritten;
+}
 
-    status = STATUS_SUCCESS;
-    if (guest_exit_requested) status = STATUS_THREAD_IS_TERMINATING;
-    else if (guest_exc_pending || guest_unwind_run_end) status = STATUS_EMU_GUEST_EXCEPTION;
+/* how a dispatch ends its run, in one place; see the full path's tail */
+static FORCEINLINE NTSTATUS trap_dispatch_run_status(void)
+{
+    if (guest_exit_requested) return STATUS_THREAD_IS_TERMINATING;
+    if (guest_exc_pending || guest_unwind_run_end) return STATUS_EMU_GUEST_EXCEPTION;
+    return STATUS_SUCCESS;
+}
+
+/***********************************************************************
+ *           emu_trap_leaf
+ *
+ * The EC leaf path (thunk_leaf_exports has the class and the argument).
+ * Called by the unix side's EC thunk as an ORDINARY FUNCTION, on the kernel
+ * stack, before it builds any callback frame: no call_user_mode_callback,
+ * no Win32-stack switch, no PE dispatcher frame, no lean return.  Serves
+ * exactly the fast path's shape -- a resolved cell, a plain flat export,
+ * nothing armed that wants to watch -- narrowed to the rows stamped `leaf`
+ * at resolve.  Every decline is answered before anything is touched, so
+ * the caller falls through to the full path with nothing to undo.
+ *
+ * What is deliberately NOT done here, and is safe to skip only because of
+ * the class: no kernel-stack depth check (a leaf nests nothing), no TEB
+ * stack-limit swap (a leaf probes no stack and raises nothing), no
+ * callback frame (a leaf makes no syscall, so the syscall dispatcher never
+ * looks for one).  The run-ending flags are still read: they can be set
+ * before this crossing and a thread spinning on leaf calls must still see
+ * them on this crossing, as it would on any other. */
+NTSTATUS WINAPI emu_trap_leaf( AMD64_CONTEXT *ctx, void *cookie )
+{
+    struct ec_row_cell *cell = cookie;
+
+    if (!cell || xstat || TRACE_ON(seh) || ReadAcquire( &cell->state ) != EC_CELL_LEAF)
+        return EMU_LEAF_DECLINED;
+    call_resolved_flat_export( ctx, &cell->e );
+    return trap_dispatch_run_status();
+}
+
+void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
+{
+    AMD64_CONTEXT *ctx = *(AMD64_CONTEXT **)args;
+    struct ec_row_cell *cell = len >= 2 * sizeof(void *) ? ((void **)args)[1] : NULL;
+    NTSTATUS (*lean_return)( NTSTATUS, TEB * ) =
+        len >= 3 * sizeof(void *) ? (NTSTATUS (*)( NTSTATUS, TEB * ))((void **)args)[2] : NULL;
+    const struct thunk_rip_cache_entry *e;
+    NTSTATUS status, lr;
+
+    if (!cell || !lean_return || xstat || TRACE_ON(seh) ||
+        !(ReadAcquire( &cell->state ) & EC_CELL_RESOLVED))
+        goto full;
+    e = &cell->e;
+    if (e->com.dispatch || e->override || e->fp || e->cb_mask || !e->proc ||
+        (e->sig & THUNK_SIG_VARIADIC))
+        goto full;
+
+    call_resolved_flat_export( ctx, e );
+    status = trap_dispatch_run_status();
 
     lr = lean_return( status, NtCurrentTeb() );
     if (lr != EMU_LEAN_RETURN_FALLBACK) RtlRaiseStatus( STATUS_INTERNAL_ERROR );
@@ -10237,7 +10402,7 @@ static void __attribute__((noinline)) emu_trap_dispatch_slow( ULONG id, void *ar
     emu_current_trap_ctx = ctx;
     emu_trap_ctx_rewritten = FALSE;
 
-    if (cell && ReadAcquire( &cell->state ) == EC_CELL_RESOLVED)
+    if (cell && (ReadAcquire( &cell->state ) & EC_CELL_RESOLVED))
     {
         /* the warm transition: this stub's row, read in place (a resolved
          * cell is immutable -- see the ec_row_cell note), no lookup at all.
@@ -10896,6 +11061,7 @@ void WINAPI RtlUserThreadStart( PRTL_THREAD_START_ROUTINE entry, void *arg )
             NTSTATUS status;
 
             params.exception_dispatcher = emu_exception_dispatch;
+            params.leaf_dispatcher = emu_trap_leaf;
 
             /* The first thread to run guest code is the one that ran the main
              * image: a guest cannot create a thread before its own entry point

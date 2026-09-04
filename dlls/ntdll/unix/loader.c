@@ -1025,6 +1025,22 @@ static NTSTATUS unwind_builtin_dll( void *args )
  */
 static void (*p_emu_trap_dispatcher)( ULONG id, void *args, ULONG len );
 
+/* The EC leaf path's PE entry (emu_trap_leaf, signal_ppc64.c; the class is
+ * thunk_leaf_exports there).  Installed with the trap dispatcher, only
+ * when EC arms, and NULL under WINE_PPC64LE_NO_EC_LEAF=1 -- the kill
+ * switch, which puts every transitioned call back on the callback frame.
+ * emu_trap_dispatch_common calls it before building any frame. */
+static NTSTATUS (*p_emu_trap_leaf)( AMD64_CONTEXT *ctx, void *cookie );
+
+/* WINE_PPC64LE_EC_LEAF_SABOTAGE=1, sampled at arming: a served leaf call's
+ * RAX is flipped on the way back, so every leaf-served export answers
+ * garbage.  The negative control that proves the leaf path is live AND
+ * load-bearing: with it armed a value gate (check-ec-leaf.sh's pid and
+ * last-error round trips) must go visibly wrong, and NO_EC_LEAF must
+ * restore it -- which proves the kill switch reroutes rather than
+ * decorates. */
+static int emu_ec_leaf_sabotage;
+
 static int  (*p_fexbridge_run_entry)( void *entry, void *arg,
                                      ULONGLONG *rax, /* same width as the
                                      bridge's unsigned long long on LP64 */
@@ -1636,7 +1652,7 @@ static void emu_teb_stack_switch( const struct emu_teb_stack *in, struct emu_teb
  * Inlined into the two bridge-facing thunks they cost nothing but code
  * size.  [MEASURED] op4k 2026-09-04: 8.8% + 11.6% of a crossing's samples
  * sat in the two of them as separate symbols. */
-static FORCEINLINE NTSTATUS emu_trap_dispatch_common( AMD64_CONTEXT *ctx, void *cookie )
+static FORCEINLINE NTSTATUS emu_trap_dispatch_common( AMD64_CONTEXT *ctx, void *cookie, BOOL ec )
 {
     struct thread_data *data = get_thread_data();
     NTSTATUS status;
@@ -1663,6 +1679,28 @@ static FORCEINLINE NTSTATUS emu_trap_dispatch_common( AMD64_CONTEXT *ctx, void *
      * would name the last trap's RIP as the current one. */
     emu_publish_guest_context( ctx, EMU_GUEST_TRAP );
 
+    /* The EC leaf path, tried FIRST and before any frame exists: a
+     * transitioned call whose cell names a leaf export (thunk_leaf_exports,
+     * signal_ppc64.c) is served by an ordinary call into PE code on this
+     * very stack -- no callback frame, no 48-register save, no Win32-stack
+     * switch, no PE dispatcher frame, no lean return.  The crossing log and
+     * the TRAP publication above still cover it: a mid-call suspend reads
+     * the same shell the full path would publish, and a fault inside the
+     * callee (a bug, by the class's definition) is reported against this
+     * crossing.  A decline touches nothing, so the full path below runs
+     * exactly as before -- and a non-leaf row declines HERE, on the
+     * cell's state word (EMU_EC_CELL_LEAF), before any call into PE code:
+     * the call-and-decline was +14 ns on every COM slot [MEASURED, the
+     * unixlib.h note].  Only the EC thunk has a cookie, so the CONTEXT and
+     * view trap protocols never get here with ec set. */
+    if (ec && cookie && p_emu_trap_leaf && *(const volatile LONG *)cookie == EMU_EC_CELL_LEAF &&
+        (status = p_emu_trap_leaf( ctx, cookie )) != EMU_LEAF_DECLINED)
+    {
+        if (__builtin_expect( emu_ec_leaf_sabotage, 0 )) ctx->Rax = ~ctx->Rax;
+        emu_crossing_pop( data );
+        goto served;
+    }
+
     /* everything below this line is native code on the native stack */
     emu_teb_stack_install( data->teb, &emu_native_teb_stack );
     status = call_emu_trap_dispatcher_inline( data, p_emu_trap_dispatcher, ctx, cookie );
@@ -1678,6 +1716,7 @@ static FORCEINLINE NTSTATUS emu_trap_dispatch_common( AMD64_CONTEXT *ctx, void *
      * with no switch it holds exactly what the snapshot does. */
     emu_teb_stack_install( data->teb, &emu_guest_teb_stack );
 
+served:
     emu_publish_guest_state( EMU_GUEST_RUNNING );
 
     if (status == STATUS_THREAD_IS_TERMINATING) emu_thread_exit_requested = TRUE;
@@ -1700,7 +1739,7 @@ static FORCEINLINE NTSTATUS emu_trap_dispatch_common( AMD64_CONTEXT *ctx, void *
 static int emu_trap_thunk( void *thread, void *ctx, void *user )
 {
     /* FEXBRIDGE_TRAP_CONTINUE / _EXIT */
-    return emu_trap_dispatch_common( ctx, NULL ) ? 1 : 0;
+    return emu_trap_dispatch_common( ctx, NULL, FALSE ) ? 1 : 0;
 }
 
 /* mirror of FEXBRIDGE_TRAP_VIEW (fexbridge.h, bridge ABI 6; the header is
@@ -1798,7 +1837,7 @@ static FORCEINLINE int emu_view_dispatch( void *thread, struct emu_trap_view *vi
         memset( &shell.FltSave, 0xDD, sizeof(shell.FltSave) );
     }
 
-    status = emu_trap_dispatch_common( &shell, cookie );
+    status = emu_trap_dispatch_common( &shell, cookie, ec );
 
     /* Write-back, unconditional and on EVERY status: under the CONTEXT
      * protocol the bridge's after-trap load applies the callback's CONTEXT
@@ -2548,6 +2587,27 @@ static NTSTATUS unixcall_emu_run_entry( void *args )
                                      "garbage for argument 0, which is what the gate's "
                                      "negative control requires\n" );
                             emu_ec_armed = TRUE;
+
+                            /* The leaf path rides on EC (it needs the per-rip
+                             * cookie) and on the PE side offering it. */
+                            str = getenv( "WINE_PPC64LE_NO_EC_LEAF" );
+                            if (str && *str == '1')
+                                ERR( "WINE_PPC64LE_NO_EC_LEAF: every transitioned call "
+                                     "takes the callback frame; the ec leaf path is off\n" );
+                            else if (params->leaf_dispatcher)
+                            {
+                                p_emu_trap_leaf = params->leaf_dispatcher;
+                                str = getenv( "WINE_PPC64LE_EC_LEAF_SABOTAGE" );
+                                emu_ec_leaf_sabotage = (str && *str == '1');
+                                if (emu_ec_leaf_sabotage)
+                                    ERR( "SABOTAGE: every leaf-served call answers ~RAX, "
+                                         "which is what the gate's negative control "
+                                         "requires\n" );
+                                /* bridge-banner style, once per process; the
+                                 * line check-ec-leaf.sh asserts on */
+                                fprintf( stderr, "wine-emu: ec leaf path live: leaf exports "
+                                         "skip the callback frame\n" );
+                            }
                         }
                     }
                 }

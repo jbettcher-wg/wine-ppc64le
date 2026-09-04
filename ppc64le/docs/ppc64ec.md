@@ -79,6 +79,10 @@
 > profile names next, and the i386 lane stays on traps by measurement.
 > Kill switches: `WINE_PPC64LE_NO_TRAP_VIEW=1`,
 > `WINE_PPC64LE_NO_EC=1`, `WINE_PPC64LE_NO_LEAN_RETURN=1`,
+> `WINE_PPC64LE_NO_EC_LEAF=1` (the leaf class, 2026-09-04: exports that
+> cannot syscall/raise/call back skip the callback frame entirely --
+> `2026-09-03/crossing-asm-op4k.md` section 11; its sabotage is
+> `WINE_PPC64LE_EC_LEAF_SABOTAGE=1`, gate `check-ec-leaf.sh`),
 > `WINEEMUNOCOMFP=1`, `FEXBRIDGE_EAGER_CTX=1`.  Gates:
 > `check-ec-transition.sh`, `check-rip-cache.sh` 4b, `check-mf-smoke`
 > step 13/control d (the FP ARGUMENT direction) and

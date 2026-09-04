@@ -37,6 +37,7 @@ typedef unsigned int u32;
 int __stdcall QueryPerformanceCounter( u64 *count );
 int __stdcall QueryPerformanceFrequency( u64 *freq );
 u32 __stdcall GetCurrentProcessId( void );
+int __stdcall IsProcessorFeaturePresent( u32 feature );
 void *__stdcall GetStdHandle( u32 which );
 int __stdcall WriteFile( void *h, const void *buf, u32 len, u32 *written, void *ov );
 void __stdcall ExitProcess( u32 code );
@@ -111,6 +112,23 @@ void mainCRTStartup( void )
     for (i = 0; i < N_CROSS; i++) sink += GetCurrentProcessId();
     QueryPerformanceCounter( &t1 );
     report( "crossing", t0, t1, freq, N_CROSS );
+
+    /* The NON-LEAF reference, added with the EC leaf path (2026-09-04):
+     * GetCurrentProcessId is in thunk_leaf_exports, so from that day the
+     * "crossing" line above measures the leaf path and this line measures
+     * the callback-frame path every other flat export still takes.
+     * IsProcessorFeaturePresent is chosen the same way: a plain flat
+     * thunk (no guest fast body), a trivial native body (one
+     * user_shared_data read), one integer argument, a stable answer -- and
+     * NOT a leaf, so it declines the leaf try and pays the full path.  The
+     * difference between the two lines is what the leaf class saves; the
+     * change in this line across trees is what the leaf TRY costs a call
+     * that declines it. */
+    for (i = 0; i < WARM; i++) sink += IsProcessorFeaturePresent( 6 );
+    QueryPerformanceCounter( &t0 );
+    for (i = 0; i < N_CROSS; i++) sink += IsProcessorFeaturePresent( 6 );
+    QueryPerformanceCounter( &t1 );
+    report( "nonleaf", t0, t1, freq, N_CROSS );
 
     /* keep `sink` observable so no future optimizer deletes the loops */
     ExitProcess( sink ? 0 : 0 );
