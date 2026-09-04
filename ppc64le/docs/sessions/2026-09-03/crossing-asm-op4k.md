@@ -239,6 +239,15 @@ publish's once-per-process env check moved out of line so it inlines
 too.  [MEASURED] 192.0 / 191.6 / 191.1 ns; gates green including
 check-rip-cache.  Day total: **313 -> 192 ns, -39%**.
 
+**And the trap entry itself folds in** (call_emu_trap_dispatcher_inline in
+unix_private.h, with struct syscall_frame lifted there and the refusal,
+the missing-dispatcher error and the two levers out of line in
+signal_ppc64.c): emu_ec_thunk is one 444-instruction frame from the
+bridge trampoline to the stack switch.  [MEASURED] 184.0-188.5 vs
+191.6-193.3 back to back, ~-3.5%.  **Day total: 313 -> 185 ns, -41%.**
+Three Cyberpunk legs on the final tree, ondemand and streaming: 19.44 /
+19.56 / 19.56 -- the ondemand band, unchanged.
+
 Not done from the list: narrowing call_user_mode_callback's FP/VMX entry
 save.  It exists for a mid-dispatch SuspendThread's GetThreadContext, and
 the signal's own ucontext cannot stand in for it (a native callee may have
