@@ -232,7 +232,8 @@
 @ stdcall -syscall NtCreateTransaction(ptr long ptr ptr long long long long ptr ptr)
 @ stdcall -syscall NtCreateUserProcess(ptr ptr long long ptr ptr long long ptr ptr ptr)
 # @ stub NtCreateWaitablePort
-@ stdcall -arch=i386,ppc64 NtCurrentTeb()
+@ stdcall -arch=i386 NtCurrentTeb()
+@ stdcall -arch=ppc64 NtCurrentTeb() __wine_ppc64_NtCurrentTeb
 @ stdcall -syscall NtDebugActiveProcess(long long)
 @ stdcall -syscall NtDebugContinue(long ptr long)
 @ stdcall -syscall=0x0034 NtDelayExecution(long ptr)
@@ -1786,6 +1787,7 @@
 @ stdcall __wine_ctrl_routine(ptr)
 @ cdecl -arch=ppc64 __wine_emu_materialize_ctx(ptr)
 @ cdecl -private -arch=ppc64 __wine_init_teb(ptr)
+@ cdecl -arch=ppc64 __wine_ppc64_teb_tls_offset()
 @ cdecl -arch=ppc64 __wine_guest__initterm(ptr ptr)
 @ cdecl -arch=ppc64 __wine_guest__initterm_e(ptr ptr)
 @ cdecl -arch=ppc64 __wine_guest_InitSecurityInterfaceW()

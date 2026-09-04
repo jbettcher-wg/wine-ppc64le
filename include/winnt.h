@@ -2868,6 +2868,29 @@ static FORCEINLINE struct _TEB * WINAPI NtCurrentTeb(void)
     __asm__("movq %%gs:0x30,%0" : "=r" (teb));
     return teb;
 }
+#elif defined(__powerpc64__) && defined(__GNUC__)
+/* No register to steal on this port: the TEB lives in an initial-exec
+ * thread-local of ntdll.dll.so, at a fixed offset from the thread pointer
+ * (r13) for the life of the process.  ntdll exports that offset once;
+ * every module keeps its own hidden copy (libs/winecrt0/teb_ppc64.c) and
+ * fills it on first use, so a TEB read is two loads and a predicted branch
+ * instead of a call through an import thunk.  [MEASURED] op4k 2026-09-03:
+ * the call was 3.4% of a guest->native crossing in kernelbase's body. */
+/* one hidden copy per module: a weak tentative definition in every unit
+ * that includes this header, merged by the linker within the module and
+ * never exported from it -- so no module has to link a runtime object for
+ * it, and code that runs before any entry point still finds it (zero, then
+ * filled). */
+__attribute__((weak, visibility("hidden"))) __int64 __wine_ppc64_teb_offset;
+NTSYSAPI __int64 CDECL __wine_ppc64_teb_tls_offset(void);
+static FORCEINLINE struct _TEB * WINAPI NtCurrentTeb(void)
+{
+    __int64 off = __wine_ppc64_teb_offset;
+    char *tp;
+    if (__builtin_expect( !off, 0 )) off = __wine_ppc64_teb_offset = __wine_ppc64_teb_tls_offset();
+    __asm__( "mr %0,13" : "=r" (tp) );
+    return *(struct _TEB **)(tp + off);
+}
 #elif defined(__x86_64__) && defined(_MSC_VER)
 unsigned __int64 __readgsqword(unsigned long);
 #pragma intrinsic(__readgsqword)

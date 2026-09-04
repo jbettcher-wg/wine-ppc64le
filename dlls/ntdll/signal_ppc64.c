@@ -163,10 +163,26 @@ __attribute__((visibility("hidden"))) __thread TEB *ppc64_current_teb
  * large variable here. */
 #define EMU_THREAD_VAR __thread __attribute__((tls_model("initial-exec")))
 
-#undef NtCurrentTeb   /* ntdll_misc.h reads the variable inline; this is the export */
-TEB * WINAPI NtCurrentTeb(void)
+/* the export every other module's winnt.h inline falls back to until it has
+ * the offset below; ntdll's own code reads the variable (ntdll_misc.h) */
+TEB * WINAPI __wine_ppc64_NtCurrentTeb(void)
 {
     return ppc64_current_teb;
+}
+
+/***********************************************************************
+ *           __wine_ppc64_teb_tls_offset
+ *
+ * The offset of ppc64_current_teb from the thread pointer.  Initial-exec
+ * thread-locals sit at a fixed offset from r13 in every thread for the life
+ * of the process, so one answer serves a module for good; winnt.h's inline
+ * NtCurrentTeb asks once per module and reads r13 + offset from then on.
+ */
+__int64 CDECL __wine_ppc64_teb_tls_offset(void)
+{
+    char *tp;
+    __asm__( "mr %0,13" : "=r" (tp) );
+    return (char *)&ppc64_current_teb - tp;
 }
 
 /***********************************************************************
@@ -10101,7 +10117,7 @@ static void marshal_thunk_args_fp( const AMD64_CONTEXT *ctx, UINT argc, UINT nar
 }
 
 
-static ULONG_PTR call_native_thunk( void *proc, const ULONG_PTR *a )
+static FORCEINLINE ULONG_PTR call_native_thunk( void *proc, const ULONG_PTR *a )
 {
     return ((ULONG_PTR (*)( ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR,
                             ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR, ULONG_PTR,
@@ -10126,7 +10142,72 @@ static ULONG_PTR call_native_thunk( void *proc, const ULONG_PTR *a )
  * stack under the emulator -- measured as a glibc stack-protector abort
  * followed by "Exception frame is not in stack limits".
  */
+static void __attribute__((noinline)) emu_trap_dispatch_slow( ULONG id, void *args, ULONG len );
+
+/* The leaf fast path: a resolved EC cell naming a plain flat export -- no COM
+ * slot, no override, no FP, no callback argument, not variadic -- with the
+ * lean return in hand and nothing armed that wants to watch.  It mirrors the
+ * plain-export arm of the full dispatcher below, instruction for instruction
+ * in effect, in a function small enough to keep its state in volatile
+ * registers: the full body is 2,800 instructions and saves sixteen
+ * non-volatile GPRs on entry for every trap, whether the trap needs them or
+ * not.  [MEASURED] op4k 2026-09-04: the prologue/epilogue stores and loads
+ * were ~3% of a crossing.  Anything else falls through to the full path,
+ * which also owns every TRACE, so tracing takes the full path too. */
 void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
+{
+    AMD64_CONTEXT *ctx = *(AMD64_CONTEXT **)args;
+    struct ec_row_cell *cell = len >= 2 * sizeof(void *) ? ((void **)args)[1] : NULL;
+    NTSTATUS (*lean_return)( NTSTATUS, TEB * ) =
+        len >= 3 * sizeof(void *) ? (NTSTATUS (*)( NTSTATUS, TEB * ))((void **)args)[2] : NULL;
+    const struct thunk_rip_cache_entry *e;
+    AMD64_CONTEXT *prev_trap_ctx;
+    BOOL prev_ctx_rewritten;
+    ULONG_PTR a[THUNK_MAX_ARGS] = { 0 };
+    ULONG_PTR ret;
+    NTSTATUS status, lr;
+    UINT sig;
+
+    if (!cell || !lean_return || xstat || TRACE_ON(seh) ||
+        ReadAcquire( &cell->state ) != EC_CELL_RESOLVED)
+        goto full;
+    e = &cell->e;
+    if (e->com.dispatch || e->override || e->fp || e->cb_mask || !e->proc ||
+        (e->sig & THUNK_SIG_VARIADIC))
+        goto full;
+
+    prev_trap_ctx = emu_current_trap_ctx;
+    prev_ctx_rewritten = emu_trap_ctx_rewritten;
+    emu_current_trap_ctx = ctx;
+    emu_trap_ctx_rewritten = FALSE;
+
+    sig = e->sig;
+    marshal_thunk_args( ctx, THUNK_SIG_ARGC(sig), THUNK_SIG_NARROW(sig), e->widths, e->signs, a );
+    ret = call_native_thunk( e->proc, a );
+    if (!emu_trap_ctx_rewritten)
+    {
+        ctx->Rip = *(DWORD64 *)(ULONG_PTR)ctx->Rsp;
+        ctx->Rsp += 8;
+        ctx->Rax = ret;
+    }
+
+    emu_current_trap_ctx = prev_trap_ctx;
+    emu_trap_ctx_rewritten = prev_ctx_rewritten;
+
+    status = STATUS_SUCCESS;
+    if (guest_exit_requested) status = STATUS_THREAD_IS_TERMINATING;
+    else if (guest_exc_pending || guest_unwind_run_end) status = STATUS_EMU_GUEST_EXCEPTION;
+
+    lr = lean_return( status, NtCurrentTeb() );
+    if (lr != EMU_LEAN_RETURN_FALLBACK) RtlRaiseStatus( STATUS_INTERNAL_ERROR );
+    status = NtCallbackReturn( NULL, 0, status );
+    RtlRaiseStatus( status );
+
+full:
+    emu_trap_dispatch_slow( id, args, len );
+}
+
+static void __attribute__((noinline)) emu_trap_dispatch_slow( ULONG id, void *args, ULONG len )
 {
     AMD64_CONTEXT *ctx = *(AMD64_CONTEXT **)args;
     /* the second pointer of the args block is the EC registration's cookie:
