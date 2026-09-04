@@ -271,6 +271,10 @@ static BOOL com_runtime_init( void )
 {
     LONG state;
 
+    /* The steady state first, on a plain acquire load: every dispatch comes
+     * through here, and on POWER the CAS below is a full sync plus a
+     * lwarx/stwcx. pair plus an isync -- 6% of a game's render thread. */
+    if (ReadAcquire( &com_init_state ) == 2) return TRUE;
     while ((state = InterlockedCompareExchange( &com_init_state, 1, 0 )))
     {
         if (state == 2) return TRUE;

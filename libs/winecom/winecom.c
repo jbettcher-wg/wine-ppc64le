@@ -108,7 +108,13 @@ C_ASSERT( offsetof(struct com_proxy, jr_pos)  == 0x30 );
 C_ASSERT( offsetof(struct com_proxy, jr_cap)  == 0x38 );
 #endif
 
-#define INTERN_BUCKETS 256
+/* The intern table grows with the proxy count (a game at play interns tens
+ * of thousands of proxies; a fixed 256-way table gave 100-node chains under
+ * wc_cs on every interface argument of every call).  Power-of-two bucket
+ * count, doubled whenever the load factor passes one; the array starts on a
+ * static 256 and moves to the heap on the first grow.  Bucket numbers are
+ * therefore only meaningful UNDER wc_cs -- compute them there. */
+#define INTERN_BUCKETS_INIT 256
 
 /* THE intern lock, shared with reverse.c through winecom_private.h: a proxy of
  * either direction can be created while the other kind is being looked up -- a
@@ -123,7 +129,42 @@ static CRITICAL_SECTION_DEBUG com_cs_debug =
 };
 CRITICAL_SECTION wc_cs = { &com_cs_debug, -1, 0, 0, 0, 0 };
 
-static struct com_proxy *intern[INTERN_BUCKETS];
+static struct com_proxy *intern_static[INTERN_BUCKETS_INIT];
+static struct com_proxy **intern = intern_static;
+static UINT intern_mask = INTERN_BUCKETS_INIT - 1;   /* buckets - 1 */
+static UINT intern_count;                             /* proxies interned */
+
+static inline UINT intern_bucket( const void *host )   /* wc_cs held */
+{
+    ULONG_PTR h = (ULONG_PTR)host >> 4;
+    h ^= h >> 17;
+    h *= (ULONG_PTR)0x9E3779B1u;
+    h ^= h >> 13;
+    return (UINT)h & intern_mask;
+}
+
+static void intern_grow(void)   /* wc_cs held */
+{
+    UINT old_buckets = intern_mask + 1, buckets = old_buckets * 2, i;
+    struct com_proxy **table, *p, *next;
+
+    if (!(table = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, HEAP_ZERO_MEMORY,
+                                   buckets * sizeof(*table) )))
+        return;   /* chains just stay longer; tried again at the next insert */
+    intern_mask = buckets - 1;
+    for (i = 0; i < old_buckets; i++)
+        for (p = intern[i]; p; p = next)
+        {
+            UINT b = intern_bucket( p->host );
+            next = p->next;
+            p->next = table[b];
+            table[b] = p;
+        }
+    if (intern != intern_static)
+        RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, intern );
+    intern = table;
+    TRACE( "intern table grown to %u buckets for %u proxies\n", buckets, intern_count );
+}
 
 const struct winecom_surface *wc_surface;
 
@@ -2444,7 +2485,7 @@ UINT winecom_iface_from_iid( const GUID *riid )
 
 void *winecom_wrap( void *host, UINT iface )
 {
-    UINT bucket = (UINT)(((ULONG_PTR)host >> 4) % INTERN_BUCKETS);
+    UINT bucket;
     struct com_proxy *p;
     void *guest;
 
@@ -2464,7 +2505,6 @@ void *winecom_wrap( void *host, UINT iface )
                    wc_surface->ifaces[iface].name, host,
                    wc_surface->ifaces[up].name );
             iface = up;
-            bucket = (UINT)(((ULONG_PTR)host >> 4) % INTERN_BUCKETS);
         }
     }
 
@@ -2492,6 +2532,7 @@ void *winecom_wrap( void *host, UINT iface )
         return host;
     }
     RtlEnterCriticalSection( &wc_cs );
+    bucket = intern_bucket( host );
     for (p = intern[bucket]; p; p = p->next)
         if (p->host == host && p->iface == iface) break;
     if (p)
@@ -2538,6 +2579,11 @@ void *winecom_wrap( void *host, UINT iface )
             p->jr_cap = JOURNAL_RING_SIZE;
         }
     }
+    if (++intern_count > intern_mask + 1)
+    {
+        intern_grow();
+        bucket = intern_bucket( host );
+    }
     p->next = intern[bucket];
     intern[bucket] = p;
     RtlLeaveCriticalSection( &wc_cs );
@@ -2580,10 +2626,9 @@ static struct com_proxy *proxy_from_pointer( void *ptr )
             if (guest32 ? (ULONG_PTR)vtbl32s[i] == vtbl
                         : (const void *)guest_vtbls[i] == cand->guest_vtbl)
             {
-                UINT bucket = (UINT)(((ULONG_PTR)cand->host >> 4) % INTERN_BUCKETS);
                 struct com_proxy *p;
                 RtlEnterCriticalSection( &wc_cs );
-                for (p = intern[bucket]; p; p = p->next)
+                for (p = intern[intern_bucket( cand->host )]; p; p = p->next)
                     if (p == cand) break;
                 RtlLeaveCriticalSection( &wc_cs );
                 return p;
@@ -2649,7 +2694,6 @@ static ULONG proxy_addref( struct com_proxy *p )
 static ULONG proxy_release( struct com_proxy *p )
 {
     UINT iface = p->iface;   /* read before the free below */
-    UINT bucket = (UINT)(((ULONG_PTR)p->host >> 4) % INTERN_BUCKETS);
     struct com_proxy **link;
     void *host = NULL;
     ULONG refs;
@@ -2658,8 +2702,8 @@ static ULONG proxy_release( struct com_proxy *p )
     refs = --p->refs;
     if (!refs)
     {
-        for (link = &intern[bucket]; *link; link = &(*link)->next)
-            if (*link == p) { *link = p->next; break; }
+        for (link = &intern[intern_bucket( p->host )]; *link; link = &(*link)->next)
+            if (*link == p) { *link = p->next; intern_count--; break; }
         host = p->host;
     }
     RtlLeaveCriticalSection( &wc_cs );
