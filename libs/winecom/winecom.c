@@ -96,6 +96,16 @@ struct com_proxy
     UINT64      jr_pos;       /* 0x30: bytes used, guest-written */
     UINT64      jr_cap;       /* 0x38: bytes available */
     BOOL        jr_draining;  /* re-entrancy fuse for the drain */
+    /* The membership tag: 1 from the moment a wrap has filled the proxy in
+     * (WriteRelease) until its last guest reference goes (cleared under
+     * wc_cs before the free).  Because a proxy's memory is NEVER returned to
+     * a general allocator -- wc_proxy_free keeps it on a free list of proxies
+     * -- the word at this offset is a live tag for as long as the process
+     * runs, and proxy_from_pointer can trust it without the lock.  [MEASURED]
+     * Witcher 3 render thread 2026-09-04: the locked membership walk was
+     * 11% of the thread AFTER the table grew -- the cost was the critical
+     * section's barriers, not the chain. */
+    LONG        live;
 };
 #ifdef _WIN64
 /* the guest ABI pin for the 64-bit lane's snippets; the i386 build of this
@@ -237,10 +247,17 @@ static BOOL guest32;
 /* Guest-legal allocations: the proxies and the 32-bit vtable block must be
  * addressable by 4-byte guest pointers.  A trivial carve-out allocator over
  * NtAllocateVirtualMemory's zero_bits form, plus a free list for the one
- * fixed size that ever comes back (a proxy).  wc_cs guards both. */
+ * fixed size that ever comes back (a proxy).  wc_cs guards both.
+ *
+ * The free list serves BOTH lanes: a freed proxy is only ever reused as a
+ * proxy, never handed back to the heap, so a stale guest pointer to one
+ * still lands on a struct com_proxy whose `live` word says no (see the
+ * field).  The first word of a listed proxy is the link -- a heap or chunk
+ * address, never one of the materialised vtables, so a freed proxy also
+ * fails proxy_from_pointer's vtable test on its own. */
 static void *low_chunk;
 static SIZE_T low_used, low_cap;
-static void *low_free_proxies;   /* singly linked through the first word */
+static void *free_proxies;   /* singly linked through the first word */
 
 static void *wc_alloc_low( SIZE_T size )
 {
@@ -269,26 +286,21 @@ static struct com_proxy *wc_proxy_alloc(void)   /* wc_cs held */
 {
     struct com_proxy *p;
 
-    if (!guest32)
-        return RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, sizeof(*p) );
-    if ((p = low_free_proxies))
+    if ((p = free_proxies))
     {
-        low_free_proxies = *(void **)p;
+        free_proxies = *(void **)p;
         return p;
     }
+    if (!guest32)
+        return RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, sizeof(*p) );
     return wc_alloc_low( sizeof(*p) );
 }
 
-static void wc_proxy_free( struct com_proxy *p )
+static void wc_proxy_free( struct com_proxy *p )   /* p->live already 0 */
 {
-    if (!guest32)
-    {
-        RtlFreeHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, p );
-        return;
-    }
     RtlEnterCriticalSection( &wc_cs );
-    *(void **)p = low_free_proxies;
-    low_free_proxies = p;
+    *(void **)p = free_proxies;
+    free_proxies = p;
     RtlLeaveCriticalSection( &wc_cs );
 }
 
@@ -2586,6 +2598,7 @@ void *winecom_wrap( void *host, UINT iface )
     }
     p->next = intern[bucket];
     intern[bucket] = p;
+    WriteRelease( &p->live, 1 );   /* every field above is visible first */
     RtlLeaveCriticalSection( &wc_cs );
     TRACE( "wrapped %s host %p as proxy %p\n", wc_surface->ifaces[iface].name,
            host, p );
@@ -2620,19 +2633,19 @@ static struct com_proxy *proxy_from_pointer( void *ptr )
     }
     if (in_block)
     {
-        /* points into the materialised block: confirm it is an interface
-         * base, then confirm the pointer is interned */
-        for (i = 0; i < wc_surface->iface_count; i++)
-            if (guest32 ? (ULONG_PTR)vtbl32s[i] == vtbl
-                        : (const void *)guest_vtbls[i] == cand->guest_vtbl)
-            {
-                struct com_proxy *p;
-                RtlEnterCriticalSection( &wc_cs );
-                for (p = intern[intern_bucket( cand->host )]; p; p = p->next)
-                    if (p == cand) break;
-                RtlLeaveCriticalSection( &wc_cs );
-                return p;
-            }
+        /* points into the materialised block, so this is one of our proxies
+         * or a freed one (proxy memory is never anything else -- see
+         * free_proxies): the live tag says which, with acquire semantics so
+         * the fields a wrap filled in are visible behind it.  Then confirm
+         * the vtable is the base of the interface the proxy says it is,
+         * O(1) through its own index. */
+        if (!ReadAcquire( &cand->live )) return NULL;
+        i = cand->iface;
+        if (i >= wc_surface->iface_count) return NULL;
+        if (guest32 ? (ULONG_PTR)vtbl32s[i] != vtbl
+                    : (const void *)guest_vtbls[i] != cand->guest_vtbl)
+            return NULL;
+        return cand;
     }
     return NULL;
 }
@@ -2705,6 +2718,7 @@ static ULONG proxy_release( struct com_proxy *p )
         for (link = &intern[intern_bucket( p->host )]; *link; link = &(*link)->next)
             if (*link == p) { *link = p->next; intern_count--; break; }
         host = p->host;
+        p->live = 0;
     }
     RtlLeaveCriticalSection( &wc_cs );
     if (!refs)
