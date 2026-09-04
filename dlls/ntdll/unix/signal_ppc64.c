@@ -1449,11 +1449,17 @@ __ASM_GLOBAL_FUNC( user_mode_callback_return,
  * this dispatch's own callback frame -- the reverse-proxy gate's 64-deep
  * ping-pong is the standing proof.
  *
- * The FPR/VR restores read the values call_user_mode_callback saved at
- * callback ENTRY, where the syscall route restores what NtCallbackReturn's
- * own dispatcher entry re-saved a moment ago; ELFv2 makes them the same
- * bytes (the dispatch preserved its nonvolatiles), and the callback-entry
- * copy is the one a mid-dispatch suspension already trusts.
+ * NO FPR/VR restore here, where the syscall route reloads f14-f31/v20-v31
+ * from what NtCallbackReturn's own dispatcher entry re-saved.  The two
+ * guards make the reload dead on this path: nothing stashed a context, and
+ * this stub is reached by an ordinary call at the normal end of the
+ * dispatch, so every callee has returned and the registers already hold the
+ * values call_user_mode_callback saved at entry -- ELFv2's contract --
+ * provided the frames still live at the call (emu_trap_dispatch,
+ * emu_exception_dispatch on the PE side) use none of them.
+ * ppc64le/cpu/check-lean-return-fpvr.sh proves that against the built
+ * object and fails the build the day a compiler starts using one.  The
+ * callback-entry copy stays: a mid-dispatch suspension reads it.
  *
  * No TOC (r2 is restored from the entry frame like every other nonvolatile),
  * no TLS (the PE side passes the teb); RA_UNRECOVERABLE for exactly
@@ -1475,48 +1481,20 @@ __ASM_GLOBAL_FUNC( emu_trap_return_direct,
                    "mr 5, 3\n\t"
                    "mr 6, 4\n\t"
                    "std 8, 0x378(6)\n\t"            /* pop the frame, same point */
-                   "lfd 14, 0x1c0(7)\n\t"
-                   "lfd 15, 0x1c8(7)\n\t"
-                   "lfd 16, 0x1d0(7)\n\t"
-                   "lfd 17, 0x1d8(7)\n\t"
-                   "lfd 18, 0x1e0(7)\n\t"
-                   "lfd 19, 0x1e8(7)\n\t"
-                   "lfd 20, 0x1f0(7)\n\t"
-                   "lfd 21, 0x1f8(7)\n\t"
-                   "lfd 22, 0x200(7)\n\t"
-                   "lfd 23, 0x208(7)\n\t"
-                   "lfd 24, 0x210(7)\n\t"
-                   "lfd 25, 0x218(7)\n\t"
-                   "lfd 26, 0x220(7)\n\t"
-                   "lfd 27, 0x228(7)\n\t"
-                   "lfd 28, 0x230(7)\n\t"
-                   "lfd 29, 0x238(7)\n\t"
-                   "lfd 30, 0x240(7)\n\t"
-                   "lfd 31, 0x248(7)\n\t"
-                   "li 12, 0x390\n\t"
-                   "lvx 20, 7, 12\n\t"
-                   "addi 12, 12, 16\n\t"
-                   "lvx 21, 7, 12\n\t"
-                   "addi 12, 12, 16\n\t"
-                   "lvx 22, 7, 12\n\t"
-                   "addi 12, 12, 16\n\t"
-                   "lvx 23, 7, 12\n\t"
-                   "addi 12, 12, 16\n\t"
-                   "lvx 24, 7, 12\n\t"
-                   "addi 12, 12, 16\n\t"
-                   "lvx 25, 7, 12\n\t"
-                   "addi 12, 12, 16\n\t"
-                   "lvx 26, 7, 12\n\t"
-                   "addi 12, 12, 16\n\t"
-                   "lvx 27, 7, 12\n\t"
-                   "addi 12, 12, 16\n\t"
-                   "lvx 28, 7, 12\n\t"
-                   "addi 12, 12, 16\n\t"
-                   "lvx 29, 7, 12\n\t"
-                   "addi 12, 12, 16\n\t"
-                   "lvx 30, 7, 12\n\t"
-                   "addi 12, 12, 16\n\t"
-                   "lvx 31, 7, 12\n\t"
+                   /* NO FPR/VR reload on this path, and the reason is the
+                    * lean guards above: with restore_flags == 0 no syscall in
+                    * this dispatch stashed a context, and this stub is reached
+                    * by an ordinary CALL from the PE dispatcher at the normal
+                    * end of its work -- every callee in between has returned,
+                    * so f14-f31 and v20-v31 hold the values call_user_mode_
+                    * callback saved at entry by the ELFv2 contract, provided
+                    * the one frame still live (the PE dispatcher's own) does
+                    * not use them.  check-lean-return-fpvr.sh proves that
+                    * against the built object.  The syscall route keeps its
+                    * reload: NtCallbackReturn's dispatcher entry re-saved the
+                    * file and its return must honour a stash.  [MEASURED] the
+                    * 18 lfd + 12 lvx/addi chain was ~3% of a crossing (op4k,
+                    * 2026-09-03 perf annotate). */
                    /* back to call_user_mode_callback's frame */
                    "ld 1, 0x140(7)\n\t"             /* frame->syscall_cfa */
                    "addi 1, 1, -0x100\n\t"
