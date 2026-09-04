@@ -151,6 +151,30 @@ each leg's new autosave moved out before the next):
 ends: the crossing work is real and measured at the crossing, and neither
 title's frame rate is set by it today.
 
+## 7. Two more legs the same night: the pin is a wash, the governor is not
+
+Asymmetric SMT (cpus 1-7 offline, core 0 in ST mode, GameThread pinned to
+cpu 0, every other thread on 8-159) against the plain SMT8 box, patched
+tree both arms, Cyberpunk `-benchmark`:
+
+| leg | governor | avg fps | floor | p50 | p99 |
+|---|---|---:|---:|---:|---:|
+| pin 1 | performance | 23.82 | 30.0 | 38.5 | 89 |
+| ctl 1 | performance | 23.54 | 30.9 | 38.8 | 90 |
+| pin 2 | ondemand | 17.67 | 40.4 | 50.2 | 141 |
+| ctl 2 | ondemand | 19.19 | 36.5 | 46.8 | 138 |
+| pin 3 | performance | 22.27 | 31.2 | 41.9 | 107 |
+| ctl 3 | ondemand | 18.65 | 35.1 | 48.5 | 136 |
+
+The frame thread alone on a whole core buys nothing under `performance`
+and loses under `ondemand`: "the critical thread is crowded on its core"
+is falsified as tested.  SMT2's +9% (NEXT.md item 6) lives on the worker
+side.  What the six legs DO show is the governor: every `performance` leg
+22-24 fps, every `ondemand` leg 18-19, p99 89 vs 136 ms -- +20-25%, far
+above the +3% the 08-2x matrix recorded.  Under ondemand the clock sat at
+2.93 GHz mid-benchmark (max 3.49): 25 idle-spinning workers never present
+the load shape that makes it boost.  Make `performance` stick.
+
 ## 4. What is still on the table, by measured size
 
 1. **PE ntdll.dll.so still builds with `-mlongcall`** (it is a .so builtin
