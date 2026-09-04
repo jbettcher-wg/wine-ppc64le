@@ -49,12 +49,18 @@ static const struct _KUSER_SHARED_DATA *user_shared_data = (struct _KUSER_SHARED
 
 static const struct ratio no_dpi;
 
+/* get_tick_count below is a seqlock READER of KUSER_SHARED_DATA: it needs
+ * each load ordered after the one before it (acquire), never a full fence.
+ * On ppc64 a SEQ_CST load is "hwsync; ld; cmp; bne-; isync" -- the trailing
+ * idiom is the acquire, the leading hwsync a store-queue drain the reader
+ * has no use for.  [MEASURED] get_tick_count was 3.8% of Cyberpunk's
+ * GameThread with three hwsyncs per call (frame-cost-budget.md §3). */
 static LONG atomic_load_long( const volatile LONG *ptr )
 {
 #if defined(__i386__) || defined(__x86_64__)
     return *ptr;
 #else
-    return __atomic_load_n( ptr, __ATOMIC_SEQ_CST );
+    return __atomic_load_n( ptr, __ATOMIC_ACQUIRE );
 #endif
 }
 
@@ -63,7 +69,7 @@ static ULONG atomic_load_ulong( const volatile ULONG *ptr )
 #if defined(__i386__) || defined(__x86_64__)
     return *ptr;
 #else
-    return __atomic_load_n( ptr, __ATOMIC_SEQ_CST );
+    return __atomic_load_n( ptr, __ATOMIC_ACQUIRE );
 #endif
 }
 
