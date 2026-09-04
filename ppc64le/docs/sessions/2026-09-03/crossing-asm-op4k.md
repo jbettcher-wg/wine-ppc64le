@@ -204,6 +204,30 @@ regression, no visible win, as the crossing share predicts.
 hand walkers; 594 loads vs 48 fresh creates in the census) -- STATUS.md
 was stale, and the hitches are not PSO creation.
 
+## 9. The next four: 219 -> 202 ns
+
+- **Every PE module reads the TEB inline** (winnt.h): ntdll exports the
+  thread-pointer offset of its TEB thread-local once
+  (`__wine_ppc64_teb_tls_offset`); each module keeps a weak hidden copy
+  and fills it on first use, so NtCurrentTeb is two loads and a predicted
+  branch.  kernelbase's GetCurrentProcessId: 0 calls left.  Two build
+  lessons on the way: a `-private` export is not in the import library,
+  and the per-module copy has to be a weak tentative definition in the
+  header -- a winecrt0 archive member is not pulled by every exe.
+- **emu_trap_dispatch split**: a 184-instruction leaf fast path with zero
+  non-volatile saves for a resolved EC cell naming a plain flat export
+  (no COM, override, FP, callback, variadic; nothing armed, no TRACE);
+  everything else takes the full 2,800-instruction body unchanged.
+- **wineserver off `-mlongcall`** (same per-makefile hook): 8,432 direct
+  bl, 89 bctrl left.  A server round trip is ~16 us of socket and
+  scheduling on this box (`ppc64le/cpu/bench-server.sh`, new: one
+  CreateEventW + CloseHandle = 33.3-33.8 us on the old server, 32.6-33.5
+  on the new) -- real, small, and not where games spend time (76
+  NtCreateEvent/s in the census).
+
+Crossing: **219 -> 202 ns** (201.7 / 202.3 / 202.5; 203.5 over 20M), gates
+green including check-rip-cache.  The day's total: 313 -> 202, -35%.
+
 ## 4. What is still on the table, by measured size
 
 1. **PE ntdll.dll.so still builds with `-mlongcall`** (it is a .so builtin
