@@ -536,6 +536,7 @@ extern NTSTATUS call_user_exception_dispatcher( struct thread_data *data, EXCEPT
 extern void call_raise_user_exception_dispatcher( struct thread_data *data );
 #ifdef __powerpc64__
 extern NTSTATUS call_emu_trap_dispatcher( struct thread_data *data, void *func, void *ctx, void *cookie );
+
 extern BOOL emu_handle_fault( void *sigcontext, EXCEPTION_RECORD *rec );
 extern void emu_invalidate_code_range( const void *addr, SIZE_T size );
 extern void emu_unregister_ec_range( const void *addr, SIZE_T size );
@@ -890,5 +891,104 @@ static inline int is_gdt_sel( WORD sel )
 }
 
 #endif  /* defined(__i386__) || defined(__x86_64__) */
+
+#ifdef __powerpc64__
+#define PPC64_RED_ZONE      288
+
+/* the syscall frame the ppc64 dispatcher builds; signal_ppc64.c asserts
+ * every offset against its assembly */
+struct syscall_frame
+{
+    ULONG64               gpr[32];        /* 000 */
+    ULONG64               lr;             /* 100 */
+    ULONG64               ctr;            /* 108 */
+    ULONG64               cr;             /* 110 */
+    ULONG64               xer;            /* 118 */
+    ULONG64               pc;             /* 120 */
+    ULONG64               fpscr;          /* 128 */
+    ULONG                 restore_flags;  /* 130 */
+    ULONG                 syscall_id;     /* 134 */
+    struct syscall_frame *prev_frame;     /* 138 */
+    void                 *syscall_cfa;    /* 140 */
+    TEB                  *teb;            /* 148 */
+    double                fpr[32];        /* 150 */
+    VECTOR128             v[32];          /* 250 */
+};
+
+
+/* stack layout when calling KiUserCallbackDispatcher */
+struct callback_stack_layout
+{
+    ULONG64              linkage[12];    /* 000 */
+    void                *args;           /* 060 arguments */
+    ULONG                len;            /* 068 arguments len */
+    ULONG                id;             /* 06c function id */
+    ULONG64              lr;             /* 070 */
+    ULONG64              sp;             /* 078 */
+    ULONG64              pc;             /* 080 */
+    ULONG64              align;          /* 088 */
+    BYTE                 args_data[0];   /* 090 copied argument data */
+};
+C_ASSERT( offsetof(struct callback_stack_layout, args_data) == 0x90 );
+
+extern NTSTATUS call_user_mode_callback( ULONG_PTR user_sp, void **ret_ptr, ULONG *ret_len,
+                                         void *func, TEB *teb );
+extern NTSTATUS emu_trap_return_direct( NTSTATUS status, TEB *teb );
+extern int emu_trap_on_kernel_stack, emu_trap_no_lean_return;
+extern void emu_trap_dispatcher_levers_init(void);
+extern NTSTATUS emu_trap_dispatcher_stack_refuse( struct thread_data *data, void *frame );
+extern NTSTATUS emu_trap_dispatcher_no_func(void);
+
+/* Enter the PE-side trap dispatcher on the Win32 stack (signal_ppc64.c has
+ * the design note).  Inline so the bridge-facing thunk carries it without a
+ * frame of its own: [MEASURED] op4k 2026-09-04, the frame's entry and
+ * return were ~5% of a crossing as a separate symbol.  Refusals and levers
+ * are out of line in signal_ppc64.c. */
+static FORCEINLINE NTSTATUS call_emu_trap_dispatcher_inline( struct thread_data *data, void *func,
+                                                             void *ctx, void *cookie )
+{
+    struct syscall_frame *frame = get_syscall_frame( data );
+    ULONG_PTR user_sp = frame->gpr[1];
+    struct callback_stack_layout *stack;
+    void *ret_ptr;
+    ULONG ret_len;
+    ULONG_PTR sp;
+    void **args;
+
+    if (__builtin_expect( !func, 0 )) return emu_trap_dispatcher_no_func();
+    if (__builtin_expect( (char *)get_kernel_stack( data ) + min_kernel_stack > (char *)&frame, 0 ))
+        return emu_trap_dispatcher_stack_refuse( data, &frame );
+    if (__builtin_expect( emu_trap_on_kernel_stack == -1, 0 )) emu_trap_dispatcher_levers_init();
+    if (emu_trap_on_kernel_stack) user_sp = (ULONG_PTR)&ret_len;
+
+    sp = (user_sp - PPC64_RED_ZONE -
+          offsetof( struct callback_stack_layout, args_data[3 * sizeof(void *)] )) & ~15;
+    stack = (struct callback_stack_layout *)sp;
+
+    /* Only the linkage slots a back-chain walker reads are written: the
+     * chain word and the CR/LR save doublewords beside it.  The rest of the
+     * block -- the TOC save and the parameter save area -- is callee-scratch
+     * by ELFv2 (the same clause the trap-op frame notes cite). */
+    stack->linkage[0] = user_sp;        /* back chain, so an unwind walks out */
+    stack->linkage[1] = 0;              /* CR save slot */
+    stack->linkage[2] = 0;              /* LR save slot */
+    stack->args = stack->args_data;
+    stack->len  = 3 * sizeof(void *);
+    stack->id   = 0;
+    stack->lr   = frame->lr;
+    stack->sp   = user_sp;
+    stack->pc   = frame->pc;
+    /* The three pointers land directly in the frame: the payload, the EC
+     * row-cell cookie (NULL on every non-EC path), and the lean-return stub
+     * emu_trap_dispatch and emu_exception_dispatch call on their normal end
+     * instead of NtCallbackReturn (NULL under the lever, and for every
+     * consumer that predates it). */
+    args = (void **)stack->args_data;
+    args[0] = ctx;
+    args[1] = cookie;
+    args[2] = emu_trap_no_lean_return ? NULL : (void *)emu_trap_return_direct;
+    return call_user_mode_callback( sp, &ret_ptr, &ret_len, func, data->teb );
+}
+#endif
 
 #endif /* __NTDLL_UNIX_PRIVATE_H */

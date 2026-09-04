@@ -1665,7 +1665,7 @@ static FORCEINLINE NTSTATUS emu_trap_dispatch_common( AMD64_CONTEXT *ctx, void *
 
     /* everything below this line is native code on the native stack */
     emu_teb_stack_install( data->teb, &emu_native_teb_stack );
-    status = call_emu_trap_dispatcher( data, p_emu_trap_dispatcher, ctx, cookie );
+    status = call_emu_trap_dispatcher_inline( data, p_emu_trap_dispatcher, ctx, cookie );
     emu_crossing_pop( data );
     /* ...and back to the GUEST stack the run is on NOW, which is not always
      * the one this trap arrived on: a guest fiber switch happens inside the

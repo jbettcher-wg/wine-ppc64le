@@ -94,7 +94,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(seh);
 #define PPC64_TRAP_ISI      0x400
 
 /* the ELFv2 red zone: 288 bytes below r1 are scratch for the current function */
-#define PPC64_RED_ZONE      288
+/* PPC64_RED_ZONE: unix_private.h */
 /* an ELFv2 stack frame owes its callee a 32-byte linkage area plus a 64-byte
  * parameter save area for the eight GPR argument registers */
 #define PPC64_LINKAGE       96
@@ -328,20 +328,7 @@ struct apc_stack_layout
 };
 C_ASSERT( offsetof(struct apc_stack_layout, context) == 0x70 );
 
-/* stack layout when calling KiUserCallbackDispatcher */
-struct callback_stack_layout
-{
-    ULONG64              linkage[12];    /* 000 */
-    void                *args;           /* 060 arguments */
-    ULONG                len;            /* 068 arguments len */
-    ULONG                id;             /* 06c function id */
-    ULONG64              lr;             /* 070 */
-    ULONG64              sp;             /* 078 */
-    ULONG64              pc;             /* 080 */
-    ULONG64              align;          /* 088 */
-    BYTE                 args_data[0];   /* 090 copied argument data */
-};
-C_ASSERT( offsetof(struct callback_stack_layout, args_data) == 0x90 );
+/* struct callback_stack_layout: unix_private.h, shared with the inline trap entry */
 
 
 /***********************************************************************
@@ -351,23 +338,8 @@ C_ASSERT( offsetof(struct callback_stack_layout, args_data) == 0x90 );
  * offset has a C_ASSERT.  gpr[1] is the user stack pointer and gpr[2] the
  * user TOC; there are no separate fields for them.
  */
-struct syscall_frame
-{
-    ULONG64               gpr[32];        /* 000 */
-    ULONG64               lr;             /* 100 */
-    ULONG64               ctr;            /* 108 */
-    ULONG64               cr;             /* 110 */
-    ULONG64               xer;            /* 118 */
-    ULONG64               pc;             /* 120 */
-    ULONG64               fpscr;          /* 128 */
-    ULONG                 restore_flags;  /* 130 */
-    ULONG                 syscall_id;     /* 134 */
-    struct syscall_frame *prev_frame;     /* 138 */
-    void                 *syscall_cfa;    /* 140 */
-    TEB                  *teb;            /* 148 */
-    double                fpr[32];        /* 150 */
-    VECTOR128             v[32];          /* 250 */
-};
+/* struct syscall_frame: unix_private.h, shared with the inline trap entry;
+ * the FRAME_* C_ASSERTs below keep it in step with the assembly */
 
 C_ASSERT( offsetof(struct syscall_frame, lr)            == 0x100 );
 C_ASSERT( offsetof(struct syscall_frame, ctr)           == 0x108 );
@@ -1667,106 +1639,55 @@ static void emu_crossing_dump( const struct thread_data *data )
     }
 }
 
-NTSTATUS call_emu_trap_dispatcher( struct thread_data *data, void *func, void *ctx, void *cookie )
+/* The cold halves of the trap entry (call_emu_trap_dispatcher_inline in
+ * unix_private.h): the refusal that names the crossing depth, and the two
+ * once-per-process levers.  Out of line so the entry itself inlines into
+ * the bridge-facing thunk with no frame of its own. */
+int emu_trap_on_kernel_stack = -1;
+int emu_trap_no_lean_return = -1;
+
+NTSTATUS __attribute__((noinline)) emu_trap_dispatcher_stack_refuse( struct thread_data *data, void *frame )
 {
-    static int on_kernel_stack = -1;
-    static int no_lean_return = -1;
-
-    struct syscall_frame *frame = get_syscall_frame( data );
-    ULONG_PTR user_sp = frame->gpr[1];
-    struct callback_stack_layout *stack;
-    void *ret_ptr;
-    ULONG ret_len;
-    ULONG_PTR sp;
-    void **args;
-
-    if (!func)
-    {
-        ERR( "no PE-side trap dispatcher registered for this run\n" );
-        return STATUS_INVALID_PARAMETER;
-    }
-
-    /* THE KERNEL STACK, AND WHY THIS REFUSAL MUST NAME ITSELF.
-     *
-     * Every crossing in either direction spends kernel stack.  A guest thunk
-     * call pushes a syscall frame here; a native->guest REVERSE call pushes
-     * another through unix_emu_run_entry; and the emulator's JIT runs on this
-     * stack too.  Before reverse proxies the nest was bounded at one level --
-     * guest calls native, native returns -- so this check was unreachable in
-     * practice.  It is reachable now, because a callback-driven API nests
-     * without a bound the port controls: OnBufferEnd calls SubmitSourceBuffer
-     * calls back, and each round trip is two more frames.
-     *
-     * This used to return silently, and the whole run then died as
-     * "guest trap ... ended the run with no consuming handler" -- a message
-     * that names neither the cause nor the depth, which is the one thing this
-     * file is not allowed to do.  Measured on DOOM (2016): the game reached
-     * here with its audio engine already running and the log said nothing
-     * about a stack. */
-    if ((char *)get_kernel_stack( data ) + min_kernel_stack > (char *)&frame)
-    {
         ERR( "kernel stack exhausted entering the guest trap dispatcher: %ld "
              "bytes left of %ld, below the %ld-byte floor.  This is CROSSING "
              "DEPTH, not a big frame: each guest->native trap and each "
              "native->guest reverse call spends some of this stack, and a "
              "callback-driven API nests them.\n",
-             (long)((char *)&frame - (char *)get_kernel_stack( data )),
+             (long)((char *)frame - (char *)get_kernel_stack( data )),
              (long)kernel_stack_size, (long)min_kernel_stack );
         emu_crossing_dump( data );
         return STATUS_STACK_OVERFLOW;
-    }
+}
+
+NTSTATUS __attribute__((noinline)) emu_trap_dispatcher_no_func(void)
+{
+    ERR( "no PE-side trap dispatcher registered for this run\n" );
+    return STATUS_INVALID_PARAMETER;
+}
+
+void __attribute__((noinline)) emu_trap_dispatcher_levers_init(void)
+{
+    const char *str;
 
     /* Verification hook.  WINEEMUKERNELSTACK=1 enters the dispatcher on the
-     * kernel stack it was called on instead, which is what happened before this
-     * function existed, so that the tests proving the switch matters have a
-     * negative control that changes nothing else about the entry path.
-     * See probes/check-guest-imports.sh. */
-    if (on_kernel_stack == -1)
-    {
-        const char *str = getenv( "WINEEMUKERNELSTACK" );
-        on_kernel_stack = (str && *str == '1');
-    }
-    if (on_kernel_stack) user_sp = (ULONG_PTR)&ret_len;
+     * kernel stack it was called on instead, which is what happened before
+     * the Win32-stack entry existed, so that the tests proving the switch
+     * matters have a negative control that changes nothing else about the
+     * entry path.  See probes/check-guest-imports.sh. */
+    str = getenv( "WINEEMUKERNELSTACK" );
+    emu_trap_on_kernel_stack = (str && *str == '1');
+    str = getenv( "WINE_PPC64LE_NO_LEAN_RETURN" );
+    emu_trap_no_lean_return = (str && *str == '1');
+    if (emu_trap_no_lean_return)
+        ERR( "WINE_PPC64LE_NO_LEAN_RETURN: every trap dispatch returns "
+             "through the NtCallbackReturn syscall\n" );
+}
 
-    if (no_lean_return == -1)
-    {
-        const char *str = getenv( "WINE_PPC64LE_NO_LEAN_RETURN" );
-        no_lean_return = (str && *str == '1');
-        if (no_lean_return)
-            ERR( "WINE_PPC64LE_NO_LEAN_RETURN: every trap dispatch returns "
-                 "through the NtCallbackReturn syscall\n" );
-    }
-    sp = (user_sp - PPC64_RED_ZONE -
-          offsetof( struct callback_stack_layout, args_data[3 * sizeof(void *)] )) & ~15;
-    stack = (struct callback_stack_layout *)sp;
-
-    /* Only the linkage slots a back-chain walker reads are written: the
-     * chain word and the CR/LR save doublewords beside it.  The rest of the
-     * block -- the TOC save and the parameter save area -- is callee-scratch
-     * by ELFv2 (the same clause the trap-op frame notes cite), and the full
-     * 96-byte memset the generic KeUserModeCallback path keeps was per-
-     * crossing cost here.  That path stays whole: it is cold, and Windows-
-     * shaped cleanliness there costs nothing. */
-    stack->linkage[0] = user_sp;        /* back chain, so an unwind walks out */
-    stack->linkage[1] = 0;              /* CR save slot */
-    stack->linkage[2] = 0;              /* LR save slot */
-    stack->args = stack->args_data;
-    stack->len  = 3 * sizeof(void *);
-    stack->id   = 0;
-    stack->lr   = frame->lr;
-    stack->sp   = user_sp;
-    stack->pc   = frame->pc;
-    /* The three pointers land directly in the frame: the payload, the EC
-     * row-cell cookie (NULL on every non-EC path), and the lean-return stub
-     * emu_trap_dispatch and emu_exception_dispatch call on their normal end
-     * instead of NtCallbackReturn (NULL under the lever, and for every
-     * consumer that predates it).  Consumers unpack the first pointer and
-     * read the rest only when len says it is there. */
-    args = (void **)stack->args_data;
-    args[0] = ctx;
-    args[1] = cookie;
-    args[2] = no_lean_return ? NULL : (void *)emu_trap_return_direct;
-    return call_user_mode_callback( sp, &ret_ptr, &ret_len, func, data->teb );
+/* the out-of-line spelling, for callers off the hot path (the exception
+ * dispatcher's entry in loader.c) */
+NTSTATUS call_emu_trap_dispatcher( struct thread_data *data, void *func, void *ctx, void *cookie )
+{
+    return call_emu_trap_dispatcher_inline( data, func, ctx, cookie );
 }
 
 
