@@ -981,7 +981,7 @@ dnl reads EXTRACXXFLAGS for the native arch too, but nothing ever defined it,
 dnl so native C++ sources were compiled with no extra flags at all.
 AC_SUBST(EXTRACXXFLAGS,"")
 AC_SUBST(UNIXDLLFLAGS,"-fPIC")
-AC_SUBST(NTDLL_NATIVE_CFLAGS,"")
+AC_SUBST(PPC64_NOLONGCALL_CFLAGS,"")
 AC_SUBST(UNIXLDFLAGS,["-shared -Wl,-Bsymbolic -Wl,-soname,\$(UNIXLIB)"])
 AC_SUBST(TOP_INSTALL_LIB,"")
 AC_SUBST(TOP_INSTALL_DEV,"")
@@ -2027,12 +2027,13 @@ then
     dnl else: PE modules, the .so builtins, tools and the server keep the
     dnl guard above.
     WINE_TRY_CFLAGS([-mno-longcall],[UNIXDLLFLAGS="$UNIXDLLFLAGS -mno-longcall"
-      dnl The one .so builtin, ntdll.dll.so, imports nothing, so it has no
-      dnl import thunk to guard either; makedep appends NATIVE_EXTRACFLAGS to
-      dnl its native-compiled objects (dlls/ntdll/Makefile.in).  [MEASURED]
-      dnl op4k 2026-09-03: its emu_trap_dispatch was 10% of a crossing's
+      dnl Two more that have no import thunk to guard: the one .so builtin,
+      dnl ntdll.dll.so, imports nothing, and wineserver is a plain ELF program.
+      dnl makedep appends NATIVE_EXTRACFLAGS to their native-compiled objects
+      dnl (dlls/ntdll/Makefile.in, server/Makefile.in).  [MEASURED] op4k
+      dnl 2026-09-03: ntdll's emu_trap_dispatch was 10% of a crossing's
       dnl instructions and 7.5% of its mispredicts, all through bctrl.
-      NTDLL_NATIVE_CFLAGS="-mno-longcall"])
+      PPC64_NOLONGCALL_CFLAGS="-mno-longcall"])
 
     dnl C++ sources never see EXTRACFLAGS: makedep compiles them with $(CXX)
     dnl and EXTRACXXFLAGS.  dlls/vcruntime140 and dlls/icu* are C++ and do call
