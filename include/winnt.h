@@ -8436,6 +8436,11 @@ static FORCEINLINE void YieldProcessor(void)
     __asm__ __volatile__( "dmb ishst\n\tyield" : : : "memory" );
 #elif defined(__i386__) || defined(__x86_64__)
     __asm__ __volatile__( "rep; nop" : : : "memory" );
+#elif defined(__powerpc64__)
+    /* the SMT "yield" priority hint (or 27,27,27): a spinning thread hands
+     * its issue slots to the core's other threads until its next dispatch,
+     * which is what x86's pause and arm's yield do for their siblings */
+    __asm__ __volatile__( "or 27,27,27" : : : "memory" );
 #else
     __asm__ __volatile__( "" : : : "memory" );
 #endif
