@@ -1739,6 +1739,18 @@ static int emu_ec_sabotage;
  * world, the stats rows, the publish) sees the trap it has always seen.
  * The +3 is safe because registration is byte-verified: only stubs whose
  * five bytes are exactly `49 89 ca 0f 05` are ever registered. */
+/* The gregs copies are 128 bytes each way on EVERY crossing.  Spelled as
+ * memcpy they are a PLT call into libc under this tree's -fno-builtin
+ * ([MEASURED] 9.4% of a crossing on op4k, 2026-09-03, perf callchain: all
+ * of memcpy's samples came from this function); spelled out they are
+ * sixteen doubleword moves the compiler schedules inline. */
+static inline void copy_gregs( UINT64 *dst, const UINT64 *src )
+{
+    unsigned int i;
+#pragma GCC unroll 16
+    for (i = 0; i < 16; i++) dst[i] = src[i];
+}
+
 static int emu_view_dispatch( void *thread, struct emu_trap_view *view, BOOL ec, void *cookie )
 {
     AMD64_CONTEXT shell;    /* deliberately NOT zeroed: only the groups named
@@ -1752,7 +1764,7 @@ static int emu_view_dispatch( void *thread, struct emu_trap_view *view, BOOL ec,
 
     /* One shape, one copy: the C_ASSERT chain above pins &shell.Rax as a
      * UINT64[16] in view->gregs order. */
-    memcpy( &shell.Rax, view->gregs, 16 * sizeof(UINT64) );
+    copy_gregs( &shell.Rax, view->gregs );
     shell.Rip = *view->rip;
     if (ec)
     {
@@ -1791,7 +1803,7 @@ static int emu_view_dispatch( void *thread, struct emu_trap_view *view, BOOL ec,
      * itself went through unixcall_emu_run_entry, which saves and restores
      * the published-context state around it; the shell is untouched by the
      * nested run by construction -- it lives on this thunk's stack.) */
-    memcpy( view->gregs, &shell.Rax, 16 * sizeof(UINT64) );
+    copy_gregs( view->gregs, &shell.Rax );
     *view->rip = shell.Rip;
 
     /* EFLAGS/FP write-back only when the group was materialized -- the ABI 5
