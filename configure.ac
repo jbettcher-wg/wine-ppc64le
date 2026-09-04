@@ -2011,6 +2011,22 @@ then
     WINE_TRY_CFLAGS([-mlongcall],[EXTRACFLAGS="$EXTRACFLAGS -mlongcall"
       WINE_TRY_CFLAGS([-mno-pltseq],[EXTRACFLAGS="$EXTRACFLAGS -mno-pltseq"])])
 
+    dnl The unix libraries (dlls/*/unix, everything makedep marks FLAG_C_UNIX)
+    dnl never call through a winebuild import thunk: they are ordinary ELF
+    dnl shared objects whose libc calls go through real PLT stubs (where the
+    dnl linker DOES emit the r2 restore) and whose own calls bind locally
+    dnl under -Wl,-Bsymbolic -fvisibility=hidden.  For them -mlongcall is pure
+    dnl cost: every call becomes addis/addi/mtctr/bctrl plus a TOC reload, and
+    dnl the callee must enter at its global entry.  [MEASURED] op4k POWER8,
+    dnl 2026-09-03, ppc64le/cpu/bench-crossing.sh: one guest->native crossing
+    dnl 314.6 -> 272.5 ns (-13%) from this flag alone, 26.0 -> 18.9 branch
+    dnl mispredicts per crossing -- the indirect call sites thrash the count
+    dnl cache.  UNIXDLLFLAGS is what makedep appends after EXTRACFLAGS for
+    dnl exactly those objects, so the negative form wins there and nowhere
+    dnl else: PE modules, the .so builtins, tools and the server keep the
+    dnl guard above.
+    WINE_TRY_CFLAGS([-mno-longcall],[UNIXDLLFLAGS="$UNIXDLLFLAGS -mno-longcall"])
+
     dnl C++ sources never see EXTRACFLAGS: makedep compiles them with $(CXX)
     dnl and EXTRACXXFLAGS.  dlls/vcruntime140 and dlls/icu* are C++ and do call
     dnl imported functions (vcruntime140's operator new loops on ::malloc), so
