@@ -92,6 +92,19 @@ extern void get_resource_lcids( LANGID *user, LANGID *user_neutral, LANGID *syst
 /* module handling */
 extern NTSTATUS load_guest_dll( const WCHAR *name, USHORT machine, HMODULE *module );
 #ifdef __powerpc64__
+/* NtCurrentTeb on this port is a read of an initial-exec thread-local that
+ * lives in this module (signal_ppc64.c has the story: no register to steal).
+ * Every other arch reads its TEB inline from winnt.h; for ntdll's OWN code
+ * the same two instructions -- "ld rN,off(r2); add rN,rN,r13" -- are
+ * available directly, and the exported function stays for everyone else.
+ * [MEASURED] op4k 2026-09-03: the out-of-line call was 2.6% of a
+ * guest->native crossing (emu_trap_dispatch reads the TEB several times). */
+extern __attribute__((visibility("hidden"))) __thread struct _TEB *ppc64_current_teb
+    __attribute__((tls_model("initial-exec")));
+#undef NtCurrentTeb
+#define NtCurrentTeb() (ppc64_current_teb)
+#endif
+#ifdef __powerpc64__
 extern void call_guest_tls_callback( void *callback, void *module, UINT reason );
 extern WCHAR *get_apiset_target_name( const WCHAR *name );
 extern BOOL call_guest_dll_entry_point( void *entry, void *module, UINT reason, void *reserved );

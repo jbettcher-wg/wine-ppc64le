@@ -163,6 +163,7 @@ __attribute__((visibility("hidden"))) __thread TEB *ppc64_current_teb
  * large variable here. */
 #define EMU_THREAD_VAR __thread __attribute__((tls_model("initial-exec")))
 
+#undef NtCurrentTeb   /* ntdll_misc.h reads the variable inline; this is the export */
 TEB * WINAPI NtCurrentTeb(void)
 {
     return ppc64_current_teb;
@@ -9788,18 +9789,31 @@ done:
  * negative control for ppc64le/thunks/check-rip-cache.sh's sub-word leg, and
  * the only lever that can make it fail -- turning the CACHE off cannot,
  * because the bug was in what the cache carried rather than in the caching. */
-static BOOL thunk_arg_width_off(void)
-{
-    static int off = -1;
+static int thunk_arg_width_off_state = -1;
+static int thunk_arg_sign_off_state = -1;
 
-    if (off == -1)
-    {
-        off = emu_env_flag( L"WINEEMUNOARGWIDTH" );
-        if (off)
-            ERR( "WINEEMUNOARGWIDTH: sub-word arguments will be cut to 32 bits "
-                 "and keep the caller's leftovers above their own width\n" );
-    }
-    return off;
+/* The env lookups and their ERRs are the cold half; kept out of line so the
+ * readers below are a load and a predicted branch.  [MEASURED] op4k
+ * 2026-09-03: the two readers were 3% of a crossing's instructions and one
+ * mispredict per crossing, because GCC would not inline a function that
+ * carries an ERR expansion. */
+static void __attribute__((noinline)) thunk_arg_levers_init(void)
+{
+    thunk_arg_width_off_state = emu_env_flag( L"WINEEMUNOARGWIDTH" );
+    if (thunk_arg_width_off_state)
+        ERR( "WINEEMUNOARGWIDTH: sub-word arguments will be cut to 32 bits "
+             "and keep the caller's leftovers above their own width\n" );
+    thunk_arg_sign_off_state = emu_env_flag( L"WINEEMUNOARGSIGN" );
+    if (thunk_arg_sign_off_state)
+        ERR( "WINEEMUNOARGSIGN: signed sub-word arguments will be "
+             "zero-extended, so a negative one arrives as a large "
+             "positive\n" );
+}
+
+static FORCEINLINE BOOL thunk_arg_width_off(void)
+{
+    if (__builtin_expect( thunk_arg_width_off_state == -1, 0 )) thunk_arg_levers_init();
+    return thunk_arg_width_off_state;
 }
 
 /* The same lever one step finer.  WINEEMUNOARGWIDTH turns off narrowing
@@ -9807,19 +9821,10 @@ static BOOL thunk_arg_width_off(void)
  * one leaves the widths alone and zero-extends everything, so a gate can prove
  * that the SIGN bit is what carries a negative sub-word argument across and
  * not merely that some narrowing happens. */
-static BOOL thunk_arg_sign_off(void)
+static FORCEINLINE BOOL thunk_arg_sign_off(void)
 {
-    static int off = -1;
-
-    if (off == -1)
-    {
-        off = emu_env_flag( L"WINEEMUNOARGSIGN" );
-        if (off)
-            ERR( "WINEEMUNOARGSIGN: signed sub-word arguments will be "
-                 "zero-extended, so a negative one arrives as a large "
-                 "positive\n" );
-    }
-    return off;
+    if (__builtin_expect( thunk_arg_sign_off_state == -1, 0 )) thunk_arg_levers_init();
+    return thunk_arg_sign_off_state;
 }
 
 static void marshal_thunk_args( const AMD64_CONTEXT *ctx, UINT argc, UINT narrow,
