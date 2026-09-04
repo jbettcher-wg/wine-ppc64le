@@ -175,6 +175,35 @@ above the +3% the 08-2x matrix recorded.  Under ondemand the clock sat at
 2.93 GHz mid-benchmark (max 3.49): 25 idle-spinning workers never present
 the load shape that makes it boost.  Make `performance` stick.
 
+## 8. Items 1-3 from the list: 236 -> 219 ns
+
+Same night, in the scratch clone, one at a time on the microbench and
+together in the game:
+
+- **PE ntdll.dll.so off `-mlongcall`** (makedep NATIVE_EXTRACFLAGS, set
+  from configure's NTDLL_NATIVE_CFLAGS): emu_trap_dispatch 141 -> 11
+  bctrl, 132 direct bl.  Sound because ntdll imports nothing -- no import
+  thunk, no direct bl can leave the module.
+- **NtCurrentTeb inline for ntdll's own PE code** + the two thunk_arg lever
+  readers as a load and a predicted branch: 0 TEB calls left in
+  emu_trap_dispatch, the readers gone from the profile.  The 3.4% of
+  NtCurrentTeb still in the bench profile is kernelbase's
+  GetCurrentProcessId body reading the TEB through the export -- every
+  other module still calls; an exported TLS offset read through the IAT
+  would make it three loads and no branch, parked.
+- **YieldProcessor = `or 27,27,27`** (the SMT yield hint) instead of an
+  empty asm; the ntsync spin already used HMT low.
+
+Crossing: **236 -> 219 ns** (three legs 225.6 / 219.1 / 217.9; 219.8 over
+20M).  Cyberpunk `-benchmark`, 3+3 interleaved, box being used (sunshine
+streaming, governor flipped mid-run): stock 19.59 / 18.53 / 21.70 vs
+patched 18.72 / 18.54 / 22.86 -- inside the +-5% the box state was
+swinging; the pair that ran wholly on `performance` was +5%.  No
+regression, no visible win, as the crossing share predicts.
+`ID3D12PipelineLibrary::Load*` turned out to be served already (three
+hand walkers; 594 loads vs 48 fresh creates in the census) -- STATUS.md
+was stale, and the hitches are not PSO creation.
+
 ## 4. What is still on the table, by measured size
 
 1. **PE ntdll.dll.so still builds with `-mlongcall`** (it is a .so builtin
