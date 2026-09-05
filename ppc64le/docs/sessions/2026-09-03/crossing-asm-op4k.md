@@ -425,6 +425,18 @@ payload), ExecuteCommandList, Flush, Map, every Get, the XMM rows.
   to the guest's `pos`; only a trap on the context itself resets the ring
   (its writer is the thread sitting in that trap).  A full ring falls
   back to the slot's trap, which is such a reset.
+- **One ring per HOST object, not per proxy.**  The first build gave
+  each proxy its own ring, and Witcher 3 rendered smeared geometry over a
+  black screen: the game QIs the immediate context for
+  ID3D11DeviceContext1 and calls SetConstantBuffers1 through it while
+  drawing through the base pointer, so two proxies of one object recorded
+  into two rings and the drain replayed one after the other -- constant
+  buffers bound after the draws that needed them.  Rings now live in a
+  pool keyed by the host pointer (struct ctx_ring; the snippet reads pos
+  and cap from the ring header), every proxy of the object shares one,
+  and each record carries the proxy it came through.  The gate's probe
+  now interleaves writes through both proxies and requires last-writer-
+  wins and exactly one armed ring.
 - **Multithread protection** (ID3D11Multithread::Enter / SetMultithread-
   Protected) would let a foreign thread's replay take DXVK's lock under
   `jr_cs` while the lock holder waits on `jr_cs`: the first dispatch of

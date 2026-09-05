@@ -25,6 +25,9 @@
  *     +4   u32  size | (shape << 24)     shape == JSH_GEN for these
  *     +8   u64  args[argc-1]             argument i at +8*i
  *     +..  blobs, one per JG_P/JG_A argument, at jg_layout::off[i-1]
+ *     +..  u64  this                     the proxy called, at jg_layout::self
+ *                                        (a shared ring holds records from
+ *                                        every proxy of the object)
  *
  * The record size is FIXED per slot (every array reserves `max` elements)
  * so the drain can validate a record by its size alone, like the first
@@ -56,6 +59,19 @@ enum jg_kind { JG_V = 0, JG_P = 1, JG_A = 2 };
 #define JG_PROXY_RING_POS  0x30
 #define JG_PROXY_RING_CAP  0x38
 
+/* The SHARED ring (JG_SCOPE_CTX): one object can be reached through
+ * several proxies -- a QueryInterface for ID3D11DeviceContext1 on the
+ * immediate context wraps a second proxy of the same DXVK object -- and
+ * their calls interleave, so the ring belongs to the HOST object, not the
+ * proxy.  proxy+0x28 then points at a ring HEADER whose first two words
+ * are pos and cap and whose records start at JG_HDR_DATA; the proxy's own
+ * pos/cap words are unused.  [MEASURED 2026-09-04 night, Witcher 3: the
+ * per-proxy form replayed the Context1 ring after the base ring, binding
+ * constant buffers after the draws that needed them -- smeared geometry.] */
+#define JG_HDR_POS  0x00
+#define JG_HDR_CAP  0x08
+#define JG_HDR_DATA 0x40
+
 #define JG_MAX_ARGS 8
 
 struct jg_arg
@@ -86,6 +102,7 @@ struct jg_layout
 {
     uint32_t rec;                 /* record bytes */
     uint32_t off[JG_MAX_ARGS];    /* blob offset for argument i+1, or 0 */
+    uint32_t self;                /* offset of the `this` word */
 };
 
 #define JG_ROUND8(n) (((n) + 7u) & ~7u)
@@ -109,6 +126,8 @@ static inline void jg_layout_compute( const struct jg_def *def, struct jg_layout
             off += JG_ROUND8( (unsigned)a->elem * a->max );
         }
     }
+    lay->self = off;
+    off += 8;
     lay->rec = off;
 }
 
@@ -248,7 +267,7 @@ static inline int32_t jg_arg_stack_disp( unsigned i ) { return 8 + 8 * (int32_t)
  * are volatile in MS-x64 and the snippet returns straight to the caller).
  */
 static inline unsigned jg_emit( uint8_t *buf, const struct jg_def *def, const struct jg_layout *lay,
-                                uint32_t key, unsigned shape, uint64_t fallback )
+                                uint32_t key, unsigned shape, uint64_t fallback, int shared )
 {
     struct jg_buf b;
     unsigned i, k;
@@ -260,11 +279,23 @@ static inline unsigned jg_emit( uint8_t *buf, const struct jg_def *def, const st
     jg_mov_load64( &b, R_RAX, R_RCX, JG_PROXY_RING_BASE );
     jg_test64( &b, R_RAX, R_RAX );
     jg_jcc_fb( &b, CC_E );
-    jg_mov_load64( &b, R_R10, R_RCX, JG_PROXY_RING_POS );
-    jg_lea64( &b, R_R11, R_R10, (int32_t)lay->rec );
-    jg_cmp64_rm( &b, R_R11, R_RCX, JG_PROXY_RING_CAP );
-    jg_jcc_fb( &b, CC_A );
-    jg_add64( &b, R_RAX, R_R10 );                 /* rax = record; r10 free */
+    if (shared)
+    {
+        /* rax = header: pos and cap live there, records after it */
+        jg_mov_load64( &b, R_R10, R_RAX, JG_HDR_POS );
+        jg_lea64( &b, R_R11, R_R10, (int32_t)lay->rec );
+        jg_cmp64_rm( &b, R_R11, R_RAX, JG_HDR_CAP );
+        jg_jcc_fb( &b, CC_A );
+        jg_mem( &b, 0x8d, -1, R_RAX, R_RAX, R_R10, 1, JG_HDR_DATA, 1 );  /* lea rax,[rax+r10+DATA] */
+    }
+    else
+    {
+        jg_mov_load64( &b, R_R10, R_RCX, JG_PROXY_RING_POS );
+        jg_lea64( &b, R_R11, R_R10, (int32_t)lay->rec );
+        jg_cmp64_rm( &b, R_R11, R_RCX, JG_PROXY_RING_CAP );
+        jg_jcc_fb( &b, CC_A );
+        jg_add64( &b, R_RAX, R_R10 );             /* rax = record; r10 free */
+    }
 
     /* array count guards, before any store: a count above max means the
      * trap serves this call with its registers exactly as they arrived */
@@ -349,9 +380,18 @@ static inline unsigned jg_emit( uint8_t *buf, const struct jg_def *def, const st
         jg_patch_fwd( &b, skip );
     }
 
+    /* the proxy this call came through */
+    jg_mov_store64( &b, R_RAX, (int32_t)lay->self, R_RCX );
+
     /* commit: publish the new position, return to the caller as a void
      * method would */
-    jg_mov_store64( &b, R_RCX, JG_PROXY_RING_POS, R_R11 );
+    if (shared)
+    {
+        jg_mov_load64( &b, R_R10, R_RCX, JG_PROXY_RING_BASE );
+        jg_mov_store64( &b, R_R10, JG_HDR_POS, R_R11 );
+    }
+    else
+        jg_mov_store64( &b, R_RCX, JG_PROXY_RING_POS, R_R11 );
     jg_ret( &b );
 
     /* the fallback: every fb branch lands here; jmp [rip+0] through the

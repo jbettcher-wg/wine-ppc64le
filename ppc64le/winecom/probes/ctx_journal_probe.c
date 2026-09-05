@@ -22,6 +22,8 @@
  *                         arguments 5..8 on the stack) + Map: the texels
  *   Unmap                 journaled, observed by the next Map succeeding
  *   a draw                Draw(3, 0) with no pipeline bound: must not crash
+ *   two proxies           QI for ID3D11DeviceContext1, writes interleaved
+ *                         through both proxies, last writer must win
  *
  * The clear colour and its 8-bit rounding are d3d11_smoke's (00 40 80 ff);
  * the second render target is cleared to (1, 0.5, 0.25, 1) = ff 80 40 ff
@@ -44,7 +46,7 @@
 #define COBJMACROS
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <d3d11.h>
+#include <d3d11_1.h>
 
 /* ---- no-CRT support ---- */
 
@@ -300,6 +302,50 @@ static int run( void )
         hr = ID3D11DeviceContext_Map( ctx, (ID3D11Resource *)staging, 0, D3D11_MAP_READ, 0, &map );
         check( SUCCEEDED(hr), "Map again after a journaled Unmap" );
         if (SUCCEEDED(hr)) ID3D11DeviceContext_Unmap( ctx, (ID3D11Resource *)staging, 0 );
+    }
+
+    /* ---- TWO PROXIES OF ONE CONTEXT, calls interleaved through both.
+     * A QueryInterface for ID3D11DeviceContext1 wraps a second proxy of the
+     * same DXVK object; its calls must land in the SAME ring as the base
+     * proxy's, in issue order.  Topology is the order-sensitive observable:
+     * last writer wins, and the writers alternate proxies. */
+    {
+        ID3D11DeviceContext1 *ctx1 = NULL;
+        static const GUID cj_IID_ID3D11DeviceContext1 =
+            { 0xbb2c6faa, 0xb5fb, 0x4082, { 0x8e,0x6b,0x38,0x8b,0x8c,0xfa,0x90,0xe1 } };
+        hr = ID3D11DeviceContext_QueryInterface( ctx, &cj_IID_ID3D11DeviceContext1, (void **)&ctx1 );
+        check( SUCCEEDED(hr) && ctx1 && (void *)ctx1 != (void *)ctx,
+               "QueryInterface(ID3D11DeviceContext1) gives a second proxy" );
+        if (SUCCEEDED(hr) && ctx1)
+        {
+            UINT first[1] = { 0 }, num[1] = { 16 };
+            ID3D11DeviceContext_IASetPrimitiveTopology( ctx, D3D11_PRIMITIVE_TOPOLOGY_POINTLIST );
+            ID3D11DeviceContext1_VSSetConstantBuffers1( ctx1, 0, 1, cb, first, num );
+            ID3D11DeviceContext1_IASetPrimitiveTopology( ctx1, D3D11_PRIMITIVE_TOPOLOGY_LINELIST );
+            ID3D11DeviceContext_RSSetState( ctx, rs );
+            ID3D11DeviceContext_IASetPrimitiveTopology( ctx, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
+            ID3D11DeviceContext1_RSSetState( ctx1, NULL );
+            ID3D11DeviceContext1_IASetPrimitiveTopology( ctx1, D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP );
+            topo = 0;
+            ID3D11DeviceContext_IAGetPrimitiveTopology( ctx, &topo );
+            check( topo == D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP,
+                   "interleaved ctx/ctx1 topology writes: last writer (ctx1) wins" );
+            rs_back = (ID3D11RasterizerState *)(ULONG_PTR)1;
+            ID3D11DeviceContext1_RSGetState( ctx1, &rs_back );
+            check( rs_back == NULL, "interleaved ctx/ctx1 RSSetState: last writer (ctx1, NULL) wins" );
+            memset( cb_back, 0, sizeof(cb_back) );
+            ID3D11DeviceContext_VSGetConstantBuffers( ctx, 0, 1, cb_back );
+            check( cb_back[0] == cb[0], "VSSetConstantBuffers1 through ctx1 -> VSGetConstantBuffers through ctx" );
+            if (cb_back[0]) ID3D11Buffer_Release( cb_back[0] );
+            /* and the other way round: base proxy last */
+            ID3D11DeviceContext1_IASetPrimitiveTopology( ctx1, D3D11_PRIMITIVE_TOPOLOGY_LINELIST );
+            ID3D11DeviceContext_IASetPrimitiveTopology( ctx, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP );
+            topo = 0;
+            ID3D11DeviceContext1_IAGetPrimitiveTopology( ctx1, &topo );
+            check( topo == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
+                   "interleaved ctx1/ctx topology writes: last writer (ctx) wins" );
+            ID3D11DeviceContext1_Release( ctx1 );
+        }
     }
 
     /* ---- ClearState, then a Get shows the defaults ---- */

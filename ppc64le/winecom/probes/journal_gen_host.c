@@ -43,7 +43,10 @@
 #define RING_CAP 8192
 #define JSH_TEST_SHAPE 9
 
-/* the fake proxy: only the three ring fields at their pinned offsets matter */
+/* the fake proxy: only the three ring fields at their pinned offsets matter.
+ * In the SHARED form `ring` points at a header (pos, cap, records at
+ * JG_HDR_DATA) and the proxy's own pos/cap are ignored; the test drives
+ * both forms through one accessor pair. */
 struct fake_proxy
 {
     uint8_t pad[JG_PROXY_RING_BASE];
@@ -52,6 +55,11 @@ struct fake_proxy
     uint64_t cap;
     uint8_t tail[64];
 };
+static int shared_form;
+static uint8_t *ring_mem;   /* RING_CAP + JG_HDR_DATA bytes */
+static uint64_t *pos_p( struct fake_proxy *px ) { return shared_form ? (uint64_t *)(ring_mem + JG_HDR_POS) : &px->pos; }
+static uint64_t *cap_p( struct fake_proxy *px ) { return shared_form ? (uint64_t *)(ring_mem + JG_HDR_CAP) : &px->cap; }
+static uint8_t *data_p( void ) { return shared_form ? ring_mem + JG_HDR_DATA : ring_mem; }
 
 typedef uint64_t (__attribute__((ms_abi)) *snippet_fn)( void *self, uint64_t a1, uint64_t a2,
                                                           uint64_t a3, uint64_t a4, uint64_t a5,
@@ -89,6 +97,7 @@ static uint64_t rnd( uint64_t *st )
  * counts requested; pointer arguments point at freshly randomized data. */
 struct argset
 {
+    void *self;
     uint64_t a[9];
     uint8_t blob[JG_MAX_ARGS][8 * 256];
     unsigned count[JG_MAX_ARGS];   /* per JG_A arg, the count used */
@@ -138,8 +147,9 @@ static void build_args( const struct jg_def *def, struct argset *as, uint64_t *s
     }
 }
 
-static uint64_t call( snippet_fn fn, struct fake_proxy *px, const struct argset *as )
+static uint64_t call( snippet_fn fn, struct fake_proxy *px, struct argset *as )
 {
+    as->self = px;
     return fn( px, as->a[1], as->a[2], as->a[3], as->a[4], as->a[5], as->a[6], as->a[7], as->a[8] );
 }
 
@@ -154,6 +164,11 @@ static void check_record( const struct jg_def *def, const struct jg_layout *lay,
     if (v != key) bad( def->name, "key" );
     memcpy( &v, rec + 4, 4 );
     if (v != (lay->rec | (JSH_TEST_SHAPE << 24))) bad( def->name, "size|shape" );
+    {
+        uint64_t self;
+        memcpy( &self, rec + lay->self, 8 );
+        if (self != (uint64_t)(uintptr_t)as->self) bad( def->name, "this" );
+    }
     for (i = 1; i < def->argc; i++)
     {
         uint64_t got;
@@ -187,14 +202,16 @@ int main( int argc, char **argv )
     uint8_t *code;
     uint8_t *ring;
     struct fake_proxy px;
+    (void)ring;
     uint64_t st = 0x9e3779b97f4a7c15ull;
     unsigned d, longest = 0;
     const char *dump = argc > 1 ? argv[1] : NULL;
 
     code = mmap( NULL, 1 << 20, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0 );
-    ring = malloc( RING_CAP );
-    if (code == MAP_FAILED || !ring) { puts( "journal_gen_host: no memory" ); return 2; }
+    ring_mem = malloc( RING_CAP + JG_HDR_DATA );
+    if (code == MAP_FAILED || !ring_mem) { puts( "journal_gen_host: no memory" ); return 2; }
 
+    for (shared_form = 0; shared_form < 2; shared_form++)
     for (d = 0; d < sizeof(jg_d3d11_defs) / sizeof(jg_d3d11_defs[0]); d++)
     {
         const struct jg_def *def = &jg_d3d11_defs[d];
@@ -206,7 +223,7 @@ int main( int argc, char **argv )
         snippet_fn fn = (snippet_fn)code;
 
         jg_layout_compute( def, &lay );
-        len = jg_emit( code, def, &lay, key, JSH_TEST_SHAPE, (uint64_t)(uintptr_t)fallback_stub );
+        len = jg_emit( code, def, &lay, key, JSH_TEST_SHAPE, (uint64_t)(uintptr_t)fallback_stub, shared_form );
         if (len > longest) longest = len;
         if (len > JG_SNIPPET_MAX) bad( def->name, "snippet longer than JG_SNIPPET_MAX" );
         if (dump && d == 0)
@@ -222,43 +239,44 @@ int main( int argc, char **argv )
 
         /* 1: a normal call */
         memset( &px, 0, sizeof(px) );
-        memset( ring, 0, RING_CAP );
-        px.ring = ring; px.pos = 16; px.cap = RING_CAP;   /* not at zero, to see the add */
+        memset( ring_mem, 0, RING_CAP + JG_HDR_DATA );
+        px.ring = ring_mem;
+        *pos_p( &px ) = 16; *cap_p( &px ) = RING_CAP;   /* not at zero, to see the add */
         build_args( def, &as, &st, 0, 0 );
         fb_hits = 0;
         call( fn, &px, &as );
         if (fb_hits) bad( def->name, "normal call fell back" );
         else
         {
-            if (px.pos != 16 + lay.rec) bad( def->name, "pos not advanced by rec" );
-            check_record( def, &lay, ring + 16, &as, key, 0 );
+            if (*pos_p( &px ) != 16 + lay.rec) bad( def->name, "pos not advanced by rec" );
+            check_record( def, &lay, data_p() + 16, &as, key, 0 );
         }
 
         /* 2: NULL pointers */
         if (has_ptr)
         {
-            memset( ring, 0, RING_CAP );
-            px.pos = 0; fb_hits = 0;
+            memset( data_p(), 0, RING_CAP );
+            *pos_p( &px ) = 0; fb_hits = 0;
             build_args( def, &as, &st, 1, 0 );
             call( fn, &px, &as );
             if (fb_hits) bad( def->name, "NULL-pointer call fell back" );
             else
             {
-                if (px.pos != lay.rec) bad( def->name, "pos (NULL case)" );
-                check_record( def, &lay, ring, &as, key, 1 );
+                if (*pos_p( &px ) != lay.rec) bad( def->name, "pos (NULL case)" );
+                check_record( def, &lay, data_p(), &as, key, 1 );
             }
         }
 
         /* 3: over the cap -> fallback with everything intact */
         if (has_arr)
         {
-            px.pos = 0; fb_hits = 0;
+            *pos_p( &px ) = 0; fb_hits = 0;
             build_args( def, &as, &st, 0, 1 );
             ret = call( fn, &px, &as );
             if (fb_hits != 1 || ret != 0xfa11bacc) bad( def->name, "over-cap call did not fall back" );
             else
             {
-                if (px.pos) bad( def->name, "over-cap call moved pos" );
+                if (*pos_p( &px )) bad( def->name, "over-cap call moved pos" );
                 if (fb_args[0] != (uint64_t)(uintptr_t)&px) bad( def->name, "fallback: rcx clobbered" );
                 for (i = 1; i < def->argc; i++)
                     if (fb_args[i] != as.a[i]) { bad( def->name, "fallback: argument clobbered" ); break; }
@@ -266,22 +284,29 @@ int main( int argc, char **argv )
         }
 
         /* 4: one byte short of room */
-        px.pos = RING_CAP - lay.rec + 1; fb_hits = 0;
+        *pos_p( &px ) = RING_CAP - lay.rec + 1; fb_hits = 0;
         build_args( def, &as, &st, 0, 0 );
         ret = call( fn, &px, &as );
-        if (fb_hits != 1 || px.pos != RING_CAP - lay.rec + 1) bad( def->name, "full ring did not fall back" );
+        if (fb_hits != 1 || *pos_p( &px ) != RING_CAP - lay.rec + 1) bad( def->name, "full ring did not fall back" );
         /* and exactly enough room records */
-        px.pos = RING_CAP - lay.rec; fb_hits = 0;
+        *pos_p( &px ) = RING_CAP - lay.rec; fb_hits = 0;
         call( fn, &px, &as );
-        if (fb_hits || px.pos != RING_CAP) bad( def->name, "exactly-enough room did not record" );
+        if (fb_hits || *pos_p( &px ) != RING_CAP) bad( def->name, "exactly-enough room did not record" );
+        /* a detached shared ring (cap 0) falls back too */
+        if (shared_form)
+        {
+            *pos_p( &px ) = 0; *cap_p( &px ) = 0; fb_hits = 0;
+            ret = call( fn, &px, &as );
+            if (fb_hits != 1 || ret != 0xfa11bacc) bad( def->name, "cap-0 ring did not fall back" );
+        }
 
         /* 5: no ring */
-        px.ring = NULL; px.pos = 0; fb_hits = 0;
+        px.ring = NULL; fb_hits = 0;
         ret = call( fn, &px, &as );
         if (fb_hits != 1 || ret != 0xfa11bacc) bad( def->name, "NULL ring did not fall back" );
     }
 
-    printf( "journal_gen_host: %u defs, longest snippet %u bytes, %d failures\n",
+    printf( "journal_gen_host: %u defs x 2 forms, longest snippet %u bytes, %d failures\n",
             (unsigned)(sizeof(jg_d3d11_defs) / sizeof(jg_d3d11_defs[0])), longest, failures );
     return failures ? 1 : 0;
 }

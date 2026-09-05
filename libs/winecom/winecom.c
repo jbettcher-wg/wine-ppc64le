@@ -1359,10 +1359,37 @@ static struct jg_layout journal_gen_lay[ARRAYSIZE(jg_d3d11_defs)];
  * replayed -- the gate's negative control */
 static BOOL journal_sabotage;
 static BOOL ctx_journal_off;             /* multithread protection seen */
-/* The registry of context-scope rings, drained at EVERY dispatch (see
- * wc_ctx_drain_all).  Slots are claimed and cleared with interlocked
- * exchanges, never compacted, so a reader walks them without a lock. */
-static struct com_proxy *ctx_rings[CTX_RINGS_MAX];
+/* A context-scope ring (JG_SCOPE_CTX) belongs to the HOST object and is
+ * shared by every proxy of it -- the immediate context reached through
+ * ID3D11DeviceContext and, after a QueryInterface, ID3D11DeviceContext1
+ * is ONE recorder whose calls interleave, and two rings would replay one
+ * after the other [MEASURED 2026-09-04, Witcher 3: constant buffers bound
+ * after the draws, smeared geometry].  The header's first two words are
+ * the snippet's pos and cap (JG_HDR_POS/CAP, journal_gen.h) and the
+ * records follow at JG_HDR_DATA.
+ *
+ * Rings live in a fixed pool, allocated on demand and never freed: a
+ * drain on another thread reads a ring's pos and cons without a lock, so
+ * a ring must stay valid memory for the process's life.  A pool slot is
+ * free when host is NULL; a ring is detached by cap = 0, which makes every
+ * snippet's room check fail and fall back forever.  Claims are interlocked
+ * (wrap runs under wc_cs and must not take jr_cs: the drain takes jr_cs
+ * before it can reach wc_cs). */
+struct ctx_ring
+{
+    UINT64 pos;          /* 0x00 guest-written: bytes appended (guest ABI) */
+    UINT64 cap;          /* 0x08 data bytes available; 0 = detached (guest ABI) */
+    UINT64 cons;         /* bytes replayed, native */
+    void  *host;         /* the object, NULL = free slot */
+    LONG   refs;         /* proxies sharing the ring */
+    BOOL   draining;     /* same-thread nesting fuse, jr_cs-guarded */
+    /* records at +JG_HDR_DATA */
+};
+C_ASSERT( offsetof(struct ctx_ring, pos) == JG_HDR_POS );
+C_ASSERT( offsetof(struct ctx_ring, cap) == JG_HDR_CAP );
+C_ASSERT( sizeof(struct ctx_ring) <= JG_HDR_DATA );
+static struct ctx_ring *ctx_pool[CTX_RINGS_MAX];
+static inline BYTE *ctx_ring_data( struct ctx_ring *r ) { return (BYTE *)r + JG_HDR_DATA; }
 /* the ID3D11Multithread rows whose dispatch turns the context journal off */
 static UINT mt_iface = ~0u, mt_slot_enter = ~0u, mt_slot_setprot = ~0u;
 /* Serializes context-ring replay across threads: a foreign thread's drain
@@ -1390,6 +1417,8 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
 /* Replay the records in [r, end) of p's ring, oldest first, through the
  * marshal core.  Shared by both drains below.  A corrupt record drops the
  * rest of the range loudly; a replay that fails is logged and skipped. */
+static struct com_proxy *proxy_from_pointer( void *ptr );
+
 static void journal_replay_range( struct com_proxy *p, BYTE *r, BYTE *end )
 {
     while (r + 8 <= end)
@@ -1444,6 +1473,22 @@ static void journal_replay_range( struct com_proxy *p, BYTE *r, BYTE *end )
             {
                 if (def->args[j - 1].kind == JG_V || !a[j - 1]) rawargs[j] = a[j - 1];
                 else rawargs[j] = (UINT64)(ULONG_PTR)(r + lay->off[j - 1]);
+            }
+            /* the record names the proxy it came through: a shared ring
+             * carries every proxy of the object, and the dispatch is by
+             * (iface, slot) of THAT proxy's table.  Re-validated, so a
+             * corrupt or stale word drops loudly rather than dispatching
+             * through garbage. */
+            {
+                struct com_proxy *rp = proxy_from_pointer( *(void **)(r + lay->self) );
+                if (!rp || rp->iface != iface)
+                {
+                    ERR( "journal record for %s names proxy %p which is not live as %s; skipped\n",
+                         sl->name, *(void **)(r + lay->self), itf->name );
+                    r += bytes;
+                    continue;
+                }
+                p = rp;
             }
             TRACE( "journal: replay %s proxy %p\n", sl->name, p );
             status = invoke_marshalled( itf, sl, p, iface, slot, rawargs, &rax, NULL );
@@ -1527,68 +1572,134 @@ static void wc_journal_drain( struct com_proxy *p )
  *
  * The idle check is two loads and no lock, which is what every dispatch
  * pays for the rings that are quiet. */
-static void wc_ctx_drain( struct com_proxy *p, BOOL on_proxy )
+static void wc_ctx_drain( struct ctx_ring *r, BOOL on_proxy )
 {
     UINT64 pos, cons;
-    BYTE *r;
 
-    pos = __atomic_load_n( &p->jr_pos, __ATOMIC_ACQUIRE );
-    cons = p->jr_cons;
+    pos = __atomic_load_n( &r->pos, __ATOMIC_ACQUIRE );
+    cons = r->cons;
     if (pos == cons && !(on_proxy && pos)) return;
 
     RtlEnterCriticalSection( &jr_cs );
-    if (!p->jr_base || p->jr_draining)   /* freed under us, or our own outer drain */
+    if (!r->host || r->draining)   /* released under us, or our own outer drain */
     {
         RtlLeaveCriticalSection( &jr_cs );
         return;
     }
-    p->jr_draining = TRUE;
-    pos = __atomic_load_n( &p->jr_pos, __ATOMIC_ACQUIRE );
-    cons = p->jr_cons;
-    r = p->jr_base;
-    if (pos > p->jr_cap || cons > pos)
+    r->draining = TRUE;
+    pos = __atomic_load_n( &r->pos, __ATOMIC_ACQUIRE );
+    cons = r->cons;
+    if (pos > r->cap + JOURNAL_GEN_MAX_REC || cons > pos)
     {
-        ERR( "context journal pos %I64u cons %I64u cap %I64u on %s proxy %p; dropping the ring\n",
-             pos, cons, p->jr_cap, wc_surface->ifaces[p->iface].name, p );
-        p->jr_cons = pos;
+        /* (a snippet past its room check may finish one record after a
+         * detach set cap to 0, hence the slack) */
+        ERR( "context journal pos %I64u cons %I64u cap %I64u host %p; dropping the ring\n",
+             pos, cons, r->cap, r->host );
+        r->cons = pos;
     }
     else if (pos > cons)
     {
-        if (journal_sabotage) p->jr_cons = pos;
+        if (journal_sabotage) r->cons = pos;
         else
         {
-            journal_replay_range( p, r + cons, r + pos );
-            p->jr_cons = pos;
+            journal_replay_range( NULL, ctx_ring_data( r ) + cons, ctx_ring_data( r ) + pos );
+            r->cons = pos;
         }
     }
     if (on_proxy)
     {
-        p->jr_cons = 0;
-        __atomic_store_n( &p->jr_pos, 0, __ATOMIC_RELEASE );
+        r->cons = 0;
+        __atomic_store_n( &r->pos, 0, __ATOMIC_RELEASE );
     }
-    p->jr_draining = FALSE;
+    r->draining = FALSE;
     RtlLeaveCriticalSection( &jr_cs );
 }
 
-/* the drain every dispatch runs: every registered context ring that has
- * something unreplayed */
+/* the drain every dispatch runs: every live ring that has something
+ * unreplayed */
 static void wc_ctx_drain_all( void )
 {
     UINT i;
 
     for (i = 0; i < CTX_RINGS_MAX; i++)
     {
-        struct com_proxy *p = __atomic_load_n( &ctx_rings[i], __ATOMIC_ACQUIRE );
-        if (p && __atomic_load_n( &p->jr_pos, __ATOMIC_ACQUIRE ) != p->jr_cons)
-            wc_ctx_drain( p, FALSE );
+        struct ctx_ring *r = __atomic_load_n( &ctx_pool[i], __ATOMIC_ACQUIRE );
+        if (r && r->host && __atomic_load_n( &r->pos, __ATOMIC_ACQUIRE ) != r->cons)
+            wc_ctx_drain( r, FALSE );
     }
 }
 
 /* the scope-aware form for the callers that only know they hold a proxy */
 static void wc_proxy_drain( struct com_proxy *p, BOOL on_proxy )
 {
-    if (p->jr_scope == JG_SCOPE_CTX) wc_ctx_drain( p, on_proxy );
+    if (p->jr_scope == JG_SCOPE_CTX)
+    {
+        struct ctx_ring *r = (struct ctx_ring *)__atomic_load_n( &p->jr_base, __ATOMIC_ACQUIRE );
+        if (r) wc_ctx_drain( r, on_proxy );
+    }
     else wc_journal_drain( p );
+}
+
+/* Find or claim the ring for `host`, taking one reference; NULL when the
+ * pool is full or memory is short (the proxy then traps, the old world).
+ * Lock-free by design -- see the pool's comment. */
+static struct ctx_ring *ctx_ring_acquire( void *host )
+{
+    UINT i;
+
+    for (i = 0; i < CTX_RINGS_MAX; i++)
+    {
+        struct ctx_ring *r = __atomic_load_n( &ctx_pool[i], __ATOMIC_ACQUIRE );
+        LONG v;
+        if (!r || r->host != host) continue;
+        while ((v = r->refs) > 0)
+            if (InterlockedCompareExchange( &r->refs, v + 1, v ) == v) return r;
+        /* refs 0: a ring on its way out; fall through to a fresh one */
+    }
+    for (i = 0; i < CTX_RINGS_MAX; i++)
+    {
+        struct ctx_ring *r = __atomic_load_n( &ctx_pool[i], __ATOMIC_ACQUIRE );
+        if (!r)
+        {
+            SIZE_T size = JG_HDR_DATA + JOURNAL_CTX_RING_SIZE;
+            void *mem = NULL;
+            if (NtAllocateVirtualMemory( NtCurrentProcess(), &mem, 0, &size,
+                                         MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE ))
+                return NULL;
+            if (InterlockedCompareExchangePointer( (void **)&ctx_pool[i], mem, NULL ))
+            {
+                SIZE_T zero = 0;
+                NtFreeVirtualMemory( NtCurrentProcess(), &mem, &zero, MEM_RELEASE );
+                r = ctx_pool[i];   /* the winner's */
+            }
+            else r = mem;
+        }
+        if (r->host) continue;
+        if (InterlockedCompareExchangePointer( &r->host, host, NULL )) continue;
+        /* ours: publish an empty, attached ring.  pos/cons are 0 (fresh, or
+         * zeroed by the release that freed the slot) */
+        r->refs = 1;
+        r->cons = 0;
+        __atomic_store_n( &r->pos, 0, __ATOMIC_RELEASE );
+        __atomic_store_n( &r->cap, (UINT64)JOURNAL_CTX_RING_SIZE, __ATOMIC_RELEASE );
+        TRACE( "journal: context ring %p armed for host %p\n", r, host );
+        return r;
+    }
+    return NULL;
+}
+
+/* Drop one reference; the last one detaches the ring and frees its slot.
+ * Whatever is still recorded belonged to an object the guest no longer
+ * holds. */
+static void ctx_ring_release( struct ctx_ring *r )
+{
+    if (InterlockedDecrement( &r->refs )) return;
+    RtlEnterCriticalSection( &jr_cs );
+    __atomic_store_n( &r->cap, 0, __ATOMIC_RELEASE );
+    r->cons = 0;
+    __atomic_store_n( &r->pos, 0, __ATOMIC_RELEASE );
+    __atomic_store_n( &r->host, NULL, __ATOMIC_RELEASE );
+    RtlLeaveCriticalSection( &jr_cs );
 }
 
 /* Multithread protection (ID3D11Multithread::SetMultithreadProtected /
@@ -1596,9 +1707,8 @@ static void wc_proxy_drain( struct com_proxy *p, BOOL on_proxy )
  * another thread's dispatch drains: the replay would take the same DXVK
  * lock under jr_cs, and the lock holder's next trap would wait on jr_cs --
  * a cycle.  The moment that interface is used, the context journal goes
- * off for the process: every ring is replayed and detached (jr_base NULL
- * makes every snippet fall back forever; the memory stays, because a
- * guest thread may be inside a snippet that already loaded the base). */
+ * off for the process: every ring is detached (cap 0 makes every snippet
+ * fall back forever) and replayed one last time. */
 static void wc_ctx_journal_disable( const char *why )
 {
     UINT i;
@@ -1610,11 +1720,10 @@ static void wc_ctx_journal_disable( const char *why )
         ERR( "context journal OFF for this process: %s\n", why );
         for (i = 0; i < CTX_RINGS_MAX; i++)
         {
-            struct com_proxy *p = ctx_rings[i];
-            if (!p) continue;
-            wc_ctx_drain( p, FALSE );
-            p->jr_base = NULL;
-            __atomic_store_n( &ctx_rings[i], NULL, __ATOMIC_RELEASE );
+            struct ctx_ring *r = ctx_pool[i];
+            if (!r || !r->host) continue;
+            __atomic_store_n( &r->cap, 0, __ATOMIC_RELEASE );   /* every snippet falls back from here */
+            wc_ctx_drain( r, FALSE );
         }
         ctx_journal_off = TRUE;
     }
@@ -1727,7 +1836,8 @@ static void install_journal_gen( unsigned char **code )
             }
 
             vslot = &guest_vtbl_block[iface_slot_base[i] + n];
-            len = jg_emit( *code, def, &journal_gen_lay[g - 1], (i << 16) | n, JSH_GEN, *vslot );
+            len = jg_emit( *code, def, &journal_gen_lay[g - 1], (i << 16) | n, JSH_GEN, *vslot,
+                           def->scope == JG_SCOPE_CTX );
             if (len > JG_SNIPPET_MAX)
             {
                 /* cannot happen for the table as written; loud if it ever does */
@@ -2899,29 +3009,26 @@ void *winecom_wrap( void *host, UINT iface )
          * leaves the snippets on their fallback path -- every call traps,
          * which is the old world.  A context-scope ring also needs a
          * registry slot, claimed here without a lock. */
-        SIZE_T ring = iface_journaled[iface] == JG_SCOPE_CTX ? JOURNAL_CTX_RING_SIZE
-                                                             : JOURNAL_RING_SIZE;
+        SIZE_T ring = JOURNAL_RING_SIZE;
         void *mem = NULL;
-        int reg = -1;
 
         if (iface_journaled[iface] == JG_SCOPE_CTX)
         {
-            UINT k;
-            for (k = 0; k < CTX_RINGS_MAX; k++)
-                if (!ctx_rings[k] &&
-                    !InterlockedCompareExchangePointer( (void **)&ctx_rings[k], p, NULL ))
-                { reg = k; break; }
-            if (reg < 0) ring = 0;   /* registry full: this context traps */
+            /* the host's ring, shared with every other proxy of it */
+            struct ctx_ring *r = ctx_ring_acquire( host );
+            if (r)
+            {
+                p->jr_scope = JG_SCOPE_CTX;
+                __atomic_store_n( &p->jr_base, (BYTE *)r, __ATOMIC_RELEASE );
+            }
         }
-        if (ring && !NtAllocateVirtualMemory( NtCurrentProcess(), &mem, 0, &ring,
-                                              MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE ))
+        else if (!NtAllocateVirtualMemory( NtCurrentProcess(), &mem, 0, &ring,
+                                           MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE ))
         {
             p->jr_cap = ring;
-            p->jr_scope = iface_journaled[iface];
+            p->jr_scope = JG_SCOPE_LIST;
             __atomic_store_n( &p->jr_base, (BYTE *)mem, __ATOMIC_RELEASE );
         }
-        else if (reg >= 0)
-            __atomic_store_n( &ctx_rings[reg], NULL, __ATOMIC_RELEASE );
     }
     if (++intern_count > intern_mask + 1)
     {
@@ -3040,7 +3147,7 @@ static ULONG proxy_release( struct com_proxy *p )
 {
     UINT iface = p->iface;   /* read before the free below */
     struct com_proxy **link;
-    void *host = NULL, *mem_ring;
+    void *host = NULL;
     ULONG refs;
 
     RtlEnterCriticalSection( &wc_cs );
@@ -3059,24 +3166,11 @@ static ULONG proxy_release( struct com_proxy *p )
                wc_surface->ifaces[p->iface].name, host );
         if (p->jr_scope == JG_SCOPE_CTX)
         {
-            /* a context ring: leave the registry, then detach under jr_cs
-             * so a drain in flight on another thread sees no ring rather
-             * than a freed one.  What it still held was state for an
-             * object that no longer exists. */
-            UINT k;
-            for (k = 0; k < CTX_RINGS_MAX; k++)
-                if (ctx_rings[k] == p)
-                    InterlockedCompareExchangePointer( (void **)&ctx_rings[k], NULL, p );
-            RtlEnterCriticalSection( &jr_cs );
-            mem_ring = p->jr_base;
+            /* one reference on the host's shared ring goes with this proxy */
+            struct ctx_ring *r = (struct ctx_ring *)p->jr_base;
             p->jr_base = NULL;
             p->jr_scope = 0;
-            RtlLeaveCriticalSection( &jr_cs );
-            if (mem_ring)
-            {
-                SIZE_T ring = 0;
-                NtFreeVirtualMemory( NtCurrentProcess(), &mem_ring, &ring, MEM_RELEASE );
-            }
+            if (r) ctx_ring_release( r );
         }
         else if (p->jr_base)
         {

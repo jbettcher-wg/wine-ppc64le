@@ -144,6 +144,10 @@ if [ "$SABOTAGE" = 0 ]; then
     [ "${n:-0}" -ge 60 ] || bad "expected >= 60 generic slots installed, saw ${n:-0}"
     n=$(replays pos) || true
     [ "${n:-0}" -ge 12 ] || bad "expected >= 12 replay lines, saw ${n:-0}"
+    grep -q 'journal: replay ID3D11DeviceContext1::VSSetConstantBuffers1 proxy' "$OUT/pos.err" \
+        || bad "the Context1 proxy's calls were never replayed"
+    n=$(grep -c 'journal: context ring .* armed for host' "$OUT/pos.err") || true
+    [ "${n:-0}" -eq 1 ] || bad "expected ONE shared context ring for the two proxies, saw ${n:-0}"
     for m in $DRIVEN; do
         grep -q "journal: replay ID3D11DeviceContext::$m proxy" "$OUT/pos.err" \
             || bad "$m was never replayed"
