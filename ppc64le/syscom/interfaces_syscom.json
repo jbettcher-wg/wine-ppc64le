@@ -6190,6 +6190,46 @@
         }
       ]
     },
+    "IMMEndpoint": {
+      "uuid": "1be09788-6894-4089-8586-9a2a6c265ac5",
+      "base": "IUnknown",
+      "header": "mmdeviceapi.h",
+      "slots": [
+        {
+          "slot": 0,
+          "owner": "IUnknown",
+          "name": "QueryInterface",
+          "ret": "HRESULT",
+          "params": [
+            "REFIID riid",
+            "void **ppvObject"
+          ]
+        },
+        {
+          "slot": 1,
+          "owner": "IUnknown",
+          "name": "AddRef",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 2,
+          "owner": "IUnknown",
+          "name": "Release",
+          "ret": "ULONG",
+          "params": []
+        },
+        {
+          "slot": 3,
+          "owner": "IMMEndpoint",
+          "name": "GetDataFlow",
+          "ret": "HRESULT",
+          "params": [
+            "EDataFlow *pDataFlow"
+          ]
+        }
+      ]
+    },
     "IMMNotificationClient": {
       "uuid": "7991eec9-7e89-4d85-8390-6c703cec60c0",
       "base": "IUnknown",

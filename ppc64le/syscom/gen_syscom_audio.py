@@ -177,15 +177,23 @@ XAUDIO2_IFACES = ["IXAudio2", "IXAudio2Voice", "IXAudio2SourceVoice",
 # NOT here, and for a reason rather than an omission:
 #   IXAudio2Extension is 2.8+ only and absent from the 2.7 header.
 MMDEV_IFACES = ["IMMDeviceEnumerator", "IMMDeviceCollection", "IMMDevice",
+                "IMMEndpoint",
                 "IAudioClient", "IAudioRenderClient", "IMMNotificationClient"]
+# IMMEndpoint: RimWorld (Unity 2022.3, FMOD) took it on, 2026-09-04.  Its
+# audio boot QIs every IMMDevice for IMMEndpoint and calls GetDataFlow
+# through the result WITHOUT checking the HRESULT -- the honest refusal
+# left NULL in rcx and the game called slot 3 of address zero
+# (UnityPlayer.dll+176adfa, rax still E_NOINTERFACE).  One slot,
+# GetDataFlow(EDataFlow*), an out-DWORD: the same lesson as IPropertyStore
+# below.
 # IMMNotificationClient is here for the same reason IXAudio2EngineCallback is:
 # it is implemented BY the application, mmdevapi keeps the pointer and calls it
 # from its own notification thread, and the reverse direction needs its slot
 # table to marshal by.
 #
-# NOT here: IMMEndpoint / IAudioClient2/3 / IAudioClock / the volume
-# interfaces (nothing on the measured path asks for them, and an unrostered
-# IID is refused loudly by winecom rather than served wrongly).
+# NOT here: IAudioClient2/3 / IAudioClock / the volume interfaces (nothing
+# on the measured path asks for them, and an unrostered IID is refused
+# loudly by winecom rather than served wrongly).
 #
 # IPropertyStore WAS on that list, and Cyberpunk 2077 took it off.  Its audio
 # boot calls IMMDevice::OpenPropertyStore and does not check the HRESULT --

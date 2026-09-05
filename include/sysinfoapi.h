@@ -110,6 +110,8 @@ WINBASEAPI BOOL        WINAPI SetComputerNameExW(COMPUTER_NAME_FORMAT,LPCWSTR);
 WINBASEAPI BOOL        WINAPI SetLocalTime(const SYSTEMTIME*);
 WINBASEAPI BOOL        WINAPI SetSystemTime(const SYSTEMTIME*);
 WINBASEAPI BOOL        WINAPI SetSystemTimeAdjustment(DWORD,BOOL);
+/* appended: tools/spec2thunk cites this header BY LINE (kernel32.thunks) */
+WINBASEAPI BOOL        WINAPI GetSystemTimes(LPFILETIME,LPFILETIME,LPFILETIME);
 
 #ifdef __cplusplus
 }

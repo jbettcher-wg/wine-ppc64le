@@ -222,7 +222,7 @@ SURFACES = {
             "IEnumConnectionPoints", "IEnumConnections", "IEnumMoniker",
             "IEnumSTATSTG", "IEnumString", "IEnumUnknown", "IErrorInfo",
             "IGlobalInterfaceTable", "IInspectable", "ILockBytes", "IMMDevice",
-            "IMMDeviceCollection", "IMMDeviceEnumerator", "IMMNotificationClient",
+            "IMMDeviceCollection", "IMMDeviceEnumerator", "IMMEndpoint", "IMMNotificationClient",
             "IMalloc", "IMarshal", "IMoniker", "IMultiQI", "IPersist",
             "IPersistFile", "IPersistStream", "IPersistStreamInit",
             "IRecordInfo", "IReferenceClock", "IRunningObjectTable",

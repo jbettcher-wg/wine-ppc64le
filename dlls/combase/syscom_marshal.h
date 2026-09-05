@@ -1,13 +1,13 @@
 /* GENERATED -- do not edit.
  *
- * Marshal tables for the wine-syscom surface (94 interfaces, 1056 vtable
+ * Marshal tables for the wine-syscom surface (95 interfaces, 1060 vtable
  * slots).  Interface order is sorted by name -- the same order spec2thunk
  * COM mode gives the guest module's stub arrays, and the runtime
  * cross-checks the IIDs at attach so the two cannot silently disagree.
  * Slot/iface types and WINECOM_CA_* classes come from
  * include/wine/winecom.h, which must be included before this file.
  *
- * The 36 audio interfaces -- the XAudio2 2.7 family and the WASAPI device
+ * The 37 audio interfaces -- the XAudio2 2.7 family and the WASAPI device
  * chain -- are generated from interfaces_syscom.json by
  * ppc64le/syscom/gen_syscom_audio.py, which also owns the enum, the
  * interface array and the roster indices in every xaux[] here.  The other
@@ -97,46 +97,47 @@ enum syscom_iface_index
     SYSCOM_IFACE_IMMDevice = 52,
     SYSCOM_IFACE_IMMDeviceCollection = 53,
     SYSCOM_IFACE_IMMDeviceEnumerator = 54,
-    SYSCOM_IFACE_IMMNotificationClient = 55,
-    SYSCOM_IFACE_IMalloc = 56,
-    SYSCOM_IFACE_IMarshal = 57,
-    SYSCOM_IFACE_IMoniker = 58,
-    SYSCOM_IFACE_IMultiQI = 59,
-    SYSCOM_IFACE_INetwork = 60,
-    SYSCOM_IFACE_INetworkConnection = 61,
-    SYSCOM_IFACE_INetworkListManager = 62,
-    SYSCOM_IFACE_IPersist = 63,
-    SYSCOM_IFACE_IPersistFile = 64,
-    SYSCOM_IFACE_IPersistStream = 65,
-    SYSCOM_IFACE_IPersistStreamInit = 66,
-    SYSCOM_IFACE_IPropertyStore = 67,
-    SYSCOM_IFACE_IRecordInfo = 68,
-    SYSCOM_IFACE_IReferenceClock = 69,
-    SYSCOM_IFACE_IRunningObjectTable = 70,
-    SYSCOM_IFACE_ISequentialStream = 71,
-    SYSCOM_IFACE_ISimpleAudioVolume = 72,
-    SYSCOM_IFACE_IStorage = 73,
-    SYSCOM_IFACE_IStream = 74,
-    SYSCOM_IFACE_ISupportErrorInfo = 75,
-    SYSCOM_IFACE_ITypeComp = 76,
-    SYSCOM_IFACE_ITypeInfo = 77,
-    SYSCOM_IFACE_ITypeLib = 78,
-    SYSCOM_IFACE_IUnknown = 79,
-    SYSCOM_IFACE_IWbemCallResult = 80,
-    SYSCOM_IFACE_IWbemClassObject = 81,
-    SYSCOM_IFACE_IWbemContext = 82,
-    SYSCOM_IFACE_IWbemLocator = 83,
-    SYSCOM_IFACE_IWbemObjectSink = 84,
-    SYSCOM_IFACE_IWbemQualifierSet = 85,
-    SYSCOM_IFACE_IWbemServices = 86,
-    SYSCOM_IFACE_IXAudio2 = 87,
-    SYSCOM_IFACE_IXAudio2EngineCallback = 88,
-    SYSCOM_IFACE_IXAudio2MasteringVoice = 89,
-    SYSCOM_IFACE_IXAudio2SourceVoice = 90,
-    SYSCOM_IFACE_IXAudio2SubmixVoice = 91,
-    SYSCOM_IFACE_IXAudio2Voice = 92,
-    SYSCOM_IFACE_IXAudio2VoiceCallback = 93,
-    SYSCOM_IFACE_COUNT = 94
+    SYSCOM_IFACE_IMMEndpoint = 55,
+    SYSCOM_IFACE_IMMNotificationClient = 56,
+    SYSCOM_IFACE_IMalloc = 57,
+    SYSCOM_IFACE_IMarshal = 58,
+    SYSCOM_IFACE_IMoniker = 59,
+    SYSCOM_IFACE_IMultiQI = 60,
+    SYSCOM_IFACE_INetwork = 61,
+    SYSCOM_IFACE_INetworkConnection = 62,
+    SYSCOM_IFACE_INetworkListManager = 63,
+    SYSCOM_IFACE_IPersist = 64,
+    SYSCOM_IFACE_IPersistFile = 65,
+    SYSCOM_IFACE_IPersistStream = 66,
+    SYSCOM_IFACE_IPersistStreamInit = 67,
+    SYSCOM_IFACE_IPropertyStore = 68,
+    SYSCOM_IFACE_IRecordInfo = 69,
+    SYSCOM_IFACE_IReferenceClock = 70,
+    SYSCOM_IFACE_IRunningObjectTable = 71,
+    SYSCOM_IFACE_ISequentialStream = 72,
+    SYSCOM_IFACE_ISimpleAudioVolume = 73,
+    SYSCOM_IFACE_IStorage = 74,
+    SYSCOM_IFACE_IStream = 75,
+    SYSCOM_IFACE_ISupportErrorInfo = 76,
+    SYSCOM_IFACE_ITypeComp = 77,
+    SYSCOM_IFACE_ITypeInfo = 78,
+    SYSCOM_IFACE_ITypeLib = 79,
+    SYSCOM_IFACE_IUnknown = 80,
+    SYSCOM_IFACE_IWbemCallResult = 81,
+    SYSCOM_IFACE_IWbemClassObject = 82,
+    SYSCOM_IFACE_IWbemContext = 83,
+    SYSCOM_IFACE_IWbemLocator = 84,
+    SYSCOM_IFACE_IWbemObjectSink = 85,
+    SYSCOM_IFACE_IWbemQualifierSet = 86,
+    SYSCOM_IFACE_IWbemServices = 87,
+    SYSCOM_IFACE_IXAudio2 = 88,
+    SYSCOM_IFACE_IXAudio2EngineCallback = 89,
+    SYSCOM_IFACE_IXAudio2MasteringVoice = 90,
+    SYSCOM_IFACE_IXAudio2SourceVoice = 91,
+    SYSCOM_IFACE_IXAudio2SubmixVoice = 92,
+    SYSCOM_IFACE_IXAudio2Voice = 93,
+    SYSCOM_IFACE_IXAudio2VoiceCallback = 94,
+    SYSCOM_IFACE_COUNT = 95
 };
 
 #define SYSCOM_HAND_COUNT 41
@@ -284,7 +285,7 @@ static const struct winecom_slot slots_IAudioSessionEvents[10] =
 static const unsigned char cls_IAudioSessionManager_3[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IAudioSessionManager_3[] = { 0, 0, 4 };
 static const unsigned char cls_IAudioSessionManager_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IAudioSessionManager_4[] = { 0, 0, 72 };
+static const unsigned char xaux_IAudioSessionManager_4[] = { 0, 0, 73 };
 static const struct winecom_slot slots_IAudioSessionManager[5] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -297,7 +298,7 @@ static const struct winecom_slot slots_IAudioSessionManager[5] =
 static const unsigned char cls_IAudioSessionManager2_3[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IAudioSessionManager2_3[] = { 0, 0, 4 };
 static const unsigned char cls_IAudioSessionManager2_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IAudioSessionManager2_4[] = { 0, 0, 72 };
+static const unsigned char xaux_IAudioSessionManager2_4[] = { 0, 0, 73 };
 static const unsigned char cls_IAudioSessionManager2_5[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IAudioSessionManager2_5[] = { 5 };
 static const unsigned char cls_IAudioSessionManager2_6[] = { WINECOM_CA_IFACE_IN };
@@ -344,13 +345,13 @@ static const struct winecom_slot slots_IAudioVolumeDuckNotification[5] =
 static const unsigned char cls_IBindCtx_3[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IBindCtx_4[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IBindCtx_8[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IBindCtx_8[] = { 70 };
+static const unsigned char xaux_IBindCtx_8[] = { 71 };
 static const unsigned char cls_IBindCtx_11[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IBindCtx_11[] = { 44 };
 static const unsigned char cls_IBindCtx_9[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IBindCtx_9[] = { 0, 79 };
+static const unsigned char xaux_IBindCtx_9[] = { 0, 80 };
 static const unsigned char cls_IBindCtx_10[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IBindCtx_10[] = { 0, 79 };
+static const unsigned char xaux_IBindCtx_10[] = { 0, 80 };
 static const struct winecom_slot slots_IBindCtx[13] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -432,7 +433,7 @@ static const unsigned char cls_IDirectMusic_5[] = { WINECOM_CA_PASS, WINECOM_CA_
 static const unsigned char xaux_IDirectMusic_5[] = { 0, 0, 29, 0 };
 static const unsigned char cls_IDirectMusic_11[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IDirectMusic_7[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusic_7[] = { 0, 69 };
+static const unsigned char xaux_IDirectMusic_7[] = { 0, 70 };
 static const struct winecom_slot slots_IDirectMusic[12] =
 {
     { "IDirectMusic::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -785,7 +786,7 @@ static const unsigned char cls_IDirectMusicPort_6[] = { WINECOM_CA_IFACE_IN, WIN
 static const unsigned char xaux_IDirectMusicPort_6[] = { 0, 20, 0, 0 };
 static const unsigned char cls_IDirectMusicPort_7[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IDirectMusicPort_8[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicPort_8[] = { 69 };
+static const unsigned char xaux_IDirectMusicPort_8[] = { 70 };
 static const unsigned char cls_IDirectMusicPort_18[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
 static const struct winecom_slot slots_IDirectMusicPort[20] =
 {
@@ -872,7 +873,7 @@ static const unsigned char cls_IDirectMusicSegment8_15[] = { WINECOM_CA_IFACE_IN
 static const unsigned char cls_IDirectMusicSegment8_20[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IDirectMusicSegment8_20[] = { 0, 0, 30 };
 static const unsigned char cls_IDirectMusicSegment8_27[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDirectMusicSegment8_27[] = { 79 };
+static const unsigned char xaux_IDirectMusicSegment8_27[] = { 80 };
 static const unsigned char cls_IDirectMusicSegment8_28[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IDirectMusicSegment8_28[] = { 0, 0, 0, 30 };
 static const unsigned char cls_IDirectMusicSegment8_29[] = { WINECOM_CA_IFACE_IN };
@@ -971,7 +972,7 @@ static const struct winecom_slot slots_IDirectMusicTrack[13] =
 };
 
 static const unsigned char cls_IDirectSound_3[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IDirectSound_3[] = { 0, 36, 79 };
+static const unsigned char xaux_IDirectSound_3[] = { 0, 36, 80 };
 static const unsigned char cls_IDirectSound_5[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IDirectSound_5[] = { 36, 36 };
 static const struct winecom_slot slots_IDirectSound[11] =
@@ -1031,7 +1032,7 @@ static const struct winecom_slot slots_IDirectSoundBuffer[21] =
 };
 
 static const unsigned char cls_IDispatch_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IDispatch_4[] = { 0, 0, 77 };
+static const unsigned char xaux_IDispatch_4[] = { 0, 0, 78 };
 static const struct winecom_slot slots_IDispatch[7] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1087,11 +1088,11 @@ static const struct winecom_slot slots_IEnumMoniker[7] =
 };
 
 static const unsigned char cls_IEnumNetworkConnections_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IEnumNetworkConnections_4[] = { 0, 0, 77 };
+static const unsigned char xaux_IEnumNetworkConnections_4[] = { 0, 0, 78 };
 static const unsigned char cls_IEnumNetworkConnections_7[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IEnumNetworkConnections_7[] = { 46 };
 static const unsigned char cls_IEnumNetworkConnections_8[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS };
-static const unsigned char xaux_IEnumNetworkConnections_8[] = { 0, 61, 0 };
+static const unsigned char xaux_IEnumNetworkConnections_8[] = { 0, 62, 0 };
 static const unsigned char cls_IEnumNetworkConnections_11[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IEnumNetworkConnections_11[] = { 41 };
 static const struct winecom_slot slots_IEnumNetworkConnections[12] =
@@ -1111,11 +1112,11 @@ static const struct winecom_slot slots_IEnumNetworkConnections[12] =
 };
 
 static const unsigned char cls_IEnumNetworks_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IEnumNetworks_4[] = { 0, 0, 77 };
+static const unsigned char xaux_IEnumNetworks_4[] = { 0, 0, 78 };
 static const unsigned char cls_IEnumNetworks_7[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IEnumNetworks_7[] = { 46 };
 static const unsigned char cls_IEnumNetworks_8[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS };
-static const unsigned char xaux_IEnumNetworks_8[] = { 0, 60, 0 };
+static const unsigned char xaux_IEnumNetworks_8[] = { 0, 61, 0 };
 static const unsigned char cls_IEnumNetworks_11[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IEnumNetworks_11[] = { 42 };
 static const struct winecom_slot slots_IEnumNetworks[12] =
@@ -1188,9 +1189,9 @@ static const struct winecom_slot slots_IEnumVARIANT[7] =
 };
 
 static const unsigned char cls_IEnumWbemClassObject_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS };
-static const unsigned char xaux_IEnumWbemClassObject_4[] = { 0, 0, 81, 0 };
+static const unsigned char xaux_IEnumWbemClassObject_4[] = { 0, 0, 82, 0 };
 static const unsigned char cls_IEnumWbemClassObject_5[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IEnumWbemClassObject_5[] = { 0, 84 };
+static const unsigned char xaux_IEnumWbemClassObject_5[] = { 0, 85 };
 static const unsigned char cls_IEnumWbemClassObject_6[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IEnumWbemClassObject_6[] = { 47 };
 static const struct winecom_slot slots_IEnumWbemClassObject[8] =
@@ -1254,7 +1255,7 @@ static const struct winecom_slot slots_ILockBytes[10] =
 };
 
 static const unsigned char cls_IMMDevice_4[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMMDevice_4[] = { 0, 67 };
+static const unsigned char xaux_IMMDevice_4[] = { 0, 68 };
 static const struct winecom_slot slots_IMMDevice[7] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1293,6 +1294,14 @@ static const struct winecom_slot slots_IMMDeviceEnumerator[8] =
     { "IMMDeviceEnumerator::GetDevice", NULL, cls_IMMDeviceEnumerator_5, xaux_IMMDeviceEnumerator_5, 3, 0, 0, 0, NULL, 0x00, 0x00, 0x02 },
     { "IMMDeviceEnumerator::RegisterEndpointNotificationCallback", NULL, NULL, NULL, 2, WINECOM_F_HAND, 6, 0, NULL, 0x00, 0x00, 0x00 },
     { "IMMDeviceEnumerator::UnregisterEndpointNotificationCallback", NULL, NULL, NULL, 2, WINECOM_F_HAND, 7, 0, NULL, 0x00, 0x00, 0x00 },
+};
+
+static const struct winecom_slot slots_IMMEndpoint[4] =
+{
+    { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
+    { "IUnknown::AddRef", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
+    { "IUnknown::Release", NULL, NULL, NULL, 1, 0, 0, 0 },  /* runtime */
+    { "IMMEndpoint::GetDataFlow", NULL, NULL, NULL, 2, 0, 0, 0, NULL, 0x00, 0x00, 0x00 },
 };
 
 static const struct winecom_slot slots_IMMNotificationClient[8] =
@@ -1346,23 +1355,23 @@ static const unsigned char cls_IMoniker_6[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_
 static const unsigned char cls_IMoniker_8[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_IMoniker_9[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
 static const unsigned char cls_IMoniker_10[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMoniker_10[] = { 0, 0, 58, 58 };
+static const unsigned char xaux_IMoniker_10[] = { 0, 0, 59, 59 };
 static const unsigned char cls_IMoniker_11[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMoniker_11[] = { 0, 0, 58 };
+static const unsigned char xaux_IMoniker_11[] = { 0, 0, 59 };
 static const unsigned char cls_IMoniker_12[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IMoniker_12[] = { 0, 40 };
 static const unsigned char cls_IMoniker_13[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IMoniker_15[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IMoniker_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IMoniker_17[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMoniker_17[] = { 58 };
+static const unsigned char xaux_IMoniker_17[] = { 59 };
 static const unsigned char cls_IMoniker_18[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMoniker_18[] = { 0, 58 };
+static const unsigned char xaux_IMoniker_18[] = { 0, 59 };
 static const unsigned char cls_IMoniker_19[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMoniker_19[] = { 0, 58 };
+static const unsigned char xaux_IMoniker_19[] = { 0, 59 };
 static const unsigned char cls_IMoniker_20[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IMoniker_21[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IMoniker_21[] = { 11, 58, 0, 0, 58 };
+static const unsigned char xaux_IMoniker_21[] = { 11, 59, 0, 0, 59 };
 static const struct winecom_slot slots_IMoniker[23] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1401,7 +1410,7 @@ static const struct winecom_slot slots_IMultiQI[4] =
 };
 
 static const unsigned char cls_INetwork_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_INetwork_4[] = { 0, 0, 77 };
+static const unsigned char xaux_INetwork_4[] = { 0, 0, 78 };
 static const unsigned char cls_INetwork_13[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_INetwork_13[] = { 41 };
 static const struct winecom_slot slots_INetwork[20] =
@@ -1429,9 +1438,9 @@ static const struct winecom_slot slots_INetwork[20] =
 };
 
 static const unsigned char cls_INetworkConnection_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_INetworkConnection_4[] = { 0, 0, 77 };
+static const unsigned char xaux_INetworkConnection_4[] = { 0, 0, 78 };
 static const unsigned char cls_INetworkConnection_7[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_INetworkConnection_7[] = { 60 };
+static const unsigned char xaux_INetworkConnection_7[] = { 61 };
 static const struct winecom_slot slots_INetworkConnection[14] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1451,7 +1460,7 @@ static const struct winecom_slot slots_INetworkConnection[14] =
 };
 
 static const unsigned char cls_INetworkListManager_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_INetworkListManager_4[] = { 0, 0, 77 };
+static const unsigned char xaux_INetworkListManager_4[] = { 0, 0, 78 };
 static const unsigned char cls_INetworkListManager_7[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_INetworkListManager_7[] = { 0, 42 };
 static const unsigned char cls_INetworkListManager_9[] = { WINECOM_CA_IFACE_OUT_STATIC };
@@ -1540,7 +1549,7 @@ static const struct winecom_slot slots_IPropertyStore[8] =
 };
 
 static const unsigned char cls_IRecordInfo_9[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IRecordInfo_9[] = { 77 };
+static const unsigned char xaux_IRecordInfo_9[] = { 78 };
 static const unsigned char cls_IRecordInfo_15[] = { WINECOM_CA_IFACE_IN };
 static const struct winecom_slot slots_IRecordInfo[19] =
 {
@@ -1591,7 +1600,7 @@ static const struct winecom_slot slots_IReferenceClock[7] =
 static const unsigned char cls_IRunningObjectTable_3[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IRunningObjectTable_5[] = { WINECOM_CA_IFACE_IN };
 static const unsigned char cls_IRunningObjectTable_6[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IRunningObjectTable_6[] = { 0, 79 };
+static const unsigned char xaux_IRunningObjectTable_6[] = { 0, 80 };
 static const unsigned char cls_IRunningObjectTable_8[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
 static const unsigned char cls_IRunningObjectTable_9[] = { WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IRunningObjectTable_9[] = { 40 };
@@ -1632,17 +1641,17 @@ static const struct winecom_slot slots_ISimpleAudioVolume[7] =
 static const unsigned char cls_IStorage_11[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
 static const unsigned char xaux_IStorage_11[] = { 0, 0, 0, 43 };
 static const unsigned char cls_IStorage_3[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IStorage_3[] = { 0, 0, 0, 0, 74 };
+static const unsigned char xaux_IStorage_3[] = { 0, 0, 0, 0, 75 };
 static const unsigned char cls_IStorage_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IStorage_4[] = { 0, 0, 0, 0, 74 };
+static const unsigned char xaux_IStorage_4[] = { 0, 0, 0, 0, 75 };
 static const unsigned char cls_IStorage_5[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IStorage_5[] = { 0, 0, 0, 0, 73 };
+static const unsigned char xaux_IStorage_5[] = { 0, 0, 0, 0, 74 };
 static const unsigned char cls_IStorage_8[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IStorage_8[] = { 0, 73, 0, 0 };
+static const unsigned char xaux_IStorage_8[] = { 0, 74, 0, 0 };
 static const unsigned char cls_IStorage_6[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IStorage_6[] = { 0, 73, 0, 0, 0, 73 };
+static const unsigned char xaux_IStorage_6[] = { 0, 74, 0, 0, 0, 74 };
 static const unsigned char cls_IStorage_7[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IStorage_7[] = { 0, 0, 0, 73 };
+static const unsigned char xaux_IStorage_7[] = { 0, 0, 0, 74 };
 static const struct winecom_slot slots_IStorage[18] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1676,7 +1685,7 @@ static const struct winecom_slot slots_IStorage[18] =
 
 static const unsigned char cls_IStream_7[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_IStream_13[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IStream_13[] = { 74 };
+static const unsigned char xaux_IStream_13[] = { 75 };
 static const struct winecom_slot slots_IStream[14] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1704,7 +1713,7 @@ static const struct winecom_slot slots_ISupportErrorInfo[4] =
 };
 
 static const unsigned char cls_ITypeComp_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_ITypeComp_4[] = { 0, 0, 77, 76 };
+static const unsigned char xaux_ITypeComp_4[] = { 0, 0, 78, 77 };
 static const struct winecom_slot slots_ITypeComp[5] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1717,14 +1726,14 @@ static const struct winecom_slot slots_ITypeComp[5] =
 };
 
 static const unsigned char cls_ITypeInfo_4[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_ITypeInfo_4[] = { 76 };
+static const unsigned char xaux_ITypeInfo_4[] = { 77 };
 static const unsigned char cls_ITypeInfo_14[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_ITypeInfo_14[] = { 0, 77 };
+static const unsigned char xaux_ITypeInfo_14[] = { 0, 78 };
 static const unsigned char cls_ITypeInfo_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
 static const unsigned char cls_ITypeInfo_18[] = { WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS };
-static const unsigned char xaux_ITypeInfo_18[] = { 78, 0 };
+static const unsigned char xaux_ITypeInfo_18[] = { 79, 0 };
 static const unsigned char cls_up_ITypeInfo_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_RIID, WINECOM_CA_PPV_OUT };
-static const unsigned char xaux_up_ITypeInfo_16[] = { 79, 0, 0 };
+static const unsigned char xaux_up_ITypeInfo_16[] = { 80, 0, 0 };
 static const struct winecom_slot slots_ITypeInfo[22] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1754,13 +1763,13 @@ static const struct winecom_slot slots_ITypeInfo[22] =
 };
 
 static const unsigned char cls_ITypeLib_4[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_ITypeLib_4[] = { 0, 77 };
+static const unsigned char xaux_ITypeLib_4[] = { 0, 78 };
 static const unsigned char cls_ITypeLib_6[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_ITypeLib_6[] = { 0, 77 };
+static const unsigned char xaux_ITypeLib_6[] = { 0, 78 };
 static const unsigned char cls_ITypeLib_8[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_ITypeLib_8[] = { 76 };
+static const unsigned char xaux_ITypeLib_8[] = { 77 };
 static const unsigned char cls_ITypeLib_11[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_ITypeLib_11[] = { 0, 0, 77, 0, 0 };
+static const unsigned char xaux_ITypeLib_11[] = { 0, 0, 78, 0, 0 };
 static const struct winecom_slot slots_ITypeLib[13] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1788,9 +1797,9 @@ static const struct winecom_slot slots_IUnknown[3] =
 };
 
 static const unsigned char cls_IWbemCallResult_3[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemCallResult_3[] = { 0, 81 };
+static const unsigned char xaux_IWbemCallResult_3[] = { 0, 82 };
 static const unsigned char cls_IWbemCallResult_5[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemCallResult_5[] = { 0, 86 };
+static const unsigned char xaux_IWbemCallResult_5[] = { 0, 87 };
 static const struct winecom_slot slots_IWbemCallResult[7] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1803,25 +1812,25 @@ static const struct winecom_slot slots_IWbemCallResult[7] =
 };
 
 static const unsigned char cls_IWbemClassObject_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemClassObject_3[] = { 85 };
+static const unsigned char xaux_IWbemClassObject_3[] = { 86 };
 static const unsigned char cls_IWbemClassObject_11[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemClassObject_11[] = { 0, 85 };
+static const unsigned char xaux_IWbemClassObject_11[] = { 0, 86 };
 static const unsigned char cls_IWbemClassObject_12[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemClassObject_12[] = { 81 };
+static const unsigned char xaux_IWbemClassObject_12[] = { 82 };
 static const unsigned char cls_IWbemClassObject_14[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemClassObject_14[] = { 0, 81 };
+static const unsigned char xaux_IWbemClassObject_14[] = { 0, 82 };
 static const unsigned char cls_IWbemClassObject_15[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemClassObject_15[] = { 0, 81 };
+static const unsigned char xaux_IWbemClassObject_15[] = { 0, 82 };
 static const unsigned char cls_IWbemClassObject_16[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IWbemClassObject_16[] = { 0, 81 };
+static const unsigned char xaux_IWbemClassObject_16[] = { 0, 82 };
 static const unsigned char cls_IWbemClassObject_19[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemClassObject_19[] = { 0, 0, 81, 81 };
+static const unsigned char xaux_IWbemClassObject_19[] = { 0, 0, 82, 82 };
 static const unsigned char cls_IWbemClassObject_20[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IWbemClassObject_20[] = { 0, 0, 81, 81 };
+static const unsigned char xaux_IWbemClassObject_20[] = { 0, 0, 82, 82 };
 static const unsigned char cls_IWbemClassObject_23[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemClassObject_23[] = { 0, 0, 81, 81 };
+static const unsigned char xaux_IWbemClassObject_23[] = { 0, 0, 82, 82 };
 static const unsigned char cls_IWbemClassObject_25[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemClassObject_25[] = { 0, 85 };
+static const unsigned char xaux_IWbemClassObject_25[] = { 0, 86 };
 static const struct winecom_slot slots_IWbemClassObject[27] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1854,7 +1863,7 @@ static const struct winecom_slot slots_IWbemClassObject[27] =
 };
 
 static const unsigned char cls_IWbemContext_3[] = { WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemContext_3[] = { 82 };
+static const unsigned char xaux_IWbemContext_3[] = { 83 };
 static const struct winecom_slot slots_IWbemContext[12] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1872,7 +1881,7 @@ static const struct winecom_slot slots_IWbemContext[12] =
 };
 
 static const unsigned char cls_IWbemLocator_3[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemLocator_3[] = { 0, 0, 0, 0, 0, 0, 82, 86 };
+static const unsigned char xaux_IWbemLocator_3[] = { 0, 0, 0, 0, 0, 0, 83, 87 };
 static const struct winecom_slot slots_IWbemLocator[4] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1882,9 +1891,9 @@ static const struct winecom_slot slots_IWbemLocator[4] =
 };
 
 static const unsigned char cls_IWbemObjectSink_3[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_ARR_IN };
-static const unsigned char xaux_IWbemObjectSink_3[] = { 0, 81 };
+static const unsigned char xaux_IWbemObjectSink_3[] = { 0, 82 };
 static const unsigned char cls_IWbemObjectSink_4[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IWbemObjectSink_4[] = { 0, 0, 0, 81 };
+static const unsigned char xaux_IWbemObjectSink_4[] = { 0, 0, 0, 82 };
 static const struct winecom_slot slots_IWbemObjectSink[5] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1909,51 +1918,51 @@ static const struct winecom_slot slots_IWbemQualifierSet[10] =
 };
 
 static const unsigned char cls_IWbemServices_3[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemServices_3[] = { 0, 0, 82, 86, 80 };
+static const unsigned char xaux_IWbemServices_3[] = { 0, 0, 83, 87, 81 };
 static const unsigned char cls_IWbemServices_4[] = { WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IWbemServices_4[] = { 84 };
+static const unsigned char xaux_IWbemServices_4[] = { 85 };
 static const unsigned char cls_IWbemServices_5[] = { WINECOM_CA_PASS, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemServices_5[] = { 0, 84 };
+static const unsigned char xaux_IWbemServices_5[] = { 0, 85 };
 static const unsigned char cls_IWbemServices_6[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemServices_6[] = { 0, 0, 82, 81, 80 };
+static const unsigned char xaux_IWbemServices_6[] = { 0, 0, 83, 82, 81 };
 static const unsigned char cls_IWbemServices_7[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IWbemServices_7[] = { 0, 0, 82, 84 };
+static const unsigned char xaux_IWbemServices_7[] = { 0, 0, 83, 85 };
 static const unsigned char cls_IWbemServices_8[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemServices_8[] = { 81, 0, 82, 80 };
+static const unsigned char xaux_IWbemServices_8[] = { 82, 0, 83, 81 };
 static const unsigned char cls_IWbemServices_9[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IWbemServices_9[] = { 81, 0, 82, 84 };
+static const unsigned char xaux_IWbemServices_9[] = { 82, 0, 83, 85 };
 static const unsigned char cls_IWbemServices_10[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemServices_10[] = { 0, 0, 82, 80 };
+static const unsigned char xaux_IWbemServices_10[] = { 0, 0, 83, 81 };
 static const unsigned char cls_IWbemServices_11[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IWbemServices_11[] = { 0, 0, 82, 84 };
+static const unsigned char xaux_IWbemServices_11[] = { 0, 0, 83, 85 };
 static const unsigned char cls_IWbemServices_12[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemServices_12[] = { 0, 0, 82, 47 };
+static const unsigned char xaux_IWbemServices_12[] = { 0, 0, 83, 47 };
 static const unsigned char cls_IWbemServices_13[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IWbemServices_13[] = { 0, 0, 82, 84 };
+static const unsigned char xaux_IWbemServices_13[] = { 0, 0, 83, 85 };
 static const unsigned char cls_IWbemServices_14[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemServices_14[] = { 81, 0, 82, 80 };
+static const unsigned char xaux_IWbemServices_14[] = { 82, 0, 83, 81 };
 static const unsigned char cls_IWbemServices_15[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IWbemServices_15[] = { 81, 0, 82, 84 };
+static const unsigned char xaux_IWbemServices_15[] = { 82, 0, 83, 85 };
 static const unsigned char cls_IWbemServices_16[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemServices_16[] = { 0, 0, 82, 80 };
+static const unsigned char xaux_IWbemServices_16[] = { 0, 0, 83, 81 };
 static const unsigned char cls_IWbemServices_17[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IWbemServices_17[] = { 0, 0, 82, 84 };
+static const unsigned char xaux_IWbemServices_17[] = { 0, 0, 83, 85 };
 static const unsigned char cls_IWbemServices_18[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemServices_18[] = { 0, 0, 82, 47 };
+static const unsigned char xaux_IWbemServices_18[] = { 0, 0, 83, 47 };
 static const unsigned char cls_IWbemServices_19[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IWbemServices_19[] = { 0, 0, 82, 84 };
+static const unsigned char xaux_IWbemServices_19[] = { 0, 0, 83, 85 };
 static const unsigned char cls_IWbemServices_20[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemServices_20[] = { 0, 0, 0, 82, 47 };
+static const unsigned char xaux_IWbemServices_20[] = { 0, 0, 0, 83, 47 };
 static const unsigned char cls_IWbemServices_21[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IWbemServices_21[] = { 0, 0, 0, 82, 84 };
+static const unsigned char xaux_IWbemServices_21[] = { 0, 0, 0, 83, 85 };
 static const unsigned char cls_IWbemServices_22[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemServices_22[] = { 0, 0, 0, 82, 47 };
+static const unsigned char xaux_IWbemServices_22[] = { 0, 0, 0, 83, 47 };
 static const unsigned char cls_IWbemServices_23[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IWbemServices_23[] = { 0, 0, 0, 82, 84 };
+static const unsigned char xaux_IWbemServices_23[] = { 0, 0, 0, 83, 85 };
 static const unsigned char cls_IWbemServices_24[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_OUT_STATIC, WINECOM_CA_IFACE_OUT_STATIC };
-static const unsigned char xaux_IWbemServices_24[] = { 0, 0, 0, 82, 81, 81, 80 };
+static const unsigned char xaux_IWbemServices_24[] = { 0, 0, 0, 83, 82, 82, 81 };
 static const unsigned char cls_IWbemServices_25[] = { WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN, WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IWbemServices_25[] = { 0, 0, 0, 82, 81, 84 };
+static const unsigned char xaux_IWbemServices_25[] = { 0, 0, 0, 83, 82, 85 };
 static const struct winecom_slot slots_IWbemServices[26] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -1985,9 +1994,9 @@ static const struct winecom_slot slots_IWbemServices[26] =
 };
 
 static const unsigned char cls_IXAudio2_6[] = { WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IXAudio2_6[] = { 88 };
+static const unsigned char xaux_IXAudio2_6[] = { 89 };
 static const unsigned char cls_IXAudio2_7[] = { WINECOM_CA_IFACE_IN };
-static const unsigned char xaux_IXAudio2_7[] = { 88 };
+static const unsigned char xaux_IXAudio2_7[] = { 89 };
 static const struct winecom_slot slots_IXAudio2[16] =
 {
     { "IUnknown::QueryInterface", NULL, NULL, NULL, 3, 0, 0, 0 },  /* runtime */
@@ -2016,13 +2025,13 @@ static const struct winecom_slot slots_IXAudio2EngineCallback[3] =
 };
 
 static const unsigned char cls_IXAudio2MasteringVoice_10[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2MasteringVoice_10[] = { 92, 0, 0 };
+static const unsigned char xaux_IXAudio2MasteringVoice_10[] = { 93, 0, 0 };
 static const unsigned char cls_IXAudio2MasteringVoice_11[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2MasteringVoice_11[] = { 92, 0 };
+static const unsigned char xaux_IXAudio2MasteringVoice_11[] = { 93, 0 };
 static const unsigned char cls_IXAudio2MasteringVoice_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2MasteringVoice_16[] = { 92, 0, 0, 0, 0 };
+static const unsigned char xaux_IXAudio2MasteringVoice_16[] = { 93, 0, 0, 0, 0 };
 static const unsigned char cls_IXAudio2MasteringVoice_17[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2MasteringVoice_17[] = { 92, 0, 0, 0 };
+static const unsigned char xaux_IXAudio2MasteringVoice_17[] = { 93, 0, 0, 0 };
 static const struct winecom_slot slots_IXAudio2MasteringVoice[19] =
 {
     { "IXAudio2Voice::GetVoiceDetails", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
@@ -2047,13 +2056,13 @@ static const struct winecom_slot slots_IXAudio2MasteringVoice[19] =
 };
 
 static const unsigned char cls_IXAudio2SourceVoice_10[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2SourceVoice_10[] = { 92, 0, 0 };
+static const unsigned char xaux_IXAudio2SourceVoice_10[] = { 93, 0, 0 };
 static const unsigned char cls_IXAudio2SourceVoice_11[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2SourceVoice_11[] = { 92, 0 };
+static const unsigned char xaux_IXAudio2SourceVoice_11[] = { 93, 0 };
 static const unsigned char cls_IXAudio2SourceVoice_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2SourceVoice_16[] = { 92, 0, 0, 0, 0 };
+static const unsigned char xaux_IXAudio2SourceVoice_16[] = { 93, 0, 0, 0, 0 };
 static const unsigned char cls_IXAudio2SourceVoice_17[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2SourceVoice_17[] = { 92, 0, 0, 0 };
+static const unsigned char xaux_IXAudio2SourceVoice_17[] = { 93, 0, 0, 0 };
 static const struct winecom_slot slots_IXAudio2SourceVoice[29] =
 {
     { "IXAudio2Voice::GetVoiceDetails", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
@@ -2088,13 +2097,13 @@ static const struct winecom_slot slots_IXAudio2SourceVoice[29] =
 };
 
 static const unsigned char cls_IXAudio2SubmixVoice_10[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2SubmixVoice_10[] = { 92, 0, 0 };
+static const unsigned char xaux_IXAudio2SubmixVoice_10[] = { 93, 0, 0 };
 static const unsigned char cls_IXAudio2SubmixVoice_11[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2SubmixVoice_11[] = { 92, 0 };
+static const unsigned char xaux_IXAudio2SubmixVoice_11[] = { 93, 0 };
 static const unsigned char cls_IXAudio2SubmixVoice_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2SubmixVoice_16[] = { 92, 0, 0, 0, 0 };
+static const unsigned char xaux_IXAudio2SubmixVoice_16[] = { 93, 0, 0, 0, 0 };
 static const unsigned char cls_IXAudio2SubmixVoice_17[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2SubmixVoice_17[] = { 92, 0, 0, 0 };
+static const unsigned char xaux_IXAudio2SubmixVoice_17[] = { 93, 0, 0, 0 };
 static const struct winecom_slot slots_IXAudio2SubmixVoice[19] =
 {
     { "IXAudio2Voice::GetVoiceDetails", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
@@ -2119,13 +2128,13 @@ static const struct winecom_slot slots_IXAudio2SubmixVoice[19] =
 };
 
 static const unsigned char cls_IXAudio2Voice_10[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2Voice_10[] = { 92, 0, 0 };
+static const unsigned char xaux_IXAudio2Voice_10[] = { 93, 0, 0 };
 static const unsigned char cls_IXAudio2Voice_11[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2Voice_11[] = { 92, 0 };
+static const unsigned char xaux_IXAudio2Voice_11[] = { 93, 0 };
 static const unsigned char cls_IXAudio2Voice_16[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2Voice_16[] = { 92, 0, 0, 0, 0 };
+static const unsigned char xaux_IXAudio2Voice_16[] = { 93, 0, 0, 0, 0 };
 static const unsigned char cls_IXAudio2Voice_17[] = { WINECOM_CA_IFACE_IN, WINECOM_CA_PASS, WINECOM_CA_PASS, WINECOM_CA_PASS };
-static const unsigned char xaux_IXAudio2Voice_17[] = { 92, 0, 0, 0 };
+static const unsigned char xaux_IXAudio2Voice_17[] = { 93, 0, 0, 0 };
 static const struct winecom_slot slots_IXAudio2Voice[19] =
 {
     { "IXAudio2Voice::GetVoiceDetails", NULL, NULL, NULL, 2, WINECOM_F_RET_VOID, 0, 0, NULL, 0x00, 0x00, 0x00 },
@@ -2272,6 +2281,8 @@ static const struct winecom_iface syscom_com_ifaces[SYSCOM_IFACE_COUNT] =
       5, slots_IMMDeviceCollection, 0 },
     { "IMMDeviceEnumerator", {0xa95664d2,0x9614,0x4f35,{0xa7,0x46,0xde,0x8d,0xb6,0x36,0x17,0xe6}},
       8, slots_IMMDeviceEnumerator, 0 },
+    { "IMMEndpoint", {0x1be09788,0x6894,0x4089,{0x85,0x86,0x9a,0x2a,0x6c,0x26,0x5a,0xc5}},
+      4, slots_IMMEndpoint, 0 },
     { "IMMNotificationClient", {0x7991eec9,0x7e89,0x4d85,{0x83,0x90,0x6c,0x70,0x3c,0xec,0x60,0xc0}},
       8, slots_IMMNotificationClient, 0 },
     { "IMalloc", {0x00000002,0x0000,0x0000,{0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}},
@@ -2413,6 +2424,7 @@ static const unsigned char syscom_iface_local[SYSCOM_IFACE_COUNT] =
     0,  /* IMMDevice */
     0,  /* IMMDeviceCollection */
     0,  /* IMMDeviceEnumerator */
+    0,  /* IMMEndpoint */
     0,  /* IMMNotificationClient */
     0,  /* IMalloc */
     0,  /* IMarshal */
@@ -2454,10 +2466,10 @@ static const unsigned char syscom_iface_local[SYSCOM_IFACE_COUNT] =
     1,  /* IXAudio2VoiceCallback */
 };
 
-/* wine-syscom: 94 interface(s), 1056 vtable slot(s).
- * The 36 audio row(s) generated here: 288 slot(s) marshalled, 26 hand-written
+/* wine-syscom: 95 interface(s), 1060 vtable slot(s).
+ * The 37 audio row(s) generated here: 289 slot(s) marshalled, 26 hand-written
  * (7 of them float-bearing, routed by argument shape), 0 refused with a
- * named reason, 90 IUnknown slot(s) served by the runtime, 6 interface(s)
+ * named reason, 93 IUnknown slot(s) served by the runtime, 6 interface(s)
  * [local] and served by combase's own dispatcher.  The 58 reused row(s):
  * 478 marshalled (73 of those upgraded from legacy refusals by the
  * reclassification pass -- see gen_syscom_audio.py's UPGRADE_LICENSED_RE --

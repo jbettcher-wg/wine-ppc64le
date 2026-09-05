@@ -2332,6 +2332,69 @@ static ULONG_PTR emu_GetModuleHandleA( const ULONG_PTR *a, void *native )
     return ret;
 }
 
+/* The Ex forms answer in the guest namespace too, with their flags kept:
+ * FROM_ADDRESS names a module by an address inside it, which the native
+ * lookup answers correctly for a guest address (a guest image is a mapped
+ * module like any other); a name is resolved exactly as GetModuleHandleW
+ * resolves it; UNCHANGED_REFCOUNT and PIN govern the reference taken.
+ * Mono (Unity 2022.3 -- RimWorld) finds ntdll and kernel32 THIS way before
+ * asking GetProcAddress for RtlAddGrowableFunctionTable and
+ * RtlInstallFunctionTableCallback: the native handle a pass-through
+ * returned made GetProcAddress refuse (rightly), mono saw neither function
+ * and asserted "should not be reached" (exceptions-amd64.c:1485) before
+ * the first frame. */
+static ULONG_PTR emu_GetModuleHandleExW( const ULONG_PTR *a, void *native )
+{
+    DWORD flags = (DWORD)a[0];
+    HMODULE *out = (HMODULE *)a[2];
+    HMODULE mod;
+    NTSTATUS status;
+
+    if (!out)
+    {
+        RtlSetLastWin32Error( ERROR_INVALID_PARAMETER );
+        return FALSE;
+    }
+    if (flags & GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS)
+        return ((ULONG_PTR (*)( ULONG_PTR, ULONG_PTR, ULONG_PTR ))native)( a[0], a[1], a[2] );
+    *out = NULL;
+    mod = a[1] ? find_guest_module( (const WCHAR *)a[1] )
+               : (HMODULE)NtCurrentTeb()->Peb->ImageBaseAddress;
+    if (!mod)
+    {
+        RtlSetLastWin32Error( ERROR_MOD_NOT_FOUND );
+        return FALSE;
+    }
+    if (!(flags & GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT) &&
+        (status = LdrAddRefDll( (flags & GET_MODULE_HANDLE_EX_FLAG_PIN) ? LDR_ADDREF_DLL_PIN : 0, mod )))
+    {
+        RtlSetLastWin32Error( RtlNtStatusToDosError( status ) );
+        return FALSE;
+    }
+    *out = mod;
+    return TRUE;
+}
+
+static ULONG_PTR emu_GetModuleHandleExA( const ULONG_PTR *a, void *native )
+{
+    UNICODE_STRING str;
+    ANSI_STRING ansi;
+    ULONG_PTR args[3] = { a[0], 0, a[2] }, ret;
+
+    if ((a[0] & GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS) || !a[1])
+        return emu_GetModuleHandleExW( a, native );
+    RtlInitAnsiString( &ansi, (const char *)a[1] );
+    if (RtlAnsiStringToUnicodeString( &str, &ansi, TRUE ))
+    {
+        RtlSetLastWin32Error( ERROR_NOT_ENOUGH_MEMORY );
+        return FALSE;
+    }
+    args[1] = (ULONG_PTR)str.Buffer;
+    ret = emu_GetModuleHandleExW( args, native );
+    RtlFreeUnicodeString( &str );
+    return ret;
+}
+
 static ULONG_PTR emu_GetProcAddress( const ULONG_PTR *a, void *native )
 {
     const IMAGE_NT_HEADERS *nt = RtlImageNtHeader( (HMODULE)a[0] );
@@ -7823,6 +7886,10 @@ static const struct thunk_override thunk_overrides[] =
     { L"kernelbase.dll", "GetProcAddress",   2, emu_GetProcAddress },
     { L"kernelbase.dll", "GetModuleHandleW", 1, emu_GetModuleHandleW },
     { L"kernelbase.dll", "GetModuleHandleA", 1, emu_GetModuleHandleA },
+    { L"kernel32.dll",   "GetModuleHandleExW", 3, emu_GetModuleHandleExW },
+    { L"kernel32.dll",   "GetModuleHandleExA", 3, emu_GetModuleHandleExA },
+    { L"kernelbase.dll", "GetModuleHandleExW", 3, emu_GetModuleHandleExW },
+    { L"kernelbase.dll", "GetModuleHandleExA", 3, emu_GetModuleHandleExA },
     { L"kernel32.dll",   "LoadLibraryA",     1, emu_LoadLibraryA },
     { L"kernel32.dll",   "LoadLibraryW",     1, emu_LoadLibraryW },
     { L"kernelbase.dll", "LoadLibraryA",     1, emu_LoadLibraryA },
