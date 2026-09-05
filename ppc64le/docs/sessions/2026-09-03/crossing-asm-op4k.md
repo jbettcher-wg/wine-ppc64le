@@ -474,6 +474,13 @@ record (its 48-register save, ~30-40 ns) before DXVK's ~30 ns body.  The
 record itself is ~10 ns.  A non-journaled slot is unchanged inside the
 spread (the drain-all walk is two loads per registered ring).
 
+**In the game.**  With the shared-ring fix in, the user played Witcher 3
+outside Novigrad on the fixed build: 16 fps where the same area had been
+running 7-12 fps on the stock tree (user's own reading of the MangoHud
+overlay, 2026-09-04 night).  One scene, one leg, not a pinned-save A/B --
+but the first port change whose effect a player could see, and the
+direction the 30k-calls-a-frame arithmetic predicted.
+
 **What the number says about the next cut.**  The replay is now the
 cost, and it has two halves the trap never had a way to remove: N
 transitions for N records, and N trips through `invoke_marshalled` for
