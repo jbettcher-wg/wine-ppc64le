@@ -65,6 +65,7 @@
 #include "winecom_private.h"
 #include "winecom_waves.h"
 #include "wine/emu_qpc.h"
+#include "journal_gen.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(winecom);
 
@@ -106,6 +107,13 @@ struct com_proxy
      * 11% of the thread AFTER the table grew -- the cost was the critical
      * section's barriers, not the chain. */
     LONG        live;
+    /* The context-scope ring's native half (journal_gen.h, JG_SCOPE_CTX):
+     * bytes replayed so far.  A drain from ANY thread advances jr_cons; only
+     * a drain running inside the recorder's own trap ON THIS PROXY resets
+     * both ends to zero, because only then is the ring's writer provably
+     * idle.  Never read by guest code. */
+    UINT64      jr_cons;
+    BYTE        jr_scope;     /* enum jg_scope of the ring, 0 = none */
 };
 #ifdef _WIN64
 /* the guest ABI pin for the 64-bit lane's snippets; the i386 build of this
@@ -1313,6 +1321,17 @@ journal_slots[] =
 #define JOURNAL_RING_SIZE  0x8000   /* 32K a list; ~150 records of the fattest shape */
 #define JOURNAL_MAX_REC    224
 
+/* The table-driven shape (journal_gen.h): the record's own size is the
+ * check, against the layout the slot's jg_def computes.  9 sits outside
+ * both enum journal_shape and DEV_SHAPE_CBV so a record of either leaking
+ * into the other's ring fails its size check. */
+#define JSH_GEN                 9
+#define JOURNAL_GEN_MAX_REC     512
+/* a context records tens of thousands of calls a frame and drains at its
+ * next trap, so its ring is eight lists' worth */
+#define JOURNAL_CTX_RING_SIZE   0x40000
+#define CTX_RINGS_MAX           16
+
 static UINT journal_rec_bytes( enum journal_shape shape )
 {
     switch (shape)
@@ -1330,8 +1349,34 @@ static UINT journal_rec_bytes( enum journal_shape shape )
 
 /* which interfaces have at least one journaled slot -- winecom_wrap gives
  * their proxies a ring */
-static unsigned char *iface_journaled;
+static unsigned char *iface_journaled;   /* per iface: 0, or the jg_scope of its ring */
 static BOOL journal_on;
+
+/* the generic shape: per (iface,slot), 1 + index into jg_d3d11_defs, or 0 */
+static unsigned char *journal_gen_map;
+static struct jg_layout journal_gen_lay[ARRAYSIZE(jg_d3d11_defs)];
+/* WINEEMUCOMJOURNALSABOTAGE=1: context rings record and are never
+ * replayed -- the gate's negative control */
+static BOOL journal_sabotage;
+static BOOL ctx_journal_off;             /* multithread protection seen */
+/* The registry of context-scope rings, drained at EVERY dispatch (see
+ * wc_ctx_drain_all).  Slots are claimed and cleared with interlocked
+ * exchanges, never compacted, so a reader walks them without a lock. */
+static struct com_proxy *ctx_rings[CTX_RINGS_MAX];
+/* the ID3D11Multithread rows whose dispatch turns the context journal off */
+static UINT mt_iface = ~0u, mt_slot_enter = ~0u, mt_slot_setprot = ~0u;
+/* Serializes context-ring replay across threads: a foreign thread's drain
+ * must WAIT for one in flight, never skip it (its own call may depend on
+ * what is being replayed).  Recursive, so a replay's classifier draining
+ * another ring nests.  Lock order: jr_cs before wc_cs, never the reverse. */
+static CRITICAL_SECTION jr_cs;
+static CRITICAL_SECTION_DEBUG jr_cs_debug =
+{
+    0, 0, &jr_cs,
+    { &jr_cs_debug.ProcessLocksList, &jr_cs_debug.ProcessLocksList },
+      0, 0, { (DWORD_PTR)(__FILE__ ": winecom jr_cs") }
+};
+static CRITICAL_SECTION jr_cs = { &jr_cs_debug, -1, 0, 0, 0, 0 };
 
 static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct winecom_slot *sl,
                                    struct com_proxy *proxy, UINT iface, UINT slot,
@@ -1342,22 +1387,11 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
  * argument-crossing case can be another thread, where D3D12's Close-before-
  * execute rule means an empty ring unless the app is racing itself -- the
  * acquire/release pair keeps even that read coherent. */
-static void wc_journal_drain( struct com_proxy *p )
+/* Replay the records in [r, end) of p's ring, oldest first, through the
+ * marshal core.  Shared by both drains below.  A corrupt record drops the
+ * rest of the range loudly; a replay that fails is logged and skipped. */
+static void journal_replay_range( struct com_proxy *p, BYTE *r, BYTE *end )
 {
-    UINT64 pos;
-    BYTE *r, *end;
-
-    if (!p->jr_base || p->jr_draining) return;
-    pos = __atomic_load_n( &p->jr_pos, __ATOMIC_ACQUIRE );
-    if (!pos) return;
-    p->jr_draining = TRUE;
-
-    r = p->jr_base;
-    end = r + (pos <= p->jr_cap ? pos : 0);   /* a corrupt pos drains nothing */
-    if (end == r)
-        ERR( "journal pos %I64u beyond cap %I64u on %s proxy %p; dropping the ring\n",
-             pos, p->jr_cap, wc_surface->ifaces[p->iface].name, p );
-
     while (r + 8 <= end)
     {
         UINT key    = *(UINT *)r;
@@ -1371,8 +1405,10 @@ static void wc_journal_drain( struct com_proxy *p )
         const struct winecom_slot *sl;
         NTSTATUS status;
 
-        if (iface >= wc_surface->iface_count || bytes < 16 || bytes > JOURNAL_MAX_REC ||
-            r + bytes > end || bytes != journal_rec_bytes( shape ))
+        if (iface >= wc_surface->iface_count || bytes < 8 || bytes > JOURNAL_GEN_MAX_REC ||
+            r + bytes > end ||
+            (shape != JSH_GEN && (bytes < 16 || bytes > JOURNAL_MAX_REC ||
+                                  bytes != journal_rec_bytes( shape ))))
         {
             ERR( "corrupt journal record (key %08x size/shape %08x) on proxy %p; "
                  "dropping the rest of the ring\n", key, sizesh, p );
@@ -1386,6 +1422,37 @@ static void wc_journal_drain( struct com_proxy *p )
             break;
         }
         sl = &itf->slots[slot];
+
+        if (shape == JSH_GEN)
+        {
+            /* the table-driven record: args as they arrived, blobs in
+             * place of the pointers that were copied */
+            const struct jg_def *def;
+            const struct jg_layout *lay;
+            UINT g = journal_gen_map ? journal_gen_map[iface_slot_base[iface] + slot] : 0;
+            UINT j;
+
+            if (!g || bytes != journal_gen_lay[g - 1].rec)
+            {
+                ERR( "generic journal record for %s (size %u) does not match its "
+                     "layout; dropping the rest of the ring\n", sl->name, bytes );
+                break;
+            }
+            def = &jg_d3d11_defs[g - 1];
+            lay = &journal_gen_lay[g - 1];
+            for (j = 1; j < def->argc; j++)
+            {
+                if (def->args[j - 1].kind == JG_V || !a[j - 1]) rawargs[j] = a[j - 1];
+                else rawargs[j] = (UINT64)(ULONG_PTR)(r + lay->off[j - 1]);
+            }
+            TRACE( "journal: replay %s proxy %p\n", sl->name, p );
+            status = invoke_marshalled( itf, sl, p, iface, slot, rawargs, &rax, NULL );
+            if (status)
+                ERR( "journal replay of %s failed, status %08x; continuing\n",
+                     sl->name, (UINT)status );
+            r += bytes;
+            continue;
+        }
 
         switch (shape)
         {
@@ -1415,8 +1482,143 @@ static void wc_journal_drain( struct com_proxy *p )
         r += bytes;
     }
 
+}
+
+/* The list-scope drain (JG_SCOPE_LIST, the first journal's rule): replay
+ * every record in `p`'s ring, oldest first, then reset the ring.  Runs on
+ * the recording thread inside its own trap in the ordered cases; the
+ * argument-crossing case can be another thread, where D3D12's Close-before-
+ * execute rule means an empty ring unless the app is racing itself -- the
+ * acquire/release pair keeps even that read coherent. */
+static void wc_journal_drain( struct com_proxy *p )
+{
+    UINT64 pos;
+    BYTE *r, *end;
+
+    if (!p->jr_base || p->jr_draining) return;
+    pos = __atomic_load_n( &p->jr_pos, __ATOMIC_ACQUIRE );
+    if (!pos) return;
+    p->jr_draining = TRUE;
+
+    r = p->jr_base;
+    end = r + (pos <= p->jr_cap ? pos : 0);   /* a corrupt pos drains nothing */
+    if (end == r)
+        ERR( "journal pos %I64u beyond cap %I64u on %s proxy %p; dropping the ring\n",
+             pos, p->jr_cap, wc_surface->ifaces[p->iface].name, p );
+    journal_replay_range( p, r, end );
     __atomic_store_n( &p->jr_pos, 0, __ATOMIC_RELEASE );
     p->jr_draining = FALSE;
+}
+
+/* The context-scope drain (JG_SCOPE_CTX).  An immediate context's ring is
+ * written by one thread (D3D11's rule: a context is externally
+ * synchronized) but must be replayed before ANY trap in the surface,
+ * whatever thread takes it: a resource the ring binds may be Released on
+ * another thread, a swapchain presented from another thread, a texture
+ * created on a loader thread while the render thread records.  So:
+ *
+ *   - any thread may replay, under jr_cs, from jr_cons to the pos it
+ *     snapshots; jr_cons moves, pos does not (the guest owns pos);
+ *   - only a drain inside the recorder's own trap ON THIS PROXY
+ *     (on_proxy) resets both to zero -- the thread that writes the ring is
+ *     the one sitting in this trap, so nobody is appending;
+ *   - a full ring falls back to the slot's trap, which is an on_proxy
+ *     drain: the slow path is the old path, and it reclaims.
+ *
+ * The idle check is two loads and no lock, which is what every dispatch
+ * pays for the rings that are quiet. */
+static void wc_ctx_drain( struct com_proxy *p, BOOL on_proxy )
+{
+    UINT64 pos, cons;
+    BYTE *r;
+
+    pos = __atomic_load_n( &p->jr_pos, __ATOMIC_ACQUIRE );
+    cons = p->jr_cons;
+    if (pos == cons && !(on_proxy && pos)) return;
+
+    RtlEnterCriticalSection( &jr_cs );
+    if (!p->jr_base || p->jr_draining)   /* freed under us, or our own outer drain */
+    {
+        RtlLeaveCriticalSection( &jr_cs );
+        return;
+    }
+    p->jr_draining = TRUE;
+    pos = __atomic_load_n( &p->jr_pos, __ATOMIC_ACQUIRE );
+    cons = p->jr_cons;
+    r = p->jr_base;
+    if (pos > p->jr_cap || cons > pos)
+    {
+        ERR( "context journal pos %I64u cons %I64u cap %I64u on %s proxy %p; dropping the ring\n",
+             pos, cons, p->jr_cap, wc_surface->ifaces[p->iface].name, p );
+        p->jr_cons = pos;
+    }
+    else if (pos > cons)
+    {
+        if (journal_sabotage) p->jr_cons = pos;
+        else
+        {
+            journal_replay_range( p, r + cons, r + pos );
+            p->jr_cons = pos;
+        }
+    }
+    if (on_proxy)
+    {
+        p->jr_cons = 0;
+        __atomic_store_n( &p->jr_pos, 0, __ATOMIC_RELEASE );
+    }
+    p->jr_draining = FALSE;
+    RtlLeaveCriticalSection( &jr_cs );
+}
+
+/* the drain every dispatch runs: every registered context ring that has
+ * something unreplayed */
+static void wc_ctx_drain_all( void )
+{
+    UINT i;
+
+    for (i = 0; i < CTX_RINGS_MAX; i++)
+    {
+        struct com_proxy *p = __atomic_load_n( &ctx_rings[i], __ATOMIC_ACQUIRE );
+        if (p && __atomic_load_n( &p->jr_pos, __ATOMIC_ACQUIRE ) != p->jr_cons)
+            wc_ctx_drain( p, FALSE );
+    }
+}
+
+/* the scope-aware form for the callers that only know they hold a proxy */
+static void wc_proxy_drain( struct com_proxy *p, BOOL on_proxy )
+{
+    if (p->jr_scope == JG_SCOPE_CTX) wc_ctx_drain( p, on_proxy );
+    else wc_journal_drain( p );
+}
+
+/* Multithread protection (ID3D11Multithread::SetMultithreadProtected /
+ * Enter) means the app may hold DXVK's context lock on one thread while
+ * another thread's dispatch drains: the replay would take the same DXVK
+ * lock under jr_cs, and the lock holder's next trap would wait on jr_cs --
+ * a cycle.  The moment that interface is used, the context journal goes
+ * off for the process: every ring is replayed and detached (jr_base NULL
+ * makes every snippet fall back forever; the memory stays, because a
+ * guest thread may be inside a snippet that already loaded the base). */
+static void wc_ctx_journal_disable( const char *why )
+{
+    UINT i;
+
+    if (ctx_journal_off) return;
+    RtlEnterCriticalSection( &jr_cs );
+    if (!ctx_journal_off)
+    {
+        ERR( "context journal OFF for this process: %s\n", why );
+        for (i = 0; i < CTX_RINGS_MAX; i++)
+        {
+            struct com_proxy *p = ctx_rings[i];
+            if (!p) continue;
+            wc_ctx_drain( p, FALSE );
+            p->jr_base = NULL;
+            __atomic_store_n( &ctx_rings[i], NULL, __ATOMIC_RELEASE );
+        }
+        ctx_journal_off = TRUE;
+    }
+    RtlLeaveCriticalSection( &jr_cs );
 }
 
 #ifdef _WIN64
@@ -1457,6 +1659,91 @@ static void sb_emit_jcc_fb( struct snippet_buf *b, BYTE opc )
     BYTE ins[2] = { opc, 0 };
     b->fixups[b->nfix++] = b->p + 1;
     sb_emit( b, ins, 2 );
+}
+
+/* Match every table row against jg_d3d11_defs by name, verify the row's
+ * shape against the curated one -- fail closed to trapping on ANY
+ * disagreement, a drifted roster must never produce a wrong record -- and
+ * point the slot at a generated snippet.  `*code` advances. */
+static void install_journal_gen( unsigned char **code )
+{
+    UINT i, n, j, k, installed = 0;
+
+    if (!(journal_gen_map = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, HEAP_ZERO_MEMORY,
+                                             total_slots )))
+        return;
+    for (j = 0; j < ARRAYSIZE(jg_d3d11_defs); j++)
+        jg_layout_compute( &jg_d3d11_defs[j], &journal_gen_lay[j] );
+
+    for (i = 0; i < wc_surface->iface_count; i++)
+    {
+        const struct winecom_iface *itf = &wc_surface->ifaces[i];
+        if (!itf->slots) continue;
+        for (n = 0; n < itf->slot_count; n++)
+        {
+            const struct winecom_slot *sl = &itf->slots[n];
+            const struct jg_def *def = NULL;
+            const char *why = NULL;
+            UINT64 *vslot;
+            UINT g = 0, len;
+
+            if (!sl->name) continue;
+            for (j = 0; j < ARRAYSIZE(jg_d3d11_defs); j++)
+                if (!strcmp( sl->name, jg_d3d11_defs[j].name )) { def = &jg_d3d11_defs[j]; g = j + 1; break; }
+            if (!def) continue;
+            if (row_forced_refused( i, n )) continue;   /* the lever must stay one */
+
+            if (sl->refuse) why = "refused row";
+            else if (sl->flags & WINECOM_F_HAND) why = "hand-served row";
+            else if (!(sl->flags & WINECOM_F_RET_VOID)) why = "not void";
+            else if (sl->argc != def->argc) why = "argument count";
+            else if (sl->fpmask) why = "floating-point argument";
+            else if (journal_gen_lay[g - 1].rec > JOURNAL_GEN_MAX_REC) why = "record too large";
+            for (k = 1; !why && k < def->argc; k++)
+            {
+                const struct jg_arg *a = &def->args[k - 1];
+                unsigned char cls = sl->cls ? sl->cls[k - 1] : WINECOM_CA_PASS;
+
+                switch (cls)
+                {
+                case WINECOM_CA_PASS:
+                case WINECOM_CA_IFACE_IN:
+                    if (a->kind == JG_A && a->elem == 8 && cls == WINECOM_CA_IFACE_IN)
+                        why = "interface where an array was curated";
+                    break;
+                case WINECOM_CA_IFACE_ARR_IN:
+                    if (a->kind != JG_A || a->elem != 8 || a->count_arg != sl->aux2 + 1)
+                        why = "interface array shape";
+                    break;
+                default:
+                    why = "argument class the journal cannot record";
+                }
+            }
+            if (why)
+            {
+                ERR( "journal slot %s does not match its curated shape (%s); it stays trapping\n",
+                     sl->name, why );
+                continue;
+            }
+
+            vslot = &guest_vtbl_block[iface_slot_base[i] + n];
+            len = jg_emit( *code, def, &journal_gen_lay[g - 1], (i << 16) | n, JSH_GEN, *vslot );
+            if (len > JG_SNIPPET_MAX)
+            {
+                /* cannot happen for the table as written; loud if it ever does */
+                ERR( "journal snippet for %s is %u bytes; aborting the generic install\n", sl->name, len );
+                return;
+            }
+            TRACE( "journal: %s slot %u recorded guest-side from %p (generic, rec %u, fallback stub %p)\n",
+                   sl->name, n, *code, journal_gen_lay[g - 1].rec, *(void **)vslot );
+            *vslot = (UINT64)(ULONG_PTR)*code;
+            *code += (len + 15) & ~15u;
+            journal_gen_map[iface_slot_base[i] + n] = g;
+            if (iface_journaled[i] < def->scope) iface_journaled[i] = def->scope;
+            installed++;
+        }
+    }
+    TRACE( "journal: %u generic slots recorded guest-side\n", installed );
 }
 
 static void install_journal( void )
@@ -1506,7 +1793,7 @@ static void install_journal( void )
     static const UINT snippet_stride = 160;   /* the fattest (VBV) is ~120 */
     unsigned char *block, *code;
     SIZE_T size;
-    UINT i, n, j, k, count = 0;
+    UINT i, n, j, k, count = 0, gen_count = 0;
 
     if (guest32) return;   /* x86-64 snippet encodings; see install_const_getters */
     if (!(iface_journaled = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap,
@@ -1518,19 +1805,42 @@ static void install_journal( void )
         const struct winecom_iface *itf = &wc_surface->ifaces[i];
         if (!itf->slots) continue;
         for (n = 0; n < itf->slot_count; n++)
+        {
             for (j = 0; j < ARRAYSIZE(journal_slots); j++)
                 if (itf->slots[n].name && !strcmp( itf->slots[n].name, journal_slots[j].name ))
                     count++;
+            for (j = 0; j < ARRAYSIZE(jg_d3d11_defs); j++)
+                if (itf->slots[n].name && !strcmp( itf->slots[n].name, jg_d3d11_defs[j].name ))
+                    gen_count++;
+        }
+        /* the rows whose dispatch turns the context journal off */
+        if (!strcmp( itf->name, "ID3D11Multithread" ))
+        {
+            mt_iface = i;
+            for (n = 0; n < itf->slot_count; n++)
+            {
+                if (!itf->slots[n].name) continue;
+                if (!strcmp( itf->slots[n].name, "ID3D11Multithread::Enter" )) mt_slot_enter = n;
+                if (!strcmp( itf->slots[n].name, "ID3D11Multithread::SetMultithreadProtected" ))
+                    mt_slot_setprot = n;
+            }
+        }
     }
-    if (!count) return;
+    if (!count && !gen_count) return;
     if (com_env_flag( L"WINEEMUNOCOMJOURNAL" ))
     {
-        ERR( "WINEEMUNOCOMJOURNAL=1 -- %u journal slots stay trapping on every call\n", count );
+        ERR( "WINEEMUNOCOMJOURNAL=1 -- %u journal slots stay trapping on every call\n",
+             count + gen_count );
         return;
+    }
+    if (gen_count && com_env_flag( L"WINEEMUCOMJOURNALSABOTAGE" ))
+    {
+        ERR( "WINEEMUCOMJOURNALSABOTAGE=1 -- context rings record and are NEVER replayed\n" );
+        journal_sabotage = TRUE;
     }
 
     block = NULL;
-    size = count * snippet_stride;
+    size = count * snippet_stride + gen_count * JG_SNIPPET_MAX;
     if (NtAllocateVirtualMemory( NtCurrentProcess(), (void **)&block, 0, &size,
                                  MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE ))
     {
@@ -1652,10 +1962,13 @@ static void install_journal( void )
                    "(shape %u rec %u, fallback stub %p)\n",
                    sl->name, n, code, def->shape, rec, *(void **)vslot );
             *vslot = (UINT64)(ULONG_PTR)code;
-            iface_journaled[i] = 1;
+            iface_journaled[i] = JG_SCOPE_LIST;
             code += snippet_stride;
         }
     }
+
+    /* the table-driven slots (journal_gen.h) */
+    if (gen_count) install_journal_gen( &code );
     journal_on = TRUE;
 }
 #else
@@ -2577,19 +2890,38 @@ void *winecom_wrap( void *host, UINT iface )
     p->jr_pos = 0;
     p->jr_cap = 0;
     p->jr_draining = FALSE;
-    if (journal_on && iface_journaled[iface])
+    p->jr_cons = 0;
+    p->jr_scope = 0;
+    if (journal_on && iface_journaled[iface] &&
+        !(iface_journaled[iface] == JG_SCOPE_CTX && ctx_journal_off))
     {
         /* one recording ring per journaled object; a failed allocation just
          * leaves the snippets on their fallback path -- every call traps,
-         * which is the old world */
-        SIZE_T ring = JOURNAL_RING_SIZE;
+         * which is the old world.  A context-scope ring also needs a
+         * registry slot, claimed here without a lock. */
+        SIZE_T ring = iface_journaled[iface] == JG_SCOPE_CTX ? JOURNAL_CTX_RING_SIZE
+                                                             : JOURNAL_RING_SIZE;
         void *mem = NULL;
-        if (!NtAllocateVirtualMemory( NtCurrentProcess(), &mem, 0, &ring,
-                                      MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE ))
+        int reg = -1;
+
+        if (iface_journaled[iface] == JG_SCOPE_CTX)
         {
-            p->jr_base = mem;
-            p->jr_cap = JOURNAL_RING_SIZE;
+            UINT k;
+            for (k = 0; k < CTX_RINGS_MAX; k++)
+                if (!ctx_rings[k] &&
+                    !InterlockedCompareExchangePointer( (void **)&ctx_rings[k], p, NULL ))
+                { reg = k; break; }
+            if (reg < 0) ring = 0;   /* registry full: this context traps */
         }
+        if (ring && !NtAllocateVirtualMemory( NtCurrentProcess(), &mem, 0, &ring,
+                                              MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE ))
+        {
+            p->jr_cap = ring;
+            p->jr_scope = iface_journaled[iface];
+            __atomic_store_n( &p->jr_base, (BYTE *)mem, __ATOMIC_RELEASE );
+        }
+        else if (reg >= 0)
+            __atomic_store_n( &ctx_rings[reg], NULL, __ATOMIC_RELEASE );
     }
     if (++intern_count > intern_mask + 1)
     {
@@ -2679,7 +3011,7 @@ BOOL wc_forward_host( void *ptr, void **host_out )
      * execute rule means this normally finds an empty ring -- Close trapped
      * and drained -- so this is the belt to that braces. */
     wc_dev_drain();
-    wc_journal_drain( p );
+    wc_proxy_drain( p, FALSE );
     *host_out = p->host;
     return TRUE;
 }
@@ -2708,7 +3040,7 @@ static ULONG proxy_release( struct com_proxy *p )
 {
     UINT iface = p->iface;   /* read before the free below */
     struct com_proxy **link;
-    void *host = NULL;
+    void *host = NULL, *mem_ring;
     ULONG refs;
 
     RtlEnterCriticalSection( &wc_cs );
@@ -2725,7 +3057,28 @@ static ULONG proxy_release( struct com_proxy *p )
     {
         TRACE( "destroying proxy %p (%s host %p)\n", p,
                wc_surface->ifaces[p->iface].name, host );
-        if (p->jr_base)
+        if (p->jr_scope == JG_SCOPE_CTX)
+        {
+            /* a context ring: leave the registry, then detach under jr_cs
+             * so a drain in flight on another thread sees no ring rather
+             * than a freed one.  What it still held was state for an
+             * object that no longer exists. */
+            UINT k;
+            for (k = 0; k < CTX_RINGS_MAX; k++)
+                if (ctx_rings[k] == p)
+                    InterlockedCompareExchangePointer( (void **)&ctx_rings[k], NULL, p );
+            RtlEnterCriticalSection( &jr_cs );
+            mem_ring = p->jr_base;
+            p->jr_base = NULL;
+            p->jr_scope = 0;
+            RtlLeaveCriticalSection( &jr_cs );
+            if (mem_ring)
+            {
+                SIZE_T ring = 0;
+                NtFreeVirtualMemory( NtCurrentProcess(), &mem_ring, &ring, MEM_RELEASE );
+            }
+        }
+        else if (p->jr_base)
         {
             /* whatever is still in the ring dies with the object: a released
              * command list's unreplayed records could only ever have fed a
@@ -3518,7 +3871,10 @@ NTSTATUS winecom_dispatch( UINT iface, UINT slot, AMD64_CONTEXT *ctx )
      * Device rings first: a replayed list command may depend on a
      * descriptor create recorded on another thread. */
     wc_dev_drain();
-    wc_journal_drain( proxy );
+    wc_ctx_drain_all();
+    wc_proxy_drain( proxy, TRUE );
+    if (iface == mt_iface && (slot == mt_slot_enter || slot == mt_slot_setprot))
+        wc_ctx_journal_disable( "the guest asked for multithread protection" );
 
     /* IUnknown's three slots head every vtable and are served from the proxy
      * table; Release of the last reference is the only crossing. */

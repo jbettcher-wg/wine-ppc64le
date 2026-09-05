@@ -23,6 +23,10 @@
 #     BENCH qpc_only_ns_per_call=...             the clock's own cost
 #     BENCH com_getfeaturelevel_ns_per_call=...  ID3D11Device::GetFeatureLevel
 #     BENCH com_gettype_ns_per_call=...          ID3D11DeviceContext::GetType
+#     BENCH com_journaled_topology_ns_per_call=  IASetPrimitiveTopology, a
+#                                                journaled slot: record +
+#                                                amortized replay.  A/B with
+#                                                WINEEMUNOCOMJOURNAL=1.
 #
 # Exit 0 = ran and printed, 2 = could not run.
 set -u

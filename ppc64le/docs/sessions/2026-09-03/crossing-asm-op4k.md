@@ -402,6 +402,78 @@ winecom keeps become readable from the unix side -- or the PE side gets
 a cheaper unix entry for a call it can prove does not raise, syscall or
 call back (the leaf argument again, one layer down).  Both are a session.
 
+## 13. The context journal: D3D11 immediate-context calls recorded guest-side
+
+Built 2026-09-04, night.  Section 12 ends with two cuts inside the trap;
+this one takes the hot D3D11 class out of the trap instead.  The first
+journal (2026-08-27) hand-encoded one snippet per shape for eight D3D12
+command-list slots.  The shapes are now a table (`libs/winecom/
+journal_gen.h`): a row names the slot and classes each argument as a
+value, a pointer to N bytes, or a counted array with a cap, and one
+generator emits the x86-64 snippet -- ring checks, count guards before any
+store, the arguments as they arrived, the blobs copied in, pos published.
+Sixty-eight ID3D11DeviceContext/Context1 rows are curated: every bind,
+viewport, scissor, blend, clear, copy, draw, dispatch, Begin/End, Unmap,
+ClearState.  Left trapping on purpose: UpdateSubresource (unbounded
+payload), ExecuteCommandList, Flush, Map, every Get, the XMM rows.
+
+- **Scope.**  A command list has one recorder and is drained at its own
+  trap.  An immediate context's state is observable through every other
+  object of the surface (a Release of a bound view, a Present, a Map), so
+  its ring is registered and drained at EVERY dispatch: two loads per
+  quiet ring.  Any thread may replay, under `jr_cs`, from a native `cons`
+  to the guest's `pos`; only a trap on the context itself resets the ring
+  (its writer is the thread sitting in that trap).  A full ring falls
+  back to the slot's trap, which is such a reset.
+- **Multithread protection** (ID3D11Multithread::Enter / SetMultithread-
+  Protected) would let a foreign thread's replay take DXVK's lock under
+  `jr_cs` while the lock holder waits on `jr_cs`: the first dispatch of
+  either row replays and detaches every context ring for the process.
+- **Levers**: `WINEEMUNOCOMJOURNAL=1` (kill, every call traps),
+  `WINEEMUCOMJOURNALSABOTAGE=1` (record, never replay).
+- **Gates**: `check-ctx-journal.sh` -- on an x86-64 host it first
+  generates and EXECUTES all 68 snippets natively against a fake ring
+  (`probes/journal_gen_host.c`: record bytes, NULL pointers, over-cap and
+  full-ring fallbacks with every register intact); then the guest probe
+  (`probes/ctx_journal_probe.c`) sets state through the journal and reads
+  it back through Gets and a texel readback across a box copy whose
+  arguments travel on the stack; then the trace must show replays and NO
+  live dispatch for the driven rows.  `--sabotage`: never-replay makes the
+  probe FAIL, the kill switch makes it PASS with the rows dispatching
+  live.  All PASS on op4k first run, plus d3d11-smoke, com-fastpath,
+  com-levers, reverse-proxy, blob-surface, dev-journal.
+
+[MEASURED], `bench-com-crossing.sh`, new line `com_journaled_topology`
+(IASetPrimitiveTopology, 200k calls, the closing IAGetPrimitiveTopology
+inside the timed region so every replay is counted), three interleaved
+rounds, box under its evening governor (the trapped slots read ~405 here
+against 360 in section 12 -- same tree, slower clock):
+
+| line | journal on | `WINEEMUNOCOMJOURNAL=1` |
+|---|---:|---:|
+| com_journaled_topology | **239.9 / 234.5 / 233.9** | 416.1 / 419.5 / 418.5 |
+| com_getfeaturelevel (not journaled) | 414.9 / 407.7 / 405.1 | 402.2 / 406.1 / 404.4 |
+
+**A journaled D3D11 call: 418 -> 235 ns, -44%.**  Not the -90% a
+"no crossing" reading promises, and the reason is the honest number of
+this section: the trap is gone but the REPLAY still pays PE winecom's
+marshal per record plus one `__wine_unix_call_dispatcher` transition per
+record (its 48-register save, ~30-40 ns) before DXVK's ~30 ns body.  The
+record itself is ~10 ns.  A non-journaled slot is unchanged inside the
+spread (the drain-all walk is two loads per registered ring).
+
+**What the number says about the next cut.**  The replay is now the
+cost, and it has two halves the trap never had a way to remove: N
+transitions for N records, and N trips through `invoke_marshalled` for
+rows whose classes are all pass-through or proxy.  A batch replay --
+the PE side unwraps proxies and writes native call descriptors for the
+whole ring, ONE unix call executes them in d3d11.so -- removes both:
+estimate ~235 -> ~80 ns per journaled call.  In a game the count is what
+matters: Witcher 3's render thread makes ~30k of these calls a frame, and
+its ring drains at the next Map, which is per draw in most engines; the
+A/B on a pinned save is the next thing to run, with the section 6 caveats
+(back the saves up, +-10% scene noise).
+
 ## 4. What is still on the table, by measured size
 
 1. **PE ntdll.dll.so still builds with `-mlongcall`** (it is a .so builtin

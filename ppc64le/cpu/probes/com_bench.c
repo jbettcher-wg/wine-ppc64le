@@ -25,6 +25,7 @@
  *     BENCH qpc_only_ns_per_call=<f> (N=<n>)
  *     BENCH com_getfeaturelevel_ns_per_call=<f> (N=<n>)
  *     BENCH com_gettype_ns_per_call=<f> (N=<n>)
+ *     BENCH com_journaled_topology_ns_per_call=<f> (N=<n>)   a journaled slot
  */
 
 #define COBJMACROS
@@ -113,6 +114,25 @@ void com_bench_entry( void )
     for (i = 0; i < N_COM; i++) sink += ID3D11DeviceContext_GetType( context );
     QueryPerformanceCounter( &t1 );
     report( "com_gettype", t0.QuadPart, t1.QuadPart, freq.QuadPart, N_COM );
+
+    /* A JOURNALED slot (journal_gen.h): the call is recorded guest-side
+     * and replayed at the next trap, so this loop pays the record per call
+     * plus a share of one replay drain whenever the ring fills.  Under
+     * WINEEMUNOCOMJOURNAL=1 it is an ordinary trapped COM slot, which is
+     * the A/B.  The final IAGetPrimitiveTopology drains what is left so the
+     * measured region includes every replay it caused. */
+    for (i = 0; i < WARM; i++)
+        ID3D11DeviceContext_IASetPrimitiveTopology( context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
+    QueryPerformanceCounter( &t0 );
+    for (i = 0; i < N_COM; i++)
+        ID3D11DeviceContext_IASetPrimitiveTopology( context, (D3D11_PRIMITIVE_TOPOLOGY)(1 + (i & 3)) );
+    {
+        D3D11_PRIMITIVE_TOPOLOGY topo = 0;
+        ID3D11DeviceContext_IAGetPrimitiveTopology( context, &topo );
+        sink += topo;
+    }
+    QueryPerformanceCounter( &t1 );
+    report( "com_journaled_topology", t0.QuadPart, t1.QuadPart, freq.QuadPart, N_COM );
 
     ID3D11DeviceContext_Release( context );
     ID3D11Device_Release( device );
