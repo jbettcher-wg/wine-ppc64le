@@ -335,6 +335,73 @@ crossing floor for an export is now the bridge's own trampoline plus ~45
 ns of wine, and the class can grow (any export proven syscall-free,
 raise-free and callback-free is one table row).
 
+## 12. The COM fast arm: a resolved COM slot skips the full dispatcher body
+
+Built 2026-09-04, evening, off the Witcher 3 render-thread profile
+(session doc 2026-09-04): with the proxy lock gone, `emu_trap_dispatch_slow`
+was 5.8% of the thread, and every D3D11 call was taking it because the fast
+arm of `emu_trap_dispatch` excluded any row with a COM dispatch.  The full
+body is 2,800 instructions and saves sixteen non-volatile GPRs on entry; a
+COM slot needs none of that -- the module's `__wine_com_dispatch` owns all
+marshalling, this side only pops the return address.
+
+- **The arm**: `call_resolved_com_slot` (signal_ppc64.c) is the COM arm
+  as one function, used by both paths: the trap-ctx pair around the
+  dispatch, the call, the pop on success, `STATUS_ILLEGAL_INSTRUCTION` on a
+  refused dispatch.  The fast path takes it when the cell is resolved, the
+  lean return is in hand, nothing is armed that wants to watch (xstat,
+  `TRACE_ON(seh)`), and the lever is not pulled.  The run-ending status
+  logic became `trap_dispatch_run_status_from(status)` so the arm's own
+  status composes the same way the full tail does.
+- **Levers**: `WINE_PPC64LE_NO_COM_FAST=1` (every COM slot takes the
+  full body -- yesterday's path exactly), `WINE_PPC64LE_COM_FAST_SABOTAGE=1`
+  (RAX flipped after every fast-served dispatch).  Banner
+  `com fast arm live` once per process.
+- **Gate**: `check-com-fastpath.sh` -- the system-COM smoke's guest
+  binary against its native output: live = banner + byte identity; kill
+  switch = no banner, identity holds; `--sabotage` = identity MUST break
+  (it breaks at step 11, `IUnknown::Release` refs=0 -> 1), and
+  `NO_COM_FAST` on top must restore it.  Both legs PASS on op4k, plus
+  check-ec-leaf, com-smoke, com-levers, reverse-proxy, blob-surface,
+  d3d11-smoke, d3d11-smoke32.
+- **Bench**: `bench-com-crossing.sh` / `probes/com_bench.c` -- the COM
+  sibling of bench-crossing: `ID3D11Device::GetFeatureLevel` and
+  `ID3D11DeviceContext::GetType` through a real DXVK device, 200k calls
+  each, guest QPC clock.  This is the first direct number for what a COM
+  slot costs on this port.
+
+[MEASURED], three interleaved rounds:
+
+| line | fast arm on | `WINE_PPC64LE_NO_COM_FAST=1` |
+|---|---:|---:|
+| com_getfeaturelevel | **360.7 / 361.1 / 360.5** | 370.0 / 370.0 / 369.3 |
+| com_gettype | **361.1 / 360.5 / 360.0** | 369.4 / 369.3 / 368.6 |
+
+**A COM slot call: 369.5 -> 360.6 ns, -9 ns (-2.4%).**  That is the
+sixteen-register prologue/epilogue and the full body's branches, and it is
+all the arm can take: the rest of the 5.8% in the profile is the part both
+paths still share.  Honest reading for the render thread: ~9 ns off each of
+the ~30k D3D11 calls a frame is under 0.3 ms of a 52 ms frame.
+
+**What the number says about the next cut.**  A COM slot costs 360 ns
+against 215 for a non-leaf flat export (bench-crossing's `nonleaf` line)
+and 131 for a leaf.  So ~145 ns is COM on top of the trap, and a perf of
+the bench (`/tmp/combench.perf` on op4k, `--comm com_bench.exe`) splits
+one call roughly: JIT'd guest loop + trap stub 4.3, PE d3d11.dll code
+(winecom_dispatch and its marshal, unsymbolized as `[JIT]` at
+0x3fffff...) 4.7, ntdll.so 3.5 (emu_ec_thunk 1.4,
+__wine_unix_call_dispatcher 0.9, call_user_mode_callback 0.5,
+syscall dispatcher 0.35, emu_trap_return_direct 0.3), bridge 0.7, PE
+ntdll 0.7, d3d11.so 0.5, DXVK 0.15 (percent of all samples).  Two things
+are the size of the whole trap: the PE winecom layer, and the second
+transition (`__wine_unix_call_dispatcher` saves the same 18+18+12
+register set the callback frame just saved, 60 ns ahead of a DXVK body
+that returns a field).  Either the unix EC thunk reaches d3d11.so without
+the PE round trip -- which means the marshal tables and proxy objects
+winecom keeps become readable from the unix side -- or the PE side gets
+a cheaper unix entry for a call it can prove does not raise, syscall or
+call back (the leaf argument again, one layer down).  Both are a session.
+
 ## 4. What is still on the table, by measured size
 
 1. **PE ntdll.dll.so still builds with `-mlongcall`** (it is a .so builtin

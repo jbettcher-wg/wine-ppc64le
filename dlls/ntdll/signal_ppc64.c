@@ -10306,12 +10306,85 @@ static FORCEINLINE void call_resolved_flat_export( AMD64_CONTEXT *ctx,
     emu_trap_ctx_rewritten = prev_ctx_rewritten;
 }
 
-/* how a dispatch ends its run, in one place; see the full path's tail */
-static FORCEINLINE NTSTATUS trap_dispatch_run_status(void)
+/* how a dispatch ends its run, in one place; see the full path's tail.
+ * `status` is what the arm itself decided (a refused COM dispatch, say):
+ * a thread exit overrides it, a pending guest raise only fills a success. */
+static FORCEINLINE NTSTATUS trap_dispatch_run_status_from( NTSTATUS status )
 {
     if (guest_exit_requested) return STATUS_THREAD_IS_TERMINATING;
-    if (guest_exc_pending || guest_unwind_run_end) return STATUS_EMU_GUEST_EXCEPTION;
-    return STATUS_SUCCESS;
+    if (!status && (guest_exc_pending || guest_unwind_run_end)) return STATUS_EMU_GUEST_EXCEPTION;
+    return status;
+}
+
+static FORCEINLINE NTSTATUS trap_dispatch_run_status(void)
+{
+    return trap_dispatch_run_status_from( STATUS_SUCCESS );
+}
+
+/* The COM slot arm, shared by the fast path and the full path: the module
+ * behind __wine_com_dispatch owns all marshalling and has written ctx->Rax;
+ * this side owns control flow -- pop the return address the guest's CALL
+ * pushed.  The trap-ctx pair brackets the call for the same reason it
+ * brackets a flat export: a fault inside DXVK is reported against
+ * emu_current_trap_ctx.  [MEASURED] op4k 2026-09-04, Witcher 3 render
+ * thread: every D3D11 call took the full dispatcher (its 2,800-instruction
+ * body and sixteen-register prologue) because the fast arm excluded any
+ * row with a COM dispatch -- emu_trap_dispatch_slow alone was 5.8% of the
+ * thread, on a path that needs none of what the full body carries. */
+static FORCEINLINE NTSTATUS call_resolved_com_slot( AMD64_CONTEXT *ctx, const struct com_thunk_hit *com )
+{
+    AMD64_CONTEXT *prev_trap_ctx = emu_current_trap_ctx;
+    BOOL prev_ctx_rewritten = emu_trap_ctx_rewritten;
+    NTSTATUS status;
+
+    emu_current_trap_ctx = ctx;
+    emu_trap_ctx_rewritten = FALSE;
+
+    status = com->dispatch( com->iface, com->slot, ctx );
+    if (status)
+    {
+        ERR( "com dispatch iface %u slot %u failed, status %08x\n",
+             com->iface, com->slot, (UINT)status );
+        status = STATUS_ILLEGAL_INSTRUCTION;
+    }
+    else
+    {
+        ctx->Rip = *(DWORD64 *)(ULONG_PTR)ctx->Rsp;
+        ctx->Rsp += 8;
+    }
+
+    emu_current_trap_ctx = prev_trap_ctx;
+    emu_trap_ctx_rewritten = prev_ctx_rewritten;
+    return status;
+}
+
+/* The COM fast arm's once-per-process levers, sampled on the first COM trap
+ * that qualifies for it.  0 = live, 1 = WINE_PPC64LE_NO_COM_FAST (every COM
+ * slot takes the full dispatcher, yesterday's path exactly), 2 =
+ * WINE_PPC64LE_COM_FAST_SABOTAGE (a fast-served slot's RAX is flipped after
+ * the dispatch wrote it, so a probe reading HRESULTs and refcounts through
+ * the proxy MUST go wrong -- the negative control that proves the arm is
+ * serving, and that NO_COM_FAST reroutes rather than decorates). */
+static int com_fast_lever = -1;
+static BOOL com_fast_said;
+
+static void __attribute__((noinline)) com_fast_lever_init(void)
+{
+    int lever = 0;
+
+    if (emu_env_flag( L"WINE_PPC64LE_NO_COM_FAST" ))
+    {
+        ERR( "WINE_PPC64LE_NO_COM_FAST: every COM slot takes the full trap dispatcher\n" );
+        lever = 1;
+    }
+    else if (emu_env_flag( L"WINE_PPC64LE_COM_FAST_SABOTAGE" ))
+    {
+        ERR( "SABOTAGE: the COM fast arm flips RAX on every slot it serves; "
+             "proxy HRESULTs and refcounts will be wrong, which is what the "
+             "gate's negative control requires\n" );
+        lever = 2;
+    }
+    com_fast_lever = lever;
 }
 
 /***********************************************************************
@@ -10356,12 +10429,28 @@ void WINAPI emu_trap_dispatch( ULONG id, void *args, ULONG len )
         !(ReadAcquire( &cell->state ) & EC_CELL_RESOLVED))
         goto full;
     e = &cell->e;
-    if (e->com.dispatch || e->override || e->fp || e->cb_mask || !e->proc ||
-        (e->sig & THUNK_SIG_VARIADIC))
-        goto full;
-
-    call_resolved_flat_export( ctx, e );
-    status = trap_dispatch_run_status();
+    if (e->com.dispatch)
+    {
+        /* the COM fast arm: a resolved slot, nothing armed that wants to
+         * watch (the xstat/TRACE test above), and the lever not pulled */
+        if (__builtin_expect( com_fast_lever == -1, 0 )) com_fast_lever_init();
+        if (com_fast_lever == 1) goto full;
+        if (!com_fast_said)
+        {
+            com_fast_said = TRUE;
+            ERR( "com fast arm live: resolved COM slots skip the full trap dispatcher\n" );
+        }
+        status = call_resolved_com_slot( ctx, &e->com );
+        if (com_fast_lever == 2) ctx->Rax ^= 1;
+        status = trap_dispatch_run_status_from( status );
+    }
+    else
+    {
+        if (e->override || e->fp || e->cb_mask || !e->proc || (e->sig & THUNK_SIG_VARIADIC))
+            goto full;
+        call_resolved_flat_export( ctx, e );
+        status = trap_dispatch_run_status();
+    }
 
     lr = lean_return( status, NtCurrentTeb() );
     if (lr != EMU_LEAN_RETURN_FALLBACK) RtlRaiseStatus( STATUS_INTERNAL_ERROR );
@@ -10439,21 +10528,10 @@ static void __attribute__((noinline)) emu_trap_dispatch_slow( ULONG id, void *ar
     argc = THUNK_SIG_ARGC(sig);
     if (com.dispatch)
     {
-        /* A COM vtable slot.  The module behind __wine_com_dispatch owns all
-         * marshalling and has written ctx->Rax; this side owns control flow:
-         * pop the return address the guest's CALL pushed. */
-        status = com.dispatch( com.iface, com.slot, ctx );
-        if (status)
-        {
-            ERR( "com dispatch iface %u slot %u failed, status %08x\n",
-                 com.iface, com.slot, (UINT)status );
-            status = STATUS_ILLEGAL_INSTRUCTION;
-        }
-        else
-        {
-            ctx->Rip = *(DWORD64 *)(ULONG_PTR)ctx->Rsp;
-            ctx->Rsp += 8;
-        }
+        /* A COM vtable slot: call_resolved_com_slot, which brackets the
+         * dispatch with its own trap-ctx pair -- nested inside this body's,
+         * harmless, and keeps the arm one function for both paths. */
+        status = call_resolved_com_slot( ctx, &com );
     }
     else if (!proc && !override)
     {
