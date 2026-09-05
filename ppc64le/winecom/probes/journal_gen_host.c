@@ -56,6 +56,7 @@ struct fake_proxy
     uint8_t tail[64];
 };
 static int shared_form;
+static volatile uint8_t dirty_byte;
 static uint8_t *ring_mem;   /* RING_CAP + JG_HDR_DATA bytes */
 static uint64_t *pos_p( struct fake_proxy *px ) { return shared_form ? (uint64_t *)(ring_mem + JG_HDR_POS) : &px->pos; }
 static uint64_t *cap_p( struct fake_proxy *px ) { return shared_form ? (uint64_t *)(ring_mem + JG_HDR_CAP) : &px->cap; }
@@ -223,7 +224,8 @@ int main( int argc, char **argv )
         snippet_fn fn = (snippet_fn)code;
 
         jg_layout_compute( def, &lay );
-        len = jg_emit( code, def, &lay, key, JSH_TEST_SHAPE, (uint64_t)(uintptr_t)fallback_stub, shared_form );
+        len = jg_emit( code, def, &lay, key, JSH_TEST_SHAPE, (uint64_t)(uintptr_t)fallback_stub, shared_form,
+                       shared_form ? (uint64_t)(uintptr_t)&dirty_byte : 0 );
         if (len > longest) longest = len;
         if (len > JG_SNIPPET_MAX) bad( def->name, "snippet longer than JG_SNIPPET_MAX" );
         if (dump && d == 0)
@@ -250,6 +252,8 @@ int main( int argc, char **argv )
         {
             if (*pos_p( &px ) != 16 + lay.rec) bad( def->name, "pos not advanced by rec" );
             check_record( def, &lay, data_p() + 16, &as, key, 0 );
+            if (shared_form && dirty_byte != 1) bad( def->name, "dirty byte not set" );
+            dirty_byte = 0;
         }
 
         /* 2: NULL pointers */

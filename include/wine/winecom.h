@@ -740,6 +740,31 @@ extern void winecom_store_guest_ptr( void *cell, void *value );
  * ntdll asks through the client's __wine_com_slot_name export, because ntdll
  * has no view of a surface -- this runtime is a static library with one
  * instance per linkee.  A refused or identity row still has a name. */
+/* The EC DIRECT digest (ppc64le, fexbridge.h "EC DIRECT calls"): what the
+ * emulator's JIT needs to call a slot's host body straight from guest code,
+ * without the dispatcher.  Layout is the bridge's struct fexbridge_ec_direct
+ * exactly (64 bytes); ntdll copies it into the slot's EC cell.  A slot is
+ * direct-able when every argument is by value or an interface pointer (the
+ * JIT unwraps those through the vtable block below), it returns in RAX or
+ * nothing, and nothing about it needs the dispatcher: no hand function, no
+ * floating point, no refusal, no journal snippet on its vtable entry, and
+ * not IUnknown's three. */
+struct winecom_direct_digest
+{
+    UINT   kind;        /* 1 COM; bit 8 set by ntdll for its sabotage lever */
+    UINT   nargs;       /* arguments after `this` */
+    UINT   slot;        /* host vtable slot index */
+    UINT   iface;       /* the proxy's interface index */
+    UINT64 fn;          /* 0 for COM */
+    UINT64 dirty;       /* address of winecom's "records pending" byte */
+    UINT64 vt_lo;       /* guest vtable block */
+    UINT64 vt_size;
+    UINT   in_mask;     /* bit p: MS-x64 position p is an interface pointer */
+    UCHAR  ext[8];      /* per position: 0 none, 1 zx32, 2 sx32, 3 zx16, 4 sx16, 5 zx8, 6 sx8 */
+    UINT   pad;
+};
+extern BOOL winecom_slot_direct( UINT iface, UINT slot, struct winecom_direct_digest *out );
+
 extern BOOL winecom_slot_names( UINT iface, UINT slot, const char **iface_name,
                                 const char **slot_name );
 

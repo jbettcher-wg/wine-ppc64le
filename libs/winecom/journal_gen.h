@@ -267,7 +267,8 @@ static inline int32_t jg_arg_stack_disp( unsigned i ) { return 8 + 8 * (int32_t)
  * are volatile in MS-x64 and the snippet returns straight to the caller).
  */
 static inline unsigned jg_emit( uint8_t *buf, const struct jg_def *def, const struct jg_layout *lay,
-                                uint32_t key, unsigned shape, uint64_t fallback, int shared )
+                                uint32_t key, unsigned shape, uint64_t fallback, int shared,
+                                uint64_t dirty )
 {
     struct jg_buf b;
     unsigned i, k;
@@ -392,6 +393,15 @@ static inline unsigned jg_emit( uint8_t *buf, const struct jg_def *def, const st
     }
     else
         jg_mov_store64( &b, R_RCX, JG_PROXY_RING_POS, R_R11 );
+    if (dirty)
+    {
+        /* "something is recorded somewhere": the byte a direct-served call
+         * (fexbridge.h, EC DIRECT) tests before skipping the dispatcher and
+         * its drain.  Stored AFTER pos so a drain that clears the byte and
+         * then scans the rings can never miss a record. */
+        jg_e8( &b, 0x48 ); jg_e8( &b, 0xb8 ); jg_e64( &b, dirty );   /* mov rax, imm64 */
+        jg_e8( &b, 0xc6 ); jg_e8( &b, 0x00 ); jg_e8( &b, 0x01 );     /* mov byte [rax], 1 */
+    }
     jg_ret( &b );
 
     /* the fallback: every fb branch lands here; jmp [rip+0] through the

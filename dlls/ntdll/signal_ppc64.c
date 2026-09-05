@@ -9471,14 +9471,120 @@ done:
 struct ec_row_cell
 {
     LONG state;                      /* EC_CELL_*; release-published */
+    UINT pad;
+    struct emu_ec_direct direct;     /* the JIT's digest (unixlib.h), valid
+                                        only once the state carries DIRECT */
     struct thunk_rip_cache_entry e;  /* valid only once RESOLVED */
 };
 /* RESOLVED is a bit: LEAF is RESOLVED with the leaf bit on top, the value
  * the unix side pre-checks against (EMU_EC_CELL_LEAF, unixlib.h), so a
- * resolved-row reader tests the bit and the leaf reader tests the value. */
-enum { EC_CELL_UNRESOLVED = 0, EC_CELL_RESOLVED = 1, EC_CELL_SLOW = 2, EC_CELL_LEAF = EMU_EC_CELL_LEAF };
+ * resolved-row reader tests the bit and the leaf reader tests the value.
+ * DIRECT is a further bit on top of either (unixlib.h). */
+enum { EC_CELL_UNRESOLVED = 0, EC_CELL_RESOLVED = 1, EC_CELL_SLOW = 2, EC_CELL_LEAF = EMU_EC_CELL_LEAF,
+       EC_CELL_DIRECT_COM = EMU_EC_CELL_DIRECT_COM, EC_CELL_DIRECT_FLAT = EMU_EC_CELL_DIRECT_FLAT };
 C_ASSERT( (EC_CELL_LEAF & EC_CELL_RESOLVED) && !(EC_CELL_SLOW & EC_CELL_RESOLVED) );
+C_ASSERT( (EC_CELL_DIRECT_COM & EC_CELL_RESOLVED) && (EC_CELL_DIRECT_FLAT & EC_CELL_LEAF) == EC_CELL_LEAF );
 C_ASSERT( offsetof( struct ec_row_cell, state ) == 0 && sizeof(((struct ec_row_cell *)0)->state) == 4 );
+C_ASSERT( offsetof( struct ec_row_cell, direct ) == EMU_EC_DIRECT_OFFSET );
+C_ASSERT( sizeof(struct emu_ec_direct) == 64 );
+
+/* The EC DIRECT levers, sampled once: 0 live, 1 WINE_PPC64LE_NO_EC_DIRECT
+ * (no cell is ever stamped DIRECT -- the PE half of the kill switch; the
+ * bridge's half is FEX_NO_EC_DIRECT), 2 WINE_PPC64LE_EC_DIRECT_SABOTAGE
+ * (every direct-served call's RAX is inverted by the JIT: the negative
+ * control that proves the arm is serving and that the kill switch reroutes
+ * rather than decorates). */
+static int ec_direct_lever = -1;
+static BOOL ec_direct_said;
+/* The older arms' levers keep their meaning with the direct arm in front
+ * of them: their kill switches (NO_EC_LEAF, NO_COM_FAST) measure the path
+ * they name, and their sabotage levers must still be able to break a
+ * probe -- so either lever on a class turns the direct arm off for that
+ * class (bit 0 flat, bit 1 COM). */
+static int ec_direct_off_class;
+
+static void __attribute__((noinline)) ec_direct_lever_init(void)
+{
+    int lever = 0;
+
+    if (emu_env_flag( L"WINE_PPC64LE_NO_EC_LEAF" ) || emu_env_flag( L"WINE_PPC64LE_EC_LEAF_SABOTAGE" ))
+        ec_direct_off_class |= 1;
+    if (emu_env_flag( L"WINE_PPC64LE_NO_COM_FAST" ) || emu_env_flag( L"WINE_PPC64LE_COM_FAST_SABOTAGE" ))
+        ec_direct_off_class |= 2;
+    if (emu_env_flag( L"WINE_PPC64LE_NO_EC_DIRECT" ))
+    {
+        ERR( "WINE_PPC64LE_NO_EC_DIRECT: no slot is served inline by the JIT\n" );
+        lever = 1;
+    }
+    else if (emu_env_flag( L"WINE_PPC64LE_EC_DIRECT_SABOTAGE" ))
+    {
+        ERR( "SABOTAGE: every direct-served call's RAX is inverted; feature levels, "
+             "HRESULTs and Map results will be wrong, which is what the gate's "
+             "negative control requires\n" );
+        lever = 2;
+    }
+    ec_direct_lever = lever;
+}
+
+/* Ask the slot's NATIVE module for its direct digest.  Cached per module
+ * base like __wine_com_dispatch is (find_guest_com_target). */
+typedef BOOL (WINAPI *com_slot_direct_func)( UINT iface, UINT slot, void *out, UINT size );
+static BOOL ec_com_direct_digest( ULONG_PTR rip, const struct com_thunk_hit *com,
+                                  struct emu_ec_direct *out )
+{
+    static struct { void *base; com_slot_direct_func fn; } cache[8];
+    LDR_DATA_TABLE_ENTRY *mod;
+    com_slot_direct_func fn = NULL;
+    HMODULE native;
+    ANSI_STRING name;
+    void *proc;
+    UINT n;
+
+    if (LdrFindEntryForAddress( (void *)rip, &mod )) return FALSE;
+    for (n = 0; n < ARRAY_SIZE(cache); n++)
+        if (cache[n].base == mod->DllBase) { fn = cache[n].fn; break; }
+    if (n == ARRAY_SIZE(cache))
+    {
+        if (LdrGetDllHandle( native_system_dir, 0, &mod->BaseDllName, &native )) return FALSE;
+        RtlInitAnsiString( &name, "__wine_com_slot_direct" );
+        if (LdrGetProcedureAddress( native, &name, 0, &proc )) proc = NULL;
+        for (n = 0; n < ARRAY_SIZE(cache); n++)
+            if (!cache[n].base)
+            {
+                cache[n].base = mod->DllBase;
+                cache[n].fn = (com_slot_direct_func)proc;
+                break;
+            }
+        fn = (com_slot_direct_func)proc;
+    }
+    if (!fn) return FALSE;
+    return fn( com->iface, com->slot, out, sizeof(*out) );
+}
+
+/* A leaf export's digest from what the resolve already measured: the
+ * function itself, its argument count, and the width/sign words. */
+static BOOL ec_flat_direct_digest( const struct thunk_rip_cache_entry *e, struct emu_ec_direct *out )
+{
+    UINT argc = THUNK_SIG_ARGC(e->sig), p;
+
+    if (!e->leaf || !e->proc || (e->sig & THUNK_SIG_VARIADIC) || argc > 8) return FALSE;
+    memset( out, 0, sizeof(*out) );
+    out->kind = EMU_EC_DIRECT_KIND_FLAT;
+    out->nargs = argc;
+    out->fn = (UINT64)(ULONG_PTR)e->proc;
+    for (p = 0; p < argc && p < 8; p++)
+    {
+        UINT w = THUNK_WIDTH( e->widths, p );
+        BOOL sign = (e->signs >> p) & 1;
+        out->ext[p] = w == 1 ? (sign ? 2 : 1) : w == 2 ? (sign ? 4 : 3) : w == 3 ? (sign ? 6 : 5) : 0;
+    }
+    /* the JIT extends positions 1..7 only (position 0 is `this` for COM);
+     * a flat export whose FIRST argument is narrower than 32 bits would
+     * reach its body with garbage above the width -- keep it on the
+     * dispatcher (none of today's leaf class is shaped that way) */
+    if (out->ext[0] >= 3) return FALSE;
+    return TRUE;
+}
 
 static void ec_cell_fill( struct ec_row_cell *cell, ULONG_PTR rip )
 {
@@ -9504,8 +9610,36 @@ static void ec_cell_fill( struct ec_row_cell *cell, ULONG_PTR rip )
      * a unixcall, and a unixcall from the kernel stack is the very frame
      * reuse the callback frame exists to prevent.  RESOLVED still serves
      * the row through the fast path, which traces normally. */
-    WriteRelease( &cell->state, (tmp.leaf && !TRACE_ON(relay) && !TRACE_ON(snoop))
-                                ? EC_CELL_LEAF : EC_CELL_RESOLVED );
+    {
+        BOOL leaf = tmp.leaf && !TRACE_ON(relay) && !TRACE_ON(snoop);
+        LONG state = leaf ? EC_CELL_LEAF : EC_CELL_RESOLVED;
+        struct emu_ec_direct d;
+        BOOL direct = FALSE;
+
+        /* EC DIRECT: the JIT serves this slot inline when nothing here wants
+         * to watch it (stats, +seh, +relay, +snoop) and the lever is not
+         * pulled.  The digest is published before the state word. */
+        if (ec_direct_lever < 0) ec_direct_lever_init();
+        if (ec_direct_lever != 1 && !xstat_on() && !TRACE_ON(seh) && !TRACE_ON(relay) && !TRACE_ON(snoop))
+        {
+            if (tmp.com.dispatch && !tmp.lane32 && !(ec_direct_off_class & 2))
+                direct = ec_com_direct_digest( rip, &tmp.com, &d );
+            else if (leaf && !(ec_direct_off_class & 1)) direct = ec_flat_direct_digest( &tmp, &d );
+        }
+        if (direct)
+        {
+            if (ec_direct_lever == 2) d.kind |= EMU_EC_DIRECT_SABOTAGE;
+            cell->direct = d;
+            state = leaf ? EC_CELL_DIRECT_FLAT : EC_CELL_DIRECT_COM;
+            if (!ec_direct_said)
+            {
+                ec_direct_said = TRUE;
+                ERR( "ec direct arm live (the JIT serves proven slots inline)\n" );
+            }
+            TRACE( "ec direct: %p stamped (kind %u, %u args)\n", (void *)rip, d.kind & 0xff, d.nargs );
+        }
+        WriteRelease( &cell->state, state );
+    }
 }
 
 
@@ -10410,7 +10544,8 @@ NTSTATUS WINAPI emu_trap_leaf( AMD64_CONTEXT *ctx, void *cookie )
 {
     struct ec_row_cell *cell = cookie;
 
-    if (!cell || xstat || TRACE_ON(seh) || ReadAcquire( &cell->state ) != EC_CELL_LEAF)
+    if (!cell || xstat || TRACE_ON(seh) ||
+        (ReadAcquire( &cell->state ) & ~EMU_EC_CELL_DIRECT) != EC_CELL_LEAF)
         return EMU_LEAF_DECLINED;
     call_resolved_flat_export( ctx, &cell->e );
     return trap_dispatch_run_status();

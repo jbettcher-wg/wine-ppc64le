@@ -1056,6 +1056,14 @@ static int  (*p_fexbridge_set_gs_base)( void *thread, ULONGLONG base );
 static int  (*p_fexbridge_set_fs_base)( void *thread, ULONGLONG base );
 static int  (*p_fexbridge_fault_is_jit)( const void *host_ucontext );
 static int  (*p_fexbridge_fault_unwind)( void *host_ucontext );
+/* EC DIRECT (fexbridge.h), optional: absent means no slot is ever served
+ * inline and no fault can be inside one */
+static int  (*p_fexbridge_ec_direct_in_flight)( void );
+static int  (*p_fexbridge_fault_unwind_direct)( void *host_ucontext );
+C_ASSERT( sizeof(struct emu_ec_direct) == 64 );
+C_ASSERT( offsetof(struct emu_ec_direct, fn) == 16 && offsetof(struct emu_ec_direct, dirty) == 24 &&
+          offsetof(struct emu_ec_direct, vt_lo) == 32 && offsetof(struct emu_ec_direct, in_mask) == 48 &&
+          offsetof(struct emu_ec_direct, ext) == 52 );
 static int  (*p_fexbridge_run)( void *thread, void *ctx );
 static void (*p_fexbridge_invalidate_code_range)( ULONGLONG start, ULONGLONG length );
 static UINT (*p_fexbridge_hwtso_prot)(void);
@@ -1213,6 +1221,8 @@ static void emu_load_bridge(void)
     p_fexbridge_current_thread = dlsym( so, "fexbridge_current_thread" );
     p_fexbridge_fault_is_jit   = dlsym( so, "fexbridge_fault_is_jit" );
     p_fexbridge_fault_unwind   = dlsym( so, "fexbridge_fault_unwind" );
+    p_fexbridge_ec_direct_in_flight = dlsym( so, "fexbridge_ec_direct_in_flight" );
+    p_fexbridge_fault_unwind_direct = dlsym( so, "fexbridge_fault_unwind_direct" );
     p_fexbridge_run            = dlsym( so, "fexbridge_run" );
     p_fexbridge_invalidate_code_range = dlsym( so, "fexbridge_invalidate_code_range" );
     /* optional (no ABI bump): an older bridge simply has no hardware TSO */
@@ -1693,7 +1703,8 @@ static FORCEINLINE NTSTATUS emu_trap_dispatch_common( AMD64_CONTEXT *ctx, void *
      * the call-and-decline was +14 ns on every COM slot [MEASURED, the
      * unixlib.h note].  Only the EC thunk has a cookie, so the CONTEXT and
      * view trap protocols never get here with ec set. */
-    if (ec && cookie && p_emu_trap_leaf && *(const volatile LONG *)cookie == EMU_EC_CELL_LEAF &&
+    if (ec && cookie && p_emu_trap_leaf &&
+        (*(const volatile LONG *)cookie & ~EMU_EC_CELL_DIRECT) == EMU_EC_CELL_LEAF &&
         (status = p_emu_trap_leaf( ctx, cookie )) != EMU_LEAF_DECLINED)
     {
         if (__builtin_expect( emu_ec_leaf_sabotage, 0 )) ctx->Rax = ~ctx->Rax;
@@ -1928,6 +1939,22 @@ BOOL emu_handle_fault( void *sigcontext, EXCEPTION_RECORD *rec )
 
     if (!p_fexbridge_fault_is_jit || !p_fexbridge_fault_unwind) return FALSE;
     is_jit = p_fexbridge_fault_is_jit( sigcontext );
+    if (!is_jit && p_fexbridge_ec_direct_in_flight && p_fexbridge_fault_unwind_direct &&
+        p_fexbridge_ec_direct_in_flight())
+    {
+        /* A fault inside a native body the JIT called directly (EC DIRECT,
+         * fexbridge.h): the guest register file was spilled at the call, so
+         * the run returns FAULT at the guest call site, and the record built
+         * here names it.  The host address is logged; it is the callee's. */
+        ERR( "fault %08x at host %p inside a direct-served native call; reported at the guest call site\n",
+             rec ? (UINT)rec->ExceptionCode : 0, rec ? rec->ExceptionAddress : NULL );
+        if (rec && data && emu_no_fault_stash != 1)
+        {
+            data->emu_fault_rec = *rec;
+            data->emu_fault_rec_valid = TRUE;
+        }
+        return p_fexbridge_fault_unwind_direct( sigcontext ) != 0;
+    }
     if (!is_jit)
     {
         if (!emu_run_depth || !rec || rec->ExceptionCode != EXCEPTION_ACCESS_VIOLATION ||

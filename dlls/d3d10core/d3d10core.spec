@@ -17,3 +17,4 @@
 # (ppc64le/vkd3d/check-ordinal-imports.sh).  Asked of the NATIVE
 # module by ntdll when the crossing sink interns a COM slot row.
 @ stdcall __wine_com_slot_name(long long ptr ptr) d3d11.__wine_com_slot_name
+@ stdcall __wine_com_slot_direct(long long ptr long) d3d11.__wine_com_slot_direct

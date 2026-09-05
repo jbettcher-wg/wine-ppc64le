@@ -493,6 +493,134 @@ its ring drains at the next Map, which is per draw in most engines; the
 A/B on a pinned save is the next thing to run, with the section 6 caveats
 (back the saves up, +-10% scene noise).
 
+## 14. EC DIRECT: the JIT makes the call
+
+Built 2026-09-05 (early), NOT COMMITTED -- working trees on both sides,
+for review.  Section 13 took the hot D3D11 class out of the trap by
+recording it; this takes the trap itself out of every call that still
+crosses and whose body takes its arguments as they are.
+
+**The mechanism.**  A registered stub RIP already compiles to a
+transition block (bridge ABI 7): spill the guest file, call the bridge
+trampoline, reload RIP, exit.  The block is now `EcTransition`
+(FEXCore IR.json, PPC64 `DEF_OP(EcTransition)`, BranchOps.cpp): after
+the same spill it reads the slot's EC cell AT RUN TIME -- the block is
+compiled before the slot is ever resolved -- and when the cell's state
+word carries the DIRECT bit it serves the call inline:
+
+1. dirty byte named by the digest must read 0 (winecom's "records
+   pending somewhere", set by every context-journal snippet, cleared by
+   the drain before it scans);
+2. positions 0..7 loaded from the frame (RCX, RDX, R8, R9) and the guest
+   stack (RSP+0x28..) into r3..r10;
+3. COM: `this` must be a live proxy of the digest's interface, its ring
+   (if any) quiet -- list position 0, shared header pos == cons -- and
+   the host object is read off it; interface arguments named by the
+   digest's mask are unwrapped the same way after their vtable is
+   checked against the guest vtable block;
+4. per-position extension (zero/sign 8/16/32, from the row's narrow and
+   dword masks, or the flat export's width/sign words);
+5. the callee: the host vtable slot (COM) or the export itself (a leaf,
+   FLAT), called ELFv2 with the in-flight marker set around it;
+6. r3 to RAX, [RSP] to RIP, RSP += 8, the partial refill (the callee
+   never touches the frame, the sentinel proves it), exit.
+
+Any check failing falls to the trampoline path inside the same block --
+DEF_OP(Thunk)'s body verbatim, sentinel disarmed first.
+
+**The contract** (fexbridge.h "EC DIRECT calls"): the digest is the
+64-byte `struct fexbridge_ec_direct` at cell + 8 (kind, nargs, slot,
+iface, fn, dirty, vt_lo, vt_size, in_mask, ext[8]); the state word's bit
+3 says it is published (9 = DIRECT|RESOLVED for a COM slot, 13 =
+DIRECT|LEAF for a flat export, so the unix leaf pre-check still accepts a
+direct leaf's fallback).  COM proxy offsets the JIT reads: host 0x08,
+iface 0x14, ring 0x28, list pos 0x30, live 0x44; ring header pos 0x00,
+cons 0x10 -- every one pinned by a C_ASSERT in winecom.c; the digest
+layout by C_ASSERTs in loader.c and signal_ppc64.c.  Two optional bridge
+symbols, no ABI bump: `fexbridge_ec_direct_in_flight`,
+`fexbridge_fault_unwind_direct`.
+
+**Who proves a slot.**  ntdll's `ec_cell_fill` asks the slot's native
+module for `__wine_com_slot_direct` (d3d11, d3d12; dxgi/d3d10core/d3d10
+forward to d3d11), which is winecom's `winecom_slot_direct`: slot >= 3,
+not refused, not a hand function, no float, no aggregate return, every
+argument PASS or IFACE_IN, at most 7 after `this`, and its vtable entry
+never re-pointed at a snippet (journal, const getter) -- a snippet's
+fallback trap must keep the dispatcher because it drains.  A flat export
+is direct when it is a leaf (thunk_leaf_exports) with at most 8
+arguments.  Not under WINE_PPC64LE_TRAP_STATS, +seh, +relay, +snoop, and
+not for a class whose older lever is pulled (NO_EC_LEAF / EC_LEAF_SABOTAGE
+turn off flat direct, NO_COM_FAST / COM_FAST_SABOTAGE turn off COM
+direct), so those gates' negative controls stay red.
+
+**Levers**: `WINE_PPC64LE_NO_EC_DIRECT=1` (PE half: no cell stamped),
+`FEX_NO_EC_DIRECT=1` (bridge half: plain trampoline blocks),
+`WINE_PPC64LE_EC_DIRECT_SABOTAGE=1` (RAX inverted after every direct-
+served call).  Banner `ec direct arm live` once per process.
+
+**Gate** `ppc64le/cpu/check-ec-direct.sh` (`probes/ec_direct_probe.c`):
+pid/tid against the TEB, 1000 x GetFeatureLevel and GetType, a format
+query through a pointer, GetData with a query proxy to unwrap and a UINT
+on the stack to extend, a Map/Unmap/Copy/Map round trip.  Live: PASS +
+banner.  `--sabotage`: RAX inverted must FAIL it (it did: pid, feature
+level, type, the second CheckFormatSupport and the second GetData all
+went red); each kill-switch half must PASS, the bridge half with the
+banner still present; sabotage under the bridge half must be inert.
+All PASS.  Also PASS with the arm live: check-com-fastpath (+ --sabotage),
+check-ec-leaf (+ --sabotage), check-ctx-journal (+ --sabotage),
+check-d3d11-smoke, check-dev-journal, check-com-smoke.
+
+[MEASURED] op4k, three interleaved rounds, live vs
+`WINE_PPC64LE_NO_EC_DIRECT=1`; the third column is the same box before
+any of this was built (the section 13 tree, an hour earlier):
+
+| line | direct live | kill switch | before |
+|---|---:|---:|---:|
+| com_getfeaturelevel | **69.8 / 69.6 / 69.4** | 367.2 / 367.4 / 368.2 | 408.8 / 413.3 / 408.0 |
+| com_gettype | **70.8 / 70.4 / 70.7** | 371.1 / 371.3 / 370.7 | 411.9 / 410.6 / 410.0 |
+| crossing (GetCurrentProcessId, leaf) | **77.7 / 77.8 / 78.0** | 128.7 / 128.6 / 128.6 | 130.1 / 130.9 / 129.7 |
+| nonleaf (IsProcessorFeaturePresent) | 214.7 / 215.2 / 215.4 | 214.8 / 215.1 / 215.3 | 214.2 / 215.6 / 213.3 |
+| com_journaled_topology | 263.4 / 260.5 / 262.8 | 266.3 / 262.7 / 261.1 | 255.0 / 253.1 / 254.2 |
+
+**A direct COM slot: 368 -> 70 ns, -81%; a direct leaf export: 129 ->
+78 ns, -40%.**  (The kill-switch arm reads 40 ns under the hour-earlier
+baseline on the COM lines; same tree otherwise, the box's clock -- not
+claimed.)  What the 70 ns still holds: the block entry and exit, the
+full spill and the partial refill (~26 register stores and ~16 loads),
+the digest and proxy checks, DXVK's 30 ns body.  The non-leaf flat line
+is untouched, as it should be: IsProcessorFeaturePresent is not a leaf.
+
+**What falls back, and why**: a slot with an interface OUT parameter,
+an aggregate return, a hand function, a float, more than 7 arguments;
+IUnknown's three (served from the proxy table); any slot behind a
+snippet; any call while a journal ring is pending -- the dispatcher's
+drain is what orders the rings, and the arm must not skip it; a `this`
+whose live tag, interface or ring says no; an interface argument whose
+vtable is not in the block.
+
+**Open risks, plainly.**
+- Faults inside the callee: the in-flight marker is set around the
+  call; emu_handle_fault (loader.c) sees a non-JIT host PC with the
+  marker up, logs it, and unwinds through `fexbridge_fault_unwind_direct`
+  to the run's FAULT return at the guest call site with the spilled file
+  -- the same attribution the leaf path has.  Built, not exercised by a
+  gate: no probe faults inside DXVK on purpose yet.
+- Memory ordering: the JIT reads the cell's state word and then the
+  digest; the PE side publishes digest first, state last (WriteRelease).
+  The JIT's reads are plain loads in program order; on POWER a dependent
+  load ordering is not guaranteed without a barrier, so a first direct
+  call racing the stamp on another thread could in principle read a
+  stale digest.  Cells are stamped once and never changed, and the
+  first call of every slot resolves through the trap on the stamping
+  thread itself, so the window needs a second thread's first call to
+  land inside the stamp -- add an `isync`/`lwsync` after the state load
+  if that ever matters.
+- Threads: the direct call runs DXVK on the guest thread's host stack,
+  exactly where the trampoline path ran it; nothing new.
+- The i386 lane keeps the trap protocol (EC is 64-bit only).
+- D3D9 and the media surfaces do not export the digest yet (one spec
+  line and one function each, the d3d11 pattern).
+
 ## 4. What is still on the table, by measured size
 
 1. **PE ntdll.dll.so still builds with `-mlongcall`** (it is a .so builtin

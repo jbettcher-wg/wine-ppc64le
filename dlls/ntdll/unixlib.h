@@ -145,6 +145,35 @@ struct emu_run_entry_params
  * acquire read stays the authority; this is a hint. */
 #define EMU_EC_CELL_LEAF 5
 
+/* EC DIRECT (fexbridge.h "EC DIRECT calls"): bit 3 of the state word tells
+ * the emulator's JIT that the digest at cell + EMU_EC_DIRECT_OFFSET is
+ * published and the slot may be served inline, straight from guest code.
+ * A resolved COM slot stamps 9 (DIRECT | RESOLVED); a leaf export stamps
+ * 13 (DIRECT | LEAF), which the leaf pre-check above must accept too so
+ * the trampoline fallback of a direct leaf still takes the leaf path. */
+#define EMU_EC_CELL_DIRECT      8
+#define EMU_EC_CELL_DIRECT_COM  9
+#define EMU_EC_CELL_DIRECT_FLAT 13
+#define EMU_EC_DIRECT_OFFSET    8
+#define EMU_EC_DIRECT_KIND_COM  1
+#define EMU_EC_DIRECT_KIND_FLAT 2
+#define EMU_EC_DIRECT_SABOTAGE  0x100
+/* struct fexbridge_ec_direct, mirrored (64 bytes; loader.c asserts) */
+struct emu_ec_direct
+{
+    UINT   kind;
+    UINT   nargs;
+    UINT   slot;
+    UINT   iface;
+    UINT64 fn;
+    UINT64 dirty;
+    UINT64 vt_lo;
+    UINT64 vt_size;
+    UINT   in_mask;
+    UCHAR  ext[8];
+    UINT   pad;
+};
+
 /* What emu_exception_dispatch receives: the guest state to dispatch against
  * and the record built where the fault was taken.  Two register files exist
  * per guest thread and never merge; a guest exception is dispatched against

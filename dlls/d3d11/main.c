@@ -532,6 +532,16 @@ BOOL WINAPI __wine_com_slot_name( UINT iface, UINT slot, const char **iface_name
     return winecom_slot_names( iface, slot, iface_name, slot_name );
 }
 
+/* The EC DIRECT digest (wine/winecom.h): asked once per slot by ntdll when
+ * it fills the slot's EC cell.  `size` guards the layout across the two
+ * modules; a mismatch answers FALSE and the slot keeps the dispatcher. */
+BOOL WINAPI __wine_com_slot_direct( UINT iface, UINT slot, void *out, UINT size )
+{
+    if (size != sizeof(struct winecom_direct_digest)) return FALSE;
+    if (!com_runtime_init()) return FALSE;
+    return winecom_slot_direct( iface, slot, out );
+}
+
 /* short spellings for the hand-written slots below */
 static UINT64 read_arg( const AMD64_CONTEXT *ctx, UINT n )
 {
@@ -2710,6 +2720,11 @@ ULONG_PTR WINAPI __wine_com_dispatch32( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3
 ULONG_PTR WINAPI __wine_com_slot_name( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4 )
 {
     __wine_spec_unimplemented_stub( "d3d11.dll", "__wine_com_slot_name" );
+}
+
+ULONG_PTR WINAPI __wine_com_slot_direct( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4 )
+{
+    __wine_spec_unimplemented_stub( "d3d11.dll", "__wine_com_slot_direct" );
 }
 
 ULONG_PTR WINAPI __wine_guest_D3D11CreateDevice( ULONG_PTR a1, ULONG_PTR a2, ULONG_PTR a3, ULONG_PTR a4, ULONG_PTR a5, ULONG_PTR a6, ULONG_PTR a7, ULONG_PTR a8, ULONG_PTR a9, ULONG_PTR a10 )

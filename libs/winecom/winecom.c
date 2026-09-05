@@ -124,6 +124,14 @@ C_ASSERT( offsetof(struct com_proxy, cached_qword) == 0x20 );
 C_ASSERT( offsetof(struct com_proxy, jr_base) == 0x28 );
 C_ASSERT( offsetof(struct com_proxy, jr_pos)  == 0x30 );
 C_ASSERT( offsetof(struct com_proxy, jr_cap)  == 0x38 );
+/* the EC DIRECT contract (fexbridge.h FEXBRIDGE_EC_PROXY_*): the JIT reads
+ * these straight off the guest's `this` */
+C_ASSERT( offsetof(struct com_proxy, host)    == 0x08 );
+C_ASSERT( offsetof(struct com_proxy, iface)   == 0x14 );
+C_ASSERT( offsetof(struct com_proxy, jr_base) == 0x28 );
+C_ASSERT( offsetof(struct com_proxy, jr_pos)  == 0x30 );
+C_ASSERT( offsetof(struct com_proxy, live)    == 0x44 );
+C_ASSERT( sizeof(struct winecom_direct_digest) == 64 );
 #endif
 
 /* The intern table grows with the proxy count (a game at play interns tens
@@ -190,6 +198,10 @@ const struct winecom_surface *wc_surface;
  * stub in the guest module's stub array for interface i. */
 static const UINT64 **guest_vtbls;
 static UINT64 *guest_vtbl_block;
+/* per slot: its vtable entry was re-pointed at a guest-side snippet (any of
+ * the installers); such a slot's stub only ever runs as a FALLBACK and must
+ * keep the dispatcher (winecom_slot_direct) */
+static unsigned char *vtbl_repointed;
 static UINT64 guest_vtbl_lo, guest_vtbl_hi;  /* published stub address range,
                                                 for the O(1) proxy test */
 static unsigned char *refuse_logged;   /* one byte per (iface, slot) */
@@ -1241,6 +1253,7 @@ static void install_const_getters( void )
                    "(fallback stub %p)\n", wc_surface->name, itf->name,
                    itf->slots[n].name, n, code, *(void **)vslot );
             *vslot = (UINT64)(ULONG_PTR)code;
+            if (vtbl_repointed) vtbl_repointed[iface_slot_base[i] + n] = 1;
             code += snippet_stride;
         }
     }
@@ -1387,9 +1400,16 @@ struct ctx_ring
 };
 C_ASSERT( offsetof(struct ctx_ring, pos) == JG_HDR_POS );
 C_ASSERT( offsetof(struct ctx_ring, cap) == JG_HDR_CAP );
+C_ASSERT( offsetof(struct ctx_ring, cons) == 0x10 );   /* FEXBRIDGE_EC_RING_CONS */
 C_ASSERT( sizeof(struct ctx_ring) <= JG_HDR_DATA );
 static struct ctx_ring *ctx_pool[CTX_RINGS_MAX];
 static inline BYTE *ctx_ring_data( struct ctx_ring *r ) { return (BYTE *)r + JG_HDR_DATA; }
+/* "records pending somewhere": set by every context-scope snippet after it
+ * commits, cleared by the drain BEFORE it scans the rings (so a record
+ * committed after the clear re-sets it).  A direct-served call (fexbridge.h
+ * EC DIRECT) tests it and takes the dispatcher -- and its drain -- when it
+ * is set.  Its address rides in every direct digest. */
+static volatile BYTE wc_ctx_dirty;
 /* the ID3D11Multithread rows whose dispatch turns the context journal off */
 static UINT mt_iface = ~0u, mt_slot_enter = ~0u, mt_slot_setprot = ~0u;
 /* Serializes context-ring replay across threads: a foreign thread's drain
@@ -1621,6 +1641,9 @@ static void wc_ctx_drain_all( void )
 {
     UINT i;
 
+    if (!wc_ctx_dirty) return;
+    wc_ctx_dirty = 0;
+    __atomic_thread_fence( __ATOMIC_SEQ_CST );
     for (i = 0; i < CTX_RINGS_MAX; i++)
     {
         struct ctx_ring *r = __atomic_load_n( &ctx_pool[i], __ATOMIC_ACQUIRE );
@@ -1837,7 +1860,8 @@ static void install_journal_gen( unsigned char **code )
 
             vslot = &guest_vtbl_block[iface_slot_base[i] + n];
             len = jg_emit( *code, def, &journal_gen_lay[g - 1], (i << 16) | n, JSH_GEN, *vslot,
-                           def->scope == JG_SCOPE_CTX );
+                           def->scope == JG_SCOPE_CTX,
+                           def->scope == JG_SCOPE_CTX ? (UINT64)(ULONG_PTR)&wc_ctx_dirty : 0 );
             if (len > JG_SNIPPET_MAX)
             {
                 /* cannot happen for the table as written; loud if it ever does */
@@ -1847,6 +1871,7 @@ static void install_journal_gen( unsigned char **code )
             TRACE( "journal: %s slot %u recorded guest-side from %p (generic, rec %u, fallback stub %p)\n",
                    sl->name, n, *code, journal_gen_lay[g - 1].rec, *(void **)vslot );
             *vslot = (UINT64)(ULONG_PTR)*code;
+            if (vtbl_repointed) vtbl_repointed[iface_slot_base[i] + n] = 1;
             *code += (len + 15) & ~15u;
             journal_gen_map[iface_slot_base[i] + n] = g;
             if (iface_journaled[i] < def->scope) iface_journaled[i] = def->scope;
@@ -2072,6 +2097,7 @@ static void install_journal( void )
                    "(shape %u rec %u, fallback stub %p)\n",
                    sl->name, n, code, def->shape, rec, *(void **)vslot );
             *vslot = (UINT64)(ULONG_PTR)code;
+            if (vtbl_repointed) vtbl_repointed[iface_slot_base[i] + n] = 1;
             iface_journaled[i] = JG_SCOPE_LIST;
             code += snippet_stride;
         }
@@ -2670,6 +2696,7 @@ static void install_dev_journal( void )
             TRACE( "devjournal: %s slot %u recorded guest-side from %p "
                    "(fallback stub %p)\n", sl->name, n, code, *(void **)vslot );
             *vslot = (UINT64)(ULONG_PTR)code;
+            if (vtbl_repointed) vtbl_repointed[iface_slot_base[i] + n] = 1;
             dev_slot_map[iface_slot_base[i] + n] = 1;
             code += snippet_stride;
         }
@@ -2722,6 +2749,7 @@ static BOOL com_runtime_init_once( void )
 
     total_slots = 0;
     for (i = 0; i < wc_surface->iface_count; i++) total_slots += entries[i].slot_count;
+    vtbl_repointed = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, HEAP_ZERO_MEMORY, total_slots );
 
     if (!(guest_vtbls = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0,
                                          wc_surface->iface_count * sizeof(*guest_vtbls)
@@ -2905,6 +2933,57 @@ BOOL winecom_slot_names( UINT iface, UINT slot, const char **iface_name,
                    : slot == 2 ? "Release" : "<identity>";
     else if (!itf->slots[slot].name) return FALSE;
     else *slot_name = itf->slots[slot].name;
+    return TRUE;
+}
+
+/* The EC DIRECT digest for one slot (wine/winecom.h has the contract).
+ * Asked once per slot by ntdll when it fills the slot's EC cell; FALSE
+ * means the slot keeps the dispatcher. */
+BOOL winecom_slot_direct( UINT iface, UINT slot, struct winecom_direct_digest *out )
+{
+    const struct winecom_iface *itf;
+    const struct winecom_slot *sl;
+    UINT i;
+
+    memset( out, 0, sizeof(*out) );
+    if (guest32 || !wc_surface || !guest_vtbl_block) return FALSE;
+    if (iface >= wc_surface->iface_count) return FALSE;
+    itf = &wc_surface->ifaces[iface];
+    if (slot < 3 || slot >= itf->slot_count || !itf->slots) return FALSE;
+    sl = &itf->slots[slot];
+    if (!sl->name || sl->refuse || row_forced_refused( iface, slot )) return FALSE;
+    if (sl->flags & (WINECOM_F_HAND | WINECOM_F_RET_VIA_ARG)) return FALSE;
+    if (sl->fpmask || sl->fpret) return FALSE;
+    if (sl->argc < 1 || sl->argc > 8) return FALSE;
+    /* a slot behind a guest-side snippet (journal, const getter) only ever
+     * traps as that snippet's fallback, which must drain: keep the dispatcher */
+    if (vtbl_repointed && vtbl_repointed[iface_slot_base[iface] + slot]) return FALSE;
+
+    for (i = 1; i < sl->argc; i++)
+    {
+        unsigned char cls = sl->cls ? sl->cls[i - 1] : WINECOM_CA_PASS;
+        UINT bit = 1u << (i - 1);
+        UCHAR ext = 0;
+
+        if (cls == WINECOM_CA_IFACE_IN) out->in_mask |= 1u << i;
+        else if (cls != WINECOM_CA_PASS) return FALSE;
+
+        if (sl->narrowmask & bit)
+        {
+            BOOL wide = (sl->narrowwide & bit) != 0, sign = (sl->narrowsign & bit) != 0;
+            ext = wide ? (sign ? 4 : 3) : (sign ? 6 : 5);
+        }
+        else if (sl->dwordmask & bit) ext = (sl->dwordsign & bit) ? 2 : 1;
+        out->ext[i] = ext;
+    }
+    out->kind = 1;
+    out->nargs = sl->argc - 1;
+    out->slot = slot;
+    out->iface = iface;
+    out->fn = 0;
+    out->dirty = (UINT64)(ULONG_PTR)&wc_ctx_dirty;
+    out->vt_lo = (UINT64)(ULONG_PTR)guest_vtbl_block;
+    out->vt_size = (UINT64)total_slots * sizeof(UINT64);
     return TRUE;
 }
 
