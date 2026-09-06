@@ -256,6 +256,27 @@ int main( int argc, char **argv )
             dirty_byte = 0;
         }
 
+        /* 1b: the dirty byte ALREADY set (the snippet tests before it
+         * stores, 2026-09-06): the record must still be right, the byte
+         * must still be 1 -- a wrong branch offset here lands somewhere in
+         * the epilogue or past the ret */
+        if (shared_form)
+        {
+            memset( data_p(), 0, RING_CAP );
+            *pos_p( &px ) = 0; fb_hits = 0;
+            build_args( def, &as, &st, 0, 0 );
+            dirty_byte = 1;
+            call( fn, &px, &as );
+            if (fb_hits) bad( def->name, "already-dirty call fell back" );
+            else
+            {
+                if (*pos_p( &px ) != lay.rec) bad( def->name, "pos (already-dirty case)" );
+                check_record( def, &lay, data_p(), &as, key, 0 );
+                if (dirty_byte != 1) bad( def->name, "dirty byte cleared by the already-dirty call" );
+            }
+            dirty_byte = 0;
+        }
+
         /* 2: NULL pointers */
         if (has_ptr)
         {

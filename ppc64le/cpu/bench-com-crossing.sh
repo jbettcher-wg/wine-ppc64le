@@ -28,6 +28,19 @@
 #                                                amortized replay.  A/B with
 #                                                WINEEMUNOCOMJOURNAL=1.
 #
+# The journaled line answers to four levers (2026-09-06, all in libs/winecom):
+#     (default)                      record; batch replay; dead records pruned
+#                                    (the probe cycles four topologies, so
+#                                    every record but the last is dead: this
+#                                    is the record's own cost)
+#     WINEEMUNOCOMLWW=1              every record replays, in batches: the
+#                                    per-record replay cost
+#     WINEEMUNOCOMLWW=1 WINEEMUNOCOMBATCH=1   one transition per record, the
+#                                    2026-09-04 replay
+#     WINEEMUNOCOMJOURNAL=1          no journal: the slot traps, and since
+#                                    EC DIRECT (round 9) that is the JIT's
+#                                    inline call
+#
 # Exit 0 = ran and printed, 2 = could not run.
 set -u
 

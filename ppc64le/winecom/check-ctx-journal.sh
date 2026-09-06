@@ -22,8 +22,13 @@
 #      lines, replay lines for the rows the probe drove, and NO live
 #      dispatch line for those rows: had the snippet fallen back, the
 #      dispatcher's own trace line for the row would be there.
+#   3  BATCHED AND PRUNED (2026-09-06).  The drain hands the records to
+#      d3d11.so in batches (one transition each: "batch replay of N
+#      records") and skips a setter a later setter of the same state
+#      overwrote before anything read it ("dead ...").  The probe's
+#      interleaved topology writes produce both lines.
 #
-# --sabotage runs two negative controls instead, and both must go red:
+# --sabotage runs the negative controls instead, and each must go red:
 #   a  WINEEMUCOMJOURNALSABOTAGE=1 records and never replays: the probe
 #      must FAIL (its Gets see stale state, its texels are wrong) and the
 #      transcript must be empty -- the observables of layers 1 and 2,
@@ -31,6 +36,13 @@
 #   b  WINEEMUNOCOMJOURNAL=1 lifts the mechanism whole: no generic install,
 #      the journaled rows dispatch live, and the probe still PASSes --
 #      trapping everything is the old world, and the old world works.
+#   c  WINEEMUCOMBATCHSABOTAGE=1 builds every batch and runs none: the
+#      transcript shows the batches, the probe FAILs.
+#   d  WINEEMUNOCOMBATCH=1: no batch lines, one transition per record, and
+#      the probe PASSes -- the pre-batch replay still works.
+#   e  WINEEMUCOMLWWSABOTAGE=1 keeps the FIRST writer of a state: the
+#      probe's last-writer-wins checks FAIL.
+#   f  WINEEMUNOCOMLWW=1: no dead-record lines, the probe PASSes.
 #
 # Environment: WINEPREFIX (booted), WINEFEXBRIDGE, a GPU DXVK can open.
 # BUILD to point at the build tree.  Exit 0 = pass, 1 = a check failed,
@@ -161,6 +173,13 @@ if [ "$SABOTAGE" = 0 ]; then
     if [ -n "$r" ] && [ -n "$g" ]; then
         [ "$r" -lt "$g" ] || bad "RSSetViewports replayed AFTER RSGetViewports was served"
     fi
+    say "layer 3: batched and pruned"
+    n=$(grep -c 'journal: batch replay of' "$OUT/pos.err") || true
+    [ "${n:-0}" -ge 3 ] || bad "expected >= 3 batch replay lines, saw ${n:-0}"
+    grep -q 'journal: dead ID3D11DeviceContext::IASetPrimitiveTopology' "$OUT/pos.err" \
+        || bad "the overwritten topology writes were never pruned as dead"
+    grep -q 'journal: dead ID3D11DeviceContext::RSSetState' "$OUT/pos.err" \
+        || bad "the overwritten RSSetState was never pruned as dead"
     [ "$fail" = 0 ] && say "PASS"
 else
     say "sabotage a: WINEEMUCOMJOURNALSABOTAGE=1 -- record, never replay"
@@ -186,7 +205,47 @@ else
     [ "${n:-0}" -eq 0 ] || bad "kill switch left $n generic slots installed"
     n=$(live_dispatches kill RSSetViewports) || true
     [ "${n:-0}" -ge 1 ] || bad "under the kill switch RSSetViewports never dispatched live"
-    [ "$fail" = 0 ] && say "PASS (both controls red where required)"
+
+    say "sabotage c: WINEEMUCOMBATCHSABOTAGE=1 -- batches built, never run"
+    rc=0; run_leg bsab WINEEMUCOMBATCHSABOTAGE=1 || rc=$?
+    grep -q 'WINEEMUCOMBATCHSABOTAGE=1' "$OUT/bsab.err" || bad "batch sabotage lever unacknowledged"
+    n=$(grep -c 'journal: batch replay of' "$OUT/bsab.err") || true
+    [ "${n:-0}" -ge 1 ] || bad "sabotaged drain built no batch at all"
+    if grep -q 'ctx_journal_probe: PASS' "$OUT/bsab.out"; then
+        bad "the probe PASSED with the batches never run -- the batch path carries nothing"
+    else
+        say "  red as required: the probe FAILED with the batches unrun"
+    fi
+
+    say "sabotage d: WINEEMUNOCOMBATCH=1 -- one transition per record"
+    rc=0; run_leg nobatch WINEEMUNOCOMBATCH=1 || rc=$?
+    [ "$rc" = 0 ] || { sed 's/^/  nobatch| /' "$OUT/nobatch.err" | tail -20 >&2; bad "no-batch leg exited $rc"; }
+    grep -q 'ctx_journal_probe: PASS' "$OUT/nobatch.out" || bad "no-batch leg did not PASS"
+    grep -q 'WINEEMUNOCOMBATCH=1' "$OUT/nobatch.err" || bad "no-batch lever unacknowledged"
+    n=$(grep -c 'journal: batch replay of' "$OUT/nobatch.err") || true
+    [ "${n:-0}" -eq 0 ] || bad "WINEEMUNOCOMBATCH=1 still batched $n time(s)"
+    n=$(replays nobatch) || true
+    [ "${n:-0}" -ge 12 ] || bad "no-batch leg replayed only ${n:-0} record(s)"
+
+    say "sabotage e: WINEEMUCOMLWWSABOTAGE=1 -- the first writer wins"
+    rc=0; run_leg lsab WINEEMUCOMLWWSABOTAGE=1 || rc=$?
+    grep -q 'WINEEMUCOMLWWSABOTAGE=1' "$OUT/lsab.err" || bad "lww sabotage lever unacknowledged"
+    if grep -q 'ctx_journal_probe: PASS' "$OUT/lsab.out"; then
+        bad "the probe PASSED with first-writer-wins -- the dead-record pass drops nothing observable"
+    else
+        say "  red as required: the probe FAILED with the first writer kept"
+    fi
+    grep -q 'interleaved ctx/ctx1 topology writes: last writer (ctx1) wins: FAIL' "$OUT/lsab.out" \
+        || bad "the interleaved topology check did not fail under first-writer-wins"
+
+    say "sabotage f: WINEEMUNOCOMLWW=1 -- every record replays"
+    rc=0; run_leg nolww WINEEMUNOCOMLWW=1 || rc=$?
+    [ "$rc" = 0 ] || { sed 's/^/  nolww| /' "$OUT/nolww.err" | tail -20 >&2; bad "no-lww leg exited $rc"; }
+    grep -q 'ctx_journal_probe: PASS' "$OUT/nolww.out" || bad "no-lww leg did not PASS"
+    grep -q 'WINEEMUNOCOMLWW=1' "$OUT/nolww.err" || bad "no-lww lever unacknowledged"
+    n=$(grep -c 'journal: dead ' "$OUT/nolww.err") || true
+    [ "${n:-0}" -eq 0 ] || bad "WINEEMUNOCOMLWW=1 still pruned $n record(s)"
+    [ "$fail" = 0 ] && say "PASS (all six controls red where required)"
 fi
 
 exit $fail

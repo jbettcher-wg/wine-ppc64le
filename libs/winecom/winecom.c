@@ -1372,6 +1372,14 @@ static struct jg_layout journal_gen_lay[ARRAYSIZE(jg_d3d11_defs)];
  * replayed -- the gate's negative control */
 static BOOL journal_sabotage;
 static BOOL ctx_journal_off;             /* multithread protection seen */
+/* The drain's two cuts (2026-09-06), each with a kill switch and a sabotage:
+ *   WINEEMUNOCOMBATCH=1        replay one `invoke` transition per record,
+ *                              the pre-batch world; WINEEMUCOMBATCHSABOTAGE=1
+ *                              builds every batch and never runs it;
+ *   WINEEMUNOCOMLWW=1          replay every record, dead or not;
+ *                              WINEEMUCOMLWWSABOTAGE=1 keeps the FIRST
+ *                              writer and drops the later ones. */
+static BOOL batch_off, batch_sabotage, lww_off, lww_sabotage;
 /* A context-scope ring (JG_SCOPE_CTX) belongs to the HOST object and is
  * shared by every proxy of it -- the immediate context reached through
  * ID3D11DeviceContext and, after a QueryInterface, ID3D11DeviceContext1
@@ -1429,18 +1437,233 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
                                    struct com_proxy *proxy, UINT iface, UINT slot,
                                    const UINT64 *rawargs, UINT64 *rax_out, UINT64 *fpret_bits );
 
-/* Replay every record in `p`'s ring, oldest first, then reset the ring.
- * Runs on the recording thread inside its own trap in the ordered cases; the
- * argument-crossing case can be another thread, where D3D12's Close-before-
- * execute rule means an empty ring unless the app is racing itself -- the
- * acquire/release pair keeps even that read coherent. */
+static struct com_proxy *proxy_from_pointer( void *ptr );
+
+/* A by-value scalar as the ELFv2 callee must see it.  A by-value integer
+ * narrower than 32 bits arrives with UNDEFINED upper bits: MS-x64 lets the
+ * caller write only the declared width (clang emits `movw $0x1, %dx`) and
+ * makes ignoring the rest the callee's job, while ELFv2 makes extending it
+ * the CALLER's job and the ppc64 callee trusts that it happened.  Done here,
+ * the only place that knows both the register and the declared width -- see
+ * struct winecom_slot::narrowmask for the measurement.  A FOUR-byte argument
+ * is clean in a register (x86-64 zero-extends 32-bit register writes) but
+ * NOT on the stack, where the guest's 32-bit store leaves the slot's upper
+ * half stale; extend per the declared signedness (winecom_slot::dwordmask,
+ * CopyDescriptors' heap type, argument seven).  One function for the live
+ * marshal and the batch drain, so the next width bug has one place to be. */
+static inline UINT64 extend_scalar( const struct winecom_slot *sl, UINT i, UINT64 raw )
+{
+    if (sl->narrowmask & (1u << (i - 1)))
+    {
+        unsigned int bits = (sl->narrowwide & (1u << (i - 1))) ? 16 : 8;
+        UINT64 mask = (1ull << bits) - 1;
+
+        raw &= mask;
+        if ((sl->narrowsign & (1u << (i - 1))) && (raw & (1ull << (bits - 1))))
+            raw |= ~mask;
+    }
+    else if (sl->dwordmask & (1u << (i - 1)))
+    {
+        if (sl->dwordsign & (1u << (i - 1))) raw = (UINT64)(INT64)(INT)raw;
+        else raw = (UINT)raw;
+    }
+    return raw;
+}
+
+/* ---- the batch replay (2026-09-06) ------------------------------------
+ *
+ * [MEASURED 2026-09-04, section 13 of crossing-asm-op4k.md] a journaled
+ * D3D11 call cost 235 ns against 418 trapped, and the whole remainder was
+ * the REPLAY: one invoke_marshalled and one __wine_unix_call_dispatcher
+ * transition (a 48-register save) per record, before DXVK's ~30 ns body.
+ * So the drain now builds native call descriptors -- the proxies unwrapped,
+ * the scalars extended, the blob pointers aimed into the ring, which is
+ * process memory the unix side reads as-is -- and hands BATCH_CALLS of them
+ * to the surface's batch invoker in ONE transition.  Everything that is not
+ * a pass-through scalar, one of our proxies, a reverse proxy, or an array of
+ * those flushes the batch and takes the old path, so the order of effects
+ * is exactly the recorded order and a refusal still refuses by name.
+ *
+ * Reverse proxies minted for a record are borrowed until the batch has RUN
+ * (ends[]); our own proxies borrow nothing (wc_forward_host).  Translated
+ * interface arrays live in arr[] rather than in the ring because a record
+ * that fails half-way must reach invoke_marshalled with its guest pointers
+ * intact. */
+#define BATCH_CALLS  32
+#define BATCH_ENDS   64
+#define BATCH_ARR    256
+struct replay_batch
+{
+    struct winecom_batch_call calls[BATCH_CALLS];
+    void  *ends[BATCH_ENDS];
+    UINT64 arr[BATCH_ARR];
+    UINT   n, n_ends, arr_used;
+};
+
+static void batch_flush( struct replay_batch *b )
+{
+    UINT i;
+
+    if (!b->n) return;
+    TRACE( "journal: batch replay of %u records\n", b->n );
+    if (!batch_sabotage) wc_surface->invoke_batch( b->calls, b->n );
+    for (i = 0; i < b->n_ends; i++) winecom_to_native_end( b->ends[i] );
+    b->n = b->n_ends = b->arr_used = 0;
+}
+
+/* one interface argument to its native pointer, FALSE = this record cannot
+ * be batched (the slow path will refuse it by name) */
+static BOOL batch_unwrap( struct replay_batch *b, const struct winecom_slot *sl, UINT i,
+                          void *guest, void **host )
+{
+    if (!guest) { *host = NULL; return TRUE; }
+    if (wc_forward_host( guest, host )) return TRUE;
+    if (b->n_ends == BATCH_ENDS) return FALSE;
+    if (!winecom_to_native( guest, (sl->xaux && (sl->xmask & (1u << (i - 1))))
+                                       ? sl->xaux[i - 1] : ~0u, host ))
+        return FALSE;
+    b->ends[b->n_ends++] = *host;
+    return TRUE;
+}
+
+static BOOL batch_add( struct replay_batch *b, const struct winecom_slot *sl,
+                       struct com_proxy *proxy, UINT slot, const UINT64 *rawargs )
+{
+    struct winecom_batch_call *c = &b->calls[b->n];
+    UINT i, ends0 = b->n_ends, arr0 = b->arr_used;
+
+    if (sl->argc > WINECOM_BATCH_MAX_ARGS || sl->fpmask || sl->fpret) return FALSE;
+    c->host = (UINT64)(ULONG_PTR)proxy->host;
+    c->slot = slot;
+    c->argc = sl->argc;
+    c->args[0] = c->host;
+    for (i = 1; i < sl->argc; i++)
+    {
+        UINT64 raw = rawargs[i];
+        void *host;
+
+        switch (sl->cls ? sl->cls[i - 1] : WINECOM_CA_PASS)
+        {
+        case WINECOM_CA_PASS:
+            c->args[i] = extend_scalar( sl, i, raw );
+            break;
+        case WINECOM_CA_IFACE_IN:
+            if (!batch_unwrap( b, sl, i, (void *)(ULONG_PTR)raw, &host )) goto undo;
+            c->args[i] = (UINT64)(ULONG_PTR)host;
+            break;
+        case WINECOM_CA_IFACE_ARR_IN:
+        {
+            UINT count = (UINT)rawargs[sl->aux2 + 1], n;
+            void *const *src = (void *const *)(ULONG_PTR)raw;
+
+            if (!src || !count) { c->args[i] = raw; break; }
+            if (b->arr_used + count > BATCH_ARR) goto undo;
+            for (n = 0; n < count; n++)
+            {
+                if (!batch_unwrap( b, sl, i, src[n], &host )) goto undo;
+                b->arr[b->arr_used + n] = (UINT64)(ULONG_PTR)host;
+            }
+            c->args[i] = (UINT64)(ULONG_PTR)&b->arr[b->arr_used];
+            b->arr_used += count;
+            break;
+        }
+        default:
+            goto undo;
+        }
+    }
+    b->n++;
+    return TRUE;
+
+undo:
+    while (b->n_ends > ends0) winecom_to_native_end( b->ends[--b->n_ends] );
+    b->arr_used = arr0;
+    return FALSE;
+}
+
+/* ---- the dead-record pass (2026-09-06) --------------------------------
+ *
+ * Between two consumers (a draw, a dispatch, a clear, a copy, a query, an
+ * Unmap -- every row classed JG_LWW_NONE, journal_gen.h) a setter whose
+ * whole effect is the state it names is dead when a later record of the
+ * same row sets that state again: the guest never observed the first
+ * value, and by DXVK's implementation of these rows nothing else did
+ * either.  The pass marks those records; the replay skips them.  A
+ * JG_LWW_RANGE row is only dead to a later record with the same
+ * (StartSlot, Count).  The two proxies of one host reach the same def
+ * index (journal_gen_map is per (iface, slot) but a def is one method), so
+ * a Context1 write kills a Context write of the same state, which is what
+ * the host object would have done.
+ *
+ * `dead` is a bit per 8-byte unit of the range (records are 8-byte
+ * aligned); the caller zeroes as many bytes as the range needs. */
+static UINT journal_lww( const BYTE *start, const BYTE *end, BYTE *dead )
+{
+    UINT last_off[ARRAYSIZE(jg_d3d11_defs)];
+    UINT last_gen[ARRAYSIZE(jg_d3d11_defs)];
+    UINT gen = 1, n_dead = 0;
+    const BYTE *r = start;
+
+    memset( last_gen, 0, sizeof(last_gen) );
+    while (r + 8 <= end)
+    {
+        UINT key = *(const UINT *)r, sizesh = *(const UINT *)(r + 4);
+        UINT iface = key >> 16, slot = key & 0xffff, bytes = sizesh & 0xffffff;
+        const struct jg_def *def = NULL;
+        UINT g = 0, off;
+
+        if (bytes < 8 || r + bytes > end) break;   /* the replay loop reports it */
+        if ((sizesh >> 24) == JSH_GEN && journal_gen_map && iface < wc_surface->iface_count &&
+            slot < wc_surface->ifaces[iface].slot_count)
+            g = journal_gen_map[iface_slot_base[iface] + slot];
+        if (g && bytes == journal_gen_lay[g - 1].rec) def = &jg_d3d11_defs[g - 1];
+        if (!def || def->lww == JG_LWW_NONE)
+        {
+            gen++;                                  /* a consumer: everything before it is live */
+            r += bytes;
+            continue;
+        }
+        off = (UINT)(r - start);
+        if (last_gen[g - 1] == gen)
+        {
+            const UINT64 *prev = (const UINT64 *)(start + last_off[g - 1] + 8);
+            const UINT64 *cur = (const UINT64 *)(r + 8);
+
+            if (def->lww == JG_LWW_ANY || (prev[0] == cur[0] && prev[1] == cur[1]))
+            {
+                UINT victim = lww_sabotage ? off : last_off[g - 1];
+
+                dead[victim >> 6] |= 1u << ((victim >> 3) & 7);
+                n_dead++;
+                if (lww_sabotage) { r += bytes; continue; }   /* the first writer stays */
+            }
+        }
+        last_off[g - 1] = off;
+        last_gen[g - 1] = gen;
+        r += bytes;
+    }
+    return n_dead;
+}
+
 /* Replay the records in [r, end) of p's ring, oldest first, through the
  * marshal core.  Shared by both drains below.  A corrupt record drops the
  * rest of the range loudly; a replay that fails is logged and skipped. */
-static struct com_proxy *proxy_from_pointer( void *ptr );
-
 static void journal_replay_range( struct com_proxy *p, BYTE *r, BYTE *end )
 {
+    struct replay_batch batch;
+    BYTE dead[JOURNAL_CTX_RING_SIZE / 64 + 1];   /* a bit per 8-byte unit, a full ring included */
+    const BYTE *start = r;
+    BOOL use_batch = wc_surface->invoke_batch && !batch_off;
+    BOOL use_lww = !lww_off && journal_gen_map && (SIZE_T)(end - r) <= JOURNAL_CTX_RING_SIZE;
+    UINT n_dead = 0;
+
+    batch.n = batch.n_ends = batch.arr_used = 0;
+    if (use_lww)
+    {
+        memset( dead, 0, (end - r) / 64 + 1 );
+        n_dead = journal_lww( r, end, dead );
+        if (n_dead) TRACE( "journal: %u dead record(s) in %u bytes\n", n_dead, (UINT)(end - r) );
+    }
+
     while (r + 8 <= end)
     {
         UINT key    = *(UINT *)r;
@@ -1479,13 +1702,19 @@ static void journal_replay_range( struct com_proxy *p, BYTE *r, BYTE *end )
             const struct jg_def *def;
             const struct jg_layout *lay;
             UINT g = journal_gen_map ? journal_gen_map[iface_slot_base[iface] + slot] : 0;
-            UINT j;
+            UINT j, off = (UINT)(r - start);
 
             if (!g || bytes != journal_gen_lay[g - 1].rec)
             {
                 ERR( "generic journal record for %s (size %u) does not match its "
                      "layout; dropping the rest of the ring\n", sl->name, bytes );
                 break;
+            }
+            if (n_dead && (dead[off >> 6] & (1u << ((off >> 3) & 7))))
+            {
+                TRACE( "journal: dead %s (overwritten before anything read it)\n", sl->name );
+                r += bytes;
+                continue;
             }
             def = &jg_d3d11_defs[g - 1];
             lay = &journal_gen_lay[g - 1];
@@ -1511,6 +1740,19 @@ static void journal_replay_range( struct com_proxy *p, BYTE *r, BYTE *end )
                 p = rp;
             }
             TRACE( "journal: replay %s proxy %p\n", sl->name, p );
+            if (use_batch)
+            {
+                if (batch.n == BATCH_CALLS) batch_flush( &batch );
+                if (batch_add( &batch, sl, p, slot, rawargs ))
+                {
+                    r += bytes;
+                    continue;
+                }
+                /* not batchable (a class the batch does not carry, an
+                 * unwrap that failed, no room): everything before it runs
+                 * first, then the old path serves it with its refusals */
+                batch_flush( &batch );
+            }
             status = invoke_marshalled( itf, sl, p, iface, slot, rawargs, &rax, NULL );
             if (status)
                 ERR( "journal replay of %s failed, status %08x; continuing\n",
@@ -1540,13 +1782,14 @@ static void journal_replay_range( struct com_proxy *p, BYTE *r, BYTE *end )
             break;
         }
 
+        batch_flush( &batch );   /* order: the first journal's shapes take the old path */
         status = invoke_marshalled( itf, sl, p, iface, slot, rawargs, &rax, NULL );
         if (status)
             ERR( "journal replay of %s failed, status %08x; continuing\n",
                  sl->name, (UINT)status );
         r += bytes;
     }
-
+    batch_flush( &batch );
 }
 
 /* The list-scope drain (JG_SCOPE_LIST, the first journal's rule): replay
@@ -1973,6 +2216,17 @@ static void install_journal( void )
         ERR( "WINEEMUCOMJOURNALSABOTAGE=1 -- context rings record and are NEVER replayed\n" );
         journal_sabotage = TRUE;
     }
+    if ((batch_off = com_env_flag( L"WINEEMUNOCOMBATCH" )))
+        ERR( "WINEEMUNOCOMBATCH=1 -- journal replay pays one transition per record\n" );
+    if ((batch_sabotage = com_env_flag( L"WINEEMUCOMBATCHSABOTAGE" )))
+        ERR( "WINEEMUCOMBATCHSABOTAGE=1 -- journal batches are built and NEVER run\n" );
+    if ((lww_off = com_env_flag( L"WINEEMUNOCOMLWW" )))
+        ERR( "WINEEMUNOCOMLWW=1 -- every journal record replays, overwritten or not\n" );
+    if ((lww_sabotage = com_env_flag( L"WINEEMUCOMLWWSABOTAGE" )))
+        ERR( "WINEEMUCOMLWWSABOTAGE=1 -- the FIRST writer of a state wins, later ones are dropped\n" );
+    if (!wc_surface->invoke_batch)
+        TRACE( "journal: surface %s has no batch invoker; replay pays one transition per record\n",
+               wc_surface->name );
 
     block = NULL;
     size = count * snippet_stride + gen_count * JG_SNIPPET_MAX;
@@ -3581,37 +3835,7 @@ static NTSTATUS invoke_marshalled( const struct winecom_iface *itf, const struct
         case WINECOM_CA_PASS:
         case WINECOM_CA_RIID:
         case WINECOM_CA_RET_PTR:
-            /* A by-value integer narrower than 32 bits arrives with UNDEFINED
-             * upper bits: MS-x64 lets the caller write only the declared width
-             * (clang emits `movw $0x1, %dx`) and makes ignoring the rest the
-             * callee's job, while ELFv2 makes extending it the CALLER's job
-             * and the ppc64 callee trusts that it happened.  Do it here, which
-             * is the only place that knows both the register and the declared
-             * width.  See struct winecom_slot::narrowmask for the measurement.
-             */
-            if (sl->narrowmask & (1u << (i - 1)))
-            {
-                unsigned int bits = (sl->narrowwide & (1u << (i - 1))) ? 16 : 8;
-                UINT64 mask = (1ull << bits) - 1;
-
-                raw &= mask;
-                if ((sl->narrowsign & (1u << (i - 1))) &&
-                    (raw & (1ull << (bits - 1))))
-                    raw |= ~mask;
-            }
-            /* A FOUR-byte argument is clean in a register (x86-64 zero-extends
-             * 32-bit register writes) but NOT on the stack, where the guest's
-             * 32-bit store leaves the slot's upper half stale and an ELFv2
-             * callee trusts the caller extended it.  Extend per the declared
-             * signedness -- see winecom_slot::dwordmask for the measurement
-             * (CopyDescriptors' heap type, argument seven). */
-            else if (sl->dwordmask & (1u << (i - 1)))
-            {
-                if (sl->dwordsign & (1u << (i - 1)))
-                    raw = (UINT64)(INT64)(INT)raw;
-                else
-                    raw = (UINT)raw;
-            }
+            raw = extend_scalar( sl, i, raw );
             args[i] = raw;
             break;
         case WINECOM_CA_IFACE_IN:

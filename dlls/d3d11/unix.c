@@ -62,6 +62,7 @@
 #include "winternl.h"
 #include "wine/unixlib.h"
 #include "wine/debug.h"
+#include "wine/winecom.h"
 #include "wine/winecom_fpcall.h"
 
 /* The ONE copy of the WSI callback ABI, shared with the DXVK patch series.
@@ -649,6 +650,38 @@ static NTSTATUS d3d11_unix_call( void *args )
     return STATUS_SUCCESS;
 }
 
+/* The journal's batch replay: the drain built every descriptor on the PE
+ * side (proxies unwrapped, integers extended, blobs pointing into the
+ * ring), so this is the loop the per-record path ran one transition at a
+ * time.  A descriptor with a NULL host or too many arguments is skipped
+ * loudly rather than dereferenced; nothing here returns a value because
+ * only void rows are journaled. */
+static NTSTATUS d3d11_unix_batch( void *args )
+{
+    struct d3d11_batch_params *p = args;
+    const struct winecom_batch_call *c = (const struct winecom_batch_call *)(ULONG_PTR)p->calls;
+    UINT i;
+
+    if (!c && p->count) return STATUS_INVALID_PARAMETER;
+    for (i = 0; i < p->count; i++, c++)
+    {
+        UINT64 a[D3D11_UNIX_MAX_ARGS] = { 0 };
+        void **vtbl;
+
+        if (!c->host || c->argc > WINECOM_BATCH_MAX_ARGS)
+        {
+            ERR( "batch call %u of %u: host %p argc %u; skipped\n", i, p->count,
+                 (void *)(ULONG_PTR)c->host, c->argc );
+            continue;
+        }
+        memcpy( a, c->args, c->argc * sizeof(a[0]) );
+        a[0] = c->host;
+        vtbl = *(void ***)(ULONG_PTR)c->host;
+        call_wide( (wide_func)vtbl[c->slot], a );
+    }
+    return STATUS_SUCCESS;
+}
+
 /* The float-bearing slots.  There are exactly three of them outside the video
  * path, and each gets its real prototype here rather than a cast of the wide
  * form: on ELFv2 a `float` argument is passed in f1..f13 and the wide form
@@ -903,6 +936,7 @@ WINE_THREAD_ENTRY( d3d11_enter_fpcall,  d3d11_unix_fpcall )
 WINE_THREAD_ENTRY( d3d11_enter_event_mint, d3d11_unix_event_mint )
 WINE_THREAD_ENTRY( d3d11_enter_event_pump, d3d11_unix_event_pump )
 WINE_THREAD_ENTRY( d3d11_enter_event_reap, d3d11_unix_event_reap )
+WINE_THREAD_ENTRY( d3d11_enter_batch,   d3d11_unix_batch )
 
 const unixlib_entry_t __wine_unix_call_funcs[] =
 {
@@ -916,6 +950,7 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     d3d11_enter_event_mint,
     d3d11_enter_event_pump,
     d3d11_enter_event_reap,
+    d3d11_enter_batch,
 };
 
 C_ASSERT( ARRAYSIZE(__wine_unix_call_funcs) == unix_funcs_count );

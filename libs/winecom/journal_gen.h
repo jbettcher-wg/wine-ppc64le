@@ -90,12 +90,32 @@ struct jg_arg
  * through any other object of the surface. */
 enum jg_scope { JG_SCOPE_LIST = 1, JG_SCOPE_CTX = 2 };
 
+/* last-writer-wins class (the drain's dead-record pass, wc_journal_lww in
+ * winecom.c): what a LATER record of the same row does to an earlier one
+ * when no consumer (a draw, dispatch, clear, copy, query, Unmap -- any row
+ * classed JG_LWW_NONE) sits between them in the ring.
+ *   JG_LWW_NONE   the record is a consumer, or a setter whose replay has
+ *                 side effects beyond the state it names -- DXVK's hazard
+ *                 tracking unbinds an SRV when its resource becomes a render
+ *                 target and vice versa, a UAV initial count of -1 means
+ *                 "keep", an SO offset of -1 means "append" -- so an
+ *                 earlier record is never dead.
+ *   JG_LWW_ANY    the later record replaces the whole state the earlier one
+ *                 set (a topology, a shader, a blend state, all viewports).
+ *   JG_LWW_RANGE  the later record replaces it when its first two
+ *                 arguments (StartSlot, Count) are equal.
+ * Curated from the D3D11 API plus what DXVK's implementation of each
+ * setter touches; keep a row NONE unless both say the state is the whole
+ * effect. */
+enum jg_lww { JG_LWW_NONE = 0, JG_LWW_ANY = 1, JG_LWW_RANGE = 2 };
+
 struct jg_def
 {
     const char *name;
     uint8_t argc;        /* including `this`, must equal the table row's */
     uint8_t scope;       /* enum jg_scope */
     struct jg_arg args[JG_MAX_ARGS];
+    uint8_t lww;         /* enum jg_lww; a row that omits it is NONE */
 };
 
 struct jg_layout
@@ -212,6 +232,9 @@ static inline void jg_cmp32_rr( struct jg_buf *b, int a, int c ) { jg_rr( b, 0x3
 static inline void jg_imul32_imm8( struct jg_buf *b, int reg, unsigned imm8 )
 { jg_rr( b, 0x6b, reg, reg, 0 ); jg_e8( b, imm8 ); }
 static inline void jg_ret( struct jg_buf *b ) { jg_e8( b, 0xc3 ); }
+/* mov r64, imm64: REX.W(+B) B8+r imm64 */
+static inline void jg_mov_imm64( struct jg_buf *b, int reg, uint64_t imm )
+{ jg_e8( b, 0x48 | ((reg >> 3) & 1) ); jg_e8( b, 0xb8 | (reg & 7) ); jg_e64( b, imm ); }
 
 /* jcc rel32 to the fallback: 0F 8x + rel32, patched at the end */
 static inline void jg_jcc_fb( struct jg_buf *b, unsigned cc )
@@ -315,9 +338,13 @@ static inline unsigned jg_emit( uint8_t *buf, const struct jg_def *def, const st
         jg_jcc_fb( &b, CC_A );
     }
 
-    /* header */
-    jg_mov_store_imm32( &b, R_RAX, 0, key );
-    jg_mov_store_imm32( &b, R_RAX, 4, lay->rec | ((uint32_t)shape << 24) );
+    /* header: key and size/shape as ONE qword store.  [MEASURED 2026-09-06,
+     * bench-com-crossing, FEX_TSOENABLED=0 as the control] the emulator
+     * fences every guest store for x86 ordering, ~3.5 ns each on POWER8,
+     * and the record's stores were a third of its cost; r10 is free here
+     * in both ring forms. */
+    jg_mov_imm64( &b, R_R10, (uint64_t)key | ((uint64_t)(lay->rec | ((uint32_t)shape << 24)) << 32) );
+    jg_mov_store64( &b, R_RAX, 0, R_R10 );
 
     /* every argument as it arrived */
     for (i = 1; i < def->argc; i++)
@@ -399,7 +426,12 @@ static inline unsigned jg_emit( uint8_t *buf, const struct jg_def *def, const st
          * (fexbridge.h, EC DIRECT) tests before skipping the dispatcher and
          * its drain.  Stored AFTER pos so a drain that clears the byte and
          * then scans the rings can never miss a record. */
-        jg_e8( &b, 0x48 ); jg_e8( &b, 0xb8 ); jg_e64( &b, dirty );   /* mov rax, imm64 */
+        /* ...and only when it is not already set: a load is unfenced, a
+         * store is not, and inside a run of recorded calls it is set every
+         * time but the first. */
+        jg_mov_imm64( &b, R_RAX, dirty );                            /* mov rax, imm64 */
+        jg_e8( &b, 0x80 ); jg_e8( &b, 0x38 ); jg_e8( &b, 0x00 );     /* cmp byte [rax], 0 */
+        jg_e8( &b, 0x75 ); jg_e8( &b, 0x03 );                        /* jne +3 (over the store) */
         jg_e8( &b, 0xc6 ); jg_e8( &b, 0x00 ); jg_e8( &b, 0x01 );     /* mov byte [rax], 1 */
     }
     jg_ret( &b );
@@ -447,49 +479,49 @@ static inline unsigned jg_emit( uint8_t *buf, const struct jg_def *def, const st
 static const struct jg_def jg_d3d11_defs[] =
 {
     /* input assembler */
-    { "ID3D11DeviceContext::IASetInputLayout",       2, JG_SCOPE_CTX, { JGV } },
-    { "ID3D11DeviceContext::IASetPrimitiveTopology", 2, JG_SCOPE_CTX, { JGV } },
-    { "ID3D11DeviceContext::IASetIndexBuffer",       4, JG_SCOPE_CTX, { JGV, JGV, JGV } },
+    { "ID3D11DeviceContext::IASetInputLayout",       2, JG_SCOPE_CTX, { JGV }, JG_LWW_ANY },
+    { "ID3D11DeviceContext::IASetPrimitiveTopology", 2, JG_SCOPE_CTX, { JGV }, JG_LWW_ANY },
+    { "ID3D11DeviceContext::IASetIndexBuffer",       4, JG_SCOPE_CTX, { JGV, JGV, JGV }, JG_LWW_ANY },
     { "ID3D11DeviceContext::IASetVertexBuffers",     6, JG_SCOPE_CTX,
-      { JGV, JGV, JGA(2, 8, 8), JGA(2, 4, 8), JGA(2, 4, 8) } },
+      { JGV, JGV, JGA(2, 8, 8), JGA(2, 4, 8), JGA(2, 4, 8) }, JG_LWW_RANGE },
     /* shaders: (shader, ppClassInstances, NumClassInstances) */
-    { "ID3D11DeviceContext::VSSetShader", 4, JG_SCOPE_CTX, { JGV, JGA(3, 8, 4), JGV } },
-    { "ID3D11DeviceContext::PSSetShader", 4, JG_SCOPE_CTX, { JGV, JGA(3, 8, 4), JGV } },
-    { "ID3D11DeviceContext::GSSetShader", 4, JG_SCOPE_CTX, { JGV, JGA(3, 8, 4), JGV } },
-    { "ID3D11DeviceContext::HSSetShader", 4, JG_SCOPE_CTX, { JGV, JGA(3, 8, 4), JGV } },
-    { "ID3D11DeviceContext::DSSetShader", 4, JG_SCOPE_CTX, { JGV, JGA(3, 8, 4), JGV } },
-    { "ID3D11DeviceContext::CSSetShader", 4, JG_SCOPE_CTX, { JGV, JGA(3, 8, 4), JGV } },
+    { "ID3D11DeviceContext::VSSetShader", 4, JG_SCOPE_CTX, { JGV, JGA(3, 8, 4), JGV }, JG_LWW_ANY },
+    { "ID3D11DeviceContext::PSSetShader", 4, JG_SCOPE_CTX, { JGV, JGA(3, 8, 4), JGV }, JG_LWW_ANY },
+    { "ID3D11DeviceContext::GSSetShader", 4, JG_SCOPE_CTX, { JGV, JGA(3, 8, 4), JGV }, JG_LWW_ANY },
+    { "ID3D11DeviceContext::HSSetShader", 4, JG_SCOPE_CTX, { JGV, JGA(3, 8, 4), JGV }, JG_LWW_ANY },
+    { "ID3D11DeviceContext::DSSetShader", 4, JG_SCOPE_CTX, { JGV, JGA(3, 8, 4), JGV }, JG_LWW_ANY },
+    { "ID3D11DeviceContext::CSSetShader", 4, JG_SCOPE_CTX, { JGV, JGA(3, 8, 4), JGV }, JG_LWW_ANY },
     /* per-stage binds: (StartSlot, Num, pp) */
-    { "ID3D11DeviceContext::VSSetConstantBuffers",  4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) } },
-    { "ID3D11DeviceContext::PSSetConstantBuffers",  4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) } },
-    { "ID3D11DeviceContext::GSSetConstantBuffers",  4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) } },
-    { "ID3D11DeviceContext::HSSetConstantBuffers",  4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) } },
-    { "ID3D11DeviceContext::DSSetConstantBuffers",  4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) } },
-    { "ID3D11DeviceContext::CSSetConstantBuffers",  4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) } },
+    { "ID3D11DeviceContext::VSSetConstantBuffers",  4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) }, JG_LWW_RANGE },
+    { "ID3D11DeviceContext::PSSetConstantBuffers",  4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) }, JG_LWW_RANGE },
+    { "ID3D11DeviceContext::GSSetConstantBuffers",  4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) }, JG_LWW_RANGE },
+    { "ID3D11DeviceContext::HSSetConstantBuffers",  4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) }, JG_LWW_RANGE },
+    { "ID3D11DeviceContext::DSSetConstantBuffers",  4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) }, JG_LWW_RANGE },
+    { "ID3D11DeviceContext::CSSetConstantBuffers",  4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) }, JG_LWW_RANGE },
     { "ID3D11DeviceContext::VSSetShaderResources",  4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) } },
     { "ID3D11DeviceContext::PSSetShaderResources",  4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) } },
     { "ID3D11DeviceContext::GSSetShaderResources",  4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) } },
     { "ID3D11DeviceContext::HSSetShaderResources",  4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) } },
     { "ID3D11DeviceContext::DSSetShaderResources",  4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) } },
     { "ID3D11DeviceContext::CSSetShaderResources",  4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) } },
-    { "ID3D11DeviceContext::VSSetSamplers",         4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) } },
-    { "ID3D11DeviceContext::PSSetSamplers",         4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) } },
-    { "ID3D11DeviceContext::GSSetSamplers",         4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) } },
-    { "ID3D11DeviceContext::HSSetSamplers",         4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) } },
-    { "ID3D11DeviceContext::DSSetSamplers",         4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) } },
-    { "ID3D11DeviceContext::CSSetSamplers",         4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) } },
+    { "ID3D11DeviceContext::VSSetSamplers",         4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) }, JG_LWW_RANGE },
+    { "ID3D11DeviceContext::PSSetSamplers",         4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) }, JG_LWW_RANGE },
+    { "ID3D11DeviceContext::GSSetSamplers",         4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) }, JG_LWW_RANGE },
+    { "ID3D11DeviceContext::HSSetSamplers",         4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) }, JG_LWW_RANGE },
+    { "ID3D11DeviceContext::DSSetSamplers",         4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) }, JG_LWW_RANGE },
+    { "ID3D11DeviceContext::CSSetSamplers",         4, JG_SCOPE_CTX, { JGV, JGV, JGA(2, 8, 16) }, JG_LWW_RANGE },
     { "ID3D11DeviceContext::CSSetUnorderedAccessViews", 5, JG_SCOPE_CTX,
       { JGV, JGV, JGA(2, 8, 8), JGA(2, 4, 8) } },
     /* output merger / rasterizer / stream-out */
     { "ID3D11DeviceContext::OMSetRenderTargets", 4, JG_SCOPE_CTX, { JGV, JGA(1, 8, 8), JGV } },
     { "ID3D11DeviceContext::OMSetRenderTargetsAndUnorderedAccessViews", 8, JG_SCOPE_CTX,
       { JGV, JGA(1, 8, 8), JGV, JGV, JGV, JGA(5, 8, 8), JGA(5, 4, 8) } },
-    { "ID3D11DeviceContext::OMSetBlendState",        4, JG_SCOPE_CTX, { JGV, JGP(16), JGV } },
-    { "ID3D11DeviceContext::OMSetDepthStencilState", 3, JG_SCOPE_CTX, { JGV, JGV } },
+    { "ID3D11DeviceContext::OMSetBlendState",        4, JG_SCOPE_CTX, { JGV, JGP(16), JGV }, JG_LWW_ANY },
+    { "ID3D11DeviceContext::OMSetDepthStencilState", 3, JG_SCOPE_CTX, { JGV, JGV }, JG_LWW_ANY },
     { "ID3D11DeviceContext::SOSetTargets",           4, JG_SCOPE_CTX, { JGV, JGA(1, 8, 4), JGA(1, 4, 4) } },
-    { "ID3D11DeviceContext::RSSetState",             2, JG_SCOPE_CTX, { JGV } },
-    { "ID3D11DeviceContext::RSSetViewports",         3, JG_SCOPE_CTX, { JGV, JGA(1, 24, 16) } },
-    { "ID3D11DeviceContext::RSSetScissorRects",      3, JG_SCOPE_CTX, { JGV, JGA(1, 16, 16) } },
+    { "ID3D11DeviceContext::RSSetState",             2, JG_SCOPE_CTX, { JGV }, JG_LWW_ANY },
+    { "ID3D11DeviceContext::RSSetViewports",         3, JG_SCOPE_CTX, { JGV, JGA(1, 24, 16) }, JG_LWW_ANY },
+    { "ID3D11DeviceContext::RSSetScissorRects",      3, JG_SCOPE_CTX, { JGV, JGA(1, 16, 16) }, JG_LWW_ANY },
     /* draws and dispatches */
     { "ID3D11DeviceContext::Draw",                         3, JG_SCOPE_CTX, { JGV, JGV } },
     { "ID3D11DeviceContext::DrawIndexed",                  4, JG_SCOPE_CTX, { JGV, JGV, JGV } },
@@ -513,7 +545,7 @@ static const struct jg_def jg_d3d11_defs[] =
     /* queries, predication, mapping, state */
     { "ID3D11DeviceContext::Begin",          2, JG_SCOPE_CTX, { JGV } },
     { "ID3D11DeviceContext::End",            2, JG_SCOPE_CTX, { JGV } },
-    { "ID3D11DeviceContext::SetPredication", 3, JG_SCOPE_CTX, { JGV, JGV } },
+    { "ID3D11DeviceContext::SetPredication", 3, JG_SCOPE_CTX, { JGV, JGV }, JG_LWW_ANY },
     { "ID3D11DeviceContext::Unmap",          3, JG_SCOPE_CTX, { JGV, JGV } },
     { "ID3D11DeviceContext::ClearState",     1, JG_SCOPE_CTX, { JGV } },
     /* ID3D11DeviceContext1 */
@@ -521,17 +553,17 @@ static const struct jg_def jg_d3d11_defs[] =
     { "ID3D11DeviceContext1::DiscardView",     2, JG_SCOPE_CTX, { JGV } },
     { "ID3D11DeviceContext1::ClearView",       5, JG_SCOPE_CTX, { JGV, JGP(16), JGA(4, 16, 16), JGV } },
     { "ID3D11DeviceContext1::VSSetConstantBuffers1", 6, JG_SCOPE_CTX,
-      { JGV, JGV, JGA(2, 8, 16), JGA(2, 4, 16), JGA(2, 4, 16) } },
+      { JGV, JGV, JGA(2, 8, 16), JGA(2, 4, 16), JGA(2, 4, 16) }, JG_LWW_RANGE },
     { "ID3D11DeviceContext1::PSSetConstantBuffers1", 6, JG_SCOPE_CTX,
-      { JGV, JGV, JGA(2, 8, 16), JGA(2, 4, 16), JGA(2, 4, 16) } },
+      { JGV, JGV, JGA(2, 8, 16), JGA(2, 4, 16), JGA(2, 4, 16) }, JG_LWW_RANGE },
     { "ID3D11DeviceContext1::GSSetConstantBuffers1", 6, JG_SCOPE_CTX,
-      { JGV, JGV, JGA(2, 8, 16), JGA(2, 4, 16), JGA(2, 4, 16) } },
+      { JGV, JGV, JGA(2, 8, 16), JGA(2, 4, 16), JGA(2, 4, 16) }, JG_LWW_RANGE },
     { "ID3D11DeviceContext1::HSSetConstantBuffers1", 6, JG_SCOPE_CTX,
-      { JGV, JGV, JGA(2, 8, 16), JGA(2, 4, 16), JGA(2, 4, 16) } },
+      { JGV, JGV, JGA(2, 8, 16), JGA(2, 4, 16), JGA(2, 4, 16) }, JG_LWW_RANGE },
     { "ID3D11DeviceContext1::DSSetConstantBuffers1", 6, JG_SCOPE_CTX,
-      { JGV, JGV, JGA(2, 8, 16), JGA(2, 4, 16), JGA(2, 4, 16) } },
+      { JGV, JGV, JGA(2, 8, 16), JGA(2, 4, 16), JGA(2, 4, 16) }, JG_LWW_RANGE },
     { "ID3D11DeviceContext1::CSSetConstantBuffers1", 6, JG_SCOPE_CTX,
-      { JGV, JGV, JGA(2, 8, 16), JGA(2, 4, 16), JGA(2, 4, 16) } },
+      { JGV, JGV, JGA(2, 8, 16), JGA(2, 4, 16), JGA(2, 4, 16) }, JG_LWW_RANGE },
 };
 
 #undef JGV

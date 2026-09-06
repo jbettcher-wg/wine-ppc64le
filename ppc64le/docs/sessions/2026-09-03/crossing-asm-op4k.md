@@ -621,6 +621,107 @@ vtable is not in the block.
 - D3D9 and the media surfaces do not export the digest yet (one spec
   line and one function each, the d3d11 pattern).
 
+## 15. The replay in batches, the dead records pruned, two stores fewer in the snippet
+
+Built 2026-09-06 on the fastppcx86 reviewer's three picks; this section is
+the two wine-side ones (the third, an inline cache at the guest call site,
+is a JIT change and is specified for that tree in
+`ppc64le/docs/sessions/2026-09-06/inline-cache-handoff.md`).
+
+**Batch replay.**  Section 13 ended with the replay as the cost: one
+`invoke_marshalled` and one `__wine_unix_call_dispatcher` transition per
+record.  The drain (`journal_replay_range`, libs/winecom/winecom.c) now
+builds native call descriptors -- proxies unwrapped through the same
+`wc_forward_host` / `winecom_to_native` the live path uses, scalars
+extended by the same `extend_scalar` (factored out of `invoke_marshalled`
+so there is one place for the next width bug), blob pointers aimed into
+the ring itself -- and hands 32 of them to the surface's new
+`invoke_batch` hook (wine/winecom.h) in ONE transition; d3d11.so runs the
+loop (`d3d11_unix_batch`).  Anything the batch does not carry (an
+argument class outside pass/proxy/proxy-array, an unwrap that fails, a
+full descriptor table, the first journal's D3D12 shapes) flushes the
+batch and takes the old path, so the order of effects is the recorded
+order and a refusal still refuses by name.  Reverse proxies minted for a
+batch are borrowed until it has run.
+
+**Dead records.**  Before the loop, `journal_lww` walks the range once:
+between two consumers (draws, dispatches, clears, copies, queries,
+Unmap, ClearState -- every row classed `JG_LWW_NONE` in journal_gen.h) a
+setter whose whole effect is the state it names is dead when a later
+record of the same row sets that state again; `JG_LWW_RANGE` rows
+(the per-stage constant-buffer, sampler and vertex-buffer binds) only to
+a later record with the same (StartSlot, Count).  Curated per row from
+the API AND from what DXVK's implementation of the setter touches: the
+SRV binds, the render-target/UAV binds and the SO binds stay NONE
+because DXVK's hazard tracking unbinds OTHER state when they run (an SRV
+whose resource becomes a render target, and the reverse), a UAV initial
+count of -1 means keep, an SO offset of -1 means append.  A Context1
+write kills a Context write of the same state: both proxies reach the
+same def index, and the ring is the host object's.
+
+**Two stores fewer in the snippet.**  Measuring the batch showed most of
+a journaled call's time in the JIT, not the replay, and
+`FEX_TSOENABLED=0` as the control took the default leg from 75 to 54 ns:
+the emulator fences every guest store for x86 ordering, ~3.5 ns each on
+POWER8, and the record had six.  The header's two dword stores are one
+qword store now, and the dirty byte is tested before it is stored (set
+every time but the first inside a run).  journal_gen_host.c gained the
+already-dirty case so a wrong branch offset cannot hide.
+
+**Levers** (all in libs/winecom, each acknowledged on stderr):
+`WINEEMUNOCOMBATCH=1` (one transition per record, the section 13 world),
+`WINEEMUCOMBATCHSABOTAGE=1` (batches built, never run),
+`WINEEMUNOCOMLWW=1` (every record replays), `WINEEMUCOMLWWSABOTAGE=1`
+(the FIRST writer wins).  **Gate**: `check-ctx-journal.sh` layer 3
+requires batch lines and dead-record lines for the probe's overwritten
+topology and rasterizer-state writes; `--sabotage` runs six controls
+(the four above plus the original two) and each goes red where it must.
+Also PASS on the tree: d3d11-smoke, d3d11-smoke32, d3d9-smoke,
+com-levers, blob-surface, dev-journal, hand-hygiene, com-fastpath,
+ec-direct, ec-leaf, com-smoke.  check-reverse-proxy's probes all PASS
+but its script fails a text assertion on `syscom_marshal.h`
+(`xaux_IWbemObjectSink_3` expected `{ 0, 81 }`, the committed header
+says `{ 0, 82 }`) -- stale on HEAD before this work, not touched here.
+
+[MEASURED] `bench-com-crossing.sh`, `com_journaled_topology`
+(IASetPrimitiveTopology cycling four values, 200k calls, the closing Get
+inside the timed region), op4k under `ondemand` after a reboot (the
+2.93 GHz clock; every leg below on the same governor), three rounds
+each, spread under 1 ns except where shown:
+
+| leg | ns/call |
+|---|---:|
+| default: record, dead records pruned, batch replay | **69.4** (75.3 before the snippet cut) |
+| `WINEEMUNOCOMLWW=1`: every record replays, batched | **125** (131 before the snippet cut) |
+| `WINEEMUNOCOMLWW=1 WINEEMUNOCOMBATCH=1`: the section 13 replay | 258-263 |
+| `WINEEMUNOCOMJOURNAL=1`: no journal, the slot traps | 83 |
+| default with `FEX_TSOENABLED=0` (control, not a setting) | 54 |
+
+**A batched replay costs half of the old one: 260 -> 125 ns per
+record, and a record that a later one overwrites costs the record alone,
+69 ns.**  Two readings the table forces:
+
+- The trapped slot is 83 ns, not the 418 of section 13, because
+  section 14 (EC DIRECT) landed in between: the JIT serves this row
+  inline now.  So for a record that does NOT collapse, the journal (125)
+  is slower than trapping it (83) -- but only in isolation.  In a
+  bind/bind/draw stream the draw's direct call finds the dirty byte set
+  and takes the dispatcher and its drain, so un-journaling the consumers
+  would cost more than it saves.  The right target is the remaining
+  per-record replay cost, ~55 ns of PE-side loop (record validation,
+  `proxy_from_pointer` on the record's proxy, the unwraps, the descriptor)
+  before DXVK's ~40 ns body; a per-run proxy cache was tried and was a
+  wash inside the noise, so it is not in.
+- The record itself is the larger half of a journaled call (69 of 125),
+  and a third of it is the emulator's store fencing.  Fewer stores is the
+  wine-side lever and it is now pulled; a way to run the port's own
+  snippets unfenced is a JIT-side idea, noted in the handoff.
+
+Not run: the Witcher 3 pinned-save A/B (the autosave-backup runner is the
+user's call, section 6 caveats) -- the batch removes 30k transitions a
+frame on the render thread there, which is the number the reviewer's
+profile split named.
+
 ## 4. What is still on the table, by measured size
 
 1. **PE ntdll.dll.so still builds with `-mlongcall`** (it is a .so builtin

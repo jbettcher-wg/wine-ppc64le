@@ -212,6 +212,17 @@ struct d3d11_event_reap_params
     UINT64 guest_handle;   /* out: the reference to NtClose, 0 if unknown */
 };
 
+/* The journal's BATCH replay (wine/winecom.h winecom_invoke_batch_fn):
+ * `count` descriptors at `calls`, each a void vtable call with its native
+ * arguments already in place, executed in order by one transition.  The
+ * descriptor array is PE memory (the drain's stack); the unix side reads
+ * it and writes nothing back. */
+struct d3d11_batch_params
+{
+    UINT64 calls;       /* const struct winecom_batch_call * */
+    UINT   count;
+};
+
 enum d3d11_unix_func
 {
     unix_init,
@@ -224,6 +235,7 @@ enum d3d11_unix_func
     unix_event_mint,
     unix_event_pump,
     unix_event_reap,
+    unix_batch,
     unix_funcs_count
 };
 

@@ -113,6 +113,21 @@ static UINT64 unix_vtbl_call( void *host, UINT slot, UINT argc, UINT64 *args )
  * files through the one shared implementation (wine/winecom_fpcall.h).  The
  * marshal table's fpmask/fpwide/fpret drive it; the VideoProcessor
  * SetStreamAlpha/SetStreamLumaKey rows are what it un-refuses today. */
+/* The batch form (wine/winecom.h winecom_invoke_batch_fn): the journal
+ * drain's descriptors, one transition for all of them.  The levers live
+ * in the drain (WINEEMUNOCOMBATCH / WINEEMUCOMBATCHSABOTAGE, libs/winecom),
+ * so this is just the crossing. */
+static void unix_vtbl_batch( const struct winecom_batch_call *calls, UINT count )
+{
+    struct d3d11_batch_params p;
+    NTSTATUS status;
+
+    p.calls = (UINT64)(ULONG_PTR)calls;
+    p.count = count;
+    if ((status = D3D11_UNIX_CALL( batch, &p )))
+        ERR( "unix batch call of %u records failed, status %08x\n", count, (UINT)status );
+}
+
 static UINT64 unix_vtbl_call_fp( void *host, UINT slot, UINT argc, UINT64 *args,
                                  UINT fpword, UINT64 *fpret_bits )
 {
@@ -481,6 +496,7 @@ static const struct winecom_surface d3d11_surface =
     .invoke_fp = unix_vtbl_call_fp,
     .event_mint = d3d11_event_mint,
     .event_reap = d3d11_event_reap,
+    .invoke_batch = unix_vtbl_batch,
 };
 
 static LONG com_init_state;            /* 0 = no, 1 = in progress, 2 = ok,

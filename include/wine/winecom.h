@@ -570,6 +570,24 @@ typedef UINT64 (*winecom_invoke_fn)( void *host, UINT slot, UINT argc,
 typedef UINT64 (*winecom_invoke_fp_fn)( void *host, UINT slot, UINT argc,
                                         UINT64 *args, UINT fpword,
                                         UINT64 *fpret_bits );
+/* The BATCH host invoker (the journal's native ring replay, 2026-09-06):
+ * `count` void vtable calls, in order, in ONE transition.  Every call's
+ * arguments are already the native view -- proxies unwrapped, narrow
+ * integers extended, blob pointers pointing at bytes that stay valid until
+ * the hook returns -- exactly what winecom_invoke_fn would have received
+ * one call at a time.  Only rows that return void reach this hook (the
+ * journal records nothing else), so there is no result to carry back.
+ * NULL = the surface has no batch entry and the drain replays through
+ * `invoke`, one transition per record.  Appended last. */
+struct winecom_batch_call
+{
+    UINT64 host;                    /* the object; also args[0] */
+    UINT   slot;
+    UINT   argc;                    /* including `this`, <= WINECOM_BATCH_MAX_ARGS */
+    UINT64 args[12];
+};
+#define WINECOM_BATCH_MAX_ARGS 12
+typedef void (*winecom_invoke_batch_fn)( const struct winecom_batch_call *calls, UINT count );
 /* A hand-written slot: reads its own arguments out of the trap CONTEXT.
  * The CONTEXT is NOT const, because a slot returning a float has to write
  * ctx->FltSave.XmmRegisters[0] itself -- MS-x64 returns floats there and not
@@ -685,6 +703,16 @@ struct winecom_surface
                                             slot FAILED, because a failing
                                             callee kept nothing.  Appended
                                             last. */
+    winecom_invoke_batch_fn invoke_batch; /* the batch invoker for the
+                                            journal drain, or NULL: the
+                                            drain then pays one `invoke`
+                                            transition per record.  A
+                                            surface that predates the
+                                            field reads NULL here.
+                                            WINEEMUNOCOMBATCH=1 makes the
+                                            runtime read this as NULL --
+                                            the negative control.
+                                            Appended last. */
 };
 
 /* Bind this linkee's runtime instance to `surface` and materialise the

@@ -534,6 +534,22 @@ nw-<title>` is live end to end — verified by smaps ('ar' VmFlags on 83
 wine-managed VMAs vs 0 in control) and the gate set, per the user's
 direction measured no further.
 
+**2026-09-06: the D3D11 context journal replays in BATCHES and prunes
+DEAD records** (crossing-asm-op4k.md section 15).  One unix transition
+per 32 records instead of one per record (`invoke_batch`, d3d11.so runs
+the loop); a setter a later setter of the same state overwrites before
+any consumer is skipped (journal_gen.h `lww` class per row, hazard-
+bearing binds excluded); the record snippet lost two fenced stores.
+Bench: a replayed record 260 -> 125 ns, a collapsed one 69.  Levers
+WINEEMUNOCOMBATCH / WINEEMUCOMBATCHSABOTAGE / WINEEMUNOCOMLWW /
+WINEEMUCOMLWWSABOTAGE; check-ctx-journal.sh --sabotage runs six controls.
+OPEN: the Witcher 3 pinned-save A/B; the ~55 ns PE-side replay loop per
+record; the guest call-site inline cache is specified for the FEX tree
+(sessions/2026-09-06/inline-cache-handoff.md).  NOTE since EC DIRECT a
+trapped direct row is 83 ns, so the journal pays only through pruning
+and through the draw not tripping the dirty byte -- read section 15
+before adding rows.
+
 ## 7. PPC64EC: steps 0/A/B are LIVE — what remains (2026-08-31)
 
 `ppc64le/docs/ppc64ec.md` has the full story and the measured ladder.
