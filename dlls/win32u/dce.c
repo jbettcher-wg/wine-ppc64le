@@ -52,6 +52,22 @@ static struct list dce_list = LIST_INIT(dce_list);
 static struct list window_surfaces = LIST_INIT( window_surfaces );
 static pthread_mutex_t surfaces_lock = PTHREAD_MUTEX_INITIALIZER;
 
+/* Set when a surface leaves its lock with a non-empty bounds rect, cleared
+ * by flush_window_surfaces() just before it walks the list.  Every writer
+ * of window_surface.bounds holds the surface mutex, so window_surface_unlock
+ * is the one choke point that sees every dirtying, whichever driver did it.
+ *
+ * Why: flush_window_surfaces() runs on EVERY empty PeekMessage and on every
+ * message wait, and it used to take surfaces_lock plus one mutex per
+ * surface to discover that nothing was dirty.  [MEASURED 2026-09-06, op4k,
+ * Cyberpunk 2077 GameThread, perf cycles:u] that was 12.5% of the thread,
+ * 8.6% of it inside pthread_mutex_lock, for surfaces that never change
+ * while a D3D swapchain owns the window.  A flag read under acquire makes
+ * the empty poll lock-free; a dirtying that races the read is served by the
+ * next poll (the flag is cleared before the walk, never after), so a flush
+ * can be one poll late but never lost. */
+static LONG surfaces_dirty;
+
 /*******************************************************************
  * Dummy window surface for windows that shouldn't get painted.
  */
@@ -607,6 +623,12 @@ void window_surface_lock( struct window_surface *surface )
 void window_surface_unlock( struct window_surface *surface )
 {
     if (surface == &dummy_surface) return;
+    /* Arm the flush poll while the mutex is STILL HELD: the poller clears the
+     * flag before it walks, and only this mutex keeps it from walking past
+     * this surface before the bounds write is visible to it.  (The flag
+     * carries no data of its own -- the walk re-reads bounds under the
+     * mutex -- so a plain store suffices; the unlock is the release.) */
+    if (!IsRectEmpty( &surface->bounds )) WriteNoFence( &surfaces_dirty, 1 );
     pthread_mutex_unlock( &surface->mutex );
 }
 
@@ -742,6 +764,9 @@ void register_window_surface( struct window_surface *old, struct window_surface 
     pthread_mutex_lock( &surfaces_lock );
     if (old) list_remove( &old->entry );
     if (new) list_add_tail( &window_surfaces, &new->entry );
+    /* a surface drawn into before it was listed armed the flag while no walk
+     * could reach it; arm it again now that one can */
+    if (new) WriteRelease( &surfaces_dirty, 1 );
     pthread_mutex_unlock( &surfaces_lock );
 }
 
@@ -752,16 +777,33 @@ void register_window_surface( struct window_surface *old, struct window_surface 
  */
 void flush_window_surfaces( BOOL idle )
 {
-    static DWORD last_idle;
+    static LONG last_idle;  /* tick of the last idle poll; written outside surfaces_lock, so atomic */
     DWORD now;
     struct window_surface *surface;
 
+    /* No fence: the flag publishes nothing by itself, every read that acts
+     * on it happens under surfaces_lock and then the surface mutex, and an
+     * acquire load is an isync on the one path this exists to make cheap. */
+    if (!ReadNoFence( &surfaces_dirty ))
+    {
+        /* Nothing pending anywhere: keep the idle clock honest and leave
+         * without the lock.  This store can land while another thread is
+         * blocked on surfaces_lock with an older `now`, which makes its
+         * never-idle test fail once; that path leaves the flag set, so the
+         * next poll retries -- one poll late, never lost. */
+        if (idle) WriteRelease( &last_idle, NtGetTickCount() );
+        return;
+    }
+
     pthread_mutex_lock( &surfaces_lock );
     now = NtGetTickCount();
-    if (idle) last_idle = now;
+    if (idle) WriteRelease( &last_idle, now );
     /* if not idle, we only flush if there's evidence that the app never goes idle */
-    else if ((int)(now - last_idle) < 50) goto done;
+    else if ((int)(now - ReadAcquire( &last_idle )) < 50) goto done;
 
+    /* clear BEFORE the walk: a surface dirtied while we walk re-arms the flag
+     * (or is seen by its flush), so nothing marked during the walk is lost */
+    InterlockedExchange( &surfaces_dirty, 0 );
     LIST_FOR_EACH_ENTRY( surface, &window_surfaces, struct window_surface, entry )
         window_surface_flush( surface );
 done:
