@@ -66,7 +66,7 @@ static void put_u64( u64 v )
 
 static void report( const char *name, u64 t0, u64 t1, u64 freq, u64 n )
 {
-    u64 ns_tenths = ((t1 - t0) * 10000000000ull / freq) / n;
+    u64 ns_tenths = n ? ((t1 - t0) * 10000000000ull / freq) / n : 0;
     put_str( "BENCH " );
     put_str( name );
     put_str( "_ns_per_call=" );
@@ -74,6 +74,31 @@ static void report( const char *name, u64 t0, u64 t1, u64 freq, u64 n )
     put_str( " (N=" );
     put_u64( n );
     put_str( ")\n" );
+}
+
+/* COM_BENCH_LOOP=<qpc|getfeaturelevel|gettype|journaled> runs ONE loop and
+ * COM_BENCH_N its iteration count (0 = setup only): the perf-stat mode of
+ * bench-com-crossing.sh runs a loop at N and at 0 and divides the counter
+ * deltas by N, so cycles, instructions, branches and mispredicts are
+ * attributed per call.  Unset = every loop, the timing run. */
+static int only_loop( const char *name )
+{
+    char buf[32];
+    DWORD n = GetEnvironmentVariableA( "COM_BENCH_LOOP", buf, sizeof(buf) );
+    const char *a = buf, *b = name;
+    if (!n || n >= sizeof(buf)) return 1;
+    while (*a && *a == *b) { a++; b++; }
+    return !*a && !*b;
+}
+
+static u64 env_n( u64 dflt )
+{
+    char buf[32];
+    u64 v = 0;
+    DWORD n = GetEnvironmentVariableA( "COM_BENCH_N", buf, sizeof(buf) ), i;
+    if (!n || n >= sizeof(buf)) return dflt;
+    for (i = 0; i < n; i++) { if (buf[i] < '0' || buf[i] > '9') return dflt; v = v * 10 + (buf[i] - '0'); }
+    return v;
 }
 
 void com_bench_entry( void )
@@ -84,7 +109,7 @@ void com_bench_entry( void )
     const D3D_FEATURE_LEVEL want_fl[] = { D3D_FEATURE_LEVEL_11_0 };
     LARGE_INTEGER freq, t0, t1;
     u64 i, sink = 0;
-    const u64 WARM = 10000, N_QPC = 2000000, N_COM = 200000;
+    const u64 WARM = 10000, N_QPC = env_n( 2000000 ), N_COM = env_n( 200000 );
     HRESULT hr;
 
     if (!QueryPerformanceFrequency( &freq ) || !freq.QuadPart) ExitProcess( 2 );
@@ -97,23 +122,35 @@ void com_bench_entry( void )
         ExitProcess( 2 );
     }
 
-    for (i = 0; i < WARM; i++) QueryPerformanceCounter( &t0 );
-    QueryPerformanceCounter( &t0 );
-    for (i = 0; i < N_QPC; i++) QueryPerformanceCounter( &t1 );
-    QueryPerformanceCounter( &t1 );
-    report( "qpc_only", t0.QuadPart, t1.QuadPart, freq.QuadPart, N_QPC );
+    if (only_loop( "qpc" ))
+    {
+        for (i = 0; i < WARM; i++) QueryPerformanceCounter( &t0 );
+        QueryPerformanceCounter( &t0 );
+        for (i = 0; i < N_QPC; i++) QueryPerformanceCounter( &t1 );
+        QueryPerformanceCounter( &t1 );
+        report( "qpc_only", t0.QuadPart, t1.QuadPart, freq.QuadPart, N_QPC );
+    }
 
-    for (i = 0; i < WARM; i++) sink += ID3D11Device_GetFeatureLevel( device );
-    QueryPerformanceCounter( &t0 );
-    for (i = 0; i < N_COM; i++) sink += ID3D11Device_GetFeatureLevel( device );
-    QueryPerformanceCounter( &t1 );
-    report( "com_getfeaturelevel", t0.QuadPart, t1.QuadPart, freq.QuadPart, N_COM );
 
-    for (i = 0; i < WARM; i++) sink += ID3D11DeviceContext_GetType( context );
-    QueryPerformanceCounter( &t0 );
-    for (i = 0; i < N_COM; i++) sink += ID3D11DeviceContext_GetType( context );
-    QueryPerformanceCounter( &t1 );
-    report( "com_gettype", t0.QuadPart, t1.QuadPart, freq.QuadPart, N_COM );
+    if (only_loop( "getfeaturelevel" ))
+    {
+        for (i = 0; i < WARM; i++) sink += ID3D11Device_GetFeatureLevel( device );
+        QueryPerformanceCounter( &t0 );
+        for (i = 0; i < N_COM; i++) sink += ID3D11Device_GetFeatureLevel( device );
+        QueryPerformanceCounter( &t1 );
+        report( "com_getfeaturelevel", t0.QuadPart, t1.QuadPart, freq.QuadPart, N_COM );
+    }
+
+
+    if (only_loop( "gettype" ))
+    {
+        for (i = 0; i < WARM; i++) sink += ID3D11DeviceContext_GetType( context );
+        QueryPerformanceCounter( &t0 );
+        for (i = 0; i < N_COM; i++) sink += ID3D11DeviceContext_GetType( context );
+        QueryPerformanceCounter( &t1 );
+        report( "com_gettype", t0.QuadPart, t1.QuadPart, freq.QuadPart, N_COM );
+    }
+
 
     /* A JOURNALED slot (journal_gen.h): the call is recorded guest-side
      * and replayed at the next trap, so this loop pays the record per call
@@ -121,18 +158,22 @@ void com_bench_entry( void )
      * WINEEMUNOCOMJOURNAL=1 it is an ordinary trapped COM slot, which is
      * the A/B.  The final IAGetPrimitiveTopology drains what is left so the
      * measured region includes every replay it caused. */
-    for (i = 0; i < WARM; i++)
-        ID3D11DeviceContext_IASetPrimitiveTopology( context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
-    QueryPerformanceCounter( &t0 );
-    for (i = 0; i < N_COM; i++)
-        ID3D11DeviceContext_IASetPrimitiveTopology( context, (D3D11_PRIMITIVE_TOPOLOGY)(1 + (i & 3)) );
+    if (only_loop( "journaled" ))
     {
-        D3D11_PRIMITIVE_TOPOLOGY topo = 0;
-        ID3D11DeviceContext_IAGetPrimitiveTopology( context, &topo );
-        sink += topo;
+        for (i = 0; i < WARM; i++)
+            ID3D11DeviceContext_IASetPrimitiveTopology( context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
+        QueryPerformanceCounter( &t0 );
+        for (i = 0; i < N_COM; i++)
+            ID3D11DeviceContext_IASetPrimitiveTopology( context, (D3D11_PRIMITIVE_TOPOLOGY)(1 + (i & 3)) );
+        {
+            D3D11_PRIMITIVE_TOPOLOGY topo = 0;
+            ID3D11DeviceContext_IAGetPrimitiveTopology( context, &topo );
+            sink += topo;
+        }
+        QueryPerformanceCounter( &t1 );
+        report( "com_journaled_topology", t0.QuadPart, t1.QuadPart, freq.QuadPart, N_COM );
     }
-    QueryPerformanceCounter( &t1 );
-    report( "com_journaled_topology", t0.QuadPart, t1.QuadPart, freq.QuadPart, N_COM );
+
 
     ID3D11DeviceContext_Release( context );
     ID3D11Device_Release( device );

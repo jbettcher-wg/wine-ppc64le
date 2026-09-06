@@ -717,6 +717,31 @@ record, and a record that a later one overwrites costs the record alone,
   wine-side lever and it is now pulled; a way to run the port's own
   snippets unfenced is a JIT-side idea, noted in the handoff.
 
+**The counters** (same evening, `PERF_STAT=1` -- each loop run at N and
+at 0 under `perf stat`, deltas per call; instructions are stable to a
+few per cent across runs, cycles are not, so read the insns and
+mispredicts columns):
+
+| loop | insns | branches | mispredicts |
+|---|---:|---:|---:|
+| direct row, EC DIRECT (GetType) | 303 | 39 | 3.0 |
+| journaled, collapsed: the record alone | 287 | 46 | 2.0 |
+| journaled, every record replayed, batched | 618 | 100 | 7.4 |
+| the same row trapped, `WINEEMUNOCOMJOURNAL=1` | 445 | 61 | 5.1 |
+
+The batched replay adds ~330 instructions and 5.4 mispredicts per
+record, and 5.4 mispredicts at POWER8's ~20 cycles each is most of the
+~55 ns.  The reviewer asked whether the replay's remaining cost is the
+intern-table chain walk of the 09-04 profile: it is not -- that table
+grows with the proxy count since 80091e5a732 and `proxy_from_pointer`
+has been lock-free O(1) since c450c940876 (both 2026-09-04, before this
+round), and 330 instructions is not a 100-node walk.  It is the
+per-record branchy C: the shape/size validation, the class switch per
+argument, the batch-add's unwrap, and the descriptor loop's indirect
+call on the unix side.  A table-driven per-row "batch plan" (the class
+sequence flattened once at install) would take the switches out; not
+built here.
+
 Not run: the Witcher 3 pinned-save A/B (the autosave-backup runner is the
 user's call, section 6 caveats) -- the batch removes 30k transitions a
 frame on the render thread there, which is the number the reviewer's

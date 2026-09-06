@@ -41,6 +41,15 @@
 #                                    EC DIRECT (round 9) that is the JIT's
 #                                    inline call
 #
+# PERF_STAT=1 adds the hardware counters the timing alone cannot show --
+# the crossing's cost on POWER8 is its branch mispredicts, not its
+# instructions (crossing-asm-op4k.md section 1).  Each loop runs twice
+# under `perf stat` (own processes, no privilege needed), once at
+# COM_BENCH_N=200000 and once at 0 (device creation only), and the
+# counter deltas divided by N are printed per call:
+#     PERFSTAT <loop> cycles=... insns=... branches=... mispredicts=...
+# A leg's timing line and its counter line together are the A/B record.
+#
 # Exit 0 = ran and printed, 2 = could not run.
 set -u
 
@@ -65,6 +74,7 @@ LIBRARY kernel32.dll
 EXPORTS
 QueryPerformanceCounter
 QueryPerformanceFrequency
+GetEnvironmentVariableA
 GetStdHandle
 WriteFile
 ExitProcess
@@ -89,4 +99,26 @@ WINEDEBUG=${WINEDEBUG:--all} WINEDLLOVERRIDES="winedbg.exe=d" \
     timeout -k 5 "${TIMEOUT:-300}" "$BUILD/wine" "$OUT/com_bench.exe" 2>"$OUT/bench.err"
 rc=$?
 [ "$rc" = 0 ] || { tail -5 "$OUT/bench.err" >&2; skip "the guest probe exited $rc (log $OUT/bench.err)"; }
+
+if [ "${PERF_STAT:-0}" = 1 ]; then
+    command -v perf >/dev/null || skip "PERF_STAT=1 needs perf"
+    EVENTS=cycles,instructions,branches,branch-misses
+    N=${PERF_N:-200000}
+    # counts <loop> <n> -> "cycles insns branches misses" summed over the run
+    counts() {
+        COM_BENCH_LOOP=$1 COM_BENCH_N=$2 WINEDEBUG=-all WINEDLLOVERRIDES="winedbg.exe=d" \
+            perf stat -x, -e $EVENTS -o "$OUT/perf-$1-$2.csv" -- \
+            timeout -k 5 "${TIMEOUT:-300}" "$BUILD/wine" "$OUT/com_bench.exe" >/dev/null 2>"$OUT/perf-$1-$2.err" \
+            || return 1
+        awk -F, '/,cycles/{c=$1} /,instructions/{i=$1} /,branches/{b=$1} /,branch-misses/{m=$1}
+                 END{print c, i, b, m}' "$OUT/perf-$1-$2.csv"
+    }
+    for loop in getfeaturelevel gettype journaled; do
+        base=$(counts $loop 0) || { echo "PERFSTAT $loop: the N=0 run failed" >&2; continue; }
+        full=$(counts $loop $N) || { echo "PERFSTAT $loop: the N=$N run failed" >&2; continue; }
+        echo "$base $full $N" | awk '{
+            printf "PERFSTAT %s cycles=%.0f insns=%.0f branches=%.1f mispredicts=%.2f per call (N=%d)\n",
+                   "'"$loop"'", ($5-$1)/$9, ($6-$2)/$9, ($7-$3)/$9, ($8-$4)/$9, $9 }'
+    done
+fi
 exit 0

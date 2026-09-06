@@ -78,9 +78,26 @@ marshal.  Do not move the classifier into the JIT.
                                         WINEEMUNOCOMLWW=1 for the 125 ns
                                         every-record-replays form)
 
-Interleave rounds A/B with the cache off (a FEX_ lever, please -- every
-port change has one); the box's governor moves the numbers by 20%, so
-same governor on both arms.  The gates that must stay green:
+`PERF_STAT=1` adds a `PERFSTAT <loop> cycles= insns= branches=
+mispredicts=` line per loop (each loop run at N and at 0 under `perf
+stat`, deltas divided by N): mispredicts are the claim, so the A/B record
+is the timing line AND the counter line.  Interleave rounds A/B with the
+cache off (a FEX_ lever, please -- every port change has one -- and it
+belongs in the CodeCache config hash like every other codegen toggle, so
+a cached block from the other arm is never served); the box's governor
+moves the numbers by 20%, so same governor on both arms.
+
+Two wine-side facts the reviewer asked about, so they are on record: the
+intern table grows with the proxy count and the dispatch once-guard reads
+before it swaps (80091e5a732, 2026-09-04), and `proxy_from_pointer` takes
+no lock at all -- a live tag on never-recycled proxy memory plus an O(1)
+vtable check (c450c940876, same day).  The replay loop uses that same
+lookup once per record, so the remaining per-record cost is not a chain
+walk; the counters say what it is (crossing-asm-op4k.md section 15): a
+direct row is 303 instructions / 3.0 mispredicts per call, a journaled
+record alone 287 / 2.0, a batched replay of one record adds ~330 / 5.4
+on top -- branchy per-record C, wine-side work, not yours.  The 3.0
+mispredicts of the direct row are the ones the inline cache is after.  The gates that must stay green:
 `ppc64le/cpu/check-ec-direct.sh`, `check-ec-leaf.sh`, `check-com-fastpath.sh`,
 `ppc64le/winecom/check-ctx-journal.sh` (and `--sabotage`),
 `ppc64le/dxvk/check-d3d11-smoke.sh`.
