@@ -185,7 +185,7 @@ static const UINT page_shift = 12;
 static const UINT_PTR page_mask = 0xfff;
 static const UINT_PTR granularity_mask = 0xffff;
 
-#ifdef __aarch64__
+#if defined(__aarch64__) || defined(__powerpc64__)
 static UINT_PTR host_page_size;
 static UINT_PTR host_page_mask;
 #else
@@ -3730,7 +3730,7 @@ void virtual_init(void)
     pthread_mutex_init( &virtual_mutex, &attr );
     pthread_mutexattr_destroy( &attr );
 
-#ifdef __aarch64__
+#if defined(__aarch64__) || defined(__powerpc64__)
     host_page_size = sysconf( _SC_PAGESIZE );
     host_page_mask = host_page_size - 1;
     TRACE( "host page size: %uk\n", (UINT)host_page_size / 1024 );
