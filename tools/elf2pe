@@ -152,9 +152,19 @@ IMAGE_REL_BASED_DIR64 = 10
 
 IMAGE_ORDINAL_FLAG64 = 1 << 63
 
-SECTION_ALIGN = 0x1000
-FILE_ALIGN = 0x200
-SHIFT = 0x1000          # RVA = elf_vaddr - base_va + SHIFT; constant, so distances hold
+# 64k, not the 4k Windows page.  Wine maps a builtin section by section with
+# mmap(), and mmap() needs the section RVA and its raw file offset to agree
+# modulo the HOST page -- so on a 64k-page host a 4k-aligned image cannot be
+# mapped at all and ntdll silently falls back to read()ing every section in,
+# which costs a copy per section and loses the page-cache sharing between
+# processes.  Aligning to 64k keeps the image mappable on a 64k host and is
+# still a whole number of pages on a 4k one, so one build serves both; it is
+# what upstream does for ARM64 (winegcc.c picks 0x10000 there).  FILE_ALIGN
+# must match SECTION_ALIGN for the congruence above to hold, which is also
+# why ARM64 sets both.
+SECTION_ALIGN = 0x10000
+FILE_ALIGN = 0x10000
+SHIFT = 0x10000         # RVA = elf_vaddr - base_va + SHIFT; constant, so distances hold
 
 
 def align_up(v, a):
