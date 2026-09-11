@@ -802,6 +802,20 @@ BOOL pe_load_debug_info(struct module* module)
                 module->module.PdbAge = srv_info.age;
             }
         }
+        if (!ret && !module->dont_load_symbols && !module->format_info[DFI_PE])
+        {
+            /* A PE module created by pe_load_builtin_module() has no file map:
+             * the image was never opened, only its NT header was read out of the
+             * debuggee.  Every format probe below reads through that map, so
+             * there is nothing to load -- say so instead of dereferencing NULL.
+             * Reached for Wine's own ntdll on a 64k-page host, where the
+             * synthesized PE header of an ELF builtin lies inside the ELF
+             * module's recorded range and SymLoadModuleExW takes the
+             * builtin fallback. */
+            WARN("no image map for %s, skipping debug info\n", debugstr_w(module->modulename));
+            module->module.SymType = SymNone;
+            return FALSE;
+        }
         if (!ret && !module->dont_load_symbols) /* didn't find direct .dbg or .pdb info, try other potential formats */
         {
             image_check_alternate(&module->format_info[DFI_PE]->u.pe_info->fmap, module);
