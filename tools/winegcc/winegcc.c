@@ -504,6 +504,7 @@ static int try_link( struct strarray link_tool, const char *cflags )
 
 static struct strarray get_link_args( const char *output_name )
 {
+    const char *max_page;
     struct strarray link_args = get_translator();
     struct strarray flags = empty_strarray;
     const char *version;
@@ -654,8 +655,18 @@ static struct strarray get_link_args( const char *output_name )
             if (!try_link( link_args, strmake("-Wl,-Ttext-segment=%s", image_base)) )
                 strarray_add( &flags, strmake("-Wl,-Ttext-segment=%s", image_base) );
         }
-        if (!try_link( link_args, "-Wl,-z,max-page-size=0x1000"))
-            strarray_add( &flags, "-Wl,-z,max-page-size=0x1000");
+        /* Not below the host page.  This exists to keep the .so builtins
+         * compact, but a PT_LOAD whose p_vaddr and p_offset differ modulo the
+         * page the kernel actually enforces cannot be mapped at all: glibc
+         * fails the dlopen with "ELF load command address/offset not
+         * page-aligned", and on a 64k-page ppc64le kernel that is every .so
+         * Wine links this way, starting with ntdll.dll.so.  ppc64le kernels
+         * come in both page sizes, so pick the one that works on both; it also
+         * keeps the RX and RW segments in separate 64k granules, which is what
+         * lets tools/elf2pe preserve W^X when it translates them to PE. */
+        max_page = (target.cpu == CPU_POWERPC64) ? "-Wl,-z,max-page-size=0x10000"
+                                                 : "-Wl,-z,max-page-size=0x1000";
+        if (!try_link( link_args, max_page )) strarray_add( &flags, max_page );
         break;
     }
 
@@ -2010,7 +2021,8 @@ int main(int argc, char **argv)
     if (output && strendswith( output, ".fake" )) fake_module = true;
 
     if (!section_align)
-        section_align = (target.cpu == CPU_ARM64 || target.cpu == CPU_ARM64EC) ? "0x10000" : "0x1000";
+        section_align = (target.cpu == CPU_ARM64 || target.cpu == CPU_ARM64EC ||
+                         target.cpu == CPU_POWERPC64) ? "0x10000" : "0x1000";
 
     if (!file_align) file_align = section_align;
 
