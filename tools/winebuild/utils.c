@@ -709,6 +709,7 @@ unsigned int get_section_alignment(void)
     {
     case CPU_ARM64:
     case CPU_ARM64EC:
+    case CPU_POWERPC64:
         return 0x10000;
     default:
         return 0x1000;
