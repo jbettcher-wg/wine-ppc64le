@@ -844,7 +844,16 @@ void output_crt_sections(void)
 void output_module( DLLSPEC *spec )
 {
     int machine = 0;
-    unsigned int page_size = 0x1000;
+    /* This is the section alignment of the fake PE header a .so builtin
+     * carries, and it has to be the target's real one.  ntdll's map_so_dll()
+     * rounds the synthetic header up to it and then anon_mmap_fixed()s that
+     * many bytes over the reserve below -- a call that must be a whole number
+     * of HOST pages, and whose room comes out of the 65536 of slack the 64k
+     * round-up in dlopen_dll() can eat plus one alignment unit.  Hardcoding
+     * 4k here left a 64k-page host asserting in anon_mmap_fixed on the very
+     * first builtin it opened.  The reserve grows with it, which is the point:
+     * the two numbers have to agree or the mmap runs off the end of it. */
+    unsigned int page_size = get_section_alignment();
     const char *data_dirs[16] = { NULL };
 
     /* Reserve some space for the PE header */
