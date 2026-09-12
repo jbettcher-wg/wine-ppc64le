@@ -1467,16 +1467,16 @@ static BOOL import_dll( WINE_MODREF *wm, const IMAGE_IMPORT_DESCRIPTOR *descr, L
             if (IMAGE_SNAP_BY_ORDINAL(import_list->u1.Ordinal))
             {
                 int ordinal = IMAGE_ORDINAL(import_list->u1.Ordinal);
-                WARN("No implementation for %s.%d", name, ordinal );
+                ERR("No implementation for %s.%d", name, ordinal );
                 thunk_list->u1.Function = allocate_stub( name, IntToPtr(ordinal) );
             }
             else
             {
                 IMAGE_IMPORT_BY_NAME *pe_name = get_rva( module, (DWORD)import_list->u1.AddressOfData );
-                WARN("No implementation for %s.%s", name, pe_name->Name );
+                ERR("No implementation for %s.%s", name, pe_name->Name );
                 thunk_list->u1.Function = allocate_stub( name, (const char*)pe_name->Name );
             }
-            WARN(" imported from %s, allocating stub %p\n",
+            ERR(" imported from %s, allocating stub %p\n",
                  debugstr_w(wm->ldr.FullDllName.Buffer),
                  (void *)thunk_list->u1.Function );
             import_list++;
@@ -1496,7 +1496,7 @@ static BOOL import_dll( WINE_MODREF *wm, const IMAGE_IMPORT_DESCRIPTOR *descr, L
             if (!thunk_list->u1.Function)
             {
                 thunk_list->u1.Function = allocate_stub( name, IntToPtr(ordinal) );
-                WARN("No implementation for %s.%d imported from %s, setting to %p\n",
+                ERR("No implementation for %s.%d imported from %s, setting to %p\n",
                      name, ordinal, debugstr_w(wm->ldr.FullDllName.Buffer),
                      (void *)thunk_list->u1.Function );
             }
@@ -1512,7 +1512,7 @@ static BOOL import_dll( WINE_MODREF *wm, const IMAGE_IMPORT_DESCRIPTOR *descr, L
             if (!thunk_list->u1.Function)
             {
                 thunk_list->u1.Function = allocate_stub( name, (const char*)pe_name->Name );
-                WARN("No implementation for %s.%s imported from %s, setting to %p\n",
+                ERR("No implementation for %s.%s imported from %s, setting to %p\n",
                      name, pe_name->Name, debugstr_w(wm->ldr.FullDllName.Buffer),
                      (void *)thunk_list->u1.Function );
             }
