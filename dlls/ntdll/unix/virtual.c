@@ -2456,8 +2456,15 @@ static NTSTATUS map_file_into_view( struct file_view *view, int fd, size_t start
 
     if (vprot & VPROT_WRITE)
     {
-        ERR( "unaligned shared mapping %p-%p not supported\n", map_addr, map_addr + map_size );
-        return STATUS_INVALID_PARAMETER;
+        /* A writable IMAGE_SCN_MEM_SHARED section that is not aligned to the
+         * host page cannot be a MAP_SHARED file mapping when the host page is
+         * larger than the PE page (ppc64 64K kernels).  Refusing it rejects the
+         * whole image (DOOM's DOOMx64vk.exe carries a 4K ".mydata" section and
+         * failed with STATUS_INVALID_IMAGE_FORMAT).  Give this process a private
+         * copy instead: the section behaves like a normal data section, and only
+         * other processes of the same image lose the shared view of it. */
+        WARN( "unaligned shared mapping %p-%p: private copy, not shared across processes (host page %lx)\n",
+              map_addr, map_addr + map_size, (unsigned long)host_page_mask + 1 );
     }
 
     mprotect( map_addr, map_size, PROT_READ | PROT_WRITE );
