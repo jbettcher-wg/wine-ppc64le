@@ -232,6 +232,8 @@ _seh_filter_dll               0x00000A21  2  int   ucrtbase.spec:1882
 # __unDNameEx are deliberately not in it.
 INCLUDE-DIR   .
 PROBE-EXTRA   thunkcxx.h
+# 2026-09-11: thunkcxx.h grew __AdjustPointer (DOOM 2016, MSVCP140 catch
+# clauses through VCRUNTIME140's forward) -- see its comment there.
 
 # div returns div_t BY VALUE, so the header oracle refuses it ("return is not
 # integer/pointer class") and icuin.dll got a sentinel.  The .spec-location

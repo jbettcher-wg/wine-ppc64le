@@ -97,4 +97,13 @@ void        __cdecl __std_type_info_destroy_list(void *header);
 size_t      __cdecl __std_type_info_hash(const void *ti);
 const char *__cdecl __std_type_info_name(void *ti, void *header);
 
+/* 2026-09-11 DOOM (2016): the staged x86-64 MSVCP140 imports
+ * VCRUNTIME140.__AdjustPointer (a catch-clause helper: given the thrown
+ * object and a this_ptr_offsets triple it applies the base-class adjustment,
+ * reading the object's own vbtable when vbase_descr >= 0) and the forward
+ * into this module was refused as "no declaration found", so the first C++
+ * exception the game handled died on sentinel 0xDEAD0005.  Data-only:
+ * pointer arithmetic on the guest's own object, no failure path, no callback. */
+void       *__cdecl __AdjustPointer(void *obj, const void *off);
+
 #endif  /* __WINE_UCRTBASE_THUNKCXX_H */

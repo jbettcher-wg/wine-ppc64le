@@ -263,6 +263,11 @@ FORWARD __std_type_info_compare  ucrtbase.__std_type_info_compare
 FORWARD __std_exception_copy     ucrtbase.__std_exception_copy
 FORWARD __std_exception_destroy  ucrtbase.__std_exception_destroy
 
+# 2026-09-11 DOOM (2016): MSVCP140's catch clauses call __AdjustPointer
+# (vcruntime140.spec:10 forwards it to ucrtbase; ucrtbase now emits it off
+# thunkcxx.h).  Same shape as the six above: one implementation, one hop.
+FORWARD __AdjustPointer           ucrtbase.__AdjustPointer
+
 # __uncaught_exception, an omission in the __current_exception block above
 # rather than a decision.  vcruntime140.spec:51 forwards it to ucrtbase like
 # its three siblings at lines 199-201, ucrtbase.thunks forwards it on to
