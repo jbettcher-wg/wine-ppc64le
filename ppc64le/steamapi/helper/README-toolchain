@@ -257,9 +257,14 @@ usr/lib/gcc/i686-linux-gnu/13/ and usr/include/i386-linux-gnu/.  So the answer
 to "do we need a 32-bit sysroot package" is NO: the one already on this disk
 is multiarch.
 
-An ArchLinux-style rootfs would NOT do -- it has no 32-bit runtime at all --
-and build-helper.sh says so by name rather than letting 219 compiles succeed
-and the link fail on a missing crt.  Note the script's FEX_ROOTFS DEFAULT is
+An ArchLinux-style rootfs does it too once lib32-glibc and lib32-gcc-libs are
+installed: the 32-bit set then lives under usr/lib32, which clang's driver
+searches beside usr/lib/i386-linux-gnu.  (Until 2026-09-12 the preflight knew
+only the multiarch path and refused the op4k Arch rootfs, whose usr/lib32 was
+complete; the launcher then ran Portal 2 with no i386 helper and steam_api
+reported "Steam is not running".)  A rootfs with neither has no 32-bit runtime
+at all, and build-helper.sh says so by name rather than letting 219 compiles
+succeed and the link fail on a missing crt.  Note the script's FEX_ROOTFS DEFAULT is
 still the ArchLinux path from the original test machine, which does not exist
 on this box; set FEX_ROOTFS explicitly here.
 

@@ -72,6 +72,8 @@
 #                     i386 set under usr/lib/i386-linux-gnu (crt, libc,
 #                     libstdc++, libgcc_s) beside the x86-64 one, so nothing
 #                     extra has to be installed or unpacked to build i386.
+#                     An ArchLinux rootfs serves both too once lib32-glibc
+#                     and lib32-gcc-libs are installed (usr/lib32).
 #
 # THE i386 TOOLCHAIN, MEASURED (2026-08-30, this machine).  gcc cannot do it:
 # x86_64-pc-linux-gnu-gcc -m32 fails with "cannot find -lgcc" -- there is no
@@ -132,23 +134,32 @@ done
 # it hardcoded the Arch layout and refused a perfectly good Ubuntu_24_04
 # rootfs with "missing .../usr/lib/Scrt1.o".
 #
-# For --machine i386 only the multiarch path can match: an Arch x86-64 rootfs
-# has no 32-bit runtime at all, and saying so here is much better than letting
-# 219 compiles succeed and the link fail on a missing crt.
+# For --machine i386 the 32-bit runtime lives in usr/lib/i386-linux-gnu on a
+# multiarch rootfs and in usr/lib32 on an Arch one with lib32-glibc (and
+# lib32-gcc-libs) installed; clang's driver searches both under --sysroot.
+# An Arch rootfs WITHOUT lib32-glibc has no 32-bit runtime at all, and saying
+# so here is much better than letting 219 compiles succeed and the link fail
+# on a missing crt.  (2026-09-12: this check knew only the multiarch path and
+# refused the op4k Arch rootfs, whose usr/lib32 had been complete since July;
+# the launcher then warned that a 32-bit title would see no Steam client.)
 crt=
 if [ "$MACHINE" = x86_64 ]; then
-    for c in "$ROOTFS/usr/lib/Scrt1.o" "$ROOTFS/usr/lib/$LIBDIR/Scrt1.o"; do
-        [ -e "$c" ] && { crt=$c; break; }
-    done
+    candidates="$ROOTFS/usr/lib/Scrt1.o $ROOTFS/usr/lib/$LIBDIR/Scrt1.o"
 else
-    [ -e "$ROOTFS/usr/lib/$LIBDIR/Scrt1.o" ] && crt=$ROOTFS/usr/lib/$LIBDIR/Scrt1.o
+    candidates="$ROOTFS/usr/lib32/Scrt1.o $ROOTFS/usr/lib/$LIBDIR/Scrt1.o"
 fi
+for c in $candidates; do
+    [ -e "$c" ] && { crt=$c; break; }
+done
 [ -n "$crt" ] || {
-    echo "build-helper.sh: no $MACHINE Scrt1.o under $ROOTFS/usr/lib" >&2
-    echo "  looked in usr/lib (Arch layout) and usr/lib/$LIBDIR (Debian/Ubuntu)." >&2
+    echo "build-helper.sh: no $MACHINE Scrt1.o under $ROOTFS/usr" >&2
     if [ "$MACHINE" = i386 ]; then
-        echo "  An i386 helper needs a MULTIARCH rootfs carrying the 32-bit runtime." >&2
-        echo "  The FEX Ubuntu_24_04 rootfs has one; an ArchLinux rootfs does not." >&2
+        echo "  looked in usr/lib32 (Arch lib32-glibc) and usr/lib/$LIBDIR (Debian/Ubuntu)." >&2
+        echo "  An i386 helper needs the 32-bit runtime: a multiarch rootfs such as the" >&2
+        echo "  FEX Ubuntu_24_04 one, or an ArchLinux rootfs with lib32-glibc and" >&2
+        echo "  lib32-gcc-libs installed." >&2
+    else
+        echo "  looked in usr/lib (Arch layout) and usr/lib/$LIBDIR (Debian/Ubuntu)." >&2
     fi
     echo "  FEX_ROOTFS names the sysroot; it is currently $ROOTFS" >&2
     exit 2
