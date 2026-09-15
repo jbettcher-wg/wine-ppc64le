@@ -349,6 +349,10 @@ typedef HRESULT (WINAPI *PFN_CreateRenderTarget)(
     BOOL, IDirect3DSurface9 **, HANDLE *);
 typedef HRESULT (WINAPI *PFN_SetRenderTarget)(
     IDirect3DDevice9 *, DWORD, IDirect3DSurface9 *);
+typedef HRESULT (WINAPI *PFN_GetRenderTarget)(
+    IDirect3DDevice9 *, DWORD, IDirect3DSurface9 **);
+typedef HRESULT (WINAPI *PFN_GetDesc_Surface)(
+    IDirect3DSurface9 *, D3DSURFACE_DESC *);
 typedef HRESULT (WINAPI *PFN_Clear)(
     IDirect3DDevice9 *, DWORD, const D3DRECT *, DWORD, D3DCOLOR, float, DWORD);
 typedef HRESULT (WINAPI *PFN_CreateOffscreenPlainSurface)(
@@ -392,6 +396,18 @@ static HRESULT call_CreateRenderTarget( IDirect3DDevice9 *dev, UINT w, UINT h, D
 static HRESULT call_SetRenderTarget( IDirect3DDevice9 *dev, DWORD idx, IDirect3DSurface9 *surf )
 {
     return ((PFN_SetRenderTarget)dev->lpVtbl->SetRenderTarget)( dev, idx, surf );
+}
+static HRESULT call_GetRenderTarget( IDirect3DDevice9 *dev, DWORD idx, IDirect3DSurface9 **out_surf )
+{
+    return ((PFN_GetRenderTarget)dev->lpVtbl->GetRenderTarget)( dev, idx, out_surf );
+}
+static ULONG call_Release_Surface_count( IDirect3DSurface9 *p )
+{
+    return ((PFN_Release_Surface)p->lpVtbl->Release)( p );
+}
+static HRESULT call_GetDesc_Surface( IDirect3DSurface9 *p, D3DSURFACE_DESC *desc )
+{
+    return ((PFN_GetDesc_Surface)p->lpVtbl->GetDesc)( p, desc );
 }
 static HRESULT call_Clear( IDirect3DDevice9 *dev, D3DCOLOR colour )
 {
@@ -772,6 +788,51 @@ static int d3d9_smoke_run( void )
     else hr = E_FAIL;
     out_hr( "hr", hr );
     verdict( SUCCEEDED(hr), "SetRenderTarget failed" );
+
+    /* ---- step 4b: the bound target outlives its last public reference --
+     * SetRenderTarget(0, rt); rt->Release(); rt->GetDesc(&desc) is legal
+     * D3D9: the device holds the bound target PRIVATELY, so the surface is
+     * alive and callable at a public count of zero, and GetRenderTarget
+     * then hands back the SAME pointer with a fresh public reference.
+     * Valve's shaderapidx9 (Source 2004 -- Vampire: The Masquerade -
+     * Bloodlines, CViewRender::DrawHighEndMonitors) does exactly this every
+     * frame.  On the guest legs this is the winecom proxy's lifetime
+     * contract: the guest's Release is the host's public Release, and a
+     * proxy at zero guest references stays a live alias that the next wrap
+     * of the pair revives.  Before that contract the proxy was freed on the
+     * guest's last Release with the free-list link written over its vtable
+     * word, and this step was `call [0+0x30]`.
+     * [MEASURED 2026-09-15: VtMB crash(...).log, shaderapidx9.dll+0x1e03b,
+     * EDX=0, "Read from location 00000030"; three runs, deterministic.]
+     * The reference GetRenderTarget hands out is the one the epilogue's
+     * Release(rt) drops. */
+    begin( "Release(rt) to zero while bound, then GetDesc(rt) and GetRenderTarget identity" );
+    if (rt)
+    {
+        IDirect3DSurface9 *again = NULL;
+        D3DSURFACE_DESC desc;
+        ULONG refs;
+
+        desc.Width = 0;
+        desc.Height = 0;
+        desc.Format = 0;
+        refs = call_Release_Surface_count( rt );
+        out( "refs=" ); out_dec( refs );
+        hr = call_GetDesc_Surface( rt, &desc );
+        out_hr( " GetDesc hr", hr );
+        out( " w=" ); out_dec( desc.Width );
+        out( " h=" ); out_dec( desc.Height );
+        out( " fmt=0x" ); out_hex( (DWORD)desc.Format, 8 );
+        if (SUCCEEDED(hr)) hr = call_GetRenderTarget( device, 0, &again );
+        out_hr( " GetRenderTarget hr", hr );
+        out( again == rt ? " same-pointer" : " DIFFERENT-pointer" );
+        verdict( refs == 0 && SUCCEEDED(hr) && desc.Width == W && desc.Height == H &&
+                 desc.Format == D3DFMT_A8R8G8B8 && again == rt,
+                 "a bound render target at public refcount zero must stay callable "
+                 "and come back as itself" );
+        if (again && again != rt) call_Release_Surface( again );
+    }
+    else { out( "no render target" ); hr = E_FAIL; verdict( FALSE, "no render target" ); }
 
     /* ---- step 5: Clear(D3DCOLOR_ARGB(0xFF,0x00,0x40,0x80)) ------------- */
     begin( "Clear(A=FF R=00 G=40 B=80, a direct 8-bit ARGB integer -- no rounding)" );

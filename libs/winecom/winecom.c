@@ -14,7 +14,20 @@
  * slots, which are served loudly with E_NOTIMPL here.
  *
  * PROXIES.  One `struct com_proxy` per (host pointer, interface), interned;
- * winecom_wrap() consumes one host reference.  The guest-facing vtable of a
+ * winecom_wrap() consumes one host reference -- and hands it to the guest:
+ * the guest's AddRef/Release ARE the host object's public AddRef/Release
+ * (proxy_addref / proxy_release forward them and serve the host's count),
+ * the proxy itself owns no reference.  A proxy whose guest count has gone
+ * to zero is NOT torn down: it stays a live, interned alias of its host
+ * pointer, because a Direct3D object outlives its last public reference for
+ * as long as the device holds it privately (D3D9's public/private split;
+ * DXVK's D3D9Resource does the same) and games lean on exactly that --
+ * SetRenderTarget(s); s->Release(); s->GetDesc() is legal D3D9 and VtMB's
+ * shaderapidx9 does it every frame.  The old form freed the proxy on the
+ * guest's last Release, wrote the free-list link over its vtable word, and
+ * the very next call through it was `call [0+0x30]`.  A zombie is revived
+ * when the host hands that (pointer, interface) out again.  The guest-facing
+ * vtable of a
  * proxy is the address sequence of a guest thunk module's stub array for
  * that interface type, materialised once at attach from the module's own
  * __wine_com_thunk_info -- and the IIDs published there are cross-checked
@@ -76,7 +89,10 @@ struct com_proxy
     const void *guest_vtbl;   /* first member: this IS the COM object the
                                  guest sees -- *(void**)proxy is its vtable */
     void       *host;         /* native/host interface pointer */
-    LONG        refs;         /* guest-visible refcount, served here */
+    LONG        refs;         /* guest references outstanding: a tally of the
+                                 host's public count as seen through this
+                                 proxy (the host serves the number; this is
+                                 the zombie test and the tracing) */
     UINT        iface;        /* index into wc_surface->ifaces[] */
     struct com_proxy *next;   /* intern-table chain */
     /* The cached answer of this interface's WINECOM_F_CONST_QWORD slot, if it
@@ -98,11 +114,12 @@ struct com_proxy
     UINT64      jr_cap;       /* 0x38: bytes available */
     BOOL        jr_draining;  /* re-entrancy fuse for the drain */
     /* The membership tag: 1 from the moment a wrap has filled the proxy in
-     * (WriteRelease) until its last guest reference goes (cleared under
-     * wc_cs before the free).  Because a proxy's memory is NEVER returned to
-     * a general allocator -- wc_proxy_free keeps it on a free list of proxies
-     * -- the word at this offset is a live tag for as long as the process
-     * runs, and proxy_from_pointer can trust it without the lock.  [MEASURED]
+     * (WriteRelease) for the rest of the process -- a proxy is never freed
+     * (see proxy_release: a zombie is still the guest's handle on an object
+     * the device may keep alive).  Because a proxy's memory is NEVER returned
+     * to a general allocator, the word at this offset is a live tag for as
+     * long as the process runs, and proxy_from_pointer can trust it without
+     * the lock.  [MEASURED]
      * Witcher 3 render thread 2026-09-04: the locked membership walk was
      * 11% of the thread AFTER the table grew -- the cost was the critical
      * section's barriers, not the chain. */
@@ -266,18 +283,14 @@ static BOOL guest32;
 
 /* Guest-legal allocations: the proxies and the 32-bit vtable block must be
  * addressable by 4-byte guest pointers.  A trivial carve-out allocator over
- * NtAllocateVirtualMemory's zero_bits form, plus a free list for the one
- * fixed size that ever comes back (a proxy).  wc_cs guards both.
+ * NtAllocateVirtualMemory's zero_bits form.  wc_cs guards it.
  *
- * The free list serves BOTH lanes: a freed proxy is only ever reused as a
- * proxy, never handed back to the heap, so a stale guest pointer to one
- * still lands on a struct com_proxy whose `live` word says no (see the
- * field).  The first word of a listed proxy is the link -- a heap or chunk
- * address, never one of the materialised vtables, so a freed proxy also
- * fails proxy_from_pointer's vtable test on its own. */
+ * Nothing ever comes back: a proxy lives for the process (proxy_release),
+ * so the population is bounded by the distinct (host pointer, interface)
+ * pairs the host ever hands out -- the host allocator's address reuse
+ * revives interned zombies instead of minting new proxies. */
 static void *low_chunk;
 static SIZE_T low_used, low_cap;
-static void *free_proxies;   /* singly linked through the first word */
 
 static void *wc_alloc_low( SIZE_T size )
 {
@@ -304,24 +317,10 @@ static void *wc_alloc_low( SIZE_T size )
 
 static struct com_proxy *wc_proxy_alloc(void)   /* wc_cs held */
 {
-    struct com_proxy *p;
-
-    if ((p = free_proxies))
-    {
-        free_proxies = *(void **)p;
-        return p;
-    }
     if (!guest32)
-        return RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0, sizeof(*p) );
-    return wc_alloc_low( sizeof(*p) );
-}
-
-static void wc_proxy_free( struct com_proxy *p )   /* p->live already 0 */
-{
-    RtlEnterCriticalSection( &wc_cs );
-    *(void **)p = free_proxies;
-    free_proxies = p;
-    RtlLeaveCriticalSection( &wc_cs );
+        return RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap, 0,
+                                sizeof(struct com_proxy) );
+    return wc_alloc_low( sizeof(struct com_proxy) );
 }
 
 /* The 32-bit guest vtables, when guest32: vtbl32s[i] points into vtbl32_block,
@@ -3130,6 +3129,24 @@ void winecom_host_release( void *host )
     wc_surface->invoke( host, 2 /* IUnknown::Release */, 1, args );
 }
 
+static ULONG host_release_count( void *host )
+{
+    UINT64 args[16] = { 0 };
+    return (ULONG)wc_surface->invoke( host, 2 /* IUnknown::Release */, 1, args );
+}
+
+static ULONG host_addref_count( void *host )
+{
+    UINT64 args[16] = { 0 };
+    return (ULONG)wc_surface->invoke( host, 1 /* IUnknown::AddRef */, 1, args );
+}
+
+static inline BOOL iface_is_local( UINT iface )
+{
+    return iface < wc_surface->iface_count &&
+           (wc_surface->ifaces[iface].flags & WINECOM_IF_LOCAL);
+}
+
 /* A [local] INTERFACE HAS NO REFERENCE MANAGEMENT AT ALL, and slot 2 of one is
  * a real method with a real effect.  On the audio surfaces it is
  * IXAudio2Voice::SetEffectChain: a voice is destroyed by DestroyVoice, has no
@@ -3251,6 +3268,64 @@ UINT winecom_iface_from_iid( const GUID *riid )
     return ~0u;
 }
 
+/* One recording ring per journaled object (install_journal); a failed
+ * allocation just leaves the snippets on their fallback path -- every call
+ * traps, which is the old world.  A context-scope ring also needs a registry
+ * slot, claimed here without a lock.  wc_cs held; p->jr_* all clear. */
+static void proxy_arm_journal( struct com_proxy *p, void *host, UINT iface )
+{
+    SIZE_T ring = JOURNAL_RING_SIZE;
+    void *mem = NULL;
+
+    if (!journal_on || !iface_journaled[iface] ||
+        (iface_journaled[iface] == JG_SCOPE_CTX && ctx_journal_off))
+        return;
+    if (iface_journaled[iface] == JG_SCOPE_CTX)
+    {
+        /* the host's ring, shared with every other proxy of it */
+        struct ctx_ring *r = ctx_ring_acquire( host );
+        if (r)
+        {
+            p->jr_scope = JG_SCOPE_CTX;
+            __atomic_store_n( &p->jr_base, (BYTE *)r, __ATOMIC_RELEASE );
+        }
+    }
+    else if (!NtAllocateVirtualMemory( NtCurrentProcess(), &mem, 0, &ring,
+                                       MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE ))
+    {
+        p->jr_cap = ring;
+        p->jr_scope = JG_SCOPE_LIST;
+        __atomic_store_n( &p->jr_base, (BYTE *)mem, __ATOMIC_RELEASE );
+    }
+}
+
+/* The ring goes with the guest's last reference: a released command list's
+ * unreplayed records could only ever have fed a recording nobody can execute
+ * any more, and a context-scope ring drops the reference this proxy held on
+ * the host's shared one.  The snippets see jr_base NULL and trap. */
+static void proxy_disarm_journal( struct com_proxy *p )
+{
+    if (p->jr_scope == JG_SCOPE_CTX)
+    {
+        struct ctx_ring *r = (struct ctx_ring *)p->jr_base;
+        __atomic_store_n( &p->jr_base, NULL, __ATOMIC_RELEASE );
+        p->jr_scope = 0;
+        if (r) ctx_ring_release( r );
+    }
+    else if (p->jr_base)
+    {
+        SIZE_T ring = 0;
+        void *mem = p->jr_base;
+        __atomic_store_n( &p->jr_base, NULL, __ATOMIC_RELEASE );
+        p->jr_cap = 0;
+        p->jr_pos = 0;
+        p->jr_scope = 0;
+        NtFreeVirtualMemory( NtCurrentProcess(), &mem, &ring, MEM_RELEASE );
+    }
+    p->jr_cons = 0;
+    p->jr_draining = FALSE;
+}
+
 void *winecom_wrap( void *host, UINT iface )
 {
     UINT bucket;
@@ -3305,12 +3380,20 @@ void *winecom_wrap( void *host, UINT iface )
         if (p->host == host && p->iface == iface) break;
     if (p)
     {
-        p->refs++;
+        /* The reference the caller handed us is the guest's now: the proxy
+         * holds none of its own, so nothing goes back.  A zombie (no guest
+         * reference left) is revived here -- either the same object the
+         * device kept alive is being handed out again, or the host's
+         * allocator put a new object of this type at the old address; the
+         * alias is right for both, only its cached answers are not. */
+        if (!p->refs++)
+        {
+            p->cached_qword = 0;
+            proxy_arm_journal( p, host, iface );
+            TRACE( "revived proxy %p (%s host %p)\n", p,
+                   wc_surface->ifaces[iface].name, host );
+        }
         RtlLeaveCriticalSection( &wc_cs );
-        /* The surplus reference: this pair is already interned and already
-         * holds one, so the one the caller handed us goes back.  Unless the
-         * interface has no reference count -- see host_release_iface. */
-        host_release_iface( host, iface );
         return p;
     }
     if (!(p = wc_proxy_alloc()))
@@ -3335,34 +3418,7 @@ void *winecom_wrap( void *host, UINT iface )
     p->jr_draining = FALSE;
     p->jr_cons = 0;
     p->jr_scope = 0;
-    if (journal_on && iface_journaled[iface] &&
-        !(iface_journaled[iface] == JG_SCOPE_CTX && ctx_journal_off))
-    {
-        /* one recording ring per journaled object; a failed allocation just
-         * leaves the snippets on their fallback path -- every call traps,
-         * which is the old world.  A context-scope ring also needs a
-         * registry slot, claimed here without a lock. */
-        SIZE_T ring = JOURNAL_RING_SIZE;
-        void *mem = NULL;
-
-        if (iface_journaled[iface] == JG_SCOPE_CTX)
-        {
-            /* the host's ring, shared with every other proxy of it */
-            struct ctx_ring *r = ctx_ring_acquire( host );
-            if (r)
-            {
-                p->jr_scope = JG_SCOPE_CTX;
-                __atomic_store_n( &p->jr_base, (BYTE *)r, __ATOMIC_RELEASE );
-            }
-        }
-        else if (!NtAllocateVirtualMemory( NtCurrentProcess(), &mem, 0, &ring,
-                                           MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE ))
-        {
-            p->jr_cap = ring;
-            p->jr_scope = JG_SCOPE_LIST;
-            __atomic_store_n( &p->jr_base, (BYTE *)mem, __ATOMIC_RELEASE );
-        }
-    }
+    proxy_arm_journal( p, host, iface );
     if (++intern_count > intern_mask + 1)
     {
         intern_grow();
@@ -3406,9 +3462,9 @@ static struct com_proxy *proxy_from_pointer( void *ptr )
     if (in_block)
     {
         /* points into the materialised block, so this is one of our proxies
-         * or a freed one (proxy memory is never anything else -- see
-         * free_proxies): the live tag says which, with acquire semantics so
-         * the fields a wrap filled in are visible behind it.  Then confirm
+         * (proxy memory is never anything else, and a proxy is never freed):
+         * the live tag says whether a wrap has filled it in, with acquire
+         * semantics so the fields are visible behind it.  Then confirm
          * the vtable is the base of the interface the proxy says it is,
          * O(1) through its own index. */
         if (!ReadAcquire( &cand->live )) return NULL;
@@ -3467,56 +3523,65 @@ void wc_forward_release( void *ptr )
     if (p) proxy_release( p );
 }
 
+/* The guest's AddRef/Release are the host object's public ones, forwarded,
+ * and the number the guest sees is the host's -- games check it, and DXVK's
+ * numbers are the ones validated against Windows.  A [local] interface has no
+ * reference count at all (host_release_iface), so its tally is served here.
+ *
+ * The last guest reference does NOT end the proxy.  It drops the host's last
+ * PUBLIC reference, after which the object is alive exactly as long as the
+ * device keeps it privately -- the state real D3D9 puts it in, and the state
+ * a game relying on SetRenderTarget(s); s->Release(); s->GetDesc() needs.
+ * The proxy stays interned as a zombie: every call through it still reaches
+ * p->host (which is valid precisely when the same call would be valid on
+ * Windows), and winecom_wrap revives it when the host hands the pair out
+ * again.  A Release past zero is the guest's over-release: clamped here, as
+ * DXVK's ComObjectClamp would, and never forwarded to what may by then be a
+ * freed host object. */
 static ULONG proxy_addref( struct com_proxy *p )
 {
     ULONG refs;
+
     RtlEnterCriticalSection( &wc_cs );
     refs = ++p->refs;
     RtlLeaveCriticalSection( &wc_cs );
-    return refs;
+    if (iface_is_local( p->iface )) return refs;
+    return host_addref_count( p->host );
 }
 
 static ULONG proxy_release( struct com_proxy *p )
 {
-    UINT iface = p->iface;   /* read before the free below */
-    struct com_proxy **link;
-    void *host = NULL;
     ULONG refs;
+    BOOL last = FALSE, over = FALSE;
 
     RtlEnterCriticalSection( &wc_cs );
-    refs = --p->refs;
-    if (!refs)
+    if (p->refs)
     {
-        for (link = &intern[intern_bucket( p->host )]; *link; link = &(*link)->next)
-            if (*link == p) { *link = p->next; intern_count--; break; }
-        host = p->host;
-        p->live = 0;
+        refs = --p->refs;
+        if (!refs)
+        {
+            last = TRUE;
+            proxy_disarm_journal( p );
+        }
+    }
+    else
+    {
+        refs = 0;
+        over = TRUE;
     }
     RtlLeaveCriticalSection( &wc_cs );
-    if (!refs)
+    if (over)
     {
-        TRACE( "destroying proxy %p (%s host %p)\n", p,
-               wc_surface->ifaces[p->iface].name, host );
-        if (p->jr_scope == JG_SCOPE_CTX)
-        {
-            /* one reference on the host's shared ring goes with this proxy */
-            struct ctx_ring *r = (struct ctx_ring *)p->jr_base;
-            p->jr_base = NULL;
-            p->jr_scope = 0;
-            if (r) ctx_ring_release( r );
-        }
-        else if (p->jr_base)
-        {
-            /* whatever is still in the ring dies with the object: a released
-             * command list's unreplayed records could only ever have fed a
-             * recording nobody can execute any more */
-            SIZE_T ring = 0;
-            void *mem = p->jr_base;
-            NtFreeVirtualMemory( NtCurrentProcess(), &mem, &ring, MEM_RELEASE );
-        }
-        host_release_iface( host, iface );
-        wc_proxy_free( p );
+        WARN( "proxy %p (%s host %p) released past zero; ignored\n", p,
+              wc_surface->ifaces[p->iface].name, p->host );
+        return 0;
     }
+    if (iface_is_local( p->iface )) return refs;
+    refs = host_release_count( p->host );
+    if (last)
+        TRACE( "last guest reference on proxy %p (%s host %p) gone; host public "
+               "count %u; proxy stays as its alias\n", p,
+               wc_surface->ifaces[p->iface].name, p->host, (unsigned)refs );
     return refs;
 }
 

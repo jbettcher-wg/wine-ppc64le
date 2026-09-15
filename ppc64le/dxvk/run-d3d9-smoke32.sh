@@ -13,7 +13,7 @@
 #
 # It is now expected to be green end to end.  Promoting it to a gate would
 # mean giving it a reference to diff against; a run that stops printing
-# `d3d9_smoke: PASS 17/17` is a regression either way.
+# `d3d9_smoke: PASS 18/18` is a regression either way.
 #
 # It is also the cheap way to work on this lane: no foreground, no game lock,
 # no GPU submission beyond a couple of clears, and it reaches every hand32
@@ -33,7 +33,7 @@
 # GetNPatchMode, whose refusal cannot pop the guest's stdcall frame, and the
 # process died there.
 #
-# [MEASURED 2026-08-30, after] `d3d9_smoke: PASS 17/17`, rc=0, and not one
+# [MEASURED 2026-08-30, after] `d3d9_smoke: PASS 18/18`, rc=0, and not one
 # refusal in the log.  The six steps the bounce added all pass -- DXT1 block
 # pitch and the one-block mip, a sub-rect flush that must not spill, a vertex
 # buffer's offset and implicit length, a cube face's (face, level) key, a
