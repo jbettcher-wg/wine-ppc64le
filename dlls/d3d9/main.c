@@ -1238,7 +1238,8 @@ static BOOL d3d9_format_geometry( UINT format, UINT *bw, UINT *bh, UINT *bb )
 
 struct lock_bounce
 {
-    struct lock_bounce *next;
+    struct lock_bounce *next;       /* the all-entries list, walked by trim */
+    struct lock_bounce *hash_next;  /* the (host, sub) bucket chain */
     void   *host;        /* HOST object pointer; with sub, the cache key */
     UINT    sub;         /* level, or face<<8|level, or 0 */
     void   *low;         /* the guest-legal buffer */
@@ -1257,6 +1258,35 @@ static CRITICAL_SECTION_DEBUG lock_cs_debug =
 };
 static CRITICAL_SECTION lock_cs = { &lock_cs_debug, -1, 0, 0, 0, 0 };
 static struct lock_bounce *lock_bounces;
+
+/* THE LOOKUP IS HASHED, NOT WALKED.  Entries are never freed (see the budget
+ * note below: the cache is of allocations, the entries stay), so after a
+ * level load the list holds one entry per (texture, mip) the title ever
+ * locked -- thousands -- and a dynamic vertex buffer locked a few hundred
+ * times a frame walked all of them twice per lock.  [MEASURED] Bloodlines'
+ * main menu: the two list walks in lock_bounce_apply and unlock_bounce were
+ * 22% of the process's cycles once the copies themselves were cheap.  The
+ * all-entries list stays for trim; only the key lookup moves. */
+#define LOCK_BOUNCE_BUCKETS 1024
+static struct lock_bounce *lock_bounce_buckets[LOCK_BOUNCE_BUCKETS];
+
+static inline unsigned int lock_bounce_hash( const void *host, UINT sub )
+{
+    ULONG_PTR h = (ULONG_PTR)host >> 4;
+    h ^= h >> 20;
+    h ^= (ULONG_PTR)sub * 0x9e3779b1u;
+    return (unsigned int)(h & (LOCK_BOUNCE_BUCKETS - 1));
+}
+
+/* caller holds lock_cs */
+static struct lock_bounce *lock_bounce_find( const void *host, UINT sub )
+{
+    struct lock_bounce *b;
+
+    for (b = lock_bounce_buckets[lock_bounce_hash( host, sub )]; b; b = b->hash_next)
+        if (b->host == host && b->sub == sub) return b;
+    return NULL;
+}
 
 /* Below-4-GiB address space is a FINITE resource shared with everything else
  * the guest owns, and a title that locks thousands of distinct mip levels
@@ -1416,10 +1446,10 @@ static HRESULT lock_bounce_apply( void *host, UINT sub, const char *what,
     HRESULT hr = S_OK;
 
     RtlEnterCriticalSection( &lock_cs );
-    for (b = lock_bounces; b; b = b->next)
-        if (b->host == host && b->sub == sub) break;
-    if (!b)
+    if (!(b = lock_bounce_find( host, sub )))
     {
+        unsigned int slot = lock_bounce_hash( host, sub );
+
         if (!(b = RtlAllocateHeap( NtCurrentTeb()->Peb->ProcessHeap,
                                    HEAP_ZERO_MEMORY, sizeof(*b) )))
         {
@@ -1430,6 +1460,8 @@ static HRESULT lock_bounce_apply( void *host, UINT sub, const char *what,
         b->sub = sub;
         b->next = lock_bounces;
         lock_bounces = b;
+        b->hash_next = lock_bounce_buckets[slot];
+        lock_bounce_buckets[slot] = b;
     }
     if (b->cap < alloc)
     {
@@ -1574,8 +1606,7 @@ static UINT64 unlock_bounce( void *host, UINT sub, UINT slot, UINT argc, UINT64 
     struct lock_bounce *b;
 
     RtlEnterCriticalSection( &lock_cs );
-    for (b = lock_bounces; b; b = b->next)
-        if (b->host == host && b->sub == sub) break;
+    b = lock_bounce_find( host, sub );
     if (b && b->host_ptr)
     {
         if (b->flush) memcpy( b->host_ptr, b->low, b->size );

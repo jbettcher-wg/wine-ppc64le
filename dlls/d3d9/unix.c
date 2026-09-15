@@ -418,6 +418,25 @@ static NTSTATUS d3d9_unix_init( void *args )
      * backend and forwards every question to the table registered below. */
     setenv( "DXVK_WSI_DRIVER", "Win32u", 0 );
 
+    /* EVERY 32-BIT LOCK IS A READBACK ON THIS LANE, so write-only buffers
+     * must live in memory the CPU can read at speed.  DXVK answers a D3D9
+     * Lock with a pointer into the buffer's own mapping, and for a
+     * WRITEONLY buffer that mapping is DEVICE_LOCAL host-visible memory --
+     * uncached, write-combined, a few hundred MB/s to READ.  Fine for the
+     * app the option was designed around, which only writes there.  Not
+     * fine here: the 32-bit proxy (main.c's lock_bounce_apply) cannot hand
+     * a 64-bit address to the guest, so every non-DISCARD lock first copies
+     * the locked span out of that mapping into a below-4-GiB bounce, and
+     * NOOVERWRITE is the flag a dynamic-buffer path uses hundreds of times a
+     * frame.  [MEASURED] Vampire: The Masquerade - Bloodlines' main menu ran
+     * at 5 fps with 73% of the process in that copy's 8-byte loads;
+     * d3d9.cachedWriteOnlyBuffers (DXVK's own lever for titles that read
+     * their write-only buffers) took the copy out of the profile entirely
+     * and tripled the frame rate.  overwrite = 0, same policy as
+     * dlls/d3d11/unix.c: a user-set DXVK_CONFIG wins, and loses this
+     * option knowingly. */
+    setenv( "DXVK_CONFIG", "d3d9.cachedWriteOnlyBuffers = True", 0 );
+
     if (!(dxvk_handle = load_dxvk_lib( D3D9_SONAME )))
     {
         ERR( "cannot load %s: %s -- did the build's DXVK step run?  "
