@@ -223,3 +223,50 @@ Hardware TSO: **+7.5% scene fps, -12% median frame time, -11% p99** in Novigrad.
 Same direction and size class as Cyberpunk (+11%).  Validated per leg from the
 prefix log (live line present in A, FEX_HWTSO=0 received and no live line in B).
 Nothing to ship -- it is the lane default; the number was owed.
+
+## PGO on the unix side (2026-09-16 01:50-03:57): built, trained, measured -- a wash in-game
+
+Shadow tree ~/Projects/power8/wt-pgo (never the launch tree).  What it took to
+build wine with -fprofile-generate on ppc64le, for the next person:
+- LDFLAGS must carry -fprofile-generate too (tools link libgcov).
+- The native PE arch copies CFLAGS (configure.ac:2510) and gcov adds TLS, which
+  the port's PE converter refuses ("PT_TLS present").  Fix after configure:
+  sed `ppc64_CFLAGS = -g -O2` / `ppc64_LDFLAGS =` into config.status, re-run
+  ./config.status, touch config.status Makefile (else make rechecks and
+  regenerates a config.h with everything undefined).
+- wine-preloader is static -nostdlib: compile its two objects by hand with
+  -fno-profile-generate LAST (makedep puts EXTRADEFS before CFLAGS, so a
+  Makefile.in opt-out loses; `make -n` output is backslash-continued, join it).
+- The instrumented configure leaves conftest .gcda files that then fail the
+  profile-use configure with -Werror=coverage-mismatch: delete them and add
+  -Wno-coverage-mismatch -Wno-missing-profile.
+- Training: one CP2077 -benchmark leg from the shadow tree (22.9 fps
+  instrumented) wrote 290 .gcda (2.6 MB).  Script: /tmp/pgo-build.sh on op64k
+  (gen / genmake / reconf / use / clean), /tmp/pgo-train.sh, /tmp/pgo-ab.sh.
+
+| tree | leg | avg fps | floor ms |
+|---|---|---|---|
+| main, plain -O2 | 1 | 31.68 | 22.27 |
+| main, plain -O2 | 2 | 31.18 | 22.08 |
+| wt-pgo, profile-use | 1 | 31.37 | 22.39 |
+| wt-pgo, profile-use | 2 | 31.13 | 22.87 |
+
+No gain.  The crossing microbench numbers for both trees are below.  Reading:
+the unix side's branch layout is not where a Cyberpunk frame goes; the frame is
+JIT and GPU, and the crossings that remain are waits (the 09-03 verdict again).
+DXVK/vkd3d-proton PGO was not attempted -- same expectation.
+
+Crossing microbench (bench-crossing.sh, nw-cp2077 prefix, two runs each):
+
+| tree | qpc guest-side | leaf crossing | non-leaf crossing |
+|---|---|---|---|
+| main, plain -O2 | 49.6 / 49.0 ns | 80.2 / 79.1 ns | 216.4 / 212.8 ns |
+| wt-pgo, profile-use | 49.5 / 50.2 ns | 80.2 / 80.1 ns | 202.1 / 201.9 ns |
+
+PGO takes **~12 ns off a non-leaf crossing (-5.5%)** and nothing off the leaf
+path (which the JIT serves without touching ntdll.so).  Bench-positive,
+fps-neutral.  Adopting it means a two-stage build (instrumented build,
+training run, rebuild) in the normal workflow; the recipe above makes that
+about 35 minutes on op64k.  The user's call whether -12 ns per non-leaf
+crossing is worth owning that pipeline; the profiles (~/pgo-data, 2.6 MB)
+are kept, the 9 GB shadow tree is deleted per the standing policy.
