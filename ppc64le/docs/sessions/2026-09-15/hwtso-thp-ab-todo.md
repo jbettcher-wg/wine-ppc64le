@@ -51,7 +51,7 @@ Facts that shape the A/B:
 8. [ ] Optional third arm for the fence-cost picture: FEX_TSOENABLED=0
        (unsound, control only, never ship) -- it bounds what HWTSO can win.
        If A ~= this arm, SAO is already delivering everything.
-9. [ ] Witcher 3 pass (D3D11, 81% JIT frame thread -- the title most likely
+9. [x] Witcher 3 pass (D3D11, 81% JIT frame thread -- the title most likely
        to show a store-fence win): pinned save (leg5-save exists on the
        box), MangoHud CSV, 200 s window, same interleave.  Back up the
        autosave before each leg.
@@ -155,3 +155,71 @@ What this session leaves for the speed list: HWTSO stays the default (+11%
 proven), THP is off the table, next candidates are PGO on ntdll.so/DXVK,
 guest-side EnterCriticalSection, native large memcpy, and the queued
 crossing cuts (see the 2026-09-15 conversation notes in NEXT.md's successor).
+
+## Step 9 (Witcher 3) -- what got in the way, 2026-09-16 00:00-00:40
+
+1. **Save-load crash, intermittent, native heap.**  Two of three launches
+   died while loading the pinned save: glibc printed `malloc(): smallbin
+   double linked list corrupted` / `corrupted double-linked list`, then the
+   port logged EXCEPTION_WINE_ASSERTION (80000101 = SIGABRT) on thread 0238
+   with the exception frame on a unix stack.  The user's allocator
+   serialization guard (FEX_GUESTANCHOR/GUESTSERIALIZE_RVA, the witcher3
+   registry row) WAS armed in every run, so this is not the guest-allocator
+   race that guard closes; it is a native-side (wine/DXVK/winecom) heap
+   overrun on the save-load path.  The op64k build is from 09-11, before the
+   09-15 winecom/d3d9 commits, and the same build exited clean on 09-12/13,
+   so it is not new code.  The third launch (gdb attached with sudo, which
+   slows the emulator's signal path) survived and ran at ~50 fps in-world.
+   Logs: ~/.local/share/wine-ppc64le/nw-witcher3/wine-ppc64le-native-20260915-235618-*.log
+   and -20260916-000709-*.log.  NEXT: run one leg with
+   LD_PRELOAD=/usr/lib/libc_malloc_debug.so GLIBC_TUNABLES=glibc.malloc.check=3
+   under `sudo gdb -p <pgrep -x witcher3.exe>` (ptrace_scope=1 blocks a
+   plain attach) with SIGABRT stop, everything else nostop/pass -- the
+   attach recipe is /tmp/w3gdb.sh on op64k.
+2. **Key injection.**  ~/fex-scripts/sendkey.py needs the python `evdev`
+   module, which no python on op64k has any more; the driver now uses
+   `YDOTOOL_SOCKET=/run/user/1000/.ydotool_socket ydotool key 57:1 57:0`
+   (SPACE) / `28:1 28:0` (ENTER) with ydotoold running.  A leg whose keys do
+   not land sits at the main menu at a flat 120 fps -- scene_stats.py then
+   says "NO SCENE", which is the tell.
+3. **Save moved to Novigrad** by the user at 00:32 (QuickSave_10ff48_7ea43c00_204e7a);
+   re-pinned, every leg restores it, autosaves the game writes are discarded.
+4. **dmesg (sudo):** 33 emulator-side entries this afternoon (fastppcx86 `trap`
+   at FEX+0x3a4e80 in short-lived pids, two segfaults at -1) -- theirs, handed
+   over as-is; ONE `wine-preloader[921975]` segfault at 18:38:24 inside
+   wld_vsprintf's `%s` (loader/preloader.c) dereferencing an argv/env string
+   at 0x7ffffe00f925 that was no longer readable.  Preloader page math uses
+   AT_PAGESZ, but loader/preloader.c:1548 hardcodes `pargc - 0x1000` for the
+   stack-overlap test -- on 64K pages that is the wrong margin.  Single
+   occurrence, unreproduced; a lead, not a finding.
+
+## Witcher 3 water scene: 30 fps (09-13 21:19) -> 50 fps (09-16 00:30), same 64K kernel line, same save spot
+
+The wine binaries on op64k are from 09-11 in both runs, so this is not a
+wine change.  The governor is ruled out by the user (known for a fact).
+What did change in between: fastppcx86 build-smc rebuilt 09-15 16:33 with 65
+commits since 09-13 (64K granule/shared-file mapping fixes, delayed
+cache-load UAF, SMC verify-after-arm, and "wine's KUSER_SHARED_DATA clocks
+are refreshed into the guest's private copy" on 09-14 20:50 -- the guest had
+been reading a stale shared-data page on 64K), the bridge rebuilt 09-14
+17:32, and linux-books-64k 7.2.5-2 -> -3 booted 09-13 21:49.  Attribution:
+the emulator rebuild first, the kernel bump second.  Not a wine finding;
+recorded so the next W3 number has a baseline with a date on it.
+
+## RESULT, step 9 -- Witcher 3, Novigrad quicksave, native lane, A A B B (2026-09-16 00:37-01:49)
+
+Each leg: launch, 240 s to menu, Continue via ydotool, 420 s streaming, then
+the MangoHud CSV's gameplay scene isolated by ~/fex-scripts/scene_stats.py
+(~17-18k scene frames per leg).  No leg crashed; no retries.
+
+| arm | leg | scene fps | p50 ms | p95 ms | p99 ms |
+|---|---|---|---|---|---|
+| HWTSO=1 (default) | 1 | 24.93 | 40.00 | 47.33 | 50.62 |
+| HWTSO=1 (default) | 2 | 24.20 | 41.67 | 47.28 | 50.71 |
+| FEX_HWTSO=0       | 3 | 22.49 | 46.89 | 53.43 | 56.84 |
+| FEX_HWTSO=0       | 4 | 22.98 | 45.26 | 52.16 | 57.74 |
+
+Hardware TSO: **+7.5% scene fps, -12% median frame time, -11% p99** in Novigrad.
+Same direction and size class as Cyberpunk (+11%).  Validated per leg from the
+prefix log (live line present in A, FEX_HWTSO=0 received and no live line in B).
+Nothing to ship -- it is the lane default; the number was owed.
