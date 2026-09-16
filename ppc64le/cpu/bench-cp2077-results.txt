@@ -36,3 +36,15 @@ ntsync-stats leg 1: avg=16.757 min=12.222 max=22.302 frames=1122 floor_ms=29.22 
 # 2026-08-31T00:49:35-06:00  tag=ntsync-hitrate  legs=1  smt=SMT=4  bridge=5336272e2c3f
 ntsync-hitrate leg 1: avg=16.487 min=12.818 max=21.526 frames=1097 floor_ms=34.04 dir=benchmark_2026-08-31_01-50-03
 # done 2026-08-31T00:52:07-06:00
+# 2026-09-15T21:45:41-07:00  tag=hwtso-on  legs=2  smt=SMT=4  bridge=75089121254a  env=hwtso=1(default)
+hwtso-on leg 1: TIMEOUT after 1500s
+hwtso-on leg 2: ABORT -- a GameThread is still running after 600s
+# 2026-09-15T22:37:51-07:00  tag=hwtso-on  legs=2  smt=SMT=4  bridge=75089121254a  env=hwtso=1(default)
+hwtso-on leg 1: avg=31.138 min=23.103 max=40.508 frames=2002 floor_ms=22.89 dir=benchmark_2026-09-15_22-38-34
+hwtso-on leg 2: avg=31.921 min=23.549 max=41.181 frames=2051 floor_ms=22.43 dir=benchmark_2026-09-15_22-41-22
+# done 2026-09-15T22:43:26-07:00
+# 2026-09-15T22:43:26-07:00  tag=hwtso-off  legs=2  smt=SMT=4  bridge=75089121254a  env=FEX_HWTSO=0
+hwtso-off leg 1: avg=28.402 min=20.838 max=37.156 frames=1826 floor_ms=24.59 dir=benchmark_2026-09-15_22-44-11
+hwtso-off leg 2: avg=28.388 min=20.552 max=37.216 frames=1825 floor_ms=24.66 dir=benchmark_2026-09-15_22-46-59
+# done 2026-09-15T22:49:11-07:00
+# 2026-09-15T22:50:46-07:00  tag=thp-always  legs=2  smt=SMT=4  bridge=75089121254a  env=thp=always,hwtso=1

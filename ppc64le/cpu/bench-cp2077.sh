@@ -49,11 +49,35 @@ export FEX_APP_DATA_LOCATION=$HOME/Development/fexrootfs/
 export FEX_ROOTFS=$HOME/Development/fexrootfs/RootFS/Ubuntu_24_04
 export FEX_THUNKGUESTLIBS=$HOME/Development/fastppcx86/build-thunks/Guest
 export FEX_THUNKHOSTLIBS=$HOME/Development/fastppcx86/build-thunks/HostLibs_64
-export WINE_PPC64LE_TREE=$HOME/Development/powerpc64le-ports/hangover-ppc64le/wine-build
-
-TOOL=$HOME/Development/powerpc64le-ports/hangover-ppc64le/wine-upstream/ppc64le/steamtool
-EXE="$HOME/.local/share/Steam/steamapps/common/Cyberpunk 2077/bin/x64/Cyberpunk2077.exe"
-RESULTS="$HOME/.local/share/wine-ppc64le/cp2077/pfx/drive_c/users/jbettcher/Documents/CD Projekt Red/Cyberpunk 2077/benchmarkResults"
+# Paths differ per developer's box.  Every one of these is an environment
+# override; the defaults are the co-dev's layout, and the block after them
+# picks the op64k layout when this script is running out of that tree.
+export WINE_PPC64LE_TREE=${WINE_PPC64LE_TREE:-$HOME/Development/powerpc64le-ports/hangover-ppc64le/wine-build}
+TOOL=${BENCH_TOOL:-$HOME/Development/powerpc64le-ports/hangover-ppc64le/wine-upstream/ppc64le/steamtool}
+EXE=${BENCH_EXE:-"$HOME/.local/share/Steam/steamapps/common/Cyberpunk 2077/bin/x64/Cyberpunk2077.exe"}
+RESULTS=${BENCH_RESULTS:-"$HOME/.local/share/wine-ppc64le/cp2077/pfx/drive_c/users/jbettcher/Documents/CD Projekt Red/Cyberpunk 2077/benchmarkResults"}
+NAME=${BENCH_NAME:-cp2077}     # run-native --name IS the prefix directory under ~/.local/share/wine-ppc64le
+if [ ! -d "$TOOL" ] && [ -x "$HERE/../steamtool/run-native" ]; then
+    # op64k layout: tree == build dir, game on /mnt/caution, prefix nw-cp2077.
+    export WINE_PPC64LE_TREE=$(cd "$HERE/../.." && pwd)
+    TOOL=$WINE_PPC64LE_TREE/ppc64le/steamtool
+    [ -e "$EXE" ] || EXE="/mnt/caution/Games/Cyberpunk 2077/bin/x64/Cyberpunk2077.exe"
+    [ -d "$RESULTS" ] || RESULTS="$HOME/.local/share/wine-ppc64le/nw-cp2077/pfx/drive_c/users/$USER/Documents/CD Projekt Red/Cyberpunk 2077/benchmarkResults"
+    [ -n "${BENCH_NAME:-}" ] || NAME=nw-cp2077
+fi
+# The bridge the game will really use is the one beside the binfmt-registered
+# emulator (steamtool/proton derives it the same way); the old in-tree copy is
+# the fallback so older layouts keep printing a checksum.
+BRIDGE=$(sed -n 's/^interpreter \(.*\)\/Bin\/FEX$/\1/p' /proc/sys/fs/binfmt_misc/FEX-x86_64 2>/dev/null)/Source/Tools/FexBridge/libfexbridge.so
+[ -e "$BRIDGE" ] || BRIDGE=$WINE_PPC64LE_TREE/dlls/ntdll/libfexbridge.so
+# A wrong NAME silently boots a FRESH prefix (2026-09-15: leg 1 ran 25 min in a
+# brand-new ~/.local/share/wine-ppc64le/cp2077 and died in a crash dialog), so
+# the prefix must already exist and be the one RESULTS points into.
+case "$RESULTS" in "$HOME/.local/share/wine-ppc64le/$NAME/"*) ;; *)
+    echo "bench-cp2077: NAME=$NAME does not match RESULTS=$RESULTS" >&2; exit 2 ;; esac
+for need in "$TOOL/run-native" "$EXE" "$HOME/.local/share/wine-ppc64le/$NAME/pfx"; do
+    [ -e "$need" ] || { echo "bench-cp2077: missing $need" >&2; exit 2; }
+done
 
 wait_idle() {   # no GameThread anywhere, or give up
     local t0=$SECONDS
@@ -64,7 +88,7 @@ wait_idle() {   # no GameThread anywhere, or give up
     return 1
 }
 
-echo "# $(date -Is)  tag=$TAG  legs=$LEGS  smt=$(ppc64_cpu --smt 2>/dev/null)  bridge=$(md5sum "$WINE_PPC64LE_TREE/dlls/ntdll/libfexbridge.so" | cut -c1-12)" >> "$LOG"
+echo "# $(date -Is)  tag=$TAG  legs=$LEGS  smt=$(ppc64_cpu --smt 2>/dev/null)  bridge=$(md5sum "$BRIDGE" 2>/dev/null | cut -c1-12)  env=${BENCH_NOTE:-}" >> "$LOG"
 
 for leg in $(seq 1 "$LEGS"); do
     if ! wait_idle; then
@@ -74,7 +98,7 @@ for leg in $(seq 1 "$LEGS"); do
 
     newest_before=$(ls -t "$RESULTS" 2>/dev/null | head -1)
 
-    ( cd "$TOOL" && setsid ./run-native --name cp2077 --appid 1091500 "$EXE" -skipStartScreen -benchmark ) \
+    ( cd "$TOOL" && setsid ./run-native --name "$NAME" --appid 1091500 "$EXE" -skipStartScreen -benchmark ) \
         > "$SCRATCH/bench-cp2077-$TAG-$leg.out" 2>&1 < /dev/null &
     launcher=$!
 
